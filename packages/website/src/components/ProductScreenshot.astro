@@ -1,5 +1,5 @@
 ---
-import { siteBase, type Locale } from '../lib/site';
+import type { Locale } from '../lib/site';
 import { screenshots, type Screenshot } from '../lib/screenshots';
 
 interface Props {
@@ -9,7 +9,7 @@ interface Props {
 }
 const { screenshot, locale, eager } = Astro.props;
 const image = screenshots[screenshot];
-const src = `${siteBase}screenshots/${image.file}`;
+const src = image.url;
 const caption = image[locale];
 ---
 <figure class:list={['docs-figure', { 'docs-figure-portrait': image.width < image.height }]}>
