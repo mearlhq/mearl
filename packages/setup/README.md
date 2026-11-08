@@ -46,7 +46,7 @@ npx @mearl/setup plugin install https://github.com/mearlhq/mearl --skill browser
 mearl tabs summary
 ```
 
-安装参数传给固定版本的公共 Skills CLI（当前 skills@1.5.0，兼容项目的 Node 最低版本），使用全局共享目录。公共 CLI 的默认 symlink 和复制模式都可注册；复制模式通过 list --global --json 确认本次成功结果对应的 canonical path，不猜测目录，也不扫描其他 Skills。自定义 CLI 可通过 MEARL_SKILLS_PATH 指定。参数不接受截断后置选项的 -- 分隔符。
+安装参数传给公共 Skills CLI，使用全局共享目录。默认由 `npx` 按当前 Node.js 版本解析 `skills`。公共 CLI 的默认 symlink 和复制模式都可注册；复制模式通过 list --global --json 确认本次成功结果对应的 canonical path，不猜测目录，也不扫描其他 Skills。自定义 CLI 可通过 MEARL_SKILLS_PATH 指定。参数不接受截断后置选项的 -- 分隔符。
 
 安装宿主提供的本地插件目录决定哪些能力由 preset 管理。install/update 维护目录中的托管注册，保留用户自行注册的插件。卸载最后一个依赖环境时移除托管插件与 Mearl Skill；其他环境需要时保留。配置准备、宿主同步和实际安装状态共用 [安装合同](../../docs/preset-installation.md)。
 

@@ -46,7 +46,7 @@ npx @mearl/setup plugin install https://github.com/mearlhq/mearl --skill browser
 mearl tabs summary
 ```
 
-Installation arguments pass to a pinned public Skills CLI (currently skills@1.5.0, compatible with the project's minimum Node version) using the global shared directory. Both default symlink and copy modes support registration. Copy mode uses list --global --json to confirm the canonical path for this successful install, without guessing directories or scanning other Skills. Set MEARL_SKILLS_PATH for a custom CLI. Arguments reject the -- separator, which would truncate trailing options.
+Installation arguments pass to the public Skills CLI using the global shared directory. By default, `npx` resolves `skills` for the current Node.js version. Both default symlink and copy modes support registration. Copy mode uses list --global --json to confirm the canonical path for this successful install, without guessing directories or scanning other Skills. Set MEARL_SKILLS_PATH for a custom CLI. Arguments reject the -- separator, which would truncate trailing options.
 
 The installation host's local plugin catalog determines preset-managed capabilities. install/update maintains managed registrations and preserves user registrations. Removing the last dependent environment removes managed plugins and the Mearl Skill; other dependent environments retain them. Configuration preparation, host synchronization, and actual status share the [installation contract](../../docs/preset-installation.en.md).
 

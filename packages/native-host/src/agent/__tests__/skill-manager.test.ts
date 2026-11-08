@@ -26,7 +26,12 @@ vi.mock('node:os', async importOriginal => {
 });
 
 function managerWith(run: SkillCliRunner): AgentSkillManager {
-  return new AgentSkillManager({ run, readSources: scope => [{ name: 'notebook-skill', source: 'example/skills', scope, hashKind: 'folder' }] });
+  return new AgentSkillManager({
+    run,
+    readSources: scope => [
+      { name: 'notebook-skill', source: 'example/skills', scope, hashKind: 'folder' },
+    ],
+  });
 }
 
 describe('AgentSkillManager', () => {
@@ -55,7 +60,9 @@ describe('AgentSkillManager', () => {
       expect.stringMatching(/npx(?:\.cmd)?$/),
       [
         '-y',
-        'skills@1.5.0',
+        '--package=skills',
+        '--',
+        'skills',
         'add',
         'example/skills',
         '--skill',
@@ -141,7 +148,8 @@ describe('sidebar Skill plugin registration', () => {
     const projectSkill = join(workspace, '.agents', 'skills', 'notebook-skill');
     mkdirSync(dirname(projectSkill), { recursive: true });
     const run = vi.fn<SkillCliRunner>(async (_executable, args) => {
-      if (args.includes('add') && !existsSync(projectSkill)) symlinkSync(source, projectSkill, 'dir');
+      if (args.includes('add') && !existsSync(projectSkill))
+        symlinkSync(source, projectSkill, 'dir');
       else if (args.includes('add')) {
         writeFileSync(
           join(source, 'assets', 'index.html'),
@@ -234,8 +242,12 @@ describe('sidebar Skill plugin registration', () => {
 
 it('checks source revisions without invoking the Skills check/update command', async () => {
   const run = vi.fn<SkillCliRunner>();
-  const checkUpdates = vi.fn(async () => [{ name: 'sample', scope: 'global' as const, source: 'example/skills' }]);
+  const checkUpdates = vi.fn(async () => [
+    { name: 'sample', scope: 'global' as const, source: 'example/skills' },
+  ]);
   const manager = new AgentSkillManager({ run, checkUpdates });
-  await expect(manager.checkUpdates({ providerId: 'codex' })).resolves.toEqual({ updates: [{ name: 'sample', scope: 'global', source: 'example/skills' }] });
+  await expect(manager.checkUpdates({ providerId: 'codex' })).resolves.toEqual({
+    updates: [{ name: 'sample', scope: 'global', source: 'example/skills' }],
+  });
   expect(run).not.toHaveBeenCalled();
 });

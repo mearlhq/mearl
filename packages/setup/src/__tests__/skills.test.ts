@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MEARL_SKILL_SOURCE, SKILLS_CLI_PACKAGE, parseGlobalMearlSkillPaths, resolveSkillsInvocation, runGlobalMearlSkillOperation } from '../skills.js';
+import {
+  MEARL_SKILL_SOURCE,
+  parseGlobalMearlSkillPaths,
+  resolveSkillsInvocation,
+  runGlobalMearlSkillOperation,
+} from '../skills.js';
 import type { CommandRunner } from '@mearl/daemon-core';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
@@ -20,18 +25,26 @@ it('clears the outer npm exec package selection before running the Skills CLI', 
 
   expect(invocation).toMatchObject({
     command: '/usr/bin/npx',
-    argsPrefix: ['-y', SKILLS_CLI_PACKAGE],
+    argsPrefix: ['-y', '--package=skills', '--', 'skills'],
     env: { PATH: '/usr/bin', npm_config_registry: environment.npm_config_registry },
   });
   expect(invocation?.env).not.toHaveProperty('npm_config_package');
   expect(environment.npm_config_package).toBe('@mearl/setup@3.0.0');
 });
 
-vi.mock('node:os', async original => { const os = await original<typeof import('node:os')>(); return { ...os, homedir: vi.fn(os.homedir) }; });
+vi.mock('node:os', async original => {
+  const os = await original<typeof import('node:os')>();
+  return { ...os, homedir: vi.fn(os.homedir) };
+});
 let directory: string;
-beforeEach(() => { directory = mkdtempSync(join(tmpdir(), 'mearl-public-skills-')); vi.mocked(homedir).mockReturnValue(directory); });
-afterEach(() => { rmSync(directory, { recursive: true, force: true }); vi.restoreAllMocks(); });
-
+beforeEach(() => {
+  directory = mkdtempSync(join(tmpdir(), 'mearl-public-skills-'));
+  vi.mocked(homedir).mockReturnValue(directory);
+});
+afterEach(() => {
+  rmSync(directory, { recursive: true, force: true });
+  vi.restoreAllMocks();
+});
 
 describe('parseGlobalMearlSkillPaths', () => {
   it('returns unique global mearl paths only', () => {
@@ -42,9 +55,18 @@ describe('parseGlobalMearlSkillPaths', () => {
           { name: 'mearl', scope: 'global', path: '/skills/mearl' },
           { name: 'mearl', scope: 'project', path: '/project/.skills/mearl' },
           { name: 'other', scope: 'global', path: '/skills/other' },
+          { name: 'removed', scope: 'global', path: null, status: 'missing' },
         ]),
       ),
     ).toEqual(['/skills/mearl']);
+  });
+
+  it('rejects an installed record without a path', () => {
+    expect(() =>
+      parseGlobalMearlSkillPaths(
+        JSON.stringify([{ name: 'mearl', scope: 'global', path: null, status: 'tracked' }]),
+      ),
+    ).toThrow('Skills returned an invalid skill list');
   });
 });
 
@@ -160,13 +182,21 @@ describe('runGlobalMearlSkillOperation', () => {
   });
 });
 
-
 it('rejects a Skills update failure even when the CLI exits zero', async () => {
   const runCommand = vi.fn<CommandRunner>(async (_command, args) => ({
-    code: 0, stderr: '', stdout: args[0] === 'list' ? JSON.stringify([{ name: 'mearl', path: '/skills/mearl', scope: 'global' }]) : 'Failed to update 1 skill',
+    code: 0,
+    stderr: '',
+    stdout:
+      args[0] === 'list'
+        ? JSON.stringify([{ name: 'mearl', path: '/skills/mearl', scope: 'global' }])
+        : 'Failed to update 1 skill',
   }));
-  await expect(runGlobalMearlSkillOperation('update', {
-    env: { MEARL_SKILLS_PATH: '/tools/skills' }, existsSync: () => true,
-    runCommand, writeLine: vi.fn(),
-  })).resolves.toBe(false);
+  await expect(
+    runGlobalMearlSkillOperation('update', {
+      env: { MEARL_SKILLS_PATH: '/tools/skills' },
+      existsSync: () => true,
+      runCommand,
+      writeLine: vi.fn(),
+    }),
+  ).resolves.toBe(false);
 });

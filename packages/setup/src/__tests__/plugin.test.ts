@@ -41,8 +41,16 @@ beforeEach(() => {
   directory = mkdtempSync(join(tmpdir(), 'mearl-setup-plugin-'));
   vi.stubEnv('MEARL_PLUGIN_DIR', join(directory, 'registry'));
   replaceOfficialPluginCatalog('a'.repeat(64), {
-    identity: { description: 'Identity adapter', skill: 'identity-request', installArgs: ['https://github.com/mearlhq/mearl', '--skill', 'identity-request', '--yes'] },
-    headers: { description: 'Headers adapter', skill: 'headers-request', installArgs: ['https://github.com/mearlhq/mearl', '--skill', 'headers-request', '--yes'] },
+    identity: {
+      description: 'Identity adapter',
+      skill: 'identity-request',
+      installArgs: ['https://github.com/mearlhq/mearl', '--skill', 'identity-request', '--yes'],
+    },
+    headers: {
+      description: 'Headers adapter',
+      skill: 'headers-request',
+      installArgs: ['https://github.com/mearlhq/mearl', '--skill', 'headers-request', '--yes'],
+    },
   });
   vi.mocked(homedir).mockReturnValue(directory);
   vi.mocked(ensurePluginRuntime).mockResolvedValue(undefined);
@@ -84,14 +92,20 @@ it('registers a directory or custom entry and validates before rebinding', async
 });
 
 it('awaits Skill setup before registration and retries failed setup', async () => {
-  writeFileSync(entry, `export const name = 'sample';
+  writeFileSync(
+    entry,
+    `export const name = 'sample';
 export async function setup({runCommand}) { const result = await runCommand('node', ['prepare-dependencies']); if (result.code) throw new Error(result.stderr); }
-export default app => app.command('hello', () => 'ready');`);
+export default app => app.command('hello', () => 'ready');`,
+  );
   const failure = vi.fn().mockResolvedValue({ code: 1, stdout: '', stderr: 'Registry offline' });
   await expect(setupPlugin(directory, undefined, failure)).rejects.toThrow('Registry offline');
   expect(findPluginRegistration('sample')).toBeUndefined();
   const runner = vi.fn().mockResolvedValue({ code: 0, stdout: '', stderr: '' });
-  await expect(setupPlugin(directory, undefined, runner)).resolves.toEqual({ name: 'sample', entry });
+  await expect(setupPlugin(directory, undefined, runner)).resolves.toEqual({
+    name: 'sample',
+    entry,
+  });
   expect(runner).toHaveBeenCalledTimes(1);
   expect(findPluginRegistration('sample')?.entry).toBe(entry);
 });
@@ -378,7 +392,7 @@ it('only runs add, forces global scope, and registers new default and named entr
   expect(await installPlugins(args, runner)).toBe(0);
   expect(runner).toHaveBeenCalledExactlyOnceWith(
     expect.stringMatching(/npx(?:\.cmd)?$/),
-    ['-y', 'skills@1.5.0', 'add', ...args, '--global'],
+    ['-y', '--package=skills', '--', 'skills', 'add', ...args, '--global'],
     expect.objectContaining({ env: expect.any(Object), tee: true }),
   );
   expect(ensurePluginRuntime).toHaveBeenCalledExactlyOnceWith(runner);
@@ -430,7 +444,9 @@ it('installs an official plugin by catalog name and records official ownership',
   await expect(ensureOfficialPlugin('identity', runner)).resolves.toBe('installed');
   expect(runner.mock.calls[0][1]).toEqual([
     '-y',
-    'skills@1.5.0',
+    '--package=skills',
+    '--',
+    'skills',
     'add',
     'https://github.com/mearlhq/mearl',
     '--skill',
@@ -457,7 +473,9 @@ it('installs Headers only when its official plugin is requested', async () => {
   await expect(ensureOfficialPlugin('headers', runner)).resolves.toBe('installed');
   expect(runner.mock.calls[0][1]).toEqual([
     '-y',
-    'skills@1.5.0',
+    '--package=skills',
+    '--',
+    'skills',
     'add',
     'https://github.com/mearlhq/mearl',
     '--skill',
@@ -556,7 +574,12 @@ it('installs a profile-only plugin without a toolbox contribution', async () => 
 it('registers copied Skills through the canonical path in the JSON list', async () => {
   const path = join(directory, '.agents', 'skills', 'copied');
   const runner = vi.fn(async (_command: string, args: string[]) => {
-    if (args.includes('list')) return { code: 0, stdout: JSON.stringify([{ name: 'copied', path, scope: 'global' }]), stderr: '' };
+    if (args.includes('list'))
+      return {
+        code: 0,
+        stdout: JSON.stringify([{ name: 'copied', path, scope: 'global' }]),
+        stderr: '',
+      };
     installSkill('copied');
     return { code: 0, stdout: 'Installed 1 skill\n│ ✓ copied (copied)\n└ Done', stderr: '' };
   });
@@ -568,12 +591,19 @@ it('registers copied Skills through the canonical path in the JSON list', async 
 it('rejects an unconfirmed or escaped copied Skill without registering anything', async () => {
   const report = 'Installed 1 skill\n│ ✓ copied (copied)\n└ Done';
   expect(() => parseInstalledPluginPaths(report)).toThrow('JSON');
-  expect(() => parseInstalledPluginPaths(report, [{ name: 'copied', path: '/outside/copied', scope: 'global' }])).toThrow('全局');
-  const runner = vi.fn(async (_command: string, args: string[]) => ({ code: 0, stdout: args.includes('list') ? '[]' : report, stderr: '' }));
+  expect(() =>
+    parseInstalledPluginPaths(report, [
+      { name: 'copied', path: '/outside/copied', scope: 'global' },
+    ]),
+  ).toThrow('全局');
+  const runner = vi.fn(async (_command: string, args: string[]) => ({
+    code: 0,
+    stdout: args.includes('list') ? '[]' : report,
+    stderr: '',
+  }));
   await expect(installPlugins(['./copied', '--yes'], runner)).rejects.toThrow('JSON');
   expect(findPluginEntry('copied')).toBeUndefined();
 });
-
 
 it('uses an explicit Skills CLI for plugin installation', async () => {
   const cli = join(directory, 'skills');
@@ -581,8 +611,14 @@ it('uses an explicit Skills CLI for plugin installation', async () => {
   const { chmodSync } = await import('node:fs');
   chmodSync(cli, 0o700);
   const runner = vi.fn(async () => ({ code: 0, stdout: 'Installation cancelled', stderr: '' }));
-  await expect(installPlugins(['source'], runner, { env: { MEARL_SKILLS_PATH: cli } })).resolves.toBe(0);
-  expect(runner).toHaveBeenCalledWith(cli, ['add', 'source', '--global'], expect.objectContaining({ tee: true }));
+  await expect(
+    installPlugins(['source'], runner, { env: { MEARL_SKILLS_PATH: cli } }),
+  ).resolves.toBe(0);
+  expect(runner).toHaveBeenCalledWith(
+    cli,
+    ['add', 'source', '--global'],
+    expect.objectContaining({ tee: true }),
+  );
 });
 
 it('keeps a user alias and shared Skill source during managed uninstall', async () => {
@@ -593,13 +629,16 @@ it('keeps a user alias and shared Skill source during managed uninstall', async 
   registerPlugin('managed', sharedEntry, undefined, { managedBy: OFFICIAL_PLUGIN_MANAGER });
   registerPlugin('my-alias', sharedEntry);
   const runner = vi.fn(async () => ({ code: 0, stdout: '', stderr: '' }));
-  await expect(uninstallPlugin('managed', runner, { preserveRegistrationsOutsideManager: OFFICIAL_PLUGIN_MANAGER })).resolves.toEqual({ removed: true, unregisteredNames: ['managed'] });
+  await expect(
+    uninstallPlugin('managed', runner, {
+      preserveRegistrationsOutsideManager: OFFICIAL_PLUGIN_MANAGER,
+    }),
+  ).resolves.toEqual({ removed: true, unregisteredNames: ['managed'] });
   expect(runner).not.toHaveBeenCalled();
   expect(findPluginRegistration('managed')).toBeUndefined();
   expect(findPluginEntry('my-alias')).toBe(sharedEntry);
   expect(existsSync(sharedEntry)).toBe(true);
 });
-
 
 it('does not replace a user registration in a managed multi-Skill install', async () => {
   registerPlugin('sample', entry);
@@ -607,93 +646,181 @@ it('does not replace a user registration in a managed multi-Skill install', asyn
     installSkill('sample');
     return { code: 0, stdout: report('sample'), stderr: '' };
   });
-  await installPlugins(['source', '--yes'], runner, { registrationManagedBy: OFFICIAL_PLUGIN_MANAGER });
+  await installPlugins(['source', '--yes'], runner, {
+    registrationManagedBy: OFFICIAL_PLUGIN_MANAGER,
+  });
   expect(findPluginEntry('sample')).toBe(entry);
   expect(findPluginRegistration('sample')?.managedBy).toBeUndefined();
 });
 
-
-it.each(['Failed to remove 1 skill(s)', ''])('retains registrations when a zero-exit removal leaves the Skill present (%s)', async output => {
-  const managedEntry = installSkill('sample');
-  registerPlugin('sample', managedEntry, undefined, { managedBy: OFFICIAL_PLUGIN_MANAGER });
-  const runner = vi.fn(async () => ({ code: 0, stdout: output, stderr: '' }));
-  await expect(uninstallPlugin('sample', runner)).rejects.toThrow('注册已保留');
-  expect(findPluginEntry('sample')).toBe(managedEntry);
-  expect(existsSync(managedEntry)).toBe(true);
-});
+it.each(['Failed to remove 1 skill(s)', ''])(
+  'retains registrations when a zero-exit removal leaves the Skill present (%s)',
+  async output => {
+    const managedEntry = installSkill('sample');
+    registerPlugin('sample', managedEntry, undefined, { managedBy: OFFICIAL_PLUGIN_MANAGER });
+    const runner = vi.fn(async () => ({ code: 0, stdout: output, stderr: '' }));
+    await expect(uninstallPlugin('sample', runner)).rejects.toThrow('注册已保留');
+    expect(findPluginEntry('sample')).toBe(managedEntry);
+    expect(existsSync(managedEntry)).toBe(true);
+  },
+);
 
 it('keeps plugin installation, registration and removal on the locally selected manager', async () => {
   const { createHash } = await import('node:crypto');
   const { prepareCapabilitySnapshot } = await import('@mearl/preset');
   const folder = join(directory, '.mearl', 'capabilities');
   mkdirSync(join(folder, 'objects'), { recursive: true });
-  const source = 'module.exports=host=>({manager:()=>({id:"workspace-skills",cli:(args,options)=>host.runCommand("private-cli",args,options)})})';
+  const source =
+    'module.exports=host=>({manager:()=>({id:"workspace-skills",cli:(args,options)=>host.runCommand("private-cli",args,options)})})';
   const sha256 = createHash('sha256').update(source).digest('hex');
   writeFileSync(join(folder, 'objects', sha256 + '.cjs'), source);
-  const snapshot = await prepareCapabilitySnapshot({ schemaVersion: 1, modules: { manager: { sha256, byteLength: Buffer.byteLength(source) } }, bindings: { 'skills.manager': { module: 'manager', handler: 'manager' } } });
+  const snapshot = await prepareCapabilitySnapshot({
+    schemaVersion: 1,
+    modules: { manager: { sha256, byteLength: Buffer.byteLength(source) } },
+    bindings: { 'skills.manager': { module: 'manager', handler: 'manager' } },
+  });
   writeFileSync(join(folder, 'active-node.json'), JSON.stringify(snapshot));
   const runner = vi.fn(async (_command: string, args: string[]) => {
-    if (args[0] === 'add') { installSkill('sample'); return { code: 0, stdout: report('sample'), stderr: '' }; }
+    if (args[0] === 'add') {
+      installSkill('sample');
+      return { code: 0, stdout: report('sample'), stderr: '' };
+    }
     rmSync(join(directory, '.agents', 'skills', 'sample'), { recursive: true, force: true });
     return { code: 0, stdout: '', stderr: '' };
   });
-  expect(await installPlugins(['https://github.com/example/skills', '--skill', 'sample'], runner)).toBe(0);
+  expect(
+    await installPlugins(['https://github.com/example/skills', '--skill', 'sample'], runner),
+  ).toBe(0);
   expect(findPluginRegistration('sample')?.managedBy).toBe('workspace-skills');
-  expect(runner).toHaveBeenCalledWith('private-cli', ['add', 'https://github.com/example/skills', '--skill', 'sample', '--global'], { tee: true });
+  expect(runner).toHaveBeenCalledWith(
+    'private-cli',
+    ['add', 'https://github.com/example/skills', '--skill', 'sample', '--global'],
+    { tee: true },
+  );
   expect((await uninstallPlugin('sample', runner)).removed).toBe(true);
-  expect(runner).toHaveBeenLastCalledWith('private-cli', ['remove', 'sample', '--global', '--yes'], { tee: true });
+  expect(runner).toHaveBeenLastCalledWith(
+    'private-cli',
+    ['remove', 'sample', '--global', '--yes'],
+    { tee: true },
+  );
 });
 
 it('retains completed files but refuses registration when the accepted catalog changes during installation', async () => {
   const runner = vi.fn(async () => {
-    installSkill('identity-request', 'export const name="identity"; export default app=>app.command("whoami",()=>({}));');
+    installSkill(
+      'identity-request',
+      'export const name="identity"; export default app=>app.command("whoami",()=>({}));',
+    );
     replaceOfficialPluginCatalog('b'.repeat(64), {});
     return { code: 0, stdout: report('identity-request'), stderr: '' };
   });
-  await expect(ensureOfficialPlugin('identity', runner)).rejects.toThrow('CATALOG_SELECTION_CHANGED');
+  await expect(ensureOfficialPlugin('identity', runner)).rejects.toThrow(
+    'CATALOG_SELECTION_CHANGED',
+  );
   expect(findPluginRegistration('identity')).toBeUndefined();
-  expect(existsSync(join(directory, '.agents', 'skills', 'identity-request', 'SKILL.md'))).toBe(true);
+  expect(existsSync(join(directory, '.agents', 'skills', 'identity-request', 'SKILL.md'))).toBe(
+    true,
+  );
 });
 
 async function selectManagedIdentity(migrateFrom?: string[]) {
   const source = 'https://github.com/example/skills#stable';
-  const prepared = await preparePreset('https://fixture.test/preset.json', { mearlApiVersion: '1.0.0', load: async () => Buffer.from(JSON.stringify({ schemaVersion: 1, id: 'team', version: '1.0.0', skills: { 'identity-request': { source, version: '^3', ...(migrateFrom ? { migrateFrom } : {}) } } })) });
+  const prepared = await preparePreset('https://fixture.test/preset.json', {
+    mearlApiVersion: '1.0.0',
+    load: async () =>
+      Buffer.from(
+        JSON.stringify({
+          schemaVersion: 1,
+          id: 'team',
+          version: '1.0.0',
+          skills: {
+            'identity-request': { source, version: '^3', ...(migrateFrom ? { migrateFrom } : {}) },
+          },
+        }),
+      ),
+  });
   const folder = join(directory, '.mearl', 'capabilities');
   const store = new PresetInstallationStore({ directory: folder });
   const receipt = await store.apply(prepared, { expectedRevision: null });
   const current = await store.current();
-  replaceOfficialPluginCatalog(receipt.revision, { identity: { description: 'Identity', skill: 'identity-request', installArgs: [source, '--skill', 'identity-request', '--yes'] } }, { path: join(folder, 'active-node.json'), sha256: current.rawHash! });
+  replaceOfficialPluginCatalog(
+    receipt.revision,
+    {
+      identity: {
+        description: 'Identity',
+        skill: 'identity-request',
+        installArgs: [source, '--skill', 'identity-request', '--yes'],
+      },
+    },
+    { path: join(folder, 'active-node.json'), sha256: current.rawHash! },
+  );
   return { source, folder };
 }
 
 it.each([
-  { source: 'https://github.com/example/skills', ref: 'stable', version: '3.1.0', error: undefined },
-  { source: 'https://github.com/example/skills', ref: 'other', version: '3.1.0', error: 'SKILL_SOURCE_CONFLICT' },
-  { source: 'https://github.com/example/other', ref: 'stable', version: '3.1.0', error: 'SKILL_SOURCE_CONFLICT' },
-  { source: 'https://github.com/example/skills', ref: 'stable', version: '2.9.0', error: 'SKILL_VERSION_REQUIRED' },
-])('verifies the selected source, ref and version before registering a preset alias ($ref, $version, $source)', async ({ source, ref, version, error }) => {
-  await selectManagedIdentity();
-  // The caller's state directory also owns its manager's existing source receipt.
-  vi.stubEnv('XDG_STATE_HOME', join(directory, 'state'));
-  const runner = vi.fn(async () => {
-    const installed = installSkill('identity-request', 'export const name="identity"; export default app=>app.command("whoami",()=>({}));');
-    writeFileSync(join(dirname(dirname(installed)), 'SKILL.md'), `---\nname: identity-request\nversion: ${version}\n---\n`);
-    const state = join(directory, 'state', 'skills');
-    mkdirSync(state, { recursive: true });
-    writeFileSync(join(state, '.skill-lock.json'), JSON.stringify({ skills: { 'identity-request': { sourceUrl: source, sourceType: 'github', ref } } }));
-    return { code: 0, stdout: report('identity-request'), stderr: '' };
-  });
-  if (error) {
-    await expect(ensureOfficialPlugin('identity', runner)).rejects.toThrow(error);
-    expect(findPluginRegistration('identity')).toBeUndefined();
-    expect(ensurePluginRuntime).not.toHaveBeenCalled();
-  } else {
-    await expect(ensureOfficialPlugin('identity', runner)).resolves.toBe('installed');
-    expect(findPluginRegistration('identity')?.managedBy).toBe(OFFICIAL_PLUGIN_MANAGER);
-  }
-  expect(existsSync(join(directory, '.agents', 'skills', 'identity-request', 'SKILL.md'))).toBe(true);
-  expect(existsSync(join(directory, '.agents', '.mearl-preset-install.json'))).toBe(false);
-});
+  {
+    source: 'https://github.com/example/skills',
+    ref: 'stable',
+    version: '3.1.0',
+    error: undefined,
+  },
+  {
+    source: 'https://github.com/example/skills',
+    ref: 'other',
+    version: '3.1.0',
+    error: 'SKILL_SOURCE_CONFLICT',
+  },
+  {
+    source: 'https://github.com/example/other',
+    ref: 'stable',
+    version: '3.1.0',
+    error: 'SKILL_SOURCE_CONFLICT',
+  },
+  {
+    source: 'https://github.com/example/skills',
+    ref: 'stable',
+    version: '2.9.0',
+    error: 'SKILL_VERSION_REQUIRED',
+  },
+])(
+  'verifies the selected source, ref and version before registering a preset alias ($ref, $version, $source)',
+  async ({ source, ref, version, error }) => {
+    await selectManagedIdentity();
+    // The caller's state directory also owns its manager's existing source receipt.
+    vi.stubEnv('XDG_STATE_HOME', join(directory, 'state'));
+    const runner = vi.fn(async () => {
+      const installed = installSkill(
+        'identity-request',
+        'export const name="identity"; export default app=>app.command("whoami",()=>({}));',
+      );
+      writeFileSync(
+        join(dirname(dirname(installed)), 'SKILL.md'),
+        `---\nname: identity-request\nversion: ${version}\n---\n`,
+      );
+      const state = join(directory, 'state', 'skills');
+      mkdirSync(state, { recursive: true });
+      writeFileSync(
+        join(state, '.skill-lock.json'),
+        JSON.stringify({
+          skills: { 'identity-request': { sourceUrl: source, sourceType: 'github', ref } },
+        }),
+      );
+      return { code: 0, stdout: report('identity-request'), stderr: '' };
+    });
+    if (error) {
+      await expect(ensureOfficialPlugin('identity', runner)).rejects.toThrow(error);
+      expect(findPluginRegistration('identity')).toBeUndefined();
+      expect(ensurePluginRuntime).not.toHaveBeenCalled();
+    } else {
+      await expect(ensureOfficialPlugin('identity', runner)).resolves.toBe('installed');
+      expect(findPluginRegistration('identity')?.managedBy).toBe(OFFICIAL_PLUGIN_MANAGER);
+    }
+    expect(existsSync(join(directory, '.agents', 'skills', 'identity-request', 'SKILL.md'))).toBe(
+      true,
+    );
+    expect(existsSync(join(directory, '.agents', '.mearl-preset-install.json'))).toBe(false);
+  },
+);
 
 it('refuses on-demand installation while the preset batch owns the global Skills directory', async () => {
   const lease = claimPresetInstallation();
@@ -701,38 +828,77 @@ it('refuses on-demand installation while the preset batch owns the global Skills
   try {
     await expect(ensureOfficialPlugin('identity', runner)).rejects.toThrow('PRESET_INSTALL_BUSY');
     expect(runner).not.toHaveBeenCalled();
-  } finally { lease.release(); }
+  } finally {
+    lease.release();
+  }
 });
 
 it('keeps the preset lease through an on-demand command and releases it on failure', async () => {
   let started!: () => void;
   let finish!: () => void;
-  const entered = new Promise<void>(resolve => { started = resolve; });
-  const gate = new Promise<void>(resolve => { finish = resolve; });
-  const runner = vi.fn(async () => { started(); await gate; return { code: 7, stdout: '', stderr: '' }; });
+  const entered = new Promise<void>(resolve => {
+    started = resolve;
+  });
+  const gate = new Promise<void>(resolve => {
+    finish = resolve;
+  });
+  const runner = vi.fn(async () => {
+    started();
+    await gate;
+    return { code: 7, stdout: '', stderr: '' };
+  });
   const running = ensureOfficialPlugin('identity', runner);
   await entered;
-  try { expect(() => claimPresetInstallation()).toThrow('PRESET_INSTALL_BUSY'); }
-  finally { finish(); }
+  try {
+    expect(() => claimPresetInstallation()).toThrow('PRESET_INSTALL_BUSY');
+  } finally {
+    finish();
+  }
   await expect(running).rejects.toThrow('exit 7');
   const lease = claimPresetInstallation();
   lease.release();
 });
 
-
 it('migrates an existing setup registration on demand and retains disabled state', async () => {
   const { source } = await selectManagedIdentity(['https://github.com/example/skills']);
-  const target = installSkill('identity-request', 'export const name="identity"; export default app=>app.command("whoami",()=>({}));');
+  const target = installSkill(
+    'identity-request',
+    'export const name="identity"; export default app=>app.command("whoami",()=>({}));',
+  );
   const manifest = join(dirname(dirname(target)), 'SKILL.md');
   writeFileSync(manifest, '---\nname: identity-request\nversion: 2.0.0\n---\n');
   renameSync(manifest, manifest + '.mearl-disabled');
   const lock = join(directory, '.agents/.skill-lock.json');
-  writeFileSync(lock, JSON.stringify({ skills: { 'identity-request': { sourceUrl: 'https://github.com/example/skills', sourceType: 'github' } } }));
+  writeFileSync(
+    lock,
+    JSON.stringify({
+      skills: {
+        'identity-request': {
+          sourceUrl: 'https://github.com/example/skills',
+          sourceType: 'github',
+        },
+      },
+    }),
+  );
   registerPlugin('identity', target, undefined, { managedBy: OFFICIAL_PLUGIN_MANAGER });
   const runner = vi.fn(async () => {
-    installSkill('identity-request', 'export const name="identity"; export default app=>app.command("whoami",()=>({}));');
+    installSkill(
+      'identity-request',
+      'export const name="identity"; export default app=>app.command("whoami",()=>({}));',
+    );
     writeFileSync(manifest, '---\nname: identity-request\nversion: 3.1.0\n---\n');
-    writeFileSync(lock, JSON.stringify({ skills: { 'identity-request': { sourceUrl: 'https://github.com/example/skills', sourceType: 'github', ref: 'stable' } } }));
+    writeFileSync(
+      lock,
+      JSON.stringify({
+        skills: {
+          'identity-request': {
+            sourceUrl: 'https://github.com/example/skills',
+            sourceType: 'github',
+            ref: 'stable',
+          },
+        },
+      }),
+    );
     return { code: 0, stdout: report('identity-request'), stderr: '' };
   });
   await expect(ensureOfficialPlugin('identity', runner)).resolves.toBe('installed');
@@ -741,19 +907,39 @@ it('migrates an existing setup registration on demand and retains disabled state
   expect(existsSync(manifest + '.mearl-disabled')).toBe(true);
   await expect(ensureOfficialPlugin('identity', runner)).resolves.toBe('existing');
   expect(runner).toHaveBeenCalledOnce();
-  expect(runner.mock.calls[0]).toEqual(expect.arrayContaining([expect.any(String), expect.arrayContaining([source])]));
+  expect(runner.mock.calls[0]).toEqual(
+    expect.arrayContaining([expect.any(String), expect.arrayContaining([source])]),
+  );
 });
 
 it('rechecks migration ownership after confirmation before invoking an external installer', async () => {
   const { source } = await selectManagedIdentity(['https://github.com/example/skills']);
-  const target = installSkill('identity-request', 'export const name="identity"; export default app=>app.command("whoami",()=>({}));');
-  writeFileSync(join(directory, '.agents/.skill-lock.json'), JSON.stringify({ skills: { 'identity-request': { sourceUrl: 'https://github.com/example/skills', sourceType: 'github' } } }));
+  const target = installSkill(
+    'identity-request',
+    'export const name="identity"; export default app=>app.command("whoami",()=>({}));',
+  );
+  writeFileSync(
+    join(directory, '.agents/.skill-lock.json'),
+    JSON.stringify({
+      skills: {
+        'identity-request': {
+          sourceUrl: 'https://github.com/example/skills',
+          sourceType: 'github',
+        },
+      },
+    }),
+  );
   registerPlugin('identity', target, undefined, { managedBy: OFFICIAL_PLUGIN_MANAGER });
   const runner = vi.fn();
-  await expect(installPlugins([source, '--skill', 'identity-request', '--yes'], runner, {
-    expectedSkill: 'identity-request', registrationManagedBy: OFFICIAL_PLUGIN_MANAGER,
-    confirm: () => { registerPlugin('identity', target); },
-  })).rejects.toThrow('SKILL_SOURCE_CONFLICT');
+  await expect(
+    installPlugins([source, '--skill', 'identity-request', '--yes'], runner, {
+      expectedSkill: 'identity-request',
+      registrationManagedBy: OFFICIAL_PLUGIN_MANAGER,
+      confirm: () => {
+        registerPlugin('identity', target);
+      },
+    }),
+  ).rejects.toThrow('SKILL_SOURCE_CONFLICT');
   expect(runner).not.toHaveBeenCalled();
   expect(findPluginRegistration('identity')?.managedBy).toBeUndefined();
 });
