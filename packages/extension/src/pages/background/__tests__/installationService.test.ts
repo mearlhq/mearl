@@ -160,7 +160,6 @@ beforeEach(() => {
       schemaVersion: 1,
       guide: {
         url: 'https://guide.example.test/installed.html',
-        registry: 'https://registry.example.test/',
       },
       presets: {
         team: {

@@ -21,19 +21,24 @@ Lead with the reader's outcome, group the key capabilities or decisions that sup
 
 ## Deployment configuration
 
-Set `MEARL_INSTALLATION_CONFIG_FILE` to an absolute JSON file path when building the website:
+Set `MEARL_INSTALLATION_CONFIG` to the installation catalog JSON when building the website. To read it from a local file, run:
+
+```sh
+MEARL_INSTALLATION_CONFIG="$(cat /path/to/installation.json)" pnpm build:website
+```
+
+The catalog uses this format:
 
 ```json
 {
   "schemaVersion": 1,
   "guide": {
-    "url": "https://guide.example.test/installed.html",
-    "registry": "https://registry.example.test/"
+    "url": "https://guide.example.test/installed.html"
   }
 }
 ```
 
-The guide and npm registry must use HTTPS origins distinct from the public website. The registry is a directory URL without a query or fragment; it need not share the guide origin. The site redirects only to the configured guide URL after a successful npm ping; URL parameters and ping responses cannot supply a destination, command or plugin source.
+The guide URL must use an HTTPS origin distinct from the public website. The welcome page sends a cross-origin `HEAD` request to the configured URL and navigates there with `location.replace` when the request resolves.
 
 Set the Pages deployment source to GitHub Actions. The `Deploy installation website` workflow runs automatically when a push to `main` changes the website code, build dependencies, reference documents rendered on the site, or deployment configuration. Other pushes skip the website workflow. You can also run it manually after updating the repository secret.
 
@@ -41,10 +46,8 @@ The workflow reads the optional repository secret `MEARL_INSTALLATION_CONFIG`, v
 
 ## Environment detection
 
-The page checks the registry's standard `-/ping` endpoint and requires a successful JSON response with `pong: true`. The registry must allow the configured website origin via CORS. No dedicated guide probe page or frame protocol is needed. This is the browser equivalent of the existing setup environment check using `npm ping`; the npm registry used for downloads remains a separate installation concern.
+The probe uses `no-cors` mode, follows redirects, omits credentials, disables caching, and includes a fresh query value. The welcome page treats an opaque response as a signal of network reachability. The browser hides the HTTP status and response contents. The public welcome page stays visible if the probe fails, receives no final response within five seconds, or cannot run silently.
 
-Requests omit credentials, refuse redirects, disable cache and carry a fresh query value. Responses are bounded to 4 KiB. Login HTML, fallback JSON, CORS failures, redirects and failed requests keep the public guide visible. A successful ping determines network reachability, not account identity or authorization; the redirect destination is always the configured guide URL.
-
-The welcome page automatically probes the registry when Local Network Access is already granted. Without a grant, browsers that support Permissions Policy probe from a frame with local network access disabled. This also supports HTTPS registries reached through a proxy. Other browsers with address-space controls only probe public IP space automatically. Click **Check guide connection** when local network access is required. The network deadline is five seconds. A pending permission request has a separate, cancellable 120-second deadline. A retry creates a new request, and navigation releases the current attempt. The direct guide link and local instructions remain available.
+The welcome page automatically probes the guide URL when Local Network Access is already granted. Without a grant, browsers that support Permissions Policy probe from a frame with local network access disabled. This also supports HTTPS guides reached through a proxy. Other browsers with address-space controls only probe public IP space. Leaving the page cancels the probe.
 
 This website is an installation entry point. Installed capability packages must continue working without keeping the website open or online. The web-to-extension installation bridge is a separate integration step.

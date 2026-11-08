@@ -5,7 +5,6 @@ const catalog = {
   schemaVersion: 1,
   guide: {
     url: 'https://guide.example.test/installed.html',
-    registry: 'https://registry.example.test/',
   },
   presets: {
     one: { label: 'First', source: 'https://assets.example.test/one.json', origins: [] },
@@ -28,7 +27,7 @@ beforeEach(() => {
         new Response(JSON.stringify(catalog), { headers: { 'content-type': 'application/json' } }),
     ),
   );
-  send = vi.fn((_id, input, callback) => callback({ success: true, data: { connected: true } }));
+  send = vi.fn((_id, _input, callback) => callback({ success: true, data: { connected: true } }));
   vi.stubGlobal('chrome', { runtime: { sendMessage: send } });
 });
 afterEach(() => {
@@ -132,42 +131,7 @@ it('replays the latest parent selection after a live open, including switching b
   }
 });
 
-it('reports the detected extension version only to the configured guide parent', async () => {
-  const parent = { postMessage: vi.fn() };
-  const original = Object.getOwnPropertyDescriptor(window, 'parent');
-  Object.defineProperty(window, 'parent', { configurable: true, get: () => parent });
-  document.querySelector<HTMLElement>('[data-installation-bridge]')!.dataset.embedded = 'true';
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe() {}
-      disconnect() {}
-    },
-  );
-  send.mockImplementation((_id, _input, callback) =>
-    callback({ success: true, data: { connected: true, version: '3.0.0-beta.5' } }),
-  );
-  try {
-    await initInstallationBridge();
-    window.dispatchEvent(
-      new MessageEvent('message', {
-        origin: 'https://guide.example.test',
-        source: parent as any,
-        data: { type: 'mearl-installation-select', schemaVersion: 1, presetId: 'one' },
-      }),
-    );
-    await flush();
-    expect(parent.postMessage).toHaveBeenCalledWith(
-      { type: 'mearl-installation-status', schemaVersion: 1, version: '3.0.0-beta.5' },
-      'https://guide.example.test',
-    );
-  } finally {
-    window.dispatchEvent(new Event('pagehide'));
-    if (original) Object.defineProperty(window, 'parent', original);
-  }
-});
-
-it.each([true, false])(
+it.each([true, false, undefined])(
   'checks for initial installation only on the embedded guide when browserReady is %s',
   async browserReady => {
     const parent = { postMessage: vi.fn() };
@@ -183,9 +147,9 @@ it.each([true, false])(
     );
     send.mockImplementation((_id, input, callback) =>
       callback(
-        input.operation === 'status'
+        input.operation === 'status' && browserReady !== undefined
           ? { success: true, data: { connected: true, browserReady } }
-          : { success: false, error: 'INVALID_INSTALLATION_REQUEST' },
+          : { success: false, error: 'INSTALLATION_SOURCE_DENIED' },
       ),
     );
     const select = (presetId: string) =>
@@ -203,9 +167,19 @@ it.each([true, false])(
       select('two');
       await flush();
       expect(send.mock.calls.map(([, input]) => input.operation)).toEqual(
-        browserReady ? ['status', 'status'] : ['status', 'openIfMissing', 'status'],
+        browserReady === false ? ['status', 'openIfMissing', 'status'] : ['status', 'status'],
       );
       expect(button().disabled).toBe(false);
+      const status = document.querySelector('[data-bridge-status]')!;
+      if (browserReady === undefined) expect(status.textContent).toBe('');
+      else expect(status.textContent).not.toContain('不可用');
+
+      const click = new MouseEvent('click');
+      Object.defineProperty(click, 'isTrusted', { value: true });
+      button().dispatchEvent(click);
+      await flush();
+      expect(send.mock.calls.at(-1)![1]).toMatchObject({ operation: 'open', presetId: 'two' });
+      expect(status.textContent).toContain('当前安装配置不可用');
     } finally {
       window.dispatchEvent(new Event('pagehide'));
       if (original) Object.defineProperty(window, 'parent', original);

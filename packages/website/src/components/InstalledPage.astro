@@ -27,10 +27,6 @@ const common = siteCopy[locale];
         </div>
         <div class="hero-actions"><a class="button button-primary" href={sitePath(locale, 'extension') + '#toolbox'}>{common.extensionTry}</a><a class="button button-secondary" href={sitePath(locale, 'installation') + '#agent'}>{common.agentInstall}</a></div>
       </header>
-      <div class="guide-status" data-guide data-config-url={`${siteBase}installation.json`} hidden>
-        <p role="status" aria-live="polite" data-guide-status></p>
-        <div class="guide-actions"><button class="button button-secondary" type="button" data-guide-detect>{t.detect}</button><button class="button button-secondary" type="button" data-guide-cancel hidden>{t.cancel}</button><a class="text-link" data-guide-link>{t.openGuide} <ArrowUpRight size={13} aria-hidden="true" /></a></div>
-      </div>
       <div class="start-grid installed-steps" role="list" aria-label={common.start}>
         <article role="listitem">
           <span>POPUP</span>
@@ -65,12 +61,13 @@ const common = siteCopy[locale];
   </div>
 </BaseLayout>
 
+<script>
+  import { initGuide } from '../scripts/welcome-guide';
+  void initGuide();
+  window.addEventListener('pageshow', event => { if (event.persisted) void initGuide(); });
+</script>
+
 <style>
-  .guide-status { margin-bottom: 24px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-soft); }
-  .guide-status[hidden], .guide-status [hidden] { display: none; }
-  .guide-status p { margin: 0 0 8px; color: var(--muted); font-size: var(--text-small); }
-  .guide-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-  .guide-actions .button { min-height: 32px; padding: 6px 10px; font-size: var(--text-small); }
   .installed-role-link { display: inline-flex; align-items: center; gap: 5px; color: var(--blue); text-decoration: none; }
   .installed-role-link:hover { color: var(--blue-hover); }
   .installed-page { min-height: var(--hero-viewport-height); }

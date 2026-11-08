@@ -14,8 +14,8 @@ export const installationBridgeCopy = {
     ready: '浏览器能力已启用，可再次点击更新配置。',
     connected: '连接成功，点击后在 Mearl 中完成启用。',
     update: '更新能力',
-    disconnectedEmbedded: '未连接到扩展，可以打开连接页继续。',
     disconnected: '尚未连接到 Mearl，请确认已安装并启用扩展，然后重试。',
+    configurationUnavailable: '当前安装配置不可用，请刷新页面后重试。',
     reconnect: '重新连接',
     missingGuide: '安装引导未配置',
     opening: '正在打开 Mearl 安装视图…',
@@ -39,8 +39,10 @@ export const installationBridgeCopy = {
     ready: 'Browser capabilities are enabled. You can update the configuration here.',
     connected: 'Connected. Continue in Mearl to enable capabilities.',
     update: 'Update capabilities',
-    disconnectedEmbedded: 'Could not connect to the extension. Open the connection page to continue.',
-    disconnected: 'Could not connect to Mearl. Check that the extension is installed and enabled, then retry.',
+    disconnected:
+      'Could not connect to Mearl. Check that the extension is installed and enabled, then retry.',
+    configurationUnavailable:
+      'This installation configuration is unavailable. Refresh the page and try again.',
     reconnect: 'Reconnect',
     missingGuide: 'The setup guide is not configured',
     opening: 'Opening Mearl setup…',

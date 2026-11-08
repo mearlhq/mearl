@@ -171,8 +171,3 @@ document.querySelectorAll('[data-copy-target]').forEach(button => {
     }, 1600);
   });
 });
-
-
-import { initGuide } from './welcome-guide';
-void initGuide();
-window.addEventListener('pageshow', event => { if (event.persisted) void initGuide(); });

@@ -1,1 +1,1 @@
-export { parseInstallationConfig, loadInstallationConfig, readInstallationJson as readJsonResponse } from '@mearl/preset/installation';
+export { parseInstallationConfig, loadInstallationConfig } from '@mearl/preset/installation';

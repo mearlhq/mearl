@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { defineConfig } from 'astro/config';
 import { satteri } from '@astrojs/markdown-satteri';
+import { INSTALLATION_CONFIG_MAX_BYTES } from '@mearl/preset/installation';
 import { parseInstallationConfig } from './src/lib/installation.mjs';
 import { referenceLinksPlugin } from './src/lib/reference-links.mjs';
 
@@ -9,10 +10,9 @@ const siteUrl = new URL(site);
 if (siteUrl.protocol !== 'https:' || siteUrl.username || siteUrl.password || siteUrl.search || siteUrl.hash || !siteUrl.pathname.endsWith('/')) {
   throw new Error('Installation site must be an HTTPS directory URL');
 }
-const configFile = process.env.MEARL_INSTALLATION_CONFIG_FILE;
-const source = configFile ? readFileSync(configFile) : Buffer.from('{"schemaVersion":1}');
-if (source.byteLength > 65_536) throw new Error('Installation configuration is too large');
-const installation = parseInstallationConfig(JSON.parse(source.toString('utf8')), siteUrl.origin);
+const source = process.env.MEARL_INSTALLATION_CONFIG || '{"schemaVersion":1}';
+if (Buffer.byteLength(source) > INSTALLATION_CONFIG_MAX_BYTES) throw new Error('Installation configuration is too large');
+const installation = parseInstallationConfig(JSON.parse(source), siteUrl.origin);
 
 export default defineConfig({
   site: siteUrl.origin,

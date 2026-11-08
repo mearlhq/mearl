@@ -7,10 +7,7 @@ interface WebRuntime {
   sendMessage(id: string, message: unknown, callback: (value: unknown) => void): void;
 }
 interface BridgeStatus {
-  version?: string;
-  connected?: boolean;
   browserReady?: boolean;
-  localComponentCount?: number;
   session?: string;
 }
 function runtime(): WebRuntime | undefined {
@@ -121,11 +118,6 @@ export async function initInstallationBridge(): Promise<void> {
     try {
       const result = await requestInstallation('status', id);
       if (disposed || turn !== generation) return;
-      if (embedded && config.guide && typeof result.version === 'string')
-        window.parent.postMessage(
-          { type: 'mearl-installation-status', schemaVersion: 1, version: result.version },
-          new URL(config.guide.url).origin,
-        );
       status.textContent = result.browserReady ? t.ready : t.connected;
       install.textContent = result.browserReady ? t.update : t.enable;
       if (embedded && !checkedForInitialInstall) {
@@ -142,8 +134,8 @@ export async function initInstallationBridge(): Promise<void> {
       install.disabled = false;
     } catch {
       if (disposed || turn !== generation) return;
-      status.textContent = embedded ? t.disconnectedEmbedded : t.disconnected;
-      install.textContent = t.reconnect;
+      status.textContent = embedded ? '' : t.disconnected;
+      install.textContent = embedded ? t.enable : t.reconnect;
       install.disabled = false;
     }
   };
@@ -213,10 +205,20 @@ export async function initInstallationBridge(): Promise<void> {
           status.textContent = t.opened;
           install.textContent = t.progress;
         }
-      } catch {
+      } catch (error) {
         if (!disposed) {
-          status.textContent = embedded ? t.openFailedEmbedded : t.openFailed;
-          install.textContent = t.reconnect;
+          const code = error instanceof Error ? error.message : '';
+          if (code === 'EXTENSION_UNAVAILABLE' || code === 'EXTENSION_TIMEOUT')
+            status.textContent = t.disconnected;
+          else if (
+            [
+              'INSTALLATION_SOURCE_DENIED',
+              'INSTALLATION_PARENT_DENIED',
+              'INSTALLATION_PRESET_UNAVAILABLE',
+            ].includes(code)
+          )
+            status.textContent = t.configurationUnavailable;
+          else status.textContent = embedded ? t.openFailedEmbedded : t.openFailed;
         }
       } finally {
         busy = false;

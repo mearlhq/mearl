@@ -43,15 +43,10 @@ jobs:
           node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Prepare deployment configuration
-        env:
-          INSTALLATION_CONFIG: ${{ secrets.MEARL_INSTALLATION_CONFIG }}
-        run: |
-          node --input-type=module -e 'import { writeFileSync } from "node:fs"; writeFileSync(process.env.RUNNER_TEMP + "/installation.json", process.env.INSTALLATION_CONFIG || "{\"schemaVersion\":1}", { mode: 0o600 });'
       - run: pnpm build:website
         env:
           GH_TOKEN: ${{ github.token }}
-          MEARL_INSTALLATION_CONFIG_FILE: ${{ runner.temp }}/installation.json
+          MEARL_INSTALLATION_CONFIG: ${{ secrets.MEARL_INSTALLATION_CONFIG }}
       - run: pnpm --filter @mearl/website typecheck
       - run: pnpm --filter @mearl/website test
       - uses: actions/upload-pages-artifact@v3

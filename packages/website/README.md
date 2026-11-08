@@ -21,19 +21,24 @@ pnpm build:website
 
 ## 部署配置
 
-构建网站时，将 `MEARL_INSTALLATION_CONFIG_FILE` 设为 JSON 文件的绝对路径：
+构建网站时，`MEARL_INSTALLATION_CONFIG` 接收安装目录的 JSON 内容。可以从本地文件读取：
+
+```sh
+MEARL_INSTALLATION_CONFIG="$(cat /path/to/installation.json)" pnpm build:website
+```
+
+安装目录示例：
 
 ```json
 {
   "schemaVersion": 1,
   "guide": {
-    "url": "https://guide.example.test/installed.html",
-    "registry": "https://registry.example.test/"
+    "url": "https://guide.example.test/installed.html"
   }
 }
 ```
 
-引导和 npm registry 必须使用与公共网站不同的 HTTPS origin。registry 为不含查询参数和片段的目录 URL，无需与引导同源。只有 npm ping 成功后才重定向到配置的引导 URL；URL 参数和 ping 响应不能提供目标地址、命令或插件来源。
+引导 URL 必须使用与公共网站不同的 HTTPS origin。欢迎页向配置的引导地址发起跨域 `HEAD` 请求。收到响应后通过 `location.replace` 进入配置的地址。
 
 将 Pages 的部署来源设为 GitHub Actions。`Deploy installation website` 工作流在 `main` 收到涉及官网代码、构建依赖、站内参考文档或部署配置的推送时自动运行。其他推送跳过官网工作流。更新仓库密钥后也可以手动运行。
 
@@ -41,10 +46,8 @@ pnpm build:website
 
 ## 环境检测
 
-页面请求 registry 的标准 `-/ping` 端点，要求成功返回含 `pong: true` 的 JSON。registry 必须通过 CORS 允许配置的网站 origin。无需专用引导探测页或 frame 协议。这与 setup 通过 `npm ping` 检测环境的方式对应；下载包使用的 npm registry 仍由安装流程单独管理。
+探测使用 `no-cors` 模式，跟随重定向，省略凭据，禁用缓存并携带新的查询值。浏览器返回不透明响应时，欢迎页将其视为网络可达。HTTP 状态和响应内容对欢迎页不可见。连接失败、五秒内未收到最终响应或无法静默探测时，继续显示公网欢迎页。
 
-请求不带凭据、拒绝重定向、禁用缓存并携带新的查询值；响应最多 4 KiB。登录 HTML、兜底 JSON、CORS 失败、重定向和请求失败均保留公共引导。ping 成功只说明网络可达，不代表身份或授权；重定向目标始终来自配置的引导 URL。
-
-欢迎页在已取得 Local Network Access 授权时自动检测 registry。未获授权时，支持权限策略的浏览器在禁用本地网络权限的 iframe 内检测，兼容经代理访问的 HTTPS registry。其他支持地址空间限制的浏览器仅自动探测公共 IP 空间。需要本地网络授权时，点击**检测引导连接**。网络超时为五秒；待决定的权限申请单独限制为 120 秒且可取消。重试创建新请求，导航释放当前尝试。直接引导链接与本地说明始终可用。
+欢迎页在已取得 Local Network Access 授权时自动检测引导地址。未获授权时，支持权限策略的浏览器在禁用本地网络权限的 iframe 内检测，兼容经代理访问的 HTTPS 引导。其他支持地址空间限制的浏览器仅自动探测公共 IP 空间。离开页面时取消探测。
 
 网站是安装入口。已安装的能力包必须在网站关闭或离线时继续运行。网页到扩展的安装桥是独立集成步骤。

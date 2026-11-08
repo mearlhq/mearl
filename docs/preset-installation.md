@@ -160,7 +160,7 @@ Native/CDP 宿主启动 30 秒后检查，后续每小时唤醒并遵守相同�
 
 ## 部署信任目录
 
-受信 preset 目录由部署者维护，核心默认使用空目录。网站构建通过 `MEARL_INSTALLATION_CONFIG_FILE` 注入 JSON；发布 Action 从 `MEARL_INSTALLATION_CONFIG` secret 读取同一份配置。第三方发现目录不能直接用作自动安装目录。preset 自身不能声明其可信；受信安装与自动更新只接受目录中匹配 ID 和完整来源的条目。
+受信 preset 目录由部署者维护，核心默认使用空目录。网站构建从 `MEARL_INSTALLATION_CONFIG` 环境变量读取目录 JSON。GitHub Actions 将同名仓库密钥传给构建。第三方发现目录不能直接用作自动安装目录。preset 自身不能声明其可信。受信安装与自动更新只接受目录中匹配 ID 和完整来源的条目。
 
 默认安装站点、扩展 ID 和本机默认目录 URL 共用 `@mearl/preset/installation-site.json`。本机 setup 与 Native 自动更新均支持 `MEARL_INSTALLATION_CONFIG_URL`，此本机环境变量不接受网页覆盖，也不改变浏览器的固定信任根。自动更新只接受 HTTPS；显式 CLI 迁移的本地验证允许回环 HTTP。部署输出的 `installation.json` 可被读取，配置中只能放可公开读取的地址与策略，不能放凭据。
 

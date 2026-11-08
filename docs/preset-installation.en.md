@@ -160,7 +160,7 @@ Automatic updates reuse exact records, source validation, overrides, and conflic
 
 ## Deployment trust catalogs
 
-Deployers maintain trusted preset catalogs; the core defaults to empty. Website builds inject JSON through `MEARL_INSTALLATION_CONFIG_FILE`; deployment Actions read the same configuration from `MEARL_INSTALLATION_CONFIG`. Third-party discovery catalogs cannot directly become automatic-install catalogs. Presets cannot declare themselves trusted; trusted installation/updates accept matching ID and complete source only.
+Deployers maintain trusted preset catalogs. The core defaults to an empty catalog. Website builds read the catalog JSON from the `MEARL_INSTALLATION_CONFIG` environment variable. GitHub Actions passes the repository secret of the same name to the build. Third-party discovery catalogs cannot directly become automatic-install catalogs. Presets cannot declare themselves trusted. Trusted installation and updates require the preset ID and full source to match the catalog.
 
 The default installation site, extension ID, and local default catalog URL share `@mearl/preset/installation-site.json`. setup and Native updates support local `MEARL_INSTALLATION_CONFIG_URL`, which web pages cannot override and which does not change browser trust roots. Automatic updates require HTTPS; explicit CLI migration permits loopback HTTP for local validation. Deployed `installation.json` is readable: include only public addresses and policy, never credentials.
 
