@@ -218,7 +218,7 @@ as advertised by the Extension. The current Extension exposes only time zones.
 The channel applies domain authorization and page-control conflict checks without registering automation pages or granting ordinary page actions, arbitrary code execution, or closure.
 Independent packages use `@mearl/provider-<id>`. EgoLite has native Space management and human handoff. The [mearl-ego Skill](../../skills/mearl-ego/SKILL.md) uses existing tools with the Mearl extension for simulation and debugging, without this Provider enhancement channel.
 
-Implement read-only `getEnhancementTarget({ browserId, tabId }, context)`. Under external user control, return
+Implement read-only `getEnhancementTarget({ browserId, tabId }, context)`. When a user controls the page, return
 `{ tabId, ready: false }`; when Agent control is confirmed, return
 `{ tabId, ready: true, mainFrameId, url }`. A current physical `targetId` may replace `mainFrameId`.
 Identity must come from the current browser target. When both are given, the host verifies both. Target-ID-only mode requires host target verification support.

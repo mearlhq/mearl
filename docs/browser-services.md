@@ -48,9 +48,9 @@ Popup 启动时，界面设置响应同时携带当前已安装浏览器 App 模
 
 `extension.operations['skills.catalog']` 可声明同名浏览器 hook。它接受 `describe`、`search`、`markdown` 三种操作；描述返回 `available`、`managerId`、`title`、`homeUrl`，搜索返回原界面使用的技能元数据以及 `pageUrl`，可选 `installSource` 指定明确的安装来源。目录本身不执行安装，也不需要 Native Host。
 
-界面捕获描述返回的提供者 revision，后续搜索和预览固定该实现与配置。只有未声明目录或描述显式返回 `available: false` 时使用公共目录；已选择目录的鉴权、网络、协议或资源错误直接显示，不切换来源。预设更新取消旧目录请求、保留搜索词和安装范围，已安装技能的本地详情继续显示。
+界面捕获描述返回的提供者 revision，后续搜索和预览固定该实现与配置。只有未声明目录或描述显式返回 `available: false` 时使用默认目录；已选择目录的鉴权、网络、协议或资源错误直接显示，不切换来源。预设更新取消旧目录请求、保留搜索词和安装范围，已安装技能的本地详情继续显示。
 
-公共默认目录离线提供随发行物打包的 Mearl Skills；社区搜索使用 Skills 官方目录，预览读取 GitHub 的确切文件 blob。唯一同名目录先验证 frontmatter，其他情况限制候选扫描并拒绝歧义；限流与读取失败保留打开原页面的入口。
+默认目录离线提供随发行物打包的 Mearl Skills；社区搜索使用 Skills 官方目录，预览读取 GitHub 的确切文件 blob。唯一同名目录先验证 frontmatter，其他情况限制候选扫描并拒绝歧义；限流与读取失败保留打开原页面的入口。
 
 扩展已接入请求元数据界面、服务开关、加载与错误处理入口，按安装定义显示对应贡献位置，后台业务由能力包提供。安装视图与宿主共用安装状态。
 
@@ -153,7 +153,7 @@ CSP 的 HTTP 来源也允许升级到 HTTPS。为避免 SSE 重定向超出 Chro
 
 iframe 的 origin 上报只扩充已接受配置。运行中文档固定其接受的映射；重新点击同目标按钮接受当前配置，并提示刷新。会话规则在 worker 重启后保留，写入失败恢复完整旧规则。CORS 目的地从已接受配置中按授权范围扩充。
 
-`extension.accountState` 可声明 `{ cacheKey, identityKey }`，供能力包沿用已有账号缓存。两键必须共享命名空间，分别为 `<namespace>-accounts-cache` 和 `<namespace>-last-<field>-id`；宿主拒绝其他设置键与跨命名空间组合。未配置时使用公共默认键。能力更新或切换存储键时，界面会重新读取对应缓存，读取完成前不展示或写入另一键的数据。
+`extension.accountState` 可声明 `{ cacheKey, identityKey }`，供能力包沿用已有账号缓存。两键必须共享命名空间，分别为 `<namespace>-accounts-cache` 和 `<namespace>-last-<field>-id`；宿主拒绝其他设置键与跨命名空间组合。未配置时使用默认键。能力更新或切换存储键时，界面会重新读取对应缓存，读取完成前不展示或写入另一键的数据。
 
 抓包控制器通过 `state.channels` 声明当前实现的通道，各项包含 `label`、`supportsModify`、`connection`、`overrides` 和可选 `onlineMocks`。通道 ID 为最多 64 字符的小写字母、数字与连字符；宿主不枚举平台名称。每个通道的命令使用 `<id>.setOverride`、`removeOverride`、`removeAllOverrides`、`reconnect`、`disconnect`，在线 Mock 可提供 `refreshOnlineMocks` 与 `cleanOnlineMock`。`prepareOverride` 在导入修改前执行能力专属校验；失败保留用户原先的修改开关。控制器仍同时维护各通道，页面按接受的通道订阅请求。无已选通道或旧选择不可用时，使用控制器返回的第一项并保存选择。
 

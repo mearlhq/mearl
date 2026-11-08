@@ -59,14 +59,14 @@ DOM 代码通过 `mearl.pageEval` 执行。文件和已注册 Skill 均从该宿
 
 ```bash
 # 直接运行配置向导，会自动生成 npx 配置
-npx @mearl/mcp-server@3 --configure
+npx @mearl/mcp-server --configure
 ```
 
 **方式二：全局安装（启动更快）**
 
 ```bash
 # 全局安装
-npm install -g @mearl/mcp-server@3
+npm install -g @mearl/mcp-server
 
 # 运行配置向导
 mearl-mcp-configure
@@ -122,7 +122,7 @@ node packages/mcp-server/dist/configure-bin.js --extension-id <你的开发版�
 mearl-mcp-uninstall
 
 # 或使用 npx
-npx @mearl/mcp-server@3 --uninstall
+npx @mearl/mcp-server --uninstall
 ```
 
 ## 故障排查

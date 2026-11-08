@@ -15,9 +15,9 @@
 ## 安装
 
 ```bash
-npm install @mearl/client@3
+npm install @mearl/client
 # 或
-pnpm add @mearl/client@3
+pnpm add @mearl/client
 ```
 
 ## SDK 使用
@@ -66,7 +66,7 @@ mearl check
 mearl check --local --json
 
 # 更新本地环境
-npx @mearl/setup@3 update --local
+npx @mearl/setup update --local
 
 # 查看某个 action 的帮助
 mearl <action> --help
@@ -248,7 +248,7 @@ Mearl 默认聚合当前机器和已配置 cloud-server 下的浏览器，并通
 client、native-host、cloud-connector 和扩展的最新发布版本。发布版本查询最长等待约 1.5 秒，
 无法访问发布源时会提示无法确认更新，不影响浏览器可用性检查。`--json` 输出机器可读的检查结果，
 与 `--updates` 同用时包含更新状态。发现更新时会提示适用的命令：client/native-host 使用
-`npx @mearl/setup@3 update`，setup 管理的扩展使用 `npx @mearl/setup extension`。
+`npx @mearl/setup update`，setup 管理的扩展使用 `npx @mearl/setup extension`。
 
 全局安装的 `mearl` CLI 默认在每天首次使用后启动独立后台进程，查询最新发布版本，并比较
 client、native-host、cloud-server 和 MCP server 的已安装版本。发现更新时调用

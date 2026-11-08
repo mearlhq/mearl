@@ -218,7 +218,7 @@ Extension 的环境增强，依次调用 `bind`、`invoke`、`release`。这条�
 它沿用域授权和现有页面控制冲突检查，不登记自动化页面，不提供普通页面操作、任意代码执行或关闭权限。
 独立 Provider 包使用 `@mearl/provider-<id>` 命名。EgoLite 已有原生 Space 管理和人工交接，通过 [mearl-ego Skill](../../skills/mearl-ego/SKILL.md) 配合 Mearl 扩展进行端模拟与调试；该流程直接调用现有工具，不使用本节的 Provider 增强通道。
 
-实现必须提供只读的 `getEnhancementTarget({ browserId, tabId }, context)`：外部用户控制时返回
+实现必须提供只读的 `getEnhancementTarget({ browserId, tabId }, context)`：页面由用户控制时返回
 `{ tabId, ready: false }`；确认 Agent 可操作时返回
 `{ tabId, ready: true, mainFrameId, url }`，也可用当前物理 `targetId` 代替 `mainFrameId`。
 身份必须来自当前浏览器目标；提供两项时，当前宿主同时核验两项。仅提供 target ID 时，需要宿主具备相应的目标核验能力。

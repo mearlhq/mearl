@@ -9,17 +9,17 @@ Mearl 环境的一次性安装、更新、卸载与配置工具。无需先全�
 安装前用 `node --version` 确认 Node.js >= 20.18.0。
 
 ```bash
-npx @mearl/setup@3 [install] [--local] [--cloud] [--cloud-mode <id>] [--mcp]
-npx @mearl/setup@3 update [--local] [--cloud] [--cloud-mode <id>] [--mcp]
-npx @mearl/setup@3 uninstall [--local] [--cloud] [--cloud-mode <id>] [--mcp] [--full]
-npx @mearl/setup@3 extension [--full] [--force]
-npx @mearl/setup@3 extension --extract
-npx @mearl/setup@3 plugin [name] <path>
-npx @mearl/setup@3 plugin install <skills add 参数...>
-npx @mearl/setup@3 plugin uninstall <name>
-npx @mearl/setup@3 provider <install|update|uninstall> <package|id>
-npx @mearl/setup@3 profile install <来源> [--browser <标识或名称>]
-npx @mearl/setup@3 preset repair [--replace-skill <name> ...]
+npx @mearl/setup [install] [--local] [--cloud] [--cloud-mode <id>] [--mcp]
+npx @mearl/setup update [--local] [--cloud] [--cloud-mode <id>] [--mcp]
+npx @mearl/setup uninstall [--local] [--cloud] [--cloud-mode <id>] [--mcp] [--full]
+npx @mearl/setup extension [--full] [--force]
+npx @mearl/setup extension --extract
+npx @mearl/setup plugin [name] <path>
+npx @mearl/setup plugin install <skills add 参数...>
+npx @mearl/setup plugin uninstall <name>
+npx @mearl/setup provider <install|update|uninstall> <package|id>
+npx @mearl/setup profile install <来源> [--browser <标识或名称>]
+npx @mearl/setup preset repair [--replace-skill <name> ...]
 ```
 
 浏览器 Provider 独立安装和演进。安装后运行 `mearl <providerId>` 查看该版本声明的能力、
@@ -30,7 +30,7 @@ npx @mearl/setup@3 preset repair [--replace-skill <name> ...]
 ## 安装端模拟
 
 ```bash
-npx @mearl/setup@3 profile install mearlhq/wechat-profile
+npx @mearl/setup profile install mearlhq/wechat-profile
 ```
 
 来源支持公开 GitHub 仓库的 `owner/repo`、`owner/repo@ref`，或能力包清单的完整 HTTPS 地址。GitHub 来源从解析后的提交读取根目录 `bundle.json`。命令安装能力包声明的全部端模拟配置，保留当前 Preset。有多个本地扩展连接时，用 `--browser` 选择目标。若扩展提示授权，请确认来源。
@@ -42,7 +42,7 @@ npx @mearl/setup@3 profile install mearlhq/wechat-profile
 一个命令安装 skill 并注册它的 CLI、SDK 和 MCP 能力：
 
 ```bash
-npx @mearl/setup@3 plugin install https://github.com/mearlhq/mearl --skill browser-tab-manager --yes
+npx @mearl/setup plugin install https://github.com/mearlhq/mearl --skill browser-tab-manager --yes
 mearl tabs summary
 ```
 
@@ -55,7 +55,7 @@ Native preset 批次新建的插件注册使用 setup 托管归属，后续通�
 GUI 和 CLI 使用同一套 preset 安装器及覆盖规则。已保存的安装尚未完成时，运行 `preset repair` 从接受的本地资源重试，不重新下载 preset，也不隐式覆盖冲突来源。显式重复指定 `--replace-skill` 即授权本次替换这些 Skill 的来源或同名旧插件注册：
 
 ```bash
-npx @mearl/setup@3 preset repair --replace-skill example-skill --replace-skill another-skill
+npx @mearl/setup preset repair --replace-skill example-skill --replace-skill another-skill
 ```
 
 已安装的 Skill 仅修复注册；来源冲突项重新安装。未列出的冲突仍会阻止安装，声明外的工具名与变更后的安装身份也会被拒绝。覆盖授权不会保留到后续普通修复或自动更新。缺少浏览器权限时仍需在扩展中授权。输出沿用 preset JSON，已就绪退出 `0`、仍有待完成项退出 `3`、安装失败退出 `1`，无效参数退出 `2`。
@@ -67,8 +67,8 @@ npx @mearl/setup@3 preset repair --replace-skill example-skill --replace-skill a
 已通过其他渠道分发的 skill 或自定义入口，可以直接传入路径注册：
 
 ```bash
-npx @mearl/setup@3 plugin /absolute/path/to/browser-tab-manager
-npx @mearl/setup@3 plugin custom ./skills/custom/entry.mjs
+npx @mearl/setup plugin /absolute/path/to/browser-tab-manager
+npx @mearl/setup plugin custom ./skills/custom/entry.mjs
 ```
 
 path 接受目录或具体文件；目录默认读取 `scripts/main.mjs` 或 `scripts/main.py`，相对路径基于调用工作目录解析。插件名优先使用显式 name，其次读取入口的 `name` metadata，最后回退到 Skill 目录名；常规注册只传 path，显式 name 仅用于覆盖或兼容旧入口。Python 插件要求 `python3 >= 3.9`，可通过 `MEARL_PYTHON` 指定解释器路径；setup 只验证入口可加载，不安装 Python，也不执行 `pip install`。
@@ -83,7 +83,7 @@ JavaScript 插件可导出 `setup({ runCommand })`，在注册前准备 Skill �
 不再需要插件时执行：
 
 ```bash
-npx @mearl/setup@3 plugin uninstall tabs
+npx @mearl/setup plugin uninstall tabs
 ```
 
 若入口位于 `~/.agents/skills/<skill>/`，setup 会先执行
@@ -99,9 +99,9 @@ Provider 由 npm 包分发，但包本身无需暴露 CLI 或安装脚本。setu
 可创建的浏览器类型名称及其表单参数：
 
 ```bash
-npx @mearl/setup@3 provider install @example/mearl-provider-device
-npx @mearl/setup@3 provider update example-device
-npx @mearl/setup@3 provider uninstall example-device
+npx @mearl/setup provider install @example/mearl-provider-device
+npx @mearl/setup provider update example-device
+npx @mearl/setup provider uninstall example-device
 ```
 
 安装参数接受包名、版本或 dist-tag；更新和卸载可使用 providerId 或完整包名。核心 @mearl 包固定使用公共 npm registry；其余 scope 沿用调用方的包管理器配置。安装沿用启动 setup 的包管理器，
@@ -112,8 +112,8 @@ npx @mearl/setup@3 provider uninstall example-device
 ## 行为
 
 - Mearl 自有 npm 包的安装和更新固定使用 `https://registry.npmjs.org/`，与最新版本查询使用同一来源；第三方包沿用当前包管理器的源配置。
-- `install` 可以省略；直接执行 `npx @mearl/setup@3` 等同于 `npx @mearl/setup@3 install`。
-  以选项开头时也默认安装，例如 `npx @mearl/setup@3 --cloud --yes`。
+- `install` 可以省略；直接执行 `npx @mearl/setup` 等同于 `npx @mearl/setup install`。
+  以选项开头时也默认安装，例如 `npx @mearl/setup --cloud --yes`。
 - `install` 未指定环境时默认 `--local`。
 - `-h` / `--help` 显示帮助，`-v` / `--version` 显示 setup 版本。
 - `update` 和 `uninstall` 未指定环境时，从当前 `PATH` 中的
@@ -159,17 +159,17 @@ npx @mearl/setup@3 provider uninstall example-device
 
 ## 安装或更新浏览器扩展
 
-首次使用时，先运行 `npx @mearl/setup@3`，再加载同版的离线 ZIP。商店提供同版扩展时，也可以直接安装。[安装步骤](../../README.md#安装本机环境)
+首次使用时，先运行 `npx @mearl/setup`，再加载同版的离线 ZIP。商店提供同版扩展时，也可以直接安装。[安装步骤](../../README.md#安装本机环境)
 
 如需由 setup 管理扩展，运行下面的命令。
 
 ```bash
-npx @mearl/setup@3 extension
+npx @mearl/setup extension
 ```
 
 加上 `--full` 可以在同一次运行中安装本机 CLI、Native Host 和 Skill。
 
-需要手动导入时，运行 `npx @mearl/setup@3 extension --extract`。setup 会下载发行 ZIP，
+需要手动导入时，运行 `npx @mearl/setup extension --extract`。setup 会下载发行 ZIP，
 在 `~/.mearl/extension-downloads/` 下创建新目录并解压，然后打印完整路径。打开
 `chrome://extensions/`，启用**开发者模式**，点击**加载已解压的扩展程序**并选择该目录。
 Chrome 使用扩展期间请保留目录。Chrome 关闭或远程调试关闭时也可以下载。
@@ -177,7 +177,7 @@ Chrome 使用扩展期间请保留目录。Chrome 关闭或远程调试关闭时
 自动安装在首次安装、旧版 setup 扩展首次迁移，或 Native Host reload 不可用时使用 CDP。如果
 Chrome 尚未开放 CDP，交互命令会提示打开
 `chrome://inspect/#remote-debugging`、启用远程调试并允许连接，然后等待安装完成。面向人的
-安装指引不要添加 `--yes`。无 TTY 环境使用 `npx @mearl/setup@3 extension --yes`；它只尝试
+安装指引不要添加 `--yes`。无 TTY 环境使用 `npx @mearl/setup extension --yes`；它只尝试
 一次，CDP 不可用时立即中断。无法确认 setup 管理来源且 CDP 不可用时不会下载或修改插件
 目录，打开 CDP 后重新执行同一命令即可。Chrome 版本过低、缺少扩展安装所需的 CDP 方法时，
 命令会中断并提示升级 Chrome。
@@ -207,7 +207,7 @@ DevTools 面板的设置按钮会显示红点，快捷设置中提供“立即�
 
 自动更新不会降级较新的 Host，也不会改动 cloud、MCP 或独立安装的 Mearl Skill。
 目标 npm 版本尚未发布、网络不可用或更新失败时，旧 Host 会继续运行；下一次扩展后台
-生命周期可重新尝试，也可手动执行 `npx @mearl/setup@3 update --local`。
+生命周期可重新尝试，也可手动执行 `npx @mearl/setup update --local`。
 
 ## 人工与 Agent 使用
 
@@ -222,41 +222,41 @@ DevTools 面板的设置按钮会显示红点，快捷设置中提供“立即�
 
 ```bash
 # 默认安装本地浏览器环境
-npx @mearl/setup@3
+npx @mearl/setup
 
 # 与上一条等价
-npx @mearl/setup@3 install
+npx @mearl/setup install
 
 # Agent / CI 无交互安装
-npx @mearl/setup@3 --yes
+npx @mearl/setup --yes
 
 # 安装云端 Agent 环境
-npx @mearl/setup@3 --cloud
+npx @mearl/setup --cloud
 
 # 同一台机器同时作为本地浏览器宿主和云端 Agent
-npx @mearl/setup@3 --local --cloud
+npx @mearl/setup --local --cloud
 
 # 自动更新当前 PATH 中检测到的全部 Mearl 环境
-npx @mearl/setup@3 update
+npx @mearl/setup update
 
 # 独立安装或更新到最新浏览器扩展
-npx @mearl/setup@3 extension
+npx @mearl/setup extension
 
 # 安装完整本地环境（client、Native Host、Skill 和扩展）
-npx @mearl/setup@3 extension --full
+npx @mearl/setup extension --full
 
 # 只卸载本地环境
-npx @mearl/setup@3 uninstall --local
+npx @mearl/setup uninstall --local
 
 # 自动检测并无交互卸载
-npx @mearl/setup@3 uninstall --yes
+npx @mearl/setup uninstall --yes
 
 # 卸载环境，并清理全部 CLI 插件与 Provider
-npx @mearl/setup@3 uninstall --full
+npx @mearl/setup uninstall --full
 
 # 安装可选浏览器 Provider
-npx @mearl/setup@3 provider install @example/mearl-provider-device
-npx @mearl/setup@3 provider install @example/mearl-provider-cloud
+npx @mearl/setup provider install @example/mearl-provider-device
+npx @mearl/setup provider install @example/mearl-provider-cloud
 ```
 
 原有 Mearl 环境包的 npm/npx 安装方式和 CLI 保持可用；setup 是统一的便利入口。
@@ -273,4 +273,4 @@ install/update 在替换包前保存选中 Preset 的确切资源和期望选择
 
 主动执行 setup 时，先沿用本机已选 preset；本机未选择时，在运行时初始化后、安装 Skill 前采用已连接浏览器的受信 preset。显式 `--preset <source>` 优先。多个浏览器的选择不同、来源不受信或状态读取失败时要求显式选择。首次连接最多等待约一分钟；浏览器关闭时只安装基础环境并说明重试方式。普通连接和后台核心更新不会自动安装首次本机 preset。
 
-发行包可设置本机进程环境变量 `MEARL_SETUP_DEFAULT_PRESET` 提供默认清单来源；默认值仅在两端均无选择时生效，插件、Provider、卸载等子命令保持原行为。安装与状态核验仍由公共安装器负责。
+发行包可设置本机进程环境变量 `MEARL_SETUP_DEFAULT_PRESET` 提供默认清单来源；默认值仅在两端均无选择时生效，插件、Provider、卸载等子命令保持原行为。安装与状态核验仍由安装器负责。

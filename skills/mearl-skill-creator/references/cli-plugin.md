@@ -52,12 +52,12 @@ def register(app):
 
 也可以用 `@app.command("read <url>", description="读取内容")` 装饰 handler。入口、input、`app.invoke` 参数和返回值必须能用 JSON 表示；业务日志不要写 stdout，进度统一使用 `app.progress`。Python 同目录模块可直接 import，第三方依赖必须已存在于所选解释器环境中。业务模块的 handler 可以接收 `app` 或所需的 `invoke`/`progress` 依赖，由入口注入；不要在模块导入时执行业务动作。
 
-注册要求 Node.js >= 20.18.0，默认命令是 `npx @mearl/setup@3 plugin <path>`。path 可为目录（默认按顺序选择 `scripts/main.mjs`、`scripts/main.py`）或具体入口文件，可传绝对或相对路径，不要求切换目录。插件名优先读取入口的 `name` metadata，没有时使用 Skill 目录名；确需覆盖时兼容 `npx @mearl/setup@3 plugin <name> <path>`。名称使用小写字母开头的字母、数字、连字符，不占用 Mearl 内置命令。
+注册要求 Node.js >= 20.18.0，默认命令是 `npx @mearl/setup plugin <path>`。path 可为目录（默认按顺序选择 `scripts/main.mjs`、`scripts/main.py`）或具体入口文件，可传绝对或相对路径，不要求切换目录。插件名优先读取入口的 `name` metadata，没有时使用 Skill 目录名；确需覆盖时兼容 `npx @mearl/setup plugin <name> <path>`。名称使用小写字母开头的字母、数字、连字符，不占用 Mearl 内置命令。
 
 在生成的 SKILL.md 中写明具体名称和实际路径定位方式，例如：
 
 ```bash
-npx @mearl/setup@3 plugin "$SKILL_DIR"
+npx @mearl/setup plugin "$SKILL_DIR"
 ```
 
 提醒 Agent 将 `$SKILL_DIR` 替换为本次读取的 skill 目录。参数确定时直接执行业务命令，遇到 `PLUGIN_NOT_REGISTERED`、`PLUGIN_ENTRY_MISSING` 或基础 mearl 未安装、不支持插件时注册一次并重试。注册会补齐缺失或低于当前 setup 版本的 client、native-host。其他加载错误、参数错误、登录失效和业务失败按实际原因处理。
@@ -69,14 +69,14 @@ Skill 需要连同源码安装时，在生成的 `SKILL.md` 顶层声明 `instal
 ```yaml
 install:
   description: 安装并注册示例 Skill 和 CLI 命令
-  command: npx @mearl/setup@3 plugin install group/project --skill example
+  command: npx @mearl/setup plugin install group/project --skill example
 ```
 
-`command` 中 `plugin install` 后的参数交给当前 preset 指定的 Skills 管理器（公共默认是 skills），安装固定为全局共享模式。setup 从安装成功输出中取得路径，注册其 `scripts/main.mjs` 或 `scripts/main.py`；不需要额外的 npm 包或安装脚本。自动注册默认使用安装目录名，需要短名称时在入口中声明 `name`；自定义入口文件继续用显式路径注册。
+`command` 中 `plugin install` 后的参数交给当前 preset 指定的 Skills 管理器（默认为 skills），安装固定为全局共享模式。setup 从安装成功输出中取得路径，注册其 `scripts/main.mjs` 或 `scripts/main.py`；不需要额外的 npm 包或安装脚本。自动注册默认使用安装目录名，需要短名称时在入口中声明 `name`；自定义入口文件继续用显式路径注册。
 
 注册保存绝对入口路径和可选的简短描述；同名注册更新绑定。原地更新 skill 入口代码后下一次 CLI 调用生效；扩展打开工具箱时按入口文件元数据自动更新注册描述与工具声明。skill 换路径时重新注册以更新绑定；入口或导入模块的源码修改对新任务生效，运行中的任务保留已接受的资源快照；仅导入模块内的导出元数据变化需要显式重新注册。
 
-卸载命令是 `npx @mearl/setup@3 plugin uninstall <name>`。全局安装到 `~/.agents/skills` 的入口会先通过当前 Skills 管理器的卸载命令移除 Skill，成功后清除关联注册；入口目录已被手动删除时仍清理 当前管理器的跟踪记录。手工路径只解除注册，不删除源码。卸载失败时保留注册以便重试。
+卸载命令是 `npx @mearl/setup plugin uninstall <name>`。全局安装到 `~/.agents/skills` 的入口会先通过当前 Skills 管理器的卸载命令移除 Skill，成功后清除关联注册；入口目录已被手动删除时仍清理 当前管理器的跟踪记录。手工路径只解除注册，不删除源码。卸载失败时保留注册以便重试。
 
 ## 工具箱页面
 

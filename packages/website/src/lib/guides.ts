@@ -30,15 +30,15 @@ mearl get_logs --payload '{"tabId":12345,"after":"<cursor>","level":"error"}'`;
 const signedRequest = `mearl send_request --browser '<browserId>' --payload '{"url":"https://api.example.com/me"}'`;
 const emulate = `mearl set_device_emulation --payload '{"tabId":12345,"enabled":true,"preset":"iphone-17-pro"}'`;
 const findProfiles = 'mearl set_app_profile --help';
-const wechatMiniProgram = `npx @mearl/setup@3 plugin install mearlhq/wechat-profile --skill wechat-miniprogram
+const wechatMiniProgram = `npx @mearl/setup plugin install mearlhq/wechat-profile --skill wechat-miniprogram
 mearl wxa run ./dist`;
 const chineseBqb = 'https://github.com/F-loat/ChineseBQB-weapp';
 const egoSetup = `npx skills add mearlhq/mearl --skill mearl-ego --global
 ego-browser skill`;
-const pluginSetup = `npx @mearl/setup@3 plugin install mearlhq/mearl --skill notes-memory
+const pluginSetup = `npx @mearl/setup plugin install mearlhq/mearl --skill notes-memory
 mearl notes --help
 mearl notes list`;
-const adapterSetup = 'npx @mearl/setup@3 plugin install mearlhq/mearl --skill mearl-bbrowser';
+const adapterSetup = 'npx @mearl/setup plugin install mearlhq/mearl --skill mearl-bbrowser';
 const adapterCommands = `mearl bbrowser site search bilibili
 mearl bbrowser site info bilibili/popular
 mearl bbrowser site bilibili/popular 10`;
@@ -172,7 +172,7 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
       lead: 'Choose the environment that matches what you need to verify.',
       routes: [
         { id: 'device', title: 'Mobile website', text: 'Apply a device preset to a web page to check layout, touch, and viewport size.' },
-        { id: 'app', title: 'App WebView', text: 'The open-source edition offers WeChat emulation for H5 pages that depend on the WeChat User-Agent, JSBridge, or WebView behavior.' },
+        { id: 'app', title: 'App WebView', text: 'Use WeChat emulation to test H5 pages that depend on the WeChat User-Agent, JSBridge, or WebView behavior.' },
         { id: 'wechat-miniprogram', title: 'Local WeChat mini-program', text: 'Use the WeChat mini-program Skill with a native project or compiled WeChat output.' },
       ],
       sections: [
@@ -199,7 +199,7 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
       lead: '先选要验证的环境，再按对应步骤操作。',
       routes: [
         { id: 'device', title: '移动网页', text: '给网页套用设备预设，检查移动端布局、触摸和视口大小。' },
-        { id: 'app', title: 'App WebView', text: '开源版提供微信端模拟，用来验证依赖微信 User-Agent、JSBridge 或 WebView 行为的 H5 页面。' },
+        { id: 'app', title: 'App WebView', text: '使用微信端模拟验证依赖微信 User-Agent、JSBridge 或 WebView 行为的 H5 页面。' },
         { id: 'wechat-miniprogram', title: '本地微信小程序', text: '用微信小程序 Skill 运行原生工程或编译后的微信产物。' },
       ],
       sections: [
@@ -266,7 +266,7 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
           ] }, links: [{ label: 'Plugin host capabilities', path: 'docs/plugin-runtime.md' }] },
         { id: 'install', title: 'Install and invoke a plugin', text: 'Use setup plugin install to install a Skill and register its script in one step. For local development, register the Skill directory with setup plugin <path>. The registered name is shared by the CLI, SDK invokePlugin, and MCP plugin_invoke.', command: pluginSetup },
         { id: 'design-review', title: 'Compare a design with a live page', text: 'Install the design-overlay Skill plugin. On the page you want to review, open Design Overlay from the Mearl Toolbox. Import a design, align it with the page, then compare pixels in the current viewport.',
-          command: 'npx @mearl/setup@3 plugin install mearlhq/mearl --skill design-overlay', links: [{ label: 'Design Overlay reference', path: 'skills/design-overlay/SKILL.md', shared: true }] },
+          command: 'npx @mearl/setup plugin install mearlhq/mearl --skill design-overlay', links: [{ label: 'Design Overlay reference', path: 'skills/design-overlay/SKILL.md', shared: true }] },
         { id: 'create', title: 'Choose the right extension point', text: 'Use a Skill plugin for a reusable task or tool and a Provider to connect another browser or device. Use an App profile to emulate another client environment. Capability packages deliver these profiles and host implementations, while a Preset distributes a configured selection.',
           links: [{ label: 'Build a Skill plugin', path: 'skills/mearl-skill-creator/references/cli-plugin.md', shared: true }, { label: 'Extend device and App emulation', page: 'emulation' }, { label: 'Provider reference', path: 'packages/provider/README.md' }, { label: 'Capability model', path: 'docs/capability-model.md' }, { label: 'Preset reference', path: 'packages/preset/README.md' }] },
       ],
@@ -288,7 +288,7 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
           ] }, links: [{ label: '插件宿主能力', path: 'docs/plugin-runtime.md' }] },
         { id: 'install', title: '安装并调用插件', text: '用 setup plugin install 一次完成 Skill 安装和脚本注册。本地开发时可用 setup plugin <path> 注册 Skill 目录。注册名可用于 CLI、SDK 的 invokePlugin 和 MCP 的 plugin_invoke。', command: pluginSetup },
         { id: 'design-review', title: '用设计稿核对真实页面', text: '安装 design-overlay Skill 插件。在要验收的网页上，从 Mearl 工具箱打开「设计稿对比」。导入设计稿、对齐页面，再比较当前视口中的像素差异。',
-          command: 'npx @mearl/setup@3 plugin install mearlhq/mearl --skill design-overlay', links: [{ label: '设计稿对比使用说明', path: 'skills/design-overlay/SKILL.md', shared: true }] },
+          command: 'npx @mearl/setup plugin install mearlhq/mearl --skill design-overlay', links: [{ label: '设计稿对比使用说明', path: 'skills/design-overlay/SKILL.md', shared: true }] },
         { id: 'create', title: '为需求选择扩展点', text: '用 Skill 插件复用任务和工具，用 Provider 接入其他浏览器或设备，用端模拟配置还原其他客户端环境。能力包可分发这些配置和宿主实现，Preset 则把选定的能力和配置一起分发。',
           links: [{ label: '开发 Skill 插件', path: 'skills/mearl-skill-creator/references/cli-plugin.md', shared: true }, { label: '扩展端模拟', page: 'emulation' }, { label: 'Provider 文档', path: 'packages/provider/README.md' }, { label: '能力模型', path: 'docs/capability-model.md' }, { label: 'Preset 文档', path: 'packages/preset/README.md' }] },
       ],

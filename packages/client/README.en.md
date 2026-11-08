@@ -15,9 +15,9 @@ Use type-safe named methods such as `getRequests` and `sendRequest`, or the flex
 ## Installation
 
 ```bash
-npm install @mearl/client@3
+npm install @mearl/client
 # Or
-pnpm add @mearl/client@3
+pnpm add @mearl/client
 ```
 
 ## SDK usage
@@ -66,7 +66,7 @@ mearl check
 mearl check --local --json
 
 # Update the local environment
-npx @mearl/setup@3 update --local
+npx @mearl/setup update --local
 
 # Show action help
 mearl <action> --help
@@ -248,7 +248,7 @@ Mearl aggregates local and configured cloud-server browsers by default, routing 
 latest client, native-host, cloud-connector, and extension releases. Release queries wait about 1.5 seconds at most;
 unreachable sources report unconfirmed updates without affecting browser checks. `--json` returns machine-readable results,
 including updates when combined with `--updates`. Available updates show appropriate commands: client/native-host use
-`npx @mearl/setup@3 update`; setup-managed extensions use `npx @mearl/setup extension`.
+`npx @mearl/setup update`; setup-managed extensions use `npx @mearl/setup extension`.
 
 By default, globally installed `mearl` launches an independent background updater after the first use each day to query releases and compare
 installed client, native-host, cloud-server, and MCP server versions. When needed, it invokes

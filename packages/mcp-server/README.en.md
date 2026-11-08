@@ -59,14 +59,14 @@ execute DOM code through `mearl.pageEval`. Files and registered Skills are read 
 
 ```bash
 # Run the configuration wizard to generate npx configuration
-npx @mearl/mcp-server@3 --configure
+npx @mearl/mcp-server --configure
 ```
 
 **Option 2: Global installation (faster startup)**
 
 ```bash
 # Install globally
-npm install -g @mearl/mcp-server@3
+npm install -g @mearl/mcp-server
 
 # Run the configuration wizard
 mearl-mcp-configure
@@ -122,7 +122,7 @@ Release versions are maintained together with the root repository and other Mear
 mearl-mcp-uninstall
 
 # Or use npx
-npx @mearl/mcp-server@3 --uninstall
+npx @mearl/mcp-server --uninstall
 ```
 
 ## Troubleshooting

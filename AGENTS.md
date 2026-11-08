@@ -64,7 +64,7 @@ Toolbox assets are bundled into an immutable snapshot when a plugin is registere
 Register explicitly when adding a plugin, rebinding its source or changing exported metadata only inside an imported module:
 
 ```bash
-npx @mearl/setup@3 plugin "$PWD/skills/<skill>"
+npx @mearl/setup plugin "$PWD/skills/<skill>"
 ```
 
 Commands capture their source and resources when accepted and execute in isolated workers. New tasks receive source edits; running tasks retain their accepted snapshot. Changes to both toolbox assets and the extension/tool host require an extension build and reload before reopening the tool.

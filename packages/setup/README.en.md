@@ -9,17 +9,17 @@ One-time installation, updates, removal, and configuration for Mearl environment
 Run `node --version` before installation to verify Node.js >= 20.18.0.
 
 ```bash
-npx @mearl/setup@3 [install] [--local] [--cloud] [--cloud-mode <id>] [--mcp]
-npx @mearl/setup@3 update [--local] [--cloud] [--cloud-mode <id>] [--mcp]
-npx @mearl/setup@3 uninstall [--local] [--cloud] [--cloud-mode <id>] [--mcp] [--full]
-npx @mearl/setup@3 extension [--full] [--force]
-npx @mearl/setup@3 extension --extract
-npx @mearl/setup@3 plugin [name] <path>
-npx @mearl/setup@3 plugin install <skills add arguments...>
-npx @mearl/setup@3 plugin uninstall <name>
-npx @mearl/setup@3 provider <install|update|uninstall> <package|id>
-npx @mearl/setup@3 profile install <source> [--browser <id-or-name>]
-npx @mearl/setup@3 preset repair [--replace-skill <name> ...]
+npx @mearl/setup [install] [--local] [--cloud] [--cloud-mode <id>] [--mcp]
+npx @mearl/setup update [--local] [--cloud] [--cloud-mode <id>] [--mcp]
+npx @mearl/setup uninstall [--local] [--cloud] [--cloud-mode <id>] [--mcp] [--full]
+npx @mearl/setup extension [--full] [--force]
+npx @mearl/setup extension --extract
+npx @mearl/setup plugin [name] <path>
+npx @mearl/setup plugin install <skills add arguments...>
+npx @mearl/setup plugin uninstall <name>
+npx @mearl/setup provider <install|update|uninstall> <package|id>
+npx @mearl/setup profile install <source> [--browser <id-or-name>]
+npx @mearl/setup preset repair [--replace-skill <name> ...]
 ```
 
 Browser Providers install and evolve independently. After installation, run `mearl <providerId>` to inspect that version's capabilities,
@@ -30,7 +30,7 @@ Install optional cloud protocols through a preset before selecting `--cloud-mode
 ## Install App emulation
 
 ```bash
-npx @mearl/setup@3 profile install mearlhq/wechat-profile
+npx @mearl/setup profile install mearlhq/wechat-profile
 ```
 
 The source can be a public GitHub `owner/repo`, `owner/repo@ref`, or a full HTTPS bundle manifest URL. GitHub sources load the root `bundle.json` from the resolved commit. The command installs every App emulation configuration declared by that bundle and preserves the active Preset. When multiple local extensions are connected, select a target with `--browser`. Confirm source access in the extension if prompted.
@@ -42,7 +42,7 @@ In the extension's quick settings, open the App selector and choose **Add App em
 Install a Skill and register its CLI, SDK, and MCP capabilities with one command:
 
 ```bash
-npx @mearl/setup@3 plugin install https://github.com/mearlhq/mearl --skill browser-tab-manager --yes
+npx @mearl/setup plugin install https://github.com/mearlhq/mearl --skill browser-tab-manager --yes
 mearl tabs summary
 ```
 
@@ -55,7 +55,7 @@ New registrations created by Native preset batches are setup-managed and retain 
 GUI and CLI share the preset installer and override rules. If a saved installation is incomplete, `preset repair` retries accepted local resources without redownloading the preset or implicitly replacing conflicting sources. Explicit repeated `--replace-skill` authorizes replacing those Skills' sources or same-name plugin registrations for this invocation:
 
 ```bash
-npx @mearl/setup@3 preset repair --replace-skill example-skill --replace-skill another-skill
+npx @mearl/setup preset repair --replace-skill example-skill --replace-skill another-skill
 ```
 
 Already installed Skills receive registration repair only; source conflicts reinstall. Unlisted conflicts still block installation, and undeclared tool names or changed installation identities are rejected. Replacement authorization does not persist into later repairs or automatic updates. Missing browser permissions still require extension authorization. Output uses preset JSON: ready exits `0`, pending components `3`, installation failure `1`, and invalid arguments `2`.
@@ -67,8 +67,8 @@ Reinstallation refreshes same-name bindings. JavaScript entries must default-exp
 Register a Skill distributed elsewhere or a custom entry directly by path:
 
 ```bash
-npx @mearl/setup@3 plugin /absolute/path/to/browser-tab-manager
-npx @mearl/setup@3 plugin custom ./skills/custom/entry.mjs
+npx @mearl/setup plugin /absolute/path/to/browser-tab-manager
+npx @mearl/setup plugin custom ./skills/custom/entry.mjs
 ```
 
 path accepts a directory or file. Directories default to `scripts/main.mjs` or `scripts/main.py`; relative paths resolve against the calling working directory. Plugin names prefer explicit name, then entry `name` metadata, then the Skill directory name. Normal registration needs only path; explicit name is for overrides or older entries. Python requires `python3 >= 3.9`; `MEARL_PYTHON` selects an interpreter. setup validates loading but does not install Python or run `pip install`.
@@ -83,7 +83,7 @@ After registration, run `mearl <name> --help` anywhere, use SDK `invokePlugin`, 
 To remove a plugin:
 
 ```bash
-npx @mearl/setup@3 plugin uninstall tabs
+npx @mearl/setup plugin uninstall tabs
 ```
 
 For entries under `~/.agents/skills/<skill>/`, setup first runs
@@ -99,9 +99,9 @@ for global package lifecycle and reads `package.json#mearl.provider` to register
 browser type name, and form arguments:
 
 ```bash
-npx @mearl/setup@3 provider install @example/mearl-provider-device
-npx @mearl/setup@3 provider update example-device
-npx @mearl/setup@3 provider uninstall example-device
+npx @mearl/setup provider install @example/mearl-provider-device
+npx @mearl/setup provider update example-device
+npx @mearl/setup provider uninstall example-device
 ```
 
 Install accepts package names, versions, and dist-tags; update/remove accept providerId or full package name. Core @mearl packages always use public npm; other scopes follow caller package-manager settings. Installation uses the package manager launching setup;
@@ -112,8 +112,8 @@ Registration clears only after successful package removal, allowing retries.
 ## Behavior
 
 - Mearl-owned npm packages install and update from `https://registry.npmjs.org/`, matching version queries. Third-party packages use current manager registry settings.
-- `install` is optional: `npx @mearl/setup@3` equals `npx @mearl/setup@3 install`.
-  An initial option also implies installation, such as `npx @mearl/setup@3 --cloud --yes`.
+- `install` is optional: `npx @mearl/setup` equals `npx @mearl/setup install`.
+  An initial option also implies installation, such as `npx @mearl/setup --cloud --yes`.
 - `install` defaults to `--local` when no environment is specified.
 - `-h` / `--help` shows help; `-v` / `--version` shows setup's version.
 - Without environment flags, `update` and `uninstall` detect
@@ -159,17 +159,17 @@ Registration clears only after successful package removal, allowing retries.
 
 ## Install or update the browser extension
 
-For first use, run `npx @mearl/setup@3` and load the matching release ZIP. You can also use the Chrome Web Store when it offers the matching version. [Installation steps](../../README.en.md#install-locally)
+For first use, run `npx @mearl/setup` and load the matching release ZIP. You can also use the Chrome Web Store when it offers the matching version. [Installation steps](../../README.en.md#install-locally)
 
 Use this command to let setup manage the extension.
 
 ```bash
-npx @mearl/setup@3 extension
+npx @mearl/setup extension
 ```
 
 Add `--full` to also install the local CLI, Native Host, and Skill in the same run.
 
-To load the extension manually, run `npx @mearl/setup@3 extension --extract`. Setup downloads the release ZIP,
+To load the extension manually, run `npx @mearl/setup extension --extract`. Setup downloads the release ZIP,
 unpacks it into a new directory under `~/.mearl/extension-downloads/`, and prints the full path. Open
 `chrome://extensions/`, enable **Developer mode**, click **Load unpacked**, and select that directory.
 Keep the directory while Chrome uses the extension. This works with Chrome closed and with remote debugging disabled.
@@ -177,7 +177,7 @@ Keep the directory while Chrome uses the extension. This works with Chrome close
 Automatic installation uses CDP for first installation, initial migration of older setup extensions, or unavailable Native Host reload. If
 Chrome has not enabled CDP, interactive setup prompts you to open
 `chrome://inspect/#remote-debugging`, enable remote debugging, and allow the connection, then waits for installation. Human-facing
-instructions should omit `--yes`. Without a TTY, use `npx @mearl/setup@3 extension --yes`: it tries
+instructions should omit `--yes`. Without a TTY, use `npx @mearl/setup extension --yes`: it tries
 once and stops immediately if CDP is unavailable. If setup ownership cannot be confirmed and CDP is unavailable, it does not download or modify
 the extension directory. Enable CDP and rerun the same command. If Chrome lacks required extension-installation CDP methods,
 the command stops and asks for a Chrome upgrade.
@@ -207,7 +207,7 @@ starts the new version. Success requires both local CLI versions to match and be
 
 Automatic updates never downgrade a newer Host or modify cloud, MCP, or independently installed Mearl Skills.
 If the npm version is unpublished, the network unavailable, or updating fails, the old Host keeps running. The next extension background
-lifecycle may retry; manual updates use `npx @mearl/setup@3 update --local`.
+lifecycle may retry; manual updates use `npx @mearl/setup update --local`.
 
 ## Human and Agent use
 
@@ -222,41 +222,41 @@ lifecycle may retry; manual updates use `npx @mearl/setup@3 update --local`.
 
 ```bash
 # Default local browser environment installation
-npx @mearl/setup@3
+npx @mearl/setup
 
 # Equivalent to the previous command
-npx @mearl/setup@3 install
+npx @mearl/setup install
 
 # Noninteractive Agent / CI installation
-npx @mearl/setup@3 --yes
+npx @mearl/setup --yes
 
 # Install the cloud Agent environment
-npx @mearl/setup@3 --cloud
+npx @mearl/setup --cloud
 
 # Use one machine as both a local browser host and cloud Agent
-npx @mearl/setup@3 --local --cloud
+npx @mearl/setup --local --cloud
 
 # Update all detected Mearl environments in the current PATH
-npx @mearl/setup@3 update
+npx @mearl/setup update
 
 # Independently install or update the latest browser extension
-npx @mearl/setup@3 extension
+npx @mearl/setup extension
 
 # Complete local environment: client, Native Host, Skill, and extension
-npx @mearl/setup@3 extension --full
+npx @mearl/setup extension --full
 
 # Remove only the local environment
-npx @mearl/setup@3 uninstall --local
+npx @mearl/setup uninstall --local
 
 # Detect and uninstall without interaction
-npx @mearl/setup@3 uninstall --yes
+npx @mearl/setup uninstall --yes
 
 # Uninstall environments and all CLI plugins and Providers
-npx @mearl/setup@3 uninstall --full
+npx @mearl/setup uninstall --full
 
 # Install an optional browser Provider
-npx @mearl/setup@3 provider install @example/mearl-provider-device
-npx @mearl/setup@3 provider install @example/mearl-provider-cloud
+npx @mearl/setup provider install @example/mearl-provider-device
+npx @mearl/setup provider install @example/mearl-provider-cloud
 ```
 
 Existing npm/npx installation methods and CLIs for Mearl environment packages remain available; setup is the unified convenience entry.
@@ -273,4 +273,4 @@ The default directory is the public site's `installation.json`; override with HT
 
 Explicit setup first reuses the local preset. Without one, after runtime initialization and before Skill installation, it adopts the connected browser's trusted preset. Explicit `--preset <source>` wins. Differing browser selections, untrusted sources, or failed state reads require an explicit choice. First connection waits about one minute; closed browsers receive only the base environment and retry guidance. Ordinary connections and background core updates do not install an initial local preset.
 
-Distributions can set local-process `MEARL_SETUP_DEFAULT_PRESET` to a default manifest source. It applies only when neither side has a selection. Plugin, Provider, removal, and other subcommands keep their behavior. The public installer still owns installation and status verification.
+Distributions can set local-process `MEARL_SETUP_DEFAULT_PRESET` to a default manifest source. It applies only when neither side has a selection. Plugin, Provider, removal, and other subcommands keep their behavior. Setup performs installation and verifies its status.

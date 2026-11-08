@@ -155,7 +155,7 @@ Automatic updates reuse exact records, source validation, overrides, and conflic
 
 Deployers maintain trusted preset catalogs; the core defaults to empty. Website builds inject JSON through `MEARL_INSTALLATION_CONFIG_FILE`; deployment Actions read the same configuration from `MEARL_INSTALLATION_CONFIG`. Third-party discovery catalogs cannot directly become automatic-install catalogs. Presets cannot declare themselves trusted; trusted installation/updates accept matching ID and complete source only.
 
-The public default site, extension ID, and local default directory URL share `@mearl/preset/installation-site.json`. setup and Native updates support local `MEARL_INSTALLATION_CONFIG_URL`, which web pages cannot override and which does not change browser trust roots. Automatic updates require HTTPS; explicit CLI migration permits loopback HTTP for local validation. Deployed `installation.json` is readable: include only public addresses and policy, never credentials.
+The default installation site, extension ID, and local default catalog URL share `@mearl/preset/installation-site.json`. setup and Native updates support local `MEARL_INSTALLATION_CONFIG_URL`, which web pages cannot override and which does not change browser trust roots. Automatic updates require HTTPS; explicit CLI migration permits loopback HTTP for local validation. Deployed `installation.json` is readable: include only public addresses and policy, never credentials.
 
 
 ## Direct installation from a website
@@ -170,7 +170,7 @@ After a user click, the extension-owned view shows the actual requesting page an
 
 Source confirmation and authorization persist in sessions bound to extension install pages, expire after 15 minutes, and are deleted on cancellation. Source changes, revocation, forged pages, or expiry prevent continuation. One installation does not create long-term trust or authorize automatic updates. Without a candidate URL or configured direct-install catalog, return `INSTALLATION_SITE_NOT_CONFIGURED`.
 
-Public builds without the variable retain existing public-site connection entries. Different build configurations require extension reload/update; deploying a website alone does not add message protocols to installed releases.
+Without this variable, the extension uses the connection entry points on the default installation site. Reload or update the extension after changing its build configuration.
 
 ### Environment management entry
 
@@ -191,6 +191,6 @@ Presets may declare the installer's npm package, version/tag, HTTPS registry, an
 
 `management` lives under `defaults` and is saved with inheritance graphs and installation credentials. It is a distribution-management declaration, not user-overridable. Changing it requires explicit preset selection. It describes npm parameters only, rejecting shell commands, extra arguments, and execution hooks.
 
-`mearl guide troubleshooting` and the extension development guide generate management commands from locally verified installation credentials without browser connections, update checks, or factory loading. When no preset is selected, the public initial-install entry is shown. Missing or corrupt installation credentials stop command generation rather than overriding an existing selection with defaults.
+`mearl guide troubleshooting` and the extension development guide generate management commands from locally verified installation credentials without browser connections, update checks, or factory loading. If no preset is selected, the guide shows the first-time installation entry point. If a preset is selected and its credentials are missing or corrupt, the guide stops command generation.
 
-Distribution entries may wrap the same public installer. Public environment installation/update/removal share a local lifecycle lease; component installation retains its own lease, with nested children owned by both. Accepted version ranges are rechecked before package commands. Removal may clean out-of-range runtime packages but still requires verifiable records. Existing preset, Skill, and plugin source protections remain.
+Installation, updates, and removal share a local lifecycle lease. Component installation uses a separate lease, and both leases cover nested installer processes. Accepted version ranges are rechecked before package commands. Removal may clean out-of-range runtime packages but still requires verifiable records. Existing preset, Skill, and plugin source protections remain.

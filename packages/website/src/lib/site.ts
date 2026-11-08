@@ -15,7 +15,7 @@ export type Page = 'home' | 'extension' | 'installed' | 'connect' | Guide | `ref
 export { repositoryUrl };
 export const chromeStoreUrl = `https://chromewebstore.google.com/detail/mearl/${installationSite.extensionId}`;
 export const releaseLine = extensionPackage.version.split('.').slice(0, 2).join('.');
-export const setupCommand = 'npx @mearl/setup@3';
+export const setupCommand = 'npx @mearl/setup';
 export const firstTask = `mearl run <<'JS'
 const tab = await mearl.tabOpen({ url: 'https://example.com' });
 const page = await mearl.pageSnapshot({ tabId: tab.tabId });

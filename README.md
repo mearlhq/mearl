@@ -24,7 +24,7 @@ Mearl 3.0 的运行包要求 **Node.js ≥ 20.18.0**，浏览器使用 **Chrome 
 ### 安装本机环境
 
 ```bash
-npx @mearl/setup@3
+npx @mearl/setup
 ```
 
 安装器配置 `mearl` CLI、Native Host 和主 Mearl Skill。请安装与本机组件同版的扩展。
@@ -62,7 +62,7 @@ JS
 主 [Mearl Skill](skills/mearl/SKILL.md) 提供浏览器操作指引。配置好本机环境后，可按客户端需要安装 MCP 服务。
 
 ```bash
-npx @mearl/setup@3 --mcp
+npx @mearl/setup --mcp
 ```
 
 客户端配置与工具目录见 [MCP 文档](packages/mcp-server/README.md)。
@@ -72,7 +72,7 @@ npx @mearl/setup@3 --mcp
 本机环境和浏览器连接就绪后，项目可直接调用 TypeScript SDK：
 
 ```bash
-npm install @mearl/client@3
+npm install @mearl/client
 ```
 
 ```typescript

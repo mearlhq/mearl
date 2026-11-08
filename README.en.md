@@ -24,7 +24,7 @@ Mearl 3.0 runtime packages require **Node.js ≥ 20.18.0**. Use **Chrome ≥ 120
 ### Install locally
 
 ```bash
-npx @mearl/setup@3
+npx @mearl/setup
 ```
 
 The installer sets up the `mearl` CLI, Native Host, and main Mearl Skill. Install the extension version that matches the local runtime.
@@ -62,7 +62,7 @@ When multiple browsers are connected, use a returned `browserId` with `--browser
 The main [Mearl Skill](skills/mearl/SKILL.md) provides browser operation guidance. After setting up the local environment, install the MCP server if your client requires it.
 
 ```bash
-npx @mearl/setup@3 --mcp
+npx @mearl/setup --mcp
 ```
 
 See the [MCP documentation](packages/mcp-server/README.en.md) for client configuration and the tool catalog.
@@ -72,7 +72,7 @@ See the [MCP documentation](packages/mcp-server/README.en.md) for client configu
 Once the local environment and browser connection are ready, use the TypeScript SDK:
 
 ```bash
-npm install @mearl/client@3
+npm install @mearl/client
 ```
 
 ```typescript

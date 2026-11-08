@@ -27,10 +27,10 @@ npx skills add https://github.com/mearlhq/mearl --skill format-converter --globa
 setup combines standard Skills installation and plugin registration:
 
 ```bash
-npx @mearl/setup@3 plugin install https://github.com/mearlhq/mearl --skill format-converter --yes
+npx @mearl/setup plugin install https://github.com/mearlhq/mearl --skill format-converter --yes
 ```
 
-Standard Skills installation and Mearl plugin registration are separate operations. Do not assume the former executes install metadata in frontmatter. setup's plugin install reads the Skills installation results and then registers their plugins. Use `setup plugin "$SKILL_DIR"` to register a local entry point. Install a complete preset with `npx @mearl/setup@3 preset apply <source>`; the preset configures the Skills manager and supports inherited overrides.
+Standard Skills installation and Mearl plugin registration are separate operations. Do not assume the former executes install metadata in frontmatter. setup's plugin install reads the Skills installation results and then registers their plugins. Use `setup plugin "$SKILL_DIR"` to register a local entry point. Install a complete preset with `npx @mearl/setup preset apply <source>`; the preset configures the Skills manager and supports inherited overrides.
 
 These resources use the existing toolbox contract and require a compatible Mearl host. Node plugins and toolbox services require local components. Browser capability packages can load independently in the extension. TinyPNG uploads images to an external compression service as part of its existing functionality.
 
@@ -52,7 +52,7 @@ The [skills.sh FAQ](https://skills.sh/docs/faq) describes automatic leaderboard 
 Mearl plugin Skills use the combined installer so dependency preparation and registration run together:
 
 ```bash
-npx @mearl/setup@3 plugin install mearlhq/mearl --skill browser-tab-manager --yes
+npx @mearl/setup plugin install mearlhq/mearl --skill browser-tab-manager --yes
 ```
 
 Publish the matching Mearl host and extension before advertising Skills that require their new capabilities. See the [release guide](../docs/releases.en.md).
