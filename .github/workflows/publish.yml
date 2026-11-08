@@ -19,7 +19,7 @@ on:
       channel:
         description: Release channel
         type: choice
-        options: [beta, stable]
+        options: [beta, stable, patch]
         default: beta
         required: true
 
@@ -169,7 +169,7 @@ jobs:
   chrome-webstore:
     name: Submit Chrome Web Store review
     needs: [build, publish]
-    if: github.repository == 'mearlhq/mearl' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.channel == 'stable'
+    if: github.repository == 'mearlhq/mearl' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && (inputs.channel == 'stable' || inputs.channel == 'patch')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: chrome-webstore
@@ -191,6 +191,7 @@ jobs:
           path: ${{ runner.temp }}/mearl-release-artifacts
       - name: Submit the verified extension ZIP
         env:
+          RELEASE_CHANNEL: ${{ inputs.channel }}
           CHROME_WEBSTORE_PUBLISHER_ID: ${{ vars.CHROME_WEBSTORE_PUBLISHER_ID }}
           CHROME_WEBSTORE_SERVICE_ACCOUNT_JSON: ${{ secrets.CHROME_WEBSTORE_SERVICE_ACCOUNT_JSON }}
         run: node scripts/chrome-webstore.mjs "$RUNNER_TEMP/mearl-release-artifacts"

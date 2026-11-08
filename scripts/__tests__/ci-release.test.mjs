@@ -2,8 +2,8 @@ import { execFileSync } from 'node:child_process';
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { afterEach, expect, it } from 'vitest';
-import { packRelease, pendingPackages, prepareRelease, releaseVersion, selectRelease, verifyRelease, verifySelection, verifyTag } from '../ci-release.mjs';
+import { afterEach, expect, it, vi } from 'vitest';
+import { packRelease, patchReleaseNotes, pendingPackages, prepareRelease, releaseVersion, selectRelease, verifyLatestPatch, verifyRelease, verifySelection, verifyTag } from '../ci-release.mjs';
 
 const temporary = [];
 afterEach(async () => { await Promise.all(temporary.splice(0).map(path => rm(path, { recursive: true, force: true }))); });
@@ -33,27 +33,32 @@ async function fixture() {
   return { source, workspace: resolve(directory, 'build'), output: resolve(directory, 'artifacts'), env };
 }
 
-it('exports a clean commit, injects beta metadata without notes and packs verifiable artifacts', async () => {
+it.each([
+  ['beta', '3.0.0-beta.2', '3.0.0.2', 'codex/open-source-ready'],
+  ['patch', '3.0.1', '3.0.1.65535', 'main'],
+])('exports a clean commit, injects %s metadata without notes and packs verifiable artifacts', async (channel, version, chromeVersion, branch) => {
   const { source, workspace, output, env } = await fixture();
+  env.GITHUB_REF_NAME = branch;
   const sourcePackage = await readFile(resolve(source, 'package.json'), 'utf8');
-  await prepareRelease(source, workspace, '3.0.0-beta.2', 'beta', env);
+  await prepareRelease(source, workspace, version, channel, env);
   expect(await readFile(resolve(source, 'package.json'), 'utf8')).toBe(sourcePackage);
   expect(git(source, 'status', '--porcelain')).toBe('');
   expect(await readdir(workspace)).not.toContain('changelogs');
-  expect(JSON.parse(await readFile(resolve(workspace, 'package.json'), 'utf8')).version).toBe('3.0.0-beta.2');
+  expect(JSON.parse(await readFile(resolve(workspace, 'package.json'), 'utf8')).version).toBe(version);
   const extension = resolve(workspace, 'packages/extension/dist_chrome');
   await mkdir(extension);
-  await writeFile(resolve(extension, 'manifest.json'), JSON.stringify({ manifest_version: 3, version: '3.0.0.2', version_name: '3.0.0-beta.2' }));
-  const release = await packRelease(workspace, output, 'beta', env);
+  await writeFile(resolve(extension, 'manifest.json'), JSON.stringify({ manifest_version: 3, version: chromeVersion, version_name: version }));
+  const release = await packRelease(workspace, output, channel, env);
   expect(release.packages.map(value => value.name).sort()).toEqual(['@mearl/client', '@mearl/mcp-server']);
-  expect(release.assets.map(value => value.file)).toContain('mearl-chrome-v3.0.0-beta.2.zip');
-  const checked = await verifyRelease(source, output, 'beta', env);
-  expect(checked.args).toContain('--publish-branch=codex/open-source-ready');
+  expect(release.assets.map(value => value.file)).toContain(`mearl-chrome-v${version}.zip`);
+  const checked = await verifyRelease(source, output, channel, env);
+  expect(checked.args).toContain(`--publish-branch=${branch}`);
+  expect(checked.args).toContain(channel === 'patch' ? 'latest' : 'beta');
   expect(checked.args).not.toContain('--no-git-checks');
   expect(checked.release.sourceCommit).toBe(env.GITHUB_SHA);
   const file = resolve(output, release.packages[0].file);
   await writeFile(file, Buffer.concat([await readFile(file), Buffer.from('tampered')]));
-  await expect(verifyRelease(source, output, 'beta', env)).rejects.toThrow('integrity mismatch');
+  await expect(verifyRelease(source, output, channel, env)).rejects.toThrow('integrity mismatch');
 });
 
 it('rejects dirty sources, nested build directories, wrong workflow identity and uncommitted stable versions', async () => {
@@ -61,6 +66,7 @@ it('rejects dirty sources, nested build directories, wrong workflow identity and
   await expect(prepareRelease(source, resolve(source, '..nested'), '3.0.0-beta.2', 'beta', env)).rejects.toThrow('outside');
   await expect(prepareRelease(source, workspace, '3.0.0-beta.2', 'beta', { ...env, GITHUB_REPOSITORY: 'someone/mearl' })).rejects.toThrow('approved repository');
   await expect(prepareRelease(source, workspace, '3.0.0', 'stable', { ...env, GITHUB_REF_NAME: 'main' })).rejects.toThrow('committed versions');
+  await expect(prepareRelease(source, workspace, '3.1.1', 'patch', { ...env, GITHUB_REF_NAME: 'main' })).rejects.toThrow('same version line');
   await writeFile(resolve(source, 'pending.txt'), 'pending');
   await expect(prepareRelease(source, workspace, '3.0.0-beta.2', 'beta', env)).rejects.toThrow('clean source');
 });
@@ -75,12 +81,36 @@ it('resumes only identical registry tarballs and fails before publishing conflic
   expect(() => verifyTag('current', 'current')).not.toThrow();
 });
 
+it('stops a patch retry before writes when any package has a newer latest version', async () => {
+  const packages = [{ name: '@mearl/client' }, { name: '@mearl/setup' }];
+  const current = async url => String(url).includes('client') ? Response.json({ version: '3.0.1' }) : new Response(null, { status: 404 });
+  await expect(verifyLatestPatch(packages, '3.0.1', current)).resolves.toBeUndefined();
+  await expect(verifyLatestPatch(packages, '3.0.1', async url => String(url).includes('setup') ? Response.json({ version: '3.0.2' }) : current(url))).rejects.toThrow('newer stable version (3.0.2)');
+});
+
+it('lists direct commits since the published release while skipping a reserved tag', async () => {
+  const { source } = await fixture();
+  const commit = message => git(source, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '--allow-empty', '-m', message);
+  git(source, 'tag', 'v3.0.0');
+  commit('fix: first patch change');
+  git(source, 'tag', 'v3.0.1');
+  commit('fix: second patch change');
+  const notes = patchReleaseNotes(source, '3.0.2', tag => tag === 'v3.0.0');
+  expect(notes).toContain('first patch change');
+  expect(notes).toContain('second patch change');
+  expect(notes).toContain('compare/v3.0.0...v3.0.2');
+  expect(notes).not.toContain('compare/v3.0.1');
+});
+
 it.each([
   ['3.0.0-beta.1', 'beta', ['3.0.0-beta.1'], '3.0.0-beta.2'],
   ['3.0.0-beta.1', 'beta', ['3.0.0-beta.4'], '3.0.0-beta.5'],
   ['3.0.0', 'beta', ['3.0.0', '3.0.1'], '3.0.2-beta.0'],
   ['3.1.0-beta.0', 'beta', ['3.0.0'], '3.1.0-beta.0'],
   ['3.0.0', 'stable', ['3.0.0-beta.9'], '3.0.0'],
+  ['3.0.0', 'patch', ['3.0.0', '3.0.1-beta.9'], '3.0.1'],
+  ['3.0.1-beta.1', 'patch', ['3.0.0'], '3.0.1'],
+  ['3.0.0', 'patch', ['3.0.9', '3.0.10', '3.1.0-beta.1'], '3.0.11'],
 ])('automatically selects the version for %s / %s', (source, channel, published, expected) => {
   expect(releaseVersion(source, channel, published)).toBe(expected);
 });
@@ -92,7 +122,33 @@ it('retains one version per workflow run and rejects changed source or channel',
   expect(() => verifySelection(record, 'stable', env)).toThrow('another workflow');
   expect(() => verifySelection(record, 'beta', { ...env, GITHUB_SHA: 'other' })).toThrow('another workflow');
   expect(() => releaseVersion('3.0.0-beta.1', 'stable')).toThrow('committed stable version');
-  expect(() => releaseVersion('3.0.0', 'unknown')).toThrow('Choose beta or stable');
+  expect(() => releaseVersion('3.0.0', 'unknown')).toThrow('Choose beta, stable or patch');
+});
+
+it('requires patch publishing to follow the latest stable version line', () => {
+  expect(() => releaseVersion('3.0.0', 'patch', ['3.0.0-beta.1'])).toThrow('latest published stable version line');
+  expect(() => releaseVersion('3.1.0', 'patch', ['3.0.0'])).toThrow('latest published stable version line');
+  expect(() => releaseVersion('3.0.0', 'patch', ['3.0.1', '3.1.0'])).toThrow('latest published stable version line');
+  expect(() => releaseVersion('3.0.2', 'patch', ['3.0.0'])).toThrow('latest published stable version line');
+});
+
+it('selects a patch above both reserved tags and npm versions and retains it on retry', async () => {
+  const { source, workspace, env } = await fixture();
+  git(source, 'tag', 'v3.0.5');
+  const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async url => Response.json({
+    versions: String(url).includes('client') ? { '3.0.0': {} } : { '3.0.3': {}, '3.0.4-beta.1': {} },
+  }));
+  const context = { ...env, GITHUB_REF_NAME: 'main', GITHUB_RUN_ID: '123' };
+  const selection = resolve(workspace, 'version.json');
+  try {
+    await expect(selectRelease(source, selection, 'patch', context)).resolves.toEqual({ version: '3.0.6', cached: false });
+    git(source, 'tag', 'v3.0.8');
+    fetch.mockClear();
+    await expect(selectRelease(source, selection, 'patch', { ...context, GITHUB_RUN_ATTEMPT: '2' })).resolves.toEqual({ version: '3.0.6', cached: true });
+    expect(fetch).not.toHaveBeenCalled();
+  } finally {
+    fetch.mockRestore();
+  }
 });
 
 it('restores a cached version before querying published packages and stops reruns without a record', async () => {

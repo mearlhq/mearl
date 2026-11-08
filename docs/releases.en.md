@@ -2,7 +2,7 @@
 
 [简体中文](releases.md) | [English](releases.en.md)
 
-The main repository is `mearlhq/mearl`; release source is merged into `main`. In GitHub Actions, choose **Publish → Run workflow**, select `main`, and choose the `beta` or `stable` channel.
+The main repository is `mearlhq/mearl`, and release source is merged into `main`. In GitHub Actions, choose **Publish → Run workflow**, select `main`, and choose `beta`, `stable`, or `patch`.
 
 ## Beta
 
@@ -20,9 +20,17 @@ Publishing uses npm's trusted `publish.yml` OIDC identity. Validated tarballs ar
 
 Manually select `stable` on `main`. First prepare, review, and commit consistent version files, `changelogs/v<version>.md`, and `changelogs/v<version>.en.md`. The workflow reads that stable version and uses the Chinese notes as the GitHub Release body, with a link to the English notes. npm uses `latest`.
 
-To enable Analytics in the stable extension, set the repository's Actions variable `VITE_MEARL_ANALYTICS_ID` and secret `VITE_MEARL_ANALYTICS_SECRET`. Leave both empty to disable reporting. The build embeds both values in the public extension JavaScript. Align the store's privacy disclosure with the data collected before release.
+### Automatic patch releases
 
-After npm publishing and GitHub Release creation, **Submit Chrome Web Store review** submits the same verified extension ZIP. The store publishes it automatically after approval. This job runs only for manual `stable` releases from `main`.
+Manually select `patch` on `main`. The workflow checks public npm package versions and Git tags, then increments the highest occupied patch on the latest stable release line. The candidate must match the source's major and minor and match or advance its patch number. For example, when the source and latest stable release are 3.0.0, the workflow selects 3.0.1. Use `stable` to start a new major or minor release line.
+
+The version is written only to the exported build directory. The Git tag points to the original source commit. The workflow generates GitHub release notes from commits since the previous published release on the current version line. npm uses `latest`. A failed-job retry reuses the workflow's retained version and artifacts. If the store already has a manually uploaded package for the same version, verify its status and origin in the Developer Dashboard.
+
+### Store review
+
+The `patch` channel builds the extension with Analytics disabled. To enable Analytics on the `stable` channel, set the repository's Actions variable `VITE_MEARL_ANALYTICS_ID` and secret `VITE_MEARL_ANALYTICS_SECRET`. Leave both empty to disable reporting. The build embeds both values in the public extension JavaScript. Align the store's privacy disclosure with the data collected before release.
+
+After npm publishing and GitHub Release creation, **Submit Chrome Web Store review** submits the same verified extension ZIP. The store publishes it automatically after approval. This job runs for manual `stable` and `patch` releases from `main`.
 
 Restrict the `chrome-webstore` GitHub environment to deployments from `main`. Set the publisher ID as the environment variable `CHROME_WEBSTORE_PUBLISHER_ID` and the authorized [Chrome Web Store service account](https://developer.chrome.com/docs/webstore/service-accounts) JSON as the environment secret `CHROME_WEBSTORE_SERVICE_ACCOUNT_JSON`. If submission fails, check the upload and review status in the Developer Dashboard. If the same version is already uploaded as a draft, submit it from the dashboard. Rerunning a failed job uses the original artifact.
 

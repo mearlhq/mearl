@@ -27,10 +27,10 @@ it('uses latest only for explicitly selected stable versions', () => {
   expect(publishArgs(stable, { channel: 'stable' }).at(-1)).toBe('--publish-branch=main');
   expect(() => publishArgs(stable)).toThrow('matching beta versions');
   expect(() => publishArgs(manifests, { channel: 'stable' })).toThrow('matching stable versions');
-  expect(() => publishArgs(stable, { channel: 'next' })).toThrow('Choose beta or stable');
+  expect(() => publishArgs(stable, { channel: 'next' })).toThrow('Choose beta, stable or patch');
 });
-it('permits stable CI only for a manual run on main', () => {
-  const options = { channel: 'stable', env: { ...ci, GITHUB_REF_NAME: 'main', GITHUB_EVENT_NAME: 'workflow_dispatch' } };
+it.each(['stable', 'patch'])('permits %s CI only for a manual run on main', channel => {
+  const options = { channel, env: { ...ci, GITHUB_REF_NAME: 'main', GITHUB_EVENT_NAME: 'workflow_dispatch' } };
   expect(publishArgs(stable, options)).toContain('latest');
   expect(() => publishArgs(stable, { ...options, env: { ...options.env, GITHUB_EVENT_NAME: 'push' } })).toThrow('explicit manual run');
   expect(() => publishArgs(stable, { ...options, env: { ...options.env, GITHUB_REF_NAME: 'codex/open-source-ready' } })).toThrow('explicit manual run');

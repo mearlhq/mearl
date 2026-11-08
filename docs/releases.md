@@ -2,7 +2,7 @@
 
 [简体中文](releases.md) | [English](releases.en.md)
 
-主仓库为 `mearlhq/mearl`，发布源码统一合入 `main`。发布入口为 GitHub Actions 的 **Publish → Run workflow**，选择 `main` 和 `beta` 或 `stable` 通道。
+主仓库为 `mearlhq/mearl`，发布源码统一合入 `main`。在 GitHub Actions 打开 **Publish → Run workflow**，选择 `main` 和 `beta`、`stable` 或 `patch` 通道。
 
 ## Beta
 
@@ -20,9 +20,17 @@ Beta 是迭代制品。Action 查询所有公开包的 npm 版本，在源码目
 
 正式版在 `main` 手动选择 `stable`。先准备、审核并提交一致的版本文件，以及 `changelogs/v<version>.md` 和 `changelogs/v<version>.en.md`。工作流读取正式版本，并将中文版作为 GitHub Release 正文；正文链接到英文版。npm 使用 `latest` 标签。
 
-要启用正式版扩展的 Analytics，在仓库的 Actions 设置中添加变量 `VITE_MEARL_ANALYTICS_ID` 和 secret `VITE_MEARL_ANALYTICS_SECRET`。两项均为空时关闭上报。构建会将两项值写入公开的扩展 JavaScript，发布前应让商店隐私披露与实际采集行为一致。
+### 自动补丁版
 
-npm 发布和 GitHub Release 完成后，**Submit Chrome Web Store review** 用同一份已校验的扩展 ZIP 提审。审核通过后商店自动上架。只有从 `main` 手动触发的 `stable` 运行会执行这一步。
+在 `main` 手动选择 `patch`。工作流核对公开 npm 包版本和 Git 标签，在最新正式版本线上选择已占用的最大正式版本加一个 patch。候选版本须与源码的主版本和次版本一致，且补丁号至少达到源码版本。例如，源码和最新正式版均为 3.0.0 时选择 3.0.1。若要开启新的主版本或次版本，请使用 `stable` 通道。
+
+版本号只写入导出的构建目录。Git 标签指向参与构建的原始提交。工作流为 GitHub 正式 Release 生成发布说明，列出当前版本线自上一份已发布 Release 以来的提交。npm 使用 `latest` 标签。失败重试沿用原工作流保留的版本和制品。若商店已有同版本的手动上传，先在开发者后台核对该版本的状态和来源。
+
+### 商店提审
+
+`patch` 通道的扩展制品关闭 Analytics。要为 `stable` 通道启用 Analytics，在仓库的 Actions 设置中添加变量 `VITE_MEARL_ANALYTICS_ID` 和 secret `VITE_MEARL_ANALYTICS_SECRET`。两项均为空时关闭上报。构建会将两项值写入公开的扩展 JavaScript，发布前应让商店隐私披露与实际采集行为一致。
+
+npm 发布和 GitHub Release 完成后，**Submit Chrome Web Store review** 用同一份已校验的扩展 ZIP 提审。审核通过后商店自动上架。从 `main` 手动触发的 `stable` 和 `patch` 均执行这一步。
 
 在 GitHub 的 `chrome-webstore` Environment 中限定部署分支为 `main`，将发布者 ID 配为变量 `CHROME_WEBSTORE_PUBLISHER_ID`，将获授权的 [Chrome Web Store 服务账号](https://developer.chrome.com/docs/webstore/service-accounts) JSON 配为 secret `CHROME_WEBSTORE_SERVICE_ACCOUNT_JSON`。提审失败后先到开发者后台确认上传和审核状态。若同版本已上传为草稿，可直接在后台提交审核。重跑失败的 job 会沿用原制品。
 

@@ -133,7 +133,9 @@ export function storeZipVersion(manifest, version) {
 }
 
 async function main(artifacts, env) {
-  const { release } = await verifyRelease(root, artifacts, 'stable', env);
+  const channel = env.RELEASE_CHANNEL ?? 'stable';
+  if (channel !== 'stable' && channel !== 'patch') throw new Error('Chrome Web Store submissions require a stable or patch release.');
+  const { release } = await verifyRelease(root, artifacts, channel, env);
   const filename = `mearl-chrome-v${release.version}.zip`;
   if (!release.assets.some(item => item.file === filename)) throw new Error('The verified extension ZIP is missing.');
   const archive = resolve(artifacts, filename);

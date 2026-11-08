@@ -43,7 +43,7 @@ Do not run separate formatting commands unless requested. Respect configured Git
 
 Publishing packages, changing release versions, changing repository visibility and deploying websites require an explicit user request. Do not rewrite history. Preserve pnpm's clean-worktree, publish-branch and remote synchronization checks; do not use `--no-git-checks`.
 
-Release through `.github/workflows/publish.yml`, following `docs/releases.md`. Beta versions are selected automatically and injected into an exported build tree. Stable releases require committed version files and release notes. Website deployment uses the separate, manually triggered `.github/workflows/website.yml`.
+Release through `.github/workflows/publish.yml`, following `docs/releases.md`. The `beta` and `patch` channels select versions automatically and inject them into an exported build tree. The `stable` channel requires committed version files and release notes. Website deployment uses the separate, manually triggered `.github/workflows/website.yml`.
 
 Match validation to the requested scope. Release tasks end with the successful authorized publication and its version and installation or download entry point.
 
@@ -190,8 +190,8 @@ pnpm exec vitest run --project skills
 
 ## Version Management
 
-- Beta releases use the automatic version selection and exported build tree described in `docs/releases.md`; do not create source-only beta version commits.
-- For an explicitly requested stable release, run `pnpm bump <version>`, review all workspace versions, Skill frontmatter and MCP metadata, and prepare both `changelogs/v<version>.md` and `changelogs/v<version>.en.md` before committing.
+- The `beta` and `patch` channels use automatic version selection and an exported build tree as described in `docs/releases.md`.
+- For an explicitly requested release through the `stable` channel, run `pnpm bump <version>`, review all workspace versions, Skill frontmatter and MCP metadata, and prepare both `changelogs/v<version>.md` and `changelogs/v<version>.en.md` before committing.
 - Release notes describe concrete user-visible changes and compatibility requirements, grouped consistently with existing release notes. Verify website rendering when its changelog presentation changes.
 - Commit stable version files and notes together using `chore: v<version>`, matching root `package.json`.
 

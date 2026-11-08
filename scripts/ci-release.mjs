@@ -9,7 +9,7 @@ import { publishArgs } from './publish.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const repository = 'mearlhq/mearl';
-const run = (command, args, cwd) => execFileSync(command, args, { cwd, maxBuffer: 64 * 1024 * 1024 });
+const run = (command, args, cwd, input) => execFileSync(command, args, { cwd, input, maxBuffer: 64 * 1024 * 1024 });
 const json = async path => JSON.parse(await readFile(path, 'utf8'));
 const hash = (bytes, algorithm = 'sha512') => `${algorithm}-${createHash(algorithm).update(bytes).digest('base64')}`;
 const manifests = async directory => Promise.all((await workspaceManifests(directory)).map(async path => ({ path, value: await json(path) })));
@@ -20,6 +20,17 @@ function cleanSource(directory, commit) {
   }
 }
 
+const stableVersions = versions => versions
+  .map(version => /^(\d+)\.(\d+)\.(\d+)$/.exec(version))
+  .filter(Boolean)
+  .map(([version, major, minor, patch]) => ({ version, major: Number(major), minor: Number(minor), patch: Number(patch) }))
+  .sort((a, b) => b.major - a.major || b.minor - a.minor || b.patch - a.patch);
+
+function taggedVersions(directory, mergedOnly = false) {
+  return run('git', ['tag', '--list', ...(mergedOnly ? ['--merged', 'HEAD'] : []), 'v*'], directory)
+    .toString().trim().split('\n').map(tag => tag.slice(1));
+}
+
 export function releaseVersion(sourceVersion, channel, published = []) {
   const match = sourceVersion.match(/^(\d+)\.(\d+)\.(\d+)(?:-beta\.(\d+))?$/);
   if (!match) throw new Error('Source version must be a stable or beta version');
@@ -27,7 +38,15 @@ export function releaseVersion(sourceVersion, channel, published = []) {
     if (match[4] !== undefined) throw new Error('Prepare the committed stable version before publishing');
     return sourceVersion;
   }
-  if (channel !== 'beta') throw new Error('Choose beta or stable publishing');
+  if (channel === 'patch') {
+    const [major, minor, patch] = match.slice(1, 4).map(Number);
+    const [latest] = stableVersions(published);
+    if (!latest || latest.major !== major || latest.minor !== minor || latest.patch + 1 < patch) {
+      throw new Error('Patch publishing requires the source to be on the latest published stable version line');
+    }
+    return [major, minor, latest.patch + 1].join('.');
+  }
+  if (channel !== 'beta') throw new Error('Choose beta, stable or patch publishing');
   let base = match.slice(1, 4).join('.');
   let patch = Number(match[3]);
   while (published.includes(base)) base = `${match[1]}.${match[2]}.${++patch}`;
@@ -48,23 +67,23 @@ export async function selectRelease(directory, selection, channel, env = process
   if (!env.GITHUB_RUN_ID) throw new Error('Version selection requires a workflow run');
   await mkdir(dirname(selection), { recursive: true });
   const record = await json(selection).catch(error => { if (error.code === 'ENOENT') return undefined; throw error; });
+  const packages = await manifests(directory);
   let version;
   if (record) {
     version = verifySelection(record, channel, env);
   } else {
     if (Number(env.GITHUB_RUN_ATTEMPT ?? 1) > 1) throw new Error('The original release version record is missing; start a new workflow run after checking partial publication');
-    const packages = await manifests(directory);
-    const documents = channel === 'beta' ? await Promise.all(packages.filter(({ value }) => !value.private).map(async ({ value }) => {
+    const documents = channel === 'beta' || channel === 'patch' ? await Promise.all(packages.filter(({ value }) => !value.private).map(async ({ value }) => {
       const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(value.name)}`, { signal: AbortSignal.timeout(30_000) });
       if (response.status === 404) return {};
       if (!response.ok) throw new Error(`Registry verification failed: ${response.status}`);
       return response.json();
     })) : [];
     const published = documents.flatMap(document => Object.keys(document.versions ?? {}));
+    if (channel === 'patch') published.push(...taggedVersions(directory));
     version = releaseVersion(packages[0].value.version, channel, published);
     await writeFile(selection, JSON.stringify({ version, channel, sourceCommit: env.GITHUB_SHA, runId: env.GITHUB_RUN_ID }, null, 2) + '\n');
   }
-  const packages = await manifests(directory);
   publishArgs(packages.map(({ value }) => ({ ...value, version })), { channel, env });
   return { version, cached: Boolean(record) };
 }
@@ -78,12 +97,18 @@ export async function prepareRelease(directory, workspace, version, channel, env
   if (channel === 'stable' && (packages.some(({ value }) => value.version !== version) || !(await readFile(resolve(directory, `changelogs/v${version}.md`), 'utf8')).trim())) {
     throw new Error('Stable releases require committed versions and release notes');
   }
+  if (channel === 'patch') {
+    const [target, source] = [version, packages[0].value.version.split('-')[0]].map(value => stableVersions([value])[0]);
+    if (!source || target.major !== source.major || target.minor !== source.minor || target.patch < source.patch) {
+      throw new Error('Patch build version must match or advance the source patch on the same version line');
+    }
+  }
   await mkdir(workspace);
   const archive = resolve(workspace, 'source.tar');
   await writeFile(archive, run('git', ['archive', 'HEAD'], directory));
   run('tar', ['-xf', archive, '-C', workspace], directory);
-  // Only the exported build tree receives beta metadata; the Git checkout stays clean.
-  if (channel === 'beta') await bumpVersion(version, workspace, { changelog: false });
+  // Generated versions belong to the exported build tree.
+  if (channel === 'beta' || channel === 'patch') await bumpVersion(version, workspace, { changelog: false });
 }
 
 async function zipFiles(directory, prefix = '') {
@@ -158,6 +183,17 @@ export async function pendingPackages(packages, version, request = fetch) {
   return pending;
 }
 
+export async function verifyLatestPatch(packages, version, request = fetch) {
+  const versions = await Promise.all(packages.map(async ({ name }) => {
+    const response = await request(`https://registry.npmjs.org/${encodeURIComponent(name)}/latest`, { signal: AbortSignal.timeout(30_000) });
+    if (response.status === 404) return '';
+    if (!response.ok) throw new Error(`Registry verification failed: ${response.status}`);
+    return (await response.json()).version;
+  }));
+  const [latest] = stableVersions([version, ...versions]);
+  if (latest.version !== version) throw new Error(`A newer stable version (${latest.version}) supersedes patch ${version}`);
+}
+
 function github(path) {
   try { return JSON.parse(run('gh', ['api', path], root).toString()); }
   catch (error) { if (error.stderr?.toString().includes('(HTTP 404)')) return undefined; throw error; }
@@ -165,6 +201,23 @@ function github(path) {
 
 export function verifyTag(commit, expected) {
   if (commit !== expected) throw new Error('Existing release tag belongs to another source commit');
+}
+
+export function patchReleaseNotes(directory, version, isPublished) {
+  const [target] = stableVersions([version]);
+  const previous = stableVersions(taggedVersions(directory, true)).find(value =>
+    value.major === target.major && value.minor === target.minor && value.patch < target.patch && isPublished(`v${value.version}`),
+  );
+  const tag = previous && `v${previous.version}`;
+  const commits = run('git', [
+    'log', '--no-merges', '--format=- %s (%h)', ...(tag ? [`refs/tags/${tag}..HEAD`] : ['--max-count=20']),
+  ], directory).toString().trim();
+  const notes = [
+    '## 补丁发布 / Patch release',
+    commits || '本次发布与上一正式版使用同一源码。 / This patch uses the same source as the previous stable release.',
+  ];
+  if (tag) notes.push(`[完整变更 / Full changelog](https://github.com/${repository}/compare/${tag}...v${version})`);
+  return notes.join('\n\n') + '\n';
 }
 
 async function githubRelease(directory, output, channel, env) {
@@ -179,8 +232,17 @@ async function githubRelease(directory, output, channel, env) {
   } else run('gh', ['api', '--method', 'POST', `${api}/git/refs`, '-f', `ref=refs/tags/${tag}`, '-f', `sha=${release.sourceCommit}`], directory);
   const existing = github(`${api}/releases/tags/${tag}`);
   if (!existing) {
-    const notes = channel === 'beta' ? ['--notes', `Beta build from ${release.sourceCommit}.`] : ['--notes-file', resolve(directory, `changelogs/${tag}.md`)];
-    run('gh', ['release', 'create', tag, '--repo', repository, '--verify-tag', '--title', tag, ...(channel === 'beta' ? ['--prerelease'] : []), ...notes, ...release.assets.map(item => resolve(output, item.file))], directory);
+    let notes;
+    let input;
+    if (channel === 'beta') notes = ['--notes', `Beta build from ${release.sourceCommit}.`];
+    else if (channel === 'patch') {
+      input = patchReleaseNotes(directory, release.version, previousTag => {
+        const previous = github(`${api}/releases/tags/${previousTag}`);
+        return previous && !previous.draft && !previous.prerelease;
+      });
+      notes = ['--notes-file', '-'];
+    } else notes = ['--notes-file', resolve(directory, `changelogs/${tag}.md`)];
+    run('gh', ['release', 'create', tag, '--repo', repository, '--verify-tag', '--title', tag, ...(channel === 'beta' ? ['--prerelease'] : []), ...notes, ...release.assets.map(item => resolve(output, item.file))], directory, input);
     return;
   }
   if (existing.draft || existing.prerelease !== (channel === 'beta')) throw new Error('Existing GitHub release has a different channel');
@@ -206,6 +268,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   else if (operation === 'check') console.log((await verifyRelease(root, output, values.channel)).release);
   else if (operation === 'publish') {
     const { release, args } = await verifyRelease(root, output, values.channel);
+    if (values.channel === 'patch') await verifyLatestPatch(release.packages, release.version);
     // A tag is immutable once it identifies a different source tree.
     const ref = github(`repos/${repository}/git/ref/tags/v${release.version}`);
     if (ref) {
