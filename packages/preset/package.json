@@ -1,0 +1,50 @@
+{
+  "name": "@mearl/preset",
+  "version": "3.0.0",
+  "description": "Browser-compatible preset validation, inheritance and capability resolution for Mearl",
+  "type": "module",
+  "license": "Apache-2.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./bundles": {
+      "types": "./dist/bundles.d.ts",
+      "import": "./dist/bundles.js"
+    },
+    "./installation": {
+      "types": "./dist/installation.d.ts",
+      "import": "./dist/installation.js"
+    },
+    "./installation-site.json": "./installation-site.json",
+    "./networkRoutes": {
+      "types": "./dist/networkRoutes.d.ts",
+      "import": "./dist/networkRoutes.js"
+    }
+  },
+  "files": [
+    "README.en.md",
+    "dist",
+    "!dist/**/*.map",
+    "installation-site.json"
+  ],
+  "scripts": {
+    "build": "rm -rf dist/ && tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "semver": "^7.8.5"
+  },
+  "devDependencies": {
+    "@types/semver": "^7.7.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mearlhq/mearl.git",
+    "directory": "packages/preset"
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "name": "@mearl/mcp-server",
+  "version": "3.0.0",
+  "description": "MCP Server for Mearl - enables AI to interact with Chrome browser requests and logs",
+  "mcpName": "io.github.mearlhq/mearl",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "@mearl/mcp-server": "./dist/index.js",
+    "mearl-mcp-server": "./dist/index.js",
+    "mearl-mcp-configure": "./dist/configure-bin.js",
+    "mearl-mcp-uninstall": "./dist/uninstall-bin.js"
+  },
+  "files": [
+    "README.en.md",
+    "dist",
+    "!dist/**/*.map",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "rm -rf dist/ && node build.mjs",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "setup": "pnpm build && npm link",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm build"
+  },
+  "keywords": [
+    "mcp",
+    "chrome-extension",
+    "devtools",
+    "mearl",
+    "ai"
+  ],
+  "author": "",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20.18.0"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org"
+  },
+  "dependencies": {
+    "@mearl/client": "workspace:*",
+    "@mearl/native-host": "workspace:*",
+    "@mearl/setup": "workspace:*",
+    "commander": "^14.0.3",
+    "prompts": "^2.4.2"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "1.32.0",
+    "@types/node": "^24.9.1",
+    "@types/prompts": "^2.4.9",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.8.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mearlhq/mearl.git",
+    "directory": "packages/mcp-server"
+  }
+}

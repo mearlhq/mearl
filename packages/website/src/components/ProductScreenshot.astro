@@ -1,0 +1,20 @@
+---
+import { siteBase, type Locale } from '../lib/site';
+import { screenshots, type Screenshot } from '../lib/screenshots';
+
+interface Props {
+  screenshot: Screenshot;
+  locale: Locale;
+  eager?: boolean;
+}
+const { screenshot, locale, eager } = Astro.props;
+const image = screenshots[screenshot];
+const src = `${siteBase}screenshots/${image.file}`;
+const caption = image[locale];
+---
+<figure class:list={['docs-figure', { 'docs-figure-portrait': image.width < image.height }]}>
+  <a href={src} aria-label={locale === 'zh-CN' ? `查看大图：${caption}` : `Open full-size screenshot. ${caption}`}>
+    <img {src} alt="" width={image.width} height={image.height} loading={eager ? 'eager' : 'lazy'} decoding="async" />
+  </a>
+  <figcaption>{caption}</figcaption>
+</figure>

@@ -1,0 +1,55 @@
+name: Published runtime on Windows
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install one published beta from the official registry
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Invoke-RestMethod 'https://registry.npmjs.org/@mearl%2fsetup/beta').version
+          if ($version -notmatch '^\d+\.\d+\.\d+-beta\.\d+$') { throw "Unexpected beta: $version" }
+          $runtime = Join-Path $env:RUNNER_TEMP 'mearl runtime'
+          New-Item -ItemType Directory -Force $runtime | Out-Null
+          npm install --prefix $runtime --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org --@mearl:registry=https://registry.npmjs.org "@mearl/setup@$version" "@mearl/native-host@$version"
+          if ($LASTEXITCODE -ne 0) { throw 'Runtime installation failed' }
+          "SMOKE_VERSION=$version" >> $env:GITHUB_ENV
+          "SMOKE_RUNTIME=$runtime" >> $env:GITHUB_ENV
+      - name: Download the matching release extension and Chrome for Testing
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $assets = Join-Path $env:RUNNER_TEMP 'mearl smoke assets'
+          New-Item -ItemType Directory -Force $assets | Out-Null
+          gh release download "v$env:SMOKE_VERSION" --repo $env:GITHUB_REPOSITORY --dir $assets --pattern "mearl-chrome-v$env:SMOKE_VERSION.zip"
+          if ($LASTEXITCODE -ne 0) { throw 'Release download failed' }
+          $extension = Join-Path $assets 'extension'
+          Expand-Archive (Join-Path $assets "mearl-chrome-v$env:SMOKE_VERSION.zip") $extension
+          $stable = (Invoke-RestMethod 'https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json').channels.Stable
+          $download = $stable.downloads.chrome | Where-Object { $_.platform -eq 'win64' }
+          Invoke-WebRequest $download.url -OutFile (Join-Path $assets 'chrome.zip')
+          Expand-Archive (Join-Path $assets 'chrome.zip') (Join-Path $assets 'browser')
+          "SMOKE_EXTENSION=$extension" >> $env:GITHUB_ENV
+          "SMOKE_CHROME=$(Join-Path $assets 'browser/chrome-win64/chrome.exe')" >> $env:GITHUB_ENV
+      - name: Verify registration, Chrome handshake and CLI transport
+        run: node scripts/smoke-windows.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-runtime-smoke
+          if-no-files-found: ignore
+          path: ${{ runner.temp }}/mearl-windows-smoke/proof.json

@@ -1,0 +1,133 @@
+---
+import { ArrowDown, ArrowRight } from '@lucide/astro';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ProductScreenshot from './ProductScreenshot.astro';
+import { clientDemoPath, siteBase, sitePath, type Guide, type Locale } from '../lib/site';
+import { siteCopy } from '../lib/site-copy';
+import '../styles/home.css';
+
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+const t = siteCopy[locale];
+const useCaseLinks = [
+  sitePath(locale, 'emulation') + '#verify',
+  sitePath(locale, 'web-debugging') + '#trace',
+  sitePath(locale, 'skill-plugins') + '#design-review',
+  sitePath(locale, 'skill-plugins') + '#reuse-workflow',
+];
+const capabilityLinks: Array<Array<{ page: Guide; label: string; anchor?: string }>> = [
+  [
+    { page: 'browser-automation', label: t.automation },
+    { page: 'authenticated-requests', label: t.authenticatedRequests },
+  ],
+  [
+    { page: 'web-debugging', label: t.debugging },
+  ],
+  [
+    { page: 'emulation', label: t.mobileGuide, anchor: '#app' },
+    { page: 'emulation', label: t.miniProgramGuide, anchor: '#wechat-miniprogram' },
+  ],
+  [
+    { page: 'skill-plugins', label: t.reuseGuide, anchor: '#reuse-workflow' },
+    { page: 'ego-lite', label: 'EgoLite' },
+    { page: 'bb-browser', label: t.bbAdapters },
+  ],
+];
+const comparison = [
+  { key: 'browser', label: t.comparisonBrowser, caption: t.comparisonBrowserCaption, width: 804, height: 1520 },
+  { key: 'wechat-mini-program', label: t.comparisonApp, caption: t.comparisonAppCaption, width: 649, height: 1227 },
+] as const;
+---
+<BaseLayout title={`Mearl · ${t.tagline}`} description={t.heroLead} {locale} page="home">
+  <div class="product-home docs-article">
+    <section class="product-hero" aria-labelledby="hero-title">
+      <div class="product-hero-copy">
+        <h1 id="hero-title">{t.headline[0]} <span>{t.headline[1]}</span></h1>
+        <p>{t.heroLead}</p>
+        <div class="product-actions">
+          <a class="button button-primary" href={sitePath(locale, 'installation')}>{t.homeInstall}<ArrowRight size={15} aria-hidden="true" /></a>
+          <a class="button button-secondary" href="#app-comparison">{t.seeExample}<ArrowDown size={14} aria-hidden="true" /></a>
+        </div>
+        <span class="product-license">{t.openSource}</span>
+      </div>
+
+      <section class="product-comparison" id="app-comparison" aria-labelledby="comparison-title">
+        <h2 id="comparison-title">{t.comparisonTitle}</h2>
+        <div class="product-comparison-grid">
+          {comparison.map(({ key, label, caption, width, height }) => {
+            const src = `${siteBase}screenshots/travel-h5-${key}.webp`;
+            return (
+              <figure class="product-comparison-view">
+                <h3>{label}</h3>
+                <a href={src} aria-label={caption}>
+                  <img {src} {width} {height} alt="" decoding="async" />
+                </a>
+                <figcaption>{caption}</figcaption>
+              </figure>
+            );
+          })}
+        </div>
+        <div class="product-comparison-links">
+          <a href={sitePath(locale, 'emulation') + '#app'}>{t.mobileGuide}<ArrowRight size={14} aria-hidden="true" /></a>
+          <a href={clientDemoPath(locale)}>{t.openDemo}<ArrowRight size={14} aria-hidden="true" /></a>
+        </div>
+      </section>
+    </section>
+
+    <section class="product-section" id="capabilities">
+      <h2>{t.capabilityOverview}</h2>
+      <ul class="product-capabilities" role="list">
+        {t.capabilityGroups.map(({ title, text }, index) => (
+          <li>
+            <h3>{title}</h3>
+            <div>
+              <p>{text}</p>
+              <div class="product-links">
+                {capabilityLinks[index].map(({ page, label, anchor = '' }) => (
+                  <a href={sitePath(locale, page) + anchor}>{label}<ArrowRight size={14} aria-hidden="true" /></a>
+                ))}
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+
+    <section class="product-section" id="case">
+      <div class="product-case-intro">
+        <div>
+          <h2>{t.caseTitle}</h2>
+          <p>{t.caseLead}</p>
+        </div>
+        <a class="docs-next" href={sitePath(locale, 'web-debugging') + '#change'}>{t.caseGuide}<ArrowRight size={15} aria-hidden="true" /></a>
+      </div>
+      <div class="product-case-shots">
+        <div><h3>{t.caseBefore}</h3><ProductScreenshot screenshot="ordersResponse" {locale} /></div>
+        <div><h3>{t.caseAfter}</h3><ProductScreenshot screenshot="ordersMock" {locale} /></div>
+      </div>
+    </section>
+
+    <section class="product-section" id="workflow">
+      <h2>{t.useCasesTitle}</h2>
+      <div class="product-role-links">
+        {t.useCases.map(({ title, text }, index) => (
+          <a href={useCaseLinks[index]}>
+            <strong>{title}<ArrowRight size={16} aria-hidden="true" /></strong>
+            <span>{text}</span>
+          </a>
+        ))}
+      </div>
+    </section>
+
+    <section class="product-section product-start" id="start">
+      <div>
+        <h2>{t.homeInstall}</h2>
+        <p>{t.startInstall}</p>
+      </div>
+      <div class="product-actions">
+        <a class="button button-primary" id="installation" href={sitePath(locale, 'installation')}>{t.install}<ArrowRight size={15} aria-hidden="true" /></a>
+        <a class="button button-secondary" id="quick-start" href={sitePath(locale, 'quick-start')}>{t.quickstart}</a>
+      </div>
+    </section>
+  </div>
+</BaseLayout>

@@ -1,0 +1,11 @@
+---
+import GuidePage from '../components/GuidePage.astro';
+import { guidePages, type Guide } from '../lib/site';
+
+export function getStaticPaths() {
+  return guidePages.map(guide => ({ params: { guide }, props: { page: guide } }));
+}
+interface Props { page: Guide }
+const { page } = Astro.props;
+---
+<GuidePage locale="zh-CN" {page} />

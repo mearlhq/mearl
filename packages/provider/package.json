@@ -1,0 +1,57 @@
+{
+  "name": "@mearl/provider",
+  "version": "3.0.0",
+  "description": "Unified contracts and runtime utilities for built-in and external Mearl browser providers",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime.d.ts",
+      "import": "./dist/runtime.js"
+    },
+    "./host": {
+      "types": "./dist/host.d.ts",
+      "import": "./dist/host.js"
+    }
+  },
+  "files": [
+    "README.en.md",
+    "dist",
+    "!dist/**/*.map"
+  ],
+  "scripts": {
+    "build": "rm -rf dist/ && tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build"
+  },
+  "keywords": [
+    "mearl",
+    "browser-provider"
+  ],
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20.18.0"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org"
+  },
+  "dependencies": {
+    "@mearl/daemon-core": "workspace:*",
+    "@mearl/browser-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.1",
+    "typescript": "^5.8.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mearlhq/mearl.git",
+    "directory": "packages/provider"
+  }
+}

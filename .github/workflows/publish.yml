@@ -1,0 +1,156 @@
+name: Publish
+run-name: Publish ${{ inputs.channel || 'beta' }} ${{ github.event_name == 'workflow_dispatch' && 'release' || 'validation' }}
+
+on:
+  push:
+    branches: [main, codex/open-source-ready]
+    paths:
+      - .github/workflows/publish.yml
+      - scripts/ci-release.mjs
+      - scripts/publish.mjs
+      - scripts/bump-version.mjs
+      - scripts/__tests__/ci-release.test.mjs
+      - scripts/__tests__/publish.test.mjs
+      - scripts/__tests__/bump-version.test.mjs
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Release channel
+        type: choice
+        options: [beta, stable]
+        default: beta
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and verify release
+    if: github.repository == 'mearlhq/mearl' && github.ref_type == 'branch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    env:
+      RELEASE_CHANNEL: ${{ inputs.channel || 'beta' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Attach the exact source commit to its release branch
+        run: |
+          git switch -c "$GITHUB_REF_NAME"
+          git branch --set-upstream-to="origin/$GITHUB_REF_NAME"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - uses: actions/cache/restore@v4
+        id: selection-cache
+        with:
+          path: ${{ runner.temp }}/mearl-release-selection
+          key: release-version-${{ github.run_id }}
+      - name: Select and retain the artifact version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! test -f scripts/ci-release.mjs; then
+            printf '%s\n' 'Select a branch containing the complete Mearl source.' >&2
+            exit 1
+          fi
+          node scripts/ci-release.mjs select --channel "$RELEASE_CHANNEL" --selection "$RUNNER_TEMP/mearl-release-selection/version.json"
+      - uses: actions/cache/save@v4
+        if: steps.version.outputs.cached != 'true'
+        with:
+          key: release-version-${{ github.run_id }}
+          path: ${{ runner.temp }}/mearl-release-selection
+      - name: Prepare artifact versions outside the source checkout
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if ! test -f scripts/ci-release.mjs; then
+            printf '%s\n' 'Select a branch containing the complete Mearl source.' >&2
+            exit 1
+          fi
+          node scripts/ci-release.mjs prepare --channel "$RELEASE_CHANNEL" --version "$RELEASE_VERSION" --workspace "$RUNNER_TEMP/mearl-release"
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+        working-directory: ${{ runner.temp }}/mearl-release
+      - run: pnpm build
+        working-directory: ${{ runner.temp }}/mearl-release
+      - run: npx --yes --package=node@20.18.0 -- node scripts/verify-node-runtime.mjs
+        working-directory: ${{ runner.temp }}/mearl-release
+      - run: pnpm typecheck
+        working-directory: ${{ runner.temp }}/mearl-release
+      - run: pnpm check:skills
+        working-directory: ${{ runner.temp }}/mearl-release
+      - run: pnpm check:preset-browser
+        working-directory: ${{ runner.temp }}/mearl-release
+      - run: pnpm check:core-browser
+        working-directory: ${{ runner.temp }}/mearl-release
+      - run: pnpm test --maxWorkers=2
+        working-directory: ${{ runner.temp }}/mearl-release
+      - name: Pack npm packages and extension attachments
+        run: node scripts/ci-release.mjs pack --channel "$RELEASE_CHANNEL" --artifacts "$RUNNER_TEMP/mearl-release-artifacts"
+        working-directory: ${{ runner.temp }}/mearl-release
+      - name: Verify tarballs against the original source commit
+        run: node scripts/ci-release.mjs check --channel "$RELEASE_CHANNEL" --artifacts "$RUNNER_TEMP/mearl-release-artifacts"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mearl-${{ steps.version.outputs.version }}
+          if-no-files-found: error
+          path: ${{ runner.temp }}/mearl-release-artifacts
+
+  publish:
+    name: Publish verified artifacts
+    needs: build
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+      id-token: write
+    env:
+      RELEASE_CHANNEL: ${{ inputs.channel }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Attach the exact source commit to its release branch
+        run: |
+          git switch -c "$GITHUB_REF_NAME"
+          git branch --set-upstream-to="origin/$GITHUB_REF_NAME"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: mearl-${{ needs.build.outputs.version }}
+          path: ${{ runner.temp }}/mearl-release-artifacts
+      - name: Verify the retained artifacts against the original source commit
+        run: node scripts/ci-release.mjs check --channel "$RELEASE_CHANNEL" --artifacts "$RUNNER_TEMP/mearl-release-artifacts"
+      - name: Publish tarballs through npm OIDC from the clean checkout
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci-release.mjs publish --channel "$RELEASE_CHANNEL" --artifacts "$RUNNER_TEMP/mearl-release-artifacts"
+      - name: Attach the immutable source tag and release downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci-release.mjs github --channel "$RELEASE_CHANNEL" --artifacts "$RUNNER_TEMP/mearl-release-artifacts"

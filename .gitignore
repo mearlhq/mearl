@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+
+# Browser extension build output
+packages/extension/dist_chrome/
+packages/extension/dist_firefox/
+packages/extension/build/
+
+# Astro generated declarations
+packages/website/.astro/

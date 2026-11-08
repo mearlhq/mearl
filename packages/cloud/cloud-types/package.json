@@ -1,0 +1,45 @@
+{
+  "name": "@mearl/cloud-types",
+  "version": "3.0.0",
+  "description": "Shared types for Mearl cloud communication packages",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "README.en.md",
+    "dist",
+    "!dist/**/*.map"
+  ],
+  "scripts": {
+    "build": "rm -rf dist/ && tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build"
+  },
+  "keywords": [
+    "mearl",
+    "cloud-types"
+  ],
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20.18.0"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mearlhq/mearl.git",
+    "directory": "packages/cloud/cloud-types"
+  }
+}

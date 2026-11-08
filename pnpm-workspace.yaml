@@ -1,0 +1,12 @@
+packages:
+  - 'packages/*'
+  - 'packages/cloud/*'
+
+# The Vitest adapter needs its test host to resolve inside the shared store.
+packageExtensions:
+  '@testing-library/jest-dom@6.9.1':
+    peerDependencies:
+      vitest: '*'
+    peerDependenciesMeta:
+      vitest:
+        optional: true

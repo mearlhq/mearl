@@ -1,0 +1,64 @@
+{
+  "tools": [
+    {
+      "id": "plugin:convert",
+      "plugin": "convert",
+      "repository": "mearlhq/mearl",
+      "skill": "format-converter",
+      "title": "格式转换",
+      "description": "时间戳、Base64、图片与 URL 双向转换",
+      "icon": "wrench",
+      "locales": {
+        "en": {
+          "title": "Format converter",
+          "description": "Convert timestamps, Base64, images and URL encoding"
+        }
+      }
+    },
+    {
+      "id": "plugin:notes",
+      "plugin": "notes",
+      "repository": "mearlhq/mearl",
+      "skill": "notes-memory",
+      "title": "记事本",
+      "description": "随手记录，并让 Agent 记住重要信息",
+      "icon": "notebook-pen",
+      "locales": {
+        "en": {
+          "title": "Notes",
+          "description": "Write notes and manage persistent Agent memory"
+        }
+      }
+    },
+    {
+      "id": "plugin:tabs",
+      "plugin": "tabs",
+      "repository": "mearlhq/mearl",
+      "skill": "browser-tab-manager",
+      "title": "标签管理",
+      "description": "整理和管理标签分组，关闭 Mearl 受控标签页",
+      "icon": "app-window",
+      "locales": {
+        "en": {
+          "title": "Tab Manager",
+          "description": "Organize tab groups and close Mearl controlled tabs"
+        }
+      }
+    },
+    {
+      "id": "plugin:tinypng",
+      "plugin": "tinypng",
+      "repository": "mearlhq/mearl",
+      "skill": "tinypng-compress",
+      "title": "图片压缩",
+      "description": "粘贴、拖入或选择图片，通过 TinyPNG 压缩",
+      "icon": "package",
+      "locales": {
+        "en": {
+          "title": "Image compression",
+          "description": "Paste, drop or choose images to compress with TinyPNG"
+        }
+      }
+    }
+  ]
+}

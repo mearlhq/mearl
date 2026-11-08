@@ -1,0 +1,3350 @@
+{
+  "appBridgeWebPageEnvironment": { "message": "网页环境" },
+  "appBridgeWebPageEnvironmentReload": { "message": "切换环境会重新加载当前网页。" },
+  "appProfileInstallTitle": { "message": "添加端模拟" },
+  "appProfileInstallAction": { "message": "添加端模拟" },
+  "appProfileInstallOfficial": { "message": "官方端模拟" },
+  "appProfileInstallWeChat": { "message": "微信端模拟" },
+  "appProfileInstallDescription": { "message": "从 GitHub 仓库或 HTTPS 能力包地址安装端模拟。请确认你信任此来源。" },
+  "appProfileInstallSource": { "message": "端模拟来源" },
+  "appProfileInstallPermissionDenied": { "message": "未授权读取端模拟来源。" },
+  "appProfileInstallFailed": { "message": "无法安装端模拟。" },
+  "appProfileInstallPending": { "message": "正在安装…" },
+  "appProfileInstallSubmit": { "message": "安装" },
+  "appProfileInstallSuccess": { "message": "已安装 $1" },
+  "requestProtocolLabel": { "message": "协议请求" },
+  "accountRequestFailed": {
+    "message": "请求失败"
+  },
+  "toolboxUserScriptsTitle": {
+    "message": "需要开启用户脚本"
+  },
+  "toolboxUserScriptsHint": {
+    "message": "在 Mearl 扩展详情页开启「允许用户脚本」。如果使用 Chrome 135–137，请在扩展程序页面开启「开发者模式」。然后返回要操作的网页重试。"
+  },
+  "toolboxUserScriptsOpen": {
+    "message": "打开扩展详情"
+  },
+  "extName": {
+    "message": "Mearl"
+  },
+  "extDescription": {
+    "message": "Agent 驱动的浏览器工具：自动化验证、调试观测、一键 Mock"
+  },
+  "openAgentSidePanelFromPage": {
+    "message": "打开 Mearl 侧边栏"
+  },
+  "openAgentSidePanelFailed": {
+    "message": "无法打开 Mearl 侧边栏，请重试。"
+  },
+  "scanQrCode": {
+    "message": "识别二维码"
+  },
+  "qrCopied": {
+    "message": "✅ 已复制: $content$",
+    "placeholders": {
+      "content": {
+        "content": "$1"
+      }
+    }
+  },
+  "qrNotFound": {
+    "message": "⚠️ 未识别到二维码，可复制图片后粘贴到 Mearl Popup 中重试"
+  },
+  "qrFailed": {
+    "message": "❌ 二维码识别失败，可复制图片后粘贴到 Mearl Popup 中重试"
+  },
+  "qrPasteDetected": {
+    "message": "已识别并展示二维码内容"
+  },
+  "qrPasteNotFound": {
+    "message": "粘贴的图片中未识别到二维码"
+  },
+  "qrPasteFailed": {
+    "message": "暂时无法识别粘贴图片中的二维码"
+  },
+  "preserveLog": {
+    "message": "保留日志"
+  },
+  "modify": {
+    "message": "修改响应"
+  },
+  "clear": {
+    "message": "清空"
+  },
+  "prevMatch": {
+    "message": "上一个"
+  },
+  "nextMatch": {
+    "message": "下一个"
+  },
+  "clearAllRequests": {
+    "message": "清空所有请求"
+  },
+  "requests": {
+    "message": "个请求"
+  },
+  "noRequests": {
+    "message": "暂无请求"
+  },
+  "filterRequests": {
+    "message": "API 名称 (支持正则)"
+  },
+  "collapseFilterBar": {
+    "message": "收起筛选"
+  },
+  "expandFilterBar": {
+    "message": "展开筛选"
+  },
+  "requestsWillAppearHere": {
+    "message": "正在监听请求"
+  },
+  "noMatchingRequests": {
+    "message": "没有匹配的请求"
+  },
+  "switchToProtocolHint": {
+    "message": "Protocol 模式已收到 $1 个请求，点击切换"
+  },
+  "switchToRequestsHint": {
+    "message": "Requests 模式已收到 $1 个请求，点击切换"
+  },
+  "enableResponseModification": {
+    "message": "启用响应修改"
+  },
+  "enableResponseModificationFailed": {
+    "message": "开启修改响应失败，请重试。"
+  },
+  "responseModificationDebuggerBusy": {
+    "message": "开启修改响应失败：当前页面被其他调试工具占用，请断开占用后重试。"
+  },
+  "showAllSpmNodes": {
+    "message": "高亮SPM"
+  },
+  "showAllSpmNodesTooltip": {
+    "message": "高亮页面中所有 SPM 节点（绿=abcd，橙=click，蓝=spm）"
+  },
+  "heatmap": {
+    "message": "热度数据"
+  },
+  "heatmapCurrentSpmAB": {
+    "message": "当前页 AB 点"
+  },
+  "heatmapNoSpmAB": {
+    "message": "未识别到当前页 AB 点，请刷新页面或检查页面是否打了 spm"
+  },
+  "heatmapLoginRequired": {
+    "message": "请先登录 $1"
+  },
+  "heatmapOpenLogin": {
+    "message": "打开登录页"
+  },
+  "heatmapMeasureExpired": {
+    "message": "服务端指标字段已变更，请联系插件维护者更新"
+  },
+  "heatmapMeasureExpUv": {
+    "message": "曝光"
+  },
+  "heatmapMeasureClkUv": {
+    "message": "点击"
+  },
+  "heatmapMeasureClkRate": {
+    "message": "点击率"
+  },
+  "heatmapMeasureIpvUv": {
+    "message": "引导IPV"
+  },
+  "heatmapMeasureTrdUv": {
+    "message": "成交UV"
+  },
+  "heatmapMeasureTrdAmt": {
+    "message": "成交额"
+  },
+  "heatmapDataDateTooltip": {
+    "message": "数据日期为昨天（T-1，分析平台 默认聚合粒度）"
+  },
+  "blockApi": {
+    "message": "隐藏此 API"
+  },
+  "unblockApi": {
+    "message": "取消隐藏"
+  },
+  "basicInfo": {
+    "message": "基本信息"
+  },
+  "apiName": {
+    "message": "API 名称"
+  },
+  "requestMethod": {
+    "message": "请求方法"
+  },
+  "statusCode": {
+    "message": "状态码"
+  },
+  "requestEnvironment": {
+    "message": "请求环境"
+  },
+  "requestEnvironmentProd": {
+    "message": "线上"
+  },
+  "requestEnvironmentPreRelease": {
+    "message": "预发"
+  },
+  "requestEnvironmentUnknown": {
+    "message": "未知"
+  },
+  "duration": {
+    "message": "请求耗时"
+  },
+  "durationMs": {
+    "message": "$1ms"
+  },
+  "timestamp": {
+    "message": "时间"
+  },
+  "queryParams": {
+    "message": "查询参数"
+  },
+  "viewDetails": {
+    "message": "查看详情"
+  },
+  "view": {
+    "message": "查看"
+  },
+  "viewInRequestTab": {
+    "message": "在 Request 标签页中查看完整请求数据"
+  },
+  "fullscreen": {
+    "message": "全屏查看"
+  },
+  "requestBody": {
+    "message": "请求体"
+  },
+  "responseBody": {
+    "message": "响应体"
+  },
+  "copy": {
+    "message": "复制"
+  },
+  "jsonParseError": {
+    "message": "JSON 解析失败，请检查格式是否正确"
+  },
+  "pinField": {
+    "message": "关注字段"
+  },
+  "unpinField": {
+    "message": "取消关注"
+  },
+  "pinnedFields": {
+    "message": "关注字段"
+  },
+  "fullResponse": {
+    "message": "完整响应"
+  },
+  "fullRequest": {
+    "message": "完整请求"
+  },
+  "requestHeaders": {
+    "message": "请求头"
+  },
+  "responseHeaders": {
+    "message": "响应头"
+  },
+  "headersSize": {
+    "message": "头部大小"
+  },
+  "headersTab": {
+    "message": "Headers"
+  },
+  "requestTab": {
+    "message": "Request"
+  },
+  "responseTab": {
+    "message": "Response"
+  },
+  "noRequestBody": {
+    "message": "无请求体"
+  },
+  "noResponseBody": {
+    "message": "无响应体"
+  },
+  "sseMessages": {
+    "message": "SSE 消息"
+  },
+  "totalMessages": {
+    "message": "总消息数"
+  },
+  "streaming": {
+    "message": "流式传输中"
+  },
+  "waitingForMessages": {
+    "message": "等待消息..."
+  },
+  "noSseMessages": {
+    "message": "暂无 SSE 消息"
+  },
+  "sseViewByMessage": {
+    "message": "逐条"
+  },
+  "sseViewAggregated": {
+    "message": "聚合"
+  },
+  "sseAggregatedTip": {
+    "message": "把多条流式响应按字段合并、增量文本自动拼接成一个大对象"
+  },
+  "sseAggregatedFromPrefix": {
+    "message": "聚合自 "
+  },
+  "sseAggregatedFromSuffix": {
+    "message": " 帧"
+  },
+  "sseDragToScrubFrames": {
+    "message": "拖动 / 点击输入 / ↑↓ 键调整聚合到第几帧，实时预览"
+  },
+  "sseHeartbeatSkipped": {
+    "message": "· 跳过 $1 心跳帧"
+  },
+  "sseOtherEvents": {
+    "message": "其它事件"
+  },
+  "save": {
+    "message": "保存"
+  },
+  "selectColor": {
+    "message": "选择颜色"
+  },
+  "formatJson": {
+    "message": "格式化"
+  },
+  "cancel": {
+    "message": "取消"
+  },
+  "dragToReorder": {
+    "message": "拖拽以重新排序"
+  },
+  "resetResponse": {
+    "message": "重置响应"
+  },
+  "responseDurationMs": {
+    "message": "响应时长 (毫秒)"
+  },
+  "responseDurationPlaceholder": {
+    "message": "如 1000"
+  },
+  "proxyRequest": {
+    "message": "代理请求"
+  },
+  "copyValue": {
+    "message": "复制值"
+  },
+  "copyPath": {
+    "message": "复制路径"
+  },
+  "copyType": {
+    "message": "复制类型"
+  },
+  "addProperty": {
+    "message": "添加属性"
+  },
+  "addElement": {
+    "message": "添加元素"
+  },
+  "removeField": {
+    "message": "移除字段"
+  },
+  "renameKey": {
+    "message": "点击重命名 key"
+  },
+  "editInModal": {
+    "message": "弹窗编辑"
+  },
+  "editInModalTitle": {
+    "message": "编辑 JSON"
+  },
+  "recursiveExpand": {
+    "message": "递归展开"
+  },
+  "recursiveCollapse": {
+    "message": "递归收起"
+  },
+  "collapseAbove": {
+    "message": "收起上方"
+  },
+  "confirm": {
+    "message": "确定"
+  },
+  "insertIndex": {
+    "message": "index"
+  },
+  "insertIndexHint": {
+    "message": "留空则添加到末尾"
+  },
+  "blocked": {
+    "message": "已隐藏"
+  },
+  "blockedApis": {
+    "message": "已隐藏"
+  },
+  "gzipSize": {
+    "message": "gzip"
+  },
+  "searchInJson": {
+    "message": "在 JSON 中搜索..."
+  },
+  "searchSseMessages": {
+    "message": "搜索全部消息"
+  },
+  "jsonViewModeTree": {
+    "message": "树形"
+  },
+  "jsonViewModeCode": {
+    "message": "代码"
+  },
+  "pickElementForSearch": {
+    "message": "点击页面元素，提取文本作为搜索词"
+  },
+  "pickingElement": {
+    "message": "点击页面中的元素以提取文本..."
+  },
+  "pickTouchHint": {
+    "message": "轻点选择元素 · 拖动预览高亮"
+  },
+  "errorBoundary_title": {
+    "message": "应用出现错误"
+  },
+  "errorBoundary_description": {
+    "message": "抱歉，应用遇到了一个错误。你可以尝试以下操作来恢复："
+  },
+  "errorBoundary_reload": {
+    "message": "重新加载"
+  },
+  "errorBoundary_clearCache": {
+    "message": "清理缓存并重试"
+  },
+  "errorBoundary_errorDetails": {
+    "message": "错误详情"
+  },
+  "welcomeDescription": {
+    "message": "Agent 驱动 · 自动验证 · 调试观测"
+  },
+  "welcomeSuccess": {
+    "message": "欢迎使用"
+  },
+  "welcomeTipPopup": {
+    "message": "JSON/URL 格式化与编辑"
+  },
+  "welcomeTipPanel": {
+    "message": "请求与埋点观测、响应 Mock"
+  },
+  "welcomeTipSidepanel": {
+    "message": "Agent 对话与浏览器自动化"
+  },
+  "welcomeTipDeviceCapture": {
+    "message": "移动端抓包与 Mock"
+  },
+  "openInNewTab": {
+    "message": "在新标签页中打开"
+  },
+  "invalidJsonFormat": {
+    "message": "无效的 JSON 格式"
+  },
+  "close": {
+    "message": "关闭"
+  },
+  "modified_count": {
+    "message": "已修改"
+  },
+  "edit": {
+    "message": "编辑"
+  },
+  "mockConditions": {
+    "message": "生效条件"
+  },
+  "responsePreview": {
+    "message": "响应数据"
+  },
+  "noConditionsHint": {
+    "message": "配置请求体字段匹配规则，为空时始终生效，只要请求中包含条件指定的字段即可命中，无需完全一致"
+  },
+  "conditionsPlaceholder": {
+    "message": "例如: { \"itemId\": \"123456\" }"
+  },
+  "conditionsMultiMockHint": {
+    "message": "同一接口可添加多条不同条件的 Mock，按条件优先匹配"
+  },
+  "remove": {
+    "message": "移除"
+  },
+  "removeAllOverrides": {
+    "message": "全部移除"
+  },
+  "emptyListGuide": {
+    "message": "尚未隐藏任何 API"
+  },
+  "emptyListGuideDescription": {
+    "message": "在请求列表中右键点击任意请求，选择\"隐藏此 API\"即可将其添加到此列表"
+  },
+  "copyFullTraceid": {
+    "message": "复制完整 Trace ID"
+  },
+  "shareLogLink": {
+    "message": "复制全链路日志链接"
+  },
+  "viewInHsfOps": {
+    "message": "在 HSF 控制台查看"
+  },
+  "hsfNotFound": {
+    "message": "未找到 HSF 接口信息"
+  },
+  "requestMetadataLoginOpenFailed": {
+    "message": "无法打开登录页，请检查扩展的站点权限后重试。"
+  },
+  "hsfInterface": {
+    "message": "HSF 接口"
+  },
+  "encodedPrefix": {
+    "message": "前缀"
+  },
+  "encoded": {
+    "message": "Encoded"
+  },
+  "clickToToggleFormat": {
+    "message": "点击切换格式"
+  },
+  "queryString": {
+    "message": "Query"
+  },
+  "hintPaste": {
+    "message": "V 粘贴"
+  },
+  "hintUndo": {
+    "message": "Z 撤销"
+  },
+  "hintCodeSearch": {
+    "message": "F: 搜索"
+  },
+  "hideShortcuts": {
+    "message": "隐藏快捷键提示"
+  },
+  "showShortcuts": {
+    "message": "显示快捷键提示"
+  },
+  "imagePreview": {
+    "message": "图片预览"
+  },
+  "clickToViewImage": {
+    "message": "点击查看图片"
+  },
+  "commandClickToViewImage": {
+    "message": "按住 Command 点击预览图片"
+  },
+  "failedToLoadImage": {
+    "message": "图片加载失败"
+  },
+  "resend": {
+    "message": "重发"
+  },
+  "resendRequest": {
+    "message": "重发请求"
+  },
+  "editRequest": {
+    "message": "编辑中"
+  },
+  "cancelEdit": {
+    "message": "取消"
+  },
+  "confirmSend": {
+    "message": "发送"
+  },
+  "resendError": {
+    "message": "请求发送失败"
+  },
+  "sending": {
+    "message": "发送中..."
+  },
+  "settings": {
+    "message": "设置"
+  },
+  "moreSettings": {
+    "message": "更多设置"
+  },
+  "extensionUpdateAvailable": {
+    "message": "发现新版本 v$1"
+  },
+  "extensionUpdateNow": {
+    "message": "立即更新"
+  },
+  "extensionUpdating": {
+    "message": "更新中..."
+  },
+  "extensionChangelog": {
+    "message": "更新日志"
+  },
+  "extensionUpdateReloading": {
+    "message": "更新完成，正在重新加载插件"
+  },
+  "extensionUpdateFailed": {
+    "message": "插件更新失败"
+  },
+  "extensionAlreadyLatest": {
+    "message": "当前已是最新版本"
+  },
+  "userManual": {
+    "message": "用户手册"
+  },
+  "settingsTitle": {
+    "message": "Mearl 设置"
+  },
+  "settingsGroupGeneral": {
+    "message": "通用"
+  },
+  "settingsGroupRequest": {
+    "message": "请求调试"
+  },
+  "settingsGroupIntegration": {
+    "message": "服务集成"
+  },
+  "appBridgeConfig": {
+    "message": "端模拟配置"
+  },
+  "deviceChromeScreenshotCopied": {
+    "message": "已复制"
+  },
+  "deviceChromeScreenshotDownloaded": {
+    "message": "已下载"
+  },
+  "deviceChromeScreenshotFailed": {
+    "message": "截图失败"
+  },
+  "appBridgeCloseConfig": {
+    "message": "关闭端模拟配置"
+  },
+  "appBridgePagePaused": {
+    "message": "配置面板打开期间，业务页面会收到隐藏事件；关闭后恢复并触发前台事件。"
+  },
+  "appBridgeV10Title": {
+    "message": "V10 页面能力"
+  },
+  "appBridgeUnreadTitle": {
+    "message": "未读消息状态"
+  },
+  "appBridgePushTitle": {
+    "message": "Push 开启状态"
+  },
+  "appBridgeEnabled": {
+    "message": "开启"
+  },
+  "appBridgeDisabled": {
+    "message": "关闭"
+  },
+  "appBridgeUnreadPoint": {
+    "message": "红点"
+  },
+  "appBridgeUnreadBubble": {
+    "message": "数字角标"
+  },
+  "appBridgeUnreadCount": {
+    "message": "未读数"
+  },
+  "appBridgeKeepCustom": {
+    "message": "保留已有高级配置"
+  },
+  "appBridgeNoCuratedOptions": {
+    "message": "当前端暂无可配置的关键回包"
+  },
+  "appBridgeLanguage": {
+    "message": "语言"
+  },
+  "appBridgeLanguageZhCN": {
+    "message": "简体中文"
+  },
+  "appBridgeLanguageZhTW": {
+    "message": "繁體中文（台灣）"
+  },
+  "appBridgeLanguageZhHK": {
+    "message": "繁體中文（香港）"
+  },
+  "appBridgeLanguageEnUS": {
+    "message": "English"
+  },
+  "appBridgeLanguageReloadHint": {
+    "message": "切换后会重新加载页面"
+  },
+  "settingsSaving": {
+    "message": "保存中..."
+  },
+  "language": {
+    "message": "语言"
+  },
+  "fontSize": {
+    "message": "字号"
+  },
+  "fontSizeSmall": {
+    "message": "较小"
+  },
+  "fontSizeDefault": {
+    "message": "默认"
+  },
+  "fontSizeLarge": {
+    "message": "较大"
+  },
+  "fontSizeMax": {
+    "message": "最大"
+  },
+  "chinese": {
+    "message": "简体中文"
+  },
+  "english": {
+    "message": "English"
+  },
+  "sseMonitoring": {
+    "message": "SSE 实时监听"
+  },
+  "sseMonitoringDesc": {
+    "message": "拦截页面 fetch 请求以监听 Server-Sent Events 流式响应"
+  },
+  "sseMonitoringDisabledHint": {
+    "message": "开启后刷新页面生效"
+  },
+  "enableSseMonitoring": {
+    "message": "开启 SSE 实时监听"
+  },
+  "sseViewRawResponse": {
+    "message": "查看原始响应"
+  },
+  "envSwitch": {
+    "message": "Protocol 环境"
+  },
+  "envSwitchDesc": {
+    "message": "刷新页面后生效。把页面发出的 Protocol 网关请求改写到目标环境，自动处理跨域"
+  },
+  "envSwitchReloadHint": {
+    "message": "刷新页面后生效"
+  },
+  "envSwitchChangeFailed": {
+    "message": "Protocol 环境切换失败，请重试"
+  },
+  "envSwitchOff": {
+    "message": "默认"
+  },
+  "deviceSimulation": {
+    "message": "设备模拟"
+  },
+  "deviceSimulationApp": {
+    "message": "客户端"
+  },
+  "deviceSimulationMobileDevice": {
+    "message": "移动设备"
+  },
+  "deviceSimulationCustom": {
+    "message": "自定义"
+  },
+  "deviceSimulationChangeFailed": {
+    "message": "设备模拟切换失败"
+  },
+  "deviceSimulationAuto": {
+    "message": "自动开启端与设备模拟"
+  },
+  "deviceSimulationAutoHint": {
+    "message": "访问 $1 下的页面时，自动开启最后选择的端与设备"
+  },
+  "deviceSimulationAutoEnabledHint": {
+    "message": "已为 $1 开启自动模拟，点击关闭"
+  },
+  "deviceSimulationAutoUnavailable": {
+    "message": "当前页面不支持按根域自动模拟"
+  },
+  "deviceSimulationAutoChangeFailed": {
+    "message": "自动模拟设置失败"
+  },
+  "deviceSimulationIosAdaptive": {
+    "message": "iOS（自适应）"
+  },
+  "deviceSimulationAndroidAdaptive": {
+    "message": "Android（自适应）"
+  },
+  "deviceSimulationIphone17Pro": {
+    "message": "iPhone 17 Pro"
+  },
+  "deviceSimulationIphoneDuoFolded": {
+    "message": "iPhone Duo（折叠）"
+  },
+  "deviceSimulationIphoneDuoUnfolded": {
+    "message": "iPhone Duo（展开）"
+  },
+  "deviceSimulationIphone17e": {
+    "message": "iPhone 17e"
+  },
+  "deviceSimulationPixel11": {
+    "message": "Pixel 11"
+  },
+  "deviceSimulationIpadMiniA17Pro": {
+    "message": "iPad mini (A17 Pro)"
+  },
+  "deviceSimulationGalaxyS26": {
+    "message": "Galaxy S26"
+  },
+  "deviceSimulationPuraXMax": {
+    "message": "Pura X Max"
+  },
+  "deviceSimulationEnableLandscape": {
+    "message": "开启横屏"
+  },
+  "deviceSimulationDisableLandscape": {
+    "message": "关闭横屏"
+  },
+  "deviceSimulationSplitScreen": {
+    "message": "分屏模拟"
+  },
+  "deviceSimulationSplitScreenHint": {
+    "message": "开启后左侧保留首页，后续页面在右侧打开"
+  },
+  "deviceSimulationFitToWindow": {
+    "message": "适应窗口"
+  },
+  "deviceSimulationFitToWindowHint": {
+    "message": "缩小设备画面以完整适应当前窗口，不改变设备尺寸和 DPR"
+  },
+  "appSimulationShowMore": {
+    "message": "展开更多"
+  },
+  "appSimulationCancelHint": {
+    "message": "再次点击取消模拟"
+  },
+  "appSimulationChangeFailed": {
+    "message": "APP 模拟切换失败"
+  },
+  "deviceSimulationShell": {
+    "message": "系统栏"
+  },
+  "deviceSimulationShellHint": {
+    "message": "模拟顶部状态栏和底部操作区"
+  },
+  "deviceSimulationPhoneFrame": {
+    "message": "手机壳"
+  },
+  "deviceSimulationPhoneFrameHint": {
+    "message": "将设备放在手机壳中居中显示"
+  },
+  "devicePreviewPanel": { "message": "调试" },
+  "devicePreviewToolbar": { "message": "设备工具条" },
+  "devicePreviewToolbarCollapse": { "message": "收起设备工具条" },
+  "deviceSimulationEnableFromPage": { "message": "开启端模拟" },
+  "deviceSimulationNoApp": { "message": "无客户端" },
+  "deviceSimulationDisable": { "message": "关闭设备模拟" },
+  "devicePreviewCapturing": { "message": "采集中" },
+  "devicePreviewCaptureUnavailable": { "message": "采集不可用" },
+  "devicePreviewPanelResize": { "message": "调整调试面板宽度" },
+  "mcpService": {
+    "message": "Agent 服务"
+  },
+  "agentPreventForeground": {
+    "message": "免打扰"
+  },
+  "agentPreventForegroundDesc": {
+    "message": "默认开启。Agent 请求激活时保持页面在后台运行，不切换标签页或唤起窗口；关闭后允许前台激活"
+  },
+  "mcpServiceDesc": {
+    "message": "允许 AI 助手直接访问浏览器中的请求数据、Mock 配置和控制台日志"
+  },
+  "externalServices": {
+    "message": "外部服务"
+  },
+  "externalServicesDesc": {
+    "message": "默认值由已安装能力配置提供，可分别调整；关闭服务会隐藏对应界面并停止相关请求"
+  },
+  "enabled": {
+    "message": "已启用"
+  },
+  "disabled": {
+    "message": "已禁用"
+  },
+  "settingsSaved": {
+    "message": "设置已保存"
+  },
+  "settingsSaveFailed": {
+    "message": "保存失败"
+  },
+  "rulesConfig": {
+    "message": "请求规则"
+  },
+  "rulesConfigDesc": {
+    "message": "拦截、重定向或修改请求，自动保存并生效"
+  },
+  "rulesSaveFailed": {
+    "message": "保存或应用失败：$1"
+  },
+  "rulesConfigDocs": {
+    "message": "查看文档"
+  },
+  "rulesDisabledTitle": {
+    "message": "请求规则已关闭"
+  },
+  "rulesDisabledHint": {
+    "message": "开启右上角开关后，可添加和管理规则"
+  },
+  "rulePriority": {
+    "message": "优先级"
+  },
+  "ruleDescriptionPlaceholder": {
+    "message": "备注"
+  },
+  "ruleActionRedirect": {
+    "message": "重定向"
+  },
+  "ruleActionRedirectDesc": {
+    "message": "将匹配的请求跳转到另一个地址"
+  },
+  "ruleActionBlock": {
+    "message": "拦截"
+  },
+  "ruleActionBlockDesc": {
+    "message": "阻止请求发出"
+  },
+  "ruleActionAllow": {
+    "message": "放行"
+  },
+  "ruleActionAllowDesc": {
+    "message": "跳过其他匹配规则，直接放行"
+  },
+  "ruleActionUpgradeScheme": {
+    "message": "升级 Https"
+  },
+  "ruleActionUpgradeSchemeDesc": {
+    "message": "将 HTTP 请求自动升级为 HTTPS"
+  },
+  "ruleActionModifyHeaders": {
+    "message": "修改 Headers"
+  },
+  "ruleActionModifyHeadersDesc": {
+    "message": "为匹配的请求添加、修改或删除请求头"
+  },
+  "ruleRequestHeaders": {
+    "message": "请求头操作"
+  },
+  "ruleResponseHeaders": {
+    "message": "响应头操作"
+  },
+  "rulePermissionTitle": {
+    "message": "申请规则域名权限"
+  },
+  "rulePermissionDescription": {
+    "message": "以下域名缺少访问权限，规则可能无法生效。授权后即可生效，取消不会丢失规则。"
+  },
+  "rulePermissionMissing": {
+    "message": "规则缺少域名权限：$1"
+  },
+  "rulePermissionGrant": {
+    "message": "申请权限"
+  },
+  "rulePermissionFailed": {
+    "message": "未能获得权限，请重试或检查扩展的网站访问权限。"
+  },
+  "rulePermissionUnscoped": {
+    "message": "部分规则的 URL 表达式无法确定完整域名范围，请缩小匹配范围，或在扩展设置中检查相关网站的访问权限。"
+  },
+  "ruleHeaderOpSet": {
+    "message": "设置"
+  },
+  "ruleHeaderOpAppend": {
+    "message": "追加"
+  },
+  "ruleHeaderOpRemove": {
+    "message": "删除"
+  },
+  "ruleHeaderAdd": {
+    "message": "添加请求头"
+  },
+  "ruleMatchUrl": {
+    "message": "匹配 URL"
+  },
+  "ruleTargetUrl": {
+    "message": "目标地址"
+  },
+  "ruleRegexSubstitution": {
+    "message": "正则"
+  },
+  "ruleFixedUrl": {
+    "message": "固定値"
+  },
+  "ruleRegexFilter": {
+    "message": "正则"
+  },
+  "ruleUrlFilter": {
+    "message": "通配符"
+  },
+  "ruleInitiatorDomains": {
+    "message": "来源域名"
+  },
+  "ruleInitiatorDomainsHint": {
+    "message": "支持含捕获组的路径正则"
+  },
+  "ruleInitiatorDomainsPlaceholder": {
+    "message": "edith.example.com\nedith.example.com/clam/([^/]+)/  ← \\a 引用第1组"
+  },
+  "ruleResourceTypes": {
+    "message": "请求类型"
+  },
+  "ruleResourceTypesHint": {
+    "message": "不选则不限"
+  },
+  "ruleAddRule": {
+    "message": "添加规则"
+  },
+  "ruleModeForm": {
+    "message": "表单"
+  },
+  "ruleModeJson": {
+    "message": "JSON"
+  },
+  "ruleN": {
+    "message": "规则 $1"
+  },
+  "rulesCurrentCount": {
+    "message": "已应用 $1 条"
+  },
+  "rulesJsonParseError": {
+    "message": "JSON 解析失败: $1"
+  },
+  "ruleAddBlank": {
+    "message": "空白规则"
+  },
+  "rulePresetProtocolI18nDesc": {
+    "message": "为 Protocol 请求添加 x-i18n-language: en-US"
+  },
+  "rulePresetAlidnDevRedirectDesc": {
+    "message": "将 CDN 资源请求重定向至开发环境"
+  },
+  "requestCasesTitle": {
+    "message": "测试平台 测试用例"
+  },
+  "requestCasesLoading": {
+    "message": "加载中..."
+  },
+  "requestCasesFailed": {
+    "message": "获取失败"
+  },
+  "hsfMaintainer": {
+    "message": "维护人"
+  },
+  "requestCasesNoData": {
+    "message": "暂无数据"
+  },
+  "requestCasesTransferSearchPlaceholder": {
+    "message": "搜索用例集..."
+  },
+  "requestCasesRetry": {
+    "message": "重新获取"
+  },
+  "accountLoginRequired": {
+    "message": "未登录 测试账号平台，请先登录"
+  },
+  "accountLogin": {
+    "message": "登录 $1"
+  },
+  "account": {
+    "message": "账号"
+  },
+  "accountShowCount": {
+    "message": "点击查看请求数"
+  },
+  "accountShowNickname": {
+    "message": "点击查看昵称"
+  },
+  "accountsLoadFailed": {
+    "message": "加载账号失败：$1"
+  },
+  "accountSearchPlaceholder": {
+    "message": "输入账号名称或 账号 ID"
+  },
+  "accountCurrentAccount": {
+    "message": "当前登录账号"
+  },
+  "accountQuickBorrow": {
+    "message": "快速借用"
+  },
+  "accountOpenPortal": {
+    "message": "打开 测试账号平台 管理台"
+  },
+  "accountMobileSsoQr": {
+    "message": "手机端扫码登录"
+  },
+  "accountSwitchToHarmony": {
+    "message": "切换至鸿蒙"
+  },
+  "accountSwitchToAndroidIos": {
+    "message": "切换至安卓 / iOS"
+  },
+  "accountQrCodeFailed": {
+    "message": "获取二维码失败"
+  },
+  "accountAutoLoginCountdown": {
+    "message": "$1s 后自动登录"
+  },
+  "accountAutoLoginPending": {
+    "message": "登录中..."
+  },
+  "retry": {
+    "message": "重试"
+  },
+  "saveToRequestCases": {
+    "message": "保存 Mock 至 测试平台"
+  },
+  "updateTestCase": {
+    "message": "更新测试用例"
+  },
+  "sceneNamePlaceholder": {
+    "message": "场景名称"
+  },
+  "scanQrCodeToEnableMock": {
+    "message": "扫码 Mock 此接口"
+  },
+  "showQRCode": {
+    "message": "显示二维码"
+  },
+  "hideQRCode": {
+    "message": "隐藏二维码"
+  },
+  "copyQRCode": {
+    "message": "复制二维码图片"
+  },
+  "qrCodeCopied": {
+    "message": "二维码已复制"
+  },
+  "copyQRCodeFailed": {
+    "message": "二维码复制失败"
+  },
+  "queryPresets": {
+    "message": "Query 快捷参数"
+  },
+  "presetImmersiveTitleBar": {
+    "message": "沉浸式标题栏"
+  },
+  "noQueryPresets": {
+    "message": "暂无预设，点 + 新建"
+  },
+  "addPreset": {
+    "message": "添加预设"
+  },
+  "deletePreset": {
+    "message": "删除"
+  },
+  "presetNamePlaceholder": {
+    "message": "名称"
+  },
+  "presetParamsPlaceholder": {
+    "message": "参数 a=1&b=2"
+  },
+  "realDeviceCapture": {
+    "message": "真机抓包"
+  },
+  "popupToolFormatter": {
+    "message": "数据格式化"
+  },
+  "popupToolBrowsers": {
+    "message": "浏览器"
+  },
+  "popupToolRules": {
+    "message": "请求规则"
+  },
+  "popupToolDeviceCapture": {
+    "message": "真机抓包"
+  },
+  "popupToolToolbox": {
+    "message": "工具箱"
+  },
+  "toolboxTitle": {
+    "message": "工具箱"
+  },
+  "toolboxInstallTools": {
+    "message": "安装工具"
+  },
+  "toolboxCatalogLoadFailed": {
+    "message": "可安装工具加载失败，请重试。"
+  },
+  "toolboxCatalogRefreshing": {
+    "message": "正在确认其他目录中的工具来源…"
+  },
+  "toolboxCatalogSourceFailed": {
+    "message": "无法加载「$1」工具目录，请重试。"
+  },
+  "toolboxCatalogSourceCached": {
+    "message": "「$1」工具目录更新失败，正在显示该目录的本地缓存。"
+  },
+  "toolboxCatalogConflict": {
+    "message": "「$1」中的插件 $2 与优先来源冲突，已忽略此条目。"
+  },
+  "toolboxCatalogEmpty": {
+    "message": "暂无可安装工具。"
+  },
+  "toolboxOfficial": {
+    "message": "官方"
+  },
+  "toolboxNoInstalledTools": {
+    "message": "暂无额外工具，点击「安装工具」添加。"
+  },
+  "toolboxInstall": {
+    "message": "安装"
+  },
+  "toolboxInstalling": {
+    "message": "安装中"
+  },
+  "toolboxUninstalling": {
+    "message": "卸载中…"
+  },
+  "toolboxInstalled": {
+    "message": "已安装"
+  },
+  "toolboxInstallTool": {
+    "message": "安装 $1"
+  },
+  "toolboxToolInstalled": {
+    "message": "$1 已安装"
+  },
+  "toolboxInstallSuccess": {
+    "message": "$1 安装成功"
+  },
+  "toolboxInstallFailed": {
+    "message": "安装失败：$1"
+  },
+  "toolboxInstallListFailed": {
+    "message": "工具已安装，列表刷新失败，请刷新工具箱重试。"
+  },
+  "toolboxReconnectFailed": {
+    "message": "无法重新连接本地服务"
+  },
+  "toolboxNativeHostInstallDescription": {
+    "message": "安装 Mearl 本地服务后即可安装和使用额外工具。请在终端执行下方命令，然后重新连接。"
+  },
+  "extensionUiServiceRequired": {
+    "message": "此操作仅允许从 Mearl 扩展页面发起。"
+  },
+  "nativeHostProtocolMismatch": {
+    "message": "扩展与本地服务协议不匹配。请更新 Mearl 扩展和本地服务，重启服务后重新连接。"
+  },
+  "toolboxNativeHostUpdateDescription": {
+    "message": "请更新 Mearl 本地服务，以安装和使用这些工具。"
+  },
+  "toolboxDescription": {
+    "message": "打开内置工具和已注册的插件工具"
+  },
+  "toolboxBack": {
+    "message": "返回工具箱"
+  },
+  "toolboxDeviceCaptureTitle": {
+    "message": "真机调试"
+  },
+  "toolboxDeviceCaptureDescription": {
+    "message": "连接真机，查看请求并调试响应"
+  },
+  "toolboxFormatterDescription": {
+    "message": "格式化与查看 JSON 等内容"
+  },
+  "toolboxChatDescription": {
+    "message": "围绕当前浏览器标签页与 Agent 对话"
+  },
+  "toolboxRulesDescription": {
+    "message": "管理请求拦截与重定向规则"
+  },
+  "toolboxBrowsersDescription": {
+    "message": "查看和管理连接的浏览器"
+  },
+  "toolboxClipboardImageTooLarge": {
+    "message": "剪贴板图片编码后超过 16 MiB"
+  },
+  "toolboxClipboardTextTooLarge": {
+    "message": "剪贴板文本超过 16 MiB"
+  },
+  "toolboxClipboardImageInvalid": {
+    "message": "请选择有效的 PNG、JPEG 或 WebP 图片"
+  },
+  "toolboxClipboardWriteFailed": {
+    "message": "无法复制图片，请检查剪贴板权限后重试"
+  },
+  "toolboxClipboardImageDimensionsTooLarge": {
+    "message": "图片像素超过复制上限（约 1600 万像素），请下载图片"
+  },
+  "toolboxClipboardReadFailed": {
+    "message": "无法读取剪贴板图片"
+  },
+  "toolboxSwitchTool": {
+    "message": "切换工具"
+  },
+  "toolboxSort": {
+    "message": "调整工具顺序"
+  },
+  "toolboxTopToolsDivider": {
+    "message": "顶部展示分隔线"
+  },
+  "toolboxTopToolsDividerHint": {
+    "message": "上下拖动调整顶部展示数量，也可使用方向键"
+  },
+  "toolboxAllToolsInHeader": {
+    "message": "所有工具已在顶部展示，可调整分隔线将工具移回工具箱"
+  },
+  "toolboxSortReset": {
+    "message": "重置工具顺序"
+  },
+  "toolboxMoveUp": {
+    "message": "上移 $1"
+  },
+  "toolboxMoveDown": {
+    "message": "下移 $1"
+  },
+  "toolboxRefresh": {
+    "message": "刷新工具列表"
+  },
+  "toolboxRefreshSuccess": {
+    "message": "工具列表已刷新"
+  },
+  "toolboxRefreshFailed": {
+    "message": "刷新失败：$1"
+  },
+  "toolboxSkillDisable": {
+    "message": "禁用 Skill"
+  },
+  "toolboxSkillEnable": {
+    "message": "启用 Skill"
+  },
+  "toolboxSkillDisabled": {
+    "message": "Skill 已禁用"
+  },
+  "toolboxSkillDisabledSuccess": {
+    "message": "Skill 已禁用，工具箱仍可使用；请重启 Agent 或新建会话"
+  },
+  "toolboxSkillEnabledSuccess": {
+    "message": "Skill 已启用；请重启 Agent 或新建会话"
+  },
+  "toolboxSkillToggleFailed": {
+    "message": "切换 Skill 状态失败：$1"
+  },
+  "toolboxPluginUpdate": {
+    "message": "检测并更新「$1」"
+  },
+  "toolboxPluginChecking": {
+    "message": "检查更新中…"
+  },
+  "toolboxPluginUpToDate": {
+    "message": "「$1」已是最新版本"
+  },
+  "toolboxPluginUpdateSuccess": {
+    "message": "「$1」已更新"
+  },
+  "toolboxPluginUpdateListFailed": {
+    "message": "工具已更新，但列表加载失败，请刷新列表"
+  },
+  "toolboxPluginRefreshSuccess": {
+    "message": "$1 已刷新"
+  },
+  "toolboxPluginRefreshListFailed": {
+    "message": "工具已刷新，但工具列表更新失败，请重试"
+  },
+  "toolboxPopupOnly": {
+    "message": "此工具仅支持在 Mearl 弹窗中打开，请从浏览器工具栏打开 Mearl"
+  },
+  "toolboxPluginRefresh": {
+    "message": "刷新 $1"
+  },
+  "toolboxPluginUninstall": {
+    "message": "卸载 $1"
+  },
+  "toolboxPluginUninstallConfirmInline": {
+    "message": "卸载 Skill？"
+  },
+  "toolboxLoading": {
+    "message": "正在读取已注册工具…"
+  },
+  "toolboxUnavailable": {
+    "message": "工具箱暂时不可用：$1"
+  },
+  "toolboxToolMissing": {
+    "message": "缺少工具标识"
+  },
+  "toolboxToolOpenFailed": {
+    "message": "工具启动失败"
+  },
+  "toolboxToolOpening": {
+    "message": "正在启动工具…"
+  },
+  "toolboxSkillUpdate": {
+    "message": "更新"
+  },
+  "toolboxSkillUpdating": {
+    "message": "正在更新…"
+  },
+  "toolboxSkillRefreshToApply": {
+    "message": "更新完成，请刷新页面"
+  },
+  "toolboxSkillUpdateFailed": {
+    "message": "Skill 更新失败：$1"
+  },
+  "toolboxToolFrame": {
+    "message": "插件工具"
+  },
+  "browserManagerTitle": {
+    "message": "浏览器管理"
+  },
+  "browserManagerDescription": {
+    "message": "查看并管理本机和 Provider 浏览器"
+  },
+  "browserManagerRefresh": {
+    "message": "刷新浏览器列表"
+  },
+  "browserManagerNew": {
+    "message": "新增"
+  },
+  "browserManagerLoading": {
+    "message": "正在读取浏览器…"
+  },
+  "browserManagerEmpty": {
+    "message": "暂无浏览器"
+  },
+  "browserManagerEmptyHint": {
+    "message": "新增本地或已注册 Provider 提供的浏览器"
+  },
+  "browserManagerRegular": {
+    "message": "当前浏览器"
+  },
+  "browserManagerOwned": {
+    "message": "托管"
+  },
+  "browserManagerAttached": {
+    "message": "已接入"
+  },
+  "browserManagerStatusConnected": {
+    "message": "已连接"
+  },
+  "browserManagerStatusPairing": {
+    "message": "等待扫码"
+  },
+  "browserManagerStatusConnecting": {
+    "message": "运行中，正在连接"
+  },
+  "browserManagerStatusStopped": {
+    "message": "已停止"
+  },
+  "browserManagerStart": {
+    "message": "启动"
+  },
+  "browserManagerClose": {
+    "message": "关闭"
+  },
+  "browserManagerCloseConfirmInline": {
+    "message": "确认关闭？"
+  },
+  "browserManagerCloseDone": {
+    "message": "浏览器已关闭"
+  },
+  "browserManagerProfile": {
+    "message": "Profile"
+  },
+  "browserManagerCleanup": {
+    "message": "清理 Profile"
+  },
+  "browserManagerCleanupConfirmInline": {
+    "message": "确认清理？"
+  },
+  "browserManagerCleanupDone": {
+    "message": "持久化 Profile 已清理"
+  },
+  "browserManagerDetach": {
+    "message": "解除连接"
+  },
+  "browserManagerDetachConfirm": {
+    "message": "确认解除本机连接？云端 Session 会继续运行。"
+  },
+  "browserManagerDetachDone": {
+    "message": "已解除连接，云端 Session 保持运行"
+  },
+  "browserManagerCreate": {
+    "message": "新增浏览器"
+  },
+  "browserManagerName": {
+    "message": "实例名称"
+  },
+  "browserManagerNamePlaceholder": {
+    "message": "留空将自动生成"
+  },
+  "browserManagerSessionId": {
+    "message": "Session ID"
+  },
+  "browserManagerSessionIdPlaceholder": {
+    "message": "例如 s-xxxxxxxx"
+  },
+  "browserManagerOptional": {
+    "message": "可选"
+  },
+  "browserManagerPersistent": {
+    "message": "持久化 Profile"
+  },
+  "browserManagerHeadless": {
+    "message": "无头模式"
+  },
+  "browserManagerSyncLogin": {
+    "message": "同步登录态"
+  },
+  "browserManagerCookieScope": {
+    "message": "同步范围"
+  },
+  "browserManagerCookieScopeTitle": {
+    "message": "同步登录态"
+  },
+  "browserManagerCookieScopeNone": {
+    "message": "未选择"
+  },
+  "browserManagerCookiePresetMearl": {
+    "message": "Mearl 服务"
+  },
+  "browserManagerCookiePresetMearlHint": {
+    "message": "测试账号平台、测试平台 等基础登录态"
+  },
+  "browserManagerCookieOtherSites": {
+    "message": "其他站点"
+  },
+  "browserManagerCookieSiteCount": {
+    "message": "$1 个站点"
+  },
+  "browserManagerCookieCurrentSite": {
+    "message": "当前站点：$1"
+  },
+  "browserManagerCookieDomainPlaceholder": {
+    "message": "支持输入多个地址，用空格、逗号或分号分隔"
+  },
+  "browserManagerCookieDomainHint": {
+    "message": "支持输入多个地址，用空格、逗号或分号分隔"
+  },
+  "browserManagerCookieDomainInvalid": {
+    "message": "请输入有效的 HTTP(S) 域名或 URL"
+  },
+  "browserManagerCookieAdd": {
+    "message": "添加"
+  },
+  "browserManagerCookieOverwriteHint": {
+    "message": "同步会覆盖目标浏览器中的同名 Cookie。"
+  },
+  "browserManagerCookiePermissionDenied": {
+    "message": "需要站点访问权限才能读取这些 Cookie"
+  },
+  "browserManagerSyncLoginDone": {
+    "message": "登录态已同步"
+  },
+  "browserManagerCopyAccess": {
+    "message": "复制浏览器访问地址"
+  },
+  "browserManagerCopyAccessDone": {
+    "message": "浏览器访问地址已复制"
+  },
+  "browserManagerLaunch": {
+    "message": "启动"
+  },
+  "browserManagerLaunchDone": {
+    "message": "浏览器已就绪"
+  },
+  "browserManagerCancel": {
+    "message": "取消"
+  },
+  "browserManagerShowDetails": {
+    "message": "展开详情"
+  },
+  "browserManagerHideDetails": {
+    "message": "收起详情"
+  },
+  "browserManagerBrowserId": {
+    "message": "Browser ID"
+  },
+  "browserManagerSource": {
+    "message": "来源"
+  },
+  "browserManagerSourceLocal": {
+    "message": "本机"
+  },
+  "browserManagerSourceRemote": {
+    "message": "远程 Connector"
+  },
+  "browserManagerTransport": {
+    "message": "连接方式"
+  },
+  "browserManagerTransportExtension": {
+    "message": "浏览器插件"
+  },
+  "browserManagerTransportCdp": {
+    "message": "CDP"
+  },
+  "browserManagerTransportProvider": {
+    "message": "外部 Provider"
+  },
+  "browserManagerProvider": {
+    "message": "Provider"
+  },
+  "browserManagerProviderVersion": {
+    "message": "Provider 版本"
+  },
+  "browserManagerPairingScan": {
+    "message": "扫码连接设备"
+  },
+  "browserManagerPairingCode": {
+    "message": "配对码"
+  },
+  "browserManagerCdpPort": {
+    "message": "CDP 端口"
+  },
+  "browserManagerContextId": {
+    "message": "Context ID"
+  },
+  "browserManagerContextName": {
+    "message": "Context 名称"
+  },
+  "browserManagerImageId": {
+    "message": "镜像 ID"
+  },
+  "browserManagerCreatedAt": {
+    "message": "创建时间"
+  },
+  "browserManagerExtensionVersion": {
+    "message": "插件版本"
+  },
+  "browserManagerNativeHostVersion": {
+    "message": "Native Host 版本"
+  },
+  "browserManagerCopiedCookies": {
+    "message": "已复制 Cookie"
+  },
+  "browserManagerYes": {
+    "message": "是"
+  },
+  "browserManagerNo": {
+    "message": "否"
+  },
+  "clickButtonToLogin": {
+    "message": "点击下方按钮进行登录"
+  },
+  "loginRequestCases": {
+    "message": "登录 测试平台"
+  },
+  "scanQrCodeCapture": {
+    "message": "扫码抓包"
+  },
+  "startCapture": {
+    "message": "开始抓包"
+  },
+  "deviceCaptureImportNeedRequest": {
+    "message": "请先在真机上触发该 API 抓包，再导入 Mock"
+  },
+  "deviceCaptureImportNeedDeviceId": {
+    "message": "未获取到 deviceId，请确认 测试平台 真机抓包已连接"
+  },
+  "deviceOnline": {
+    "message": "设备在线"
+  },
+  "deviceOffline": {
+    "message": "设备离线"
+  },
+  "harmonyOS": {
+    "message": "鸿蒙"
+  },
+  "scanQrCodeToStart": {
+    "message": "使用手机扫描二维码启动抓包"
+  },
+  "userIdLabel": {
+    "message": "用户 ID"
+  },
+  "mcpIntegration": {
+    "message": "Agent 集成"
+  },
+  "mcpConnected": {
+    "message": "已连接"
+  },
+  "mcpDisconnected": {
+    "message": "未连接"
+  },
+  "mcpIntegrationConnected": {
+    "message": "Agent 集成 (已连接)"
+  },
+  "mcpIntegrationDisconnected": {
+    "message": "Agent 集成 (未连接)"
+  },
+  "agentDescription": {
+    "message": "允许 AI 助手（Claude、Codex、Cursor）直接访问浏览器中的请求数据和控制台日志。"
+  },
+  "cloudModeDescription": {
+    "message": "在云端安装 skill 后，让 agent 按云端模式完成配置，然后填写下方地址连接即可。"
+  },
+  "mcpQuickSetup": {
+    "message": "快速配置"
+  },
+  "mcpSetupHint": {
+    "message": "重启 AI 客户端生效"
+  },
+  "agentFullDocs": {
+    "message": "获取更多能力"
+  },
+  "agentCapabilities": {
+    "message": "你可以这样问"
+  },
+  "agentExample1": {
+    "message": "获取 x 接口入参并生成请求代码"
+  },
+  "agentExample2": {
+    "message": "获取/修改 x 接口响应内容"
+  },
+  "agentExample3": {
+    "message": "获取页面控制台中的异常日志"
+  },
+  "agentExample4": {
+    "message": "使用代理请求获取 x 链接"
+  },
+  "agentExample5": {
+    "message": "新增一条请求规则，把 a 域名的请求重定向到 b 域名"
+  },
+  "agentAllCapabilities": {
+    "message": "全部可用能力"
+  },
+  "agentCapCategoryData": {
+    "message": "数据获取"
+  },
+  "agentCapGetRequests": {
+    "message": "获取网络请求"
+  },
+  "agentCapGetLogs": {
+    "message": "获取控制台日志"
+  },
+  "agentCapGetEvents": {
+    "message": "获取埋点事件"
+  },
+  "agentCapGetScreenshot": {
+    "message": "页面截图"
+  },
+  "agentCapGetSelectedElement": {
+    "message": "获取选中元素"
+  },
+  "agentCapCategoryMock": {
+    "message": "Mock & 请求"
+  },
+  "agentCapSetMock": {
+    "message": "设置接口 Mock"
+  },
+  "agentCapGetMocks": {
+    "message": "查看已有 Mock"
+  },
+  "agentCapAddRule": {
+    "message": "添加请求规则"
+  },
+  "agentCapProxyRequest": {
+    "message": "发送 Http 请求 (携带 Cookies)"
+  },
+  "agentCapSendCapturedRequest": {
+    "message": "发送 Protocol 请求"
+  },
+  "agentCapCategoryBrowser": {
+    "message": "浏览器自动化"
+  },
+  "agentCapTabManage": {
+    "message": "标签页管理"
+  },
+  "agentCapPageNavigate": {
+    "message": "页面导航"
+  },
+  "agentCapPageSnapshot": {
+    "message": "页面快照"
+  },
+  "agentCapPageClick": {
+    "message": "点击元素"
+  },
+  "agentCapPageType": {
+    "message": "输入文本"
+  },
+  "agentCapPagePress": {
+    "message": "按键操作"
+  },
+  "agentCapPageScroll": {
+    "message": "滚动页面"
+  },
+  "agentCapPageWait": {
+    "message": "等待加载/元素"
+  },
+  "agentCapPageEval": {
+    "message": "执行 JavaScript"
+  },
+  "agentCapPageUpload": {
+    "message": "上传文件"
+  },
+  "agentCapPageFrames": {
+    "message": "列出框架"
+  },
+  "agentCapSetDeviceEmulation": {
+    "message": "移动端模拟"
+  },
+  "skillQuickSetup": {
+    "message": "快速配置"
+  },
+  "skillSetupCli": {
+    "message": "CLI"
+  },
+  "skillSetupAgent": {
+    "message": "Agent"
+  },
+  "skillSetupAgentPrompt": {
+    "message": "读取 $1 完成配置"
+  },
+  "cloudServerPlaceholder": {
+    "message": "粘贴 cloud-connector 命令或连接地址"
+  },
+  "connect": {
+    "message": "连接"
+  },
+  "disconnect": {
+    "message": "断开"
+  },
+  "connected": {
+    "message": "已连接"
+  },
+  "cloudConnections": {
+    "message": "云端连接"
+  },
+  "cloudConnectorConnectSuccess": {
+    "message": "云端连接成功"
+  },
+  "cloudConnectorConnectFailed": {
+    "message": "云端连接失败：$1"
+  },
+  "cloudConnectorDisconnectSuccess": {
+    "message": "云端连接已断开"
+  },
+  "cloudConnectorDisconnectFailed": {
+    "message": "断开云端连接失败：$1"
+  },
+  "translate": {
+    "message": "翻译"
+  },
+  "traditionalChinese": {
+    "message": "繁体中文"
+  },
+  "translating": {
+    "message": "翻译中..."
+  },
+  "translateError": {
+    "message": "翻译出错: $1"
+  },
+  "translateNotSupportedDesc": {
+    "message": "翻译 API 从 Chrome 138 开始在稳定版中提供。请升级到最新版本的 Chrome 浏览器。"
+  },
+  "translateEnableSteps": {
+    "message": "升级步骤"
+  },
+  "translateStep1": {
+    "message": "访问 Chrome 设置 → 关于 Chrome"
+  },
+  "translateStep2": {
+    "message": "检查并安装最新版本（需要 Chrome 138+）"
+  },
+  "translateStep3": {
+    "message": "重启浏览器后即可使用翻译功能"
+  },
+  "translateLearnMore": {
+    "message": "了解更多关于 Chrome 内置 AI"
+  },
+  "translateModelDownloading": {
+    "message": "翻译模型正在下载中，请稍候..."
+  },
+  "downloadProgress": {
+    "message": "下载进度"
+  },
+  "translateDownloadHint": {
+    "message": "首次使用时需要下载语言模型，下载完成后会自动可用。"
+  },
+  "translateFailedDesc": {
+    "message": "翻译过程中发生错误，请稍后重试。"
+  },
+  "translateRetryHint": {
+    "message": "如果问题持续存在，请检查网络连接或重启浏览器。"
+  },
+  "globalTranslation": {
+    "message": "实时翻译"
+  },
+  "globalTranslationDesc": {
+    "message": "开启响应修改后生效，接口加载时实时翻译其中的中文内容"
+  },
+  "globalTranslationNone": {
+    "message": "关闭"
+  },
+  "translationDict": {
+    "message": "翻译词典"
+  },
+  "translationDictDesc": {
+    "message": "自定义翻译内容，每次翻译时将优先使用词典中的内容"
+  },
+  "translationDictAdd": {
+    "message": "添加条目"
+  },
+  "translationDictAddNew": {
+    "message": "新建词典条目"
+  },
+  "translationDictOriginal": {
+    "message": "原文（中文）"
+  },
+  "translationDictSearch": {
+    "message": "搜索原文或译文..."
+  },
+  "translationDictEmpty": {
+    "message": "词典为空，点击「添加条目」新建自定义译文"
+  },
+  "translationDictExport": {
+    "message": "导出词典"
+  },
+  "translationDictImport": {
+    "message": "导入词典"
+  },
+  "translationDictImportSuccess": {
+    "message": "导入成功，共 $1 条"
+  },
+  "translationDictImportError": {
+    "message": "导入失败：JSON 格式错误"
+  },
+  "translationDictClickToEdit": {
+    "message": "点击编辑"
+  },
+  "translationDictFromCache": {
+    "message": "从缓存选取"
+  },
+  "translationDictCacheTitle": {
+    "message": "翻译缓存"
+  },
+  "translationDictCacheDesc": {
+    "message": "以下是本次会话中 AI 已翻译的内容，可选择性地加入词典作为固定译文"
+  },
+  "translationDictCacheEmpty": {
+    "message": "暂无翻译缓存"
+  },
+  "translationDictCacheSearch": {
+    "message": "搜索缓存..."
+  },
+  "translationDictCacheSelected": {
+    "message": "已选 $1 条"
+  },
+  "translationDictCacheImport": {
+    "message": "加入词典"
+  },
+  "translationDictCacheImportSuccess": {
+    "message": "已加入 $1 条"
+  },
+  "translationDictCacheCount": {
+    "message": "$1 条缓存"
+  },
+  "translationDictEntries": {
+    "message": "条记录"
+  },
+  "export": {
+    "message": "导出"
+  },
+  "import": {
+    "message": "导入"
+  },
+  "add": {
+    "message": "添加"
+  },
+  "delete": {
+    "message": "删除"
+  },
+  "refresh": {
+    "message": "刷新"
+  },
+  "selectAll": {
+    "message": "全选"
+  },
+  "inDict": {
+    "message": "词典"
+  },
+  "loading": {
+    "message": "加载中..."
+  },
+  "downloadingModel": {
+    "message": "下载模型..."
+  },
+  "customUserAgent": {
+    "message": "自定义 User-Agent"
+  },
+  "customUserAgentDesc": {
+    "message": "仅作用于当前标签页，刷新页面后生效，同时影响请求头和 navigator.userAgent"
+  },
+  "uaReset": {
+    "message": "重置"
+  },
+  "customDateTime": {
+    "message": "自定义时区和时间"
+  },
+  "customDateTimeDesc": {
+    "message": "仅作用于当前标签页；立即模拟页面时区，选择时间后页面时钟将从该时刻开始正常走时"
+  },
+  "customTime": {
+    "message": "自定义时间"
+  },
+  "customTimeNow": {
+    "message": "使用当前时间"
+  },
+  "customTimeClear": {
+    "message": "清空时间"
+  },
+  "timezoneSystem": {
+    "message": "默认"
+  },
+  "timezoneShanghai": {
+    "message": "上海"
+  },
+  "timezoneTokyo": {
+    "message": "东京"
+  },
+  "timezoneSingapore": {
+    "message": "新加坡"
+  },
+  "timezoneLondon": {
+    "message": "伦敦"
+  },
+  "timezoneNewYork": {
+    "message": "纽约"
+  },
+  "timezoneLosAngeles": {
+    "message": "洛杉矶"
+  },
+  "modeApiDebug": {
+    "message": "接口调试"
+  },
+  "modeRumVerify": {
+    "message": "埋点验证"
+  },
+  "switchMode": {
+    "message": "切换模式"
+  },
+  "switchRequestSubMode": {
+    "message": "切换 Protocol / Requests 模式"
+  },
+  "rumWaitingForEvents": {
+    "message": "正在监听埋点事件"
+  },
+  "selectAllOfSource": {
+    "message": "全部开启"
+  },
+  "deselectAllOfSource": {
+    "message": "全部关闭"
+  },
+  "rumFilterEvents": {
+    "message": "过滤事件 (支持正则)"
+  },
+  "rumSuccess": {
+    "message": "成功"
+  },
+  "rumFailed": {
+    "message": "失败"
+  },
+  "rumSelectEvent": {
+    "message": "请选择一个事件"
+  },
+  "rumEventType": {
+    "message": "事件类型"
+  },
+  "rumSubType": {
+    "message": "子类型"
+  },
+  "rumResult": {
+    "message": "结果"
+  },
+  "rumEventFields": {
+    "message": "事件字段"
+  },
+  "timingData": {
+    "message": "耗时数据"
+  },
+  "trackingSource": {
+    "message": "来源"
+  },
+  "aplusExpdata": {
+    "message": "曝光数据"
+  },
+  "aplusValidation": {
+    "message": "校验结果"
+  },
+  "aplusValidationPass": {
+    "message": "校验通过"
+  },
+  "aplusHighlightOnPageTitle": {
+    "message": "点击定位元素到 Elements 面板"
+  },
+  "aplusHighlightButtonTitle": {
+    "message": "点击在页面高亮元素"
+  },
+  "aplusSpmName": {
+    "message": "SPM 名称"
+  },
+  "aplusValidSpmUrlFormat": {
+    "message": "spm-url 格式不标准（期望 A.B.C.D 四段）：$1"
+  },
+  "aplusValidExpMissing": {
+    "message": "EXP 事件缺少 expdata"
+  },
+  "aplusValidExpdataMissingSpm": {
+    "message": "expdata[$1] 缺少 spm 字段"
+  },
+  "aplusValidExpdataSpmFormat": {
+    "message": "expdata[$1].spm 格式不标准"
+  },
+  "aplusValidClkMissingPointSpm": {
+    "message": "CLK 事件缺少点击点位 SPM（gokey.spm）"
+  },
+  "aplusValidClkSpmFormat": {
+    "message": "gokey.spm 格式不标准（期望 C.D 或 A.B.C.D）：$1"
+  },
+  "aplusValidClkMissingSpmCnt": {
+    "message": "CLK 事件缺少 spm-cnt"
+  },
+  "aplusValidPvMissingSpmUrl": {
+    "message": "PV 事件缺少 spm-url"
+  },
+  "aplusValidChecksExpdataCount": {
+    "message": "expdata: $1 条"
+  },
+  "aplusValidSpmUndefinedSegment": {
+    "message": "spm 含有 undefined/null 段，埋点代码未正确赋属：$1"
+  },
+  "aplusValidExpdataSpmUndefined": {
+    "message": "expdata[$1].spm 含有 undefined/null 段，埋点代码未正确赋属：$2"
+  },
+  "aplusValidSpmChineseChar": {
+    "message": "spm 含有中文字符，请使用英文/数字：$1"
+  },
+  "aplusValidSpmInvalidChar": {
+    "message": "spm 含有非法字符（仅允许 0-9 a-z A-Z _ / - .）：$1"
+  },
+  "aplusValidSpmCntSegments": {
+    "message": "spm-cnt 段数不足，期望 appId.B.C.D.token 至少五段：$1"
+  },
+  "aplusValidSpmCntPrefix": {
+    "message": "spm-cnt 前两段（appId、页面 ID）应为数字，疑似占位符未替换：$1"
+  },
+  "query": {
+    "message": "查询"
+  },
+  "queryTtidName": {
+    "message": "查询 TTID 名称"
+  },
+  "querySpmName": {
+    "message": "查询 SPM 名称"
+  },
+  "queryResultUnknown": {
+    "message": "未知"
+  },
+  "queryResultError": {
+    "message": "异常"
+  },
+  "agentPermissions": {
+    "message": "域名权限"
+  },
+  "agentPermissionsDesc": {
+    "message": "配置 Agent 可访问的域名（代理请求、脚本执行等）"
+  },
+  "agentPermissionsAllDomains": {
+    "message": "全部域名"
+  },
+  "agentPermissionsAllDomainsFailed": {
+    "message": "全部域名权限更新失败"
+  },
+  "agentPermissionsBuiltIn": {
+    "message": "内置"
+  },
+  "agentPermissionsInputPlaceholder": {
+    "message": "输入域名，如 example.com"
+  },
+  "agentPermissionsGrant": {
+    "message": "授权"
+  },
+  "agentPermissionsRevoke": {
+    "message": "撤销"
+  },
+  "agentPermissionsRevokeFailed": {
+    "message": "撤销失败，配置保存失败"
+  },
+  "agentPermissionsGrantFailed": {
+    "message": "授权失败，用户取消或域名格式有误"
+  },
+  "agentPermissionsEnable": {
+    "message": "启用"
+  },
+  "agentPermissionsDisable": {
+    "message": "禁用"
+  },
+  "hostPermissionNoticeTitle": {
+    "message": "当前站点未授权"
+  },
+  "hostPermissionNoticeDesc": {
+    "message": "当前页面域名 $1 不在默认权限范围内，部分功能不可用。"
+  },
+  "hostPermissionGrant": {
+    "message": "授权当前站点"
+  },
+  "hostPermissionGranted": {
+    "message": "已授权当前站点"
+  },
+  "hostPermissionGrantFailed": {
+    "message": "授权失败，可能是用户取消或浏览器拦截"
+  },
+  "contentScriptNeedsPermission": {
+    "message": "当前站点未授权，无法操作页面"
+  },
+  "permissionsConfig": {
+    "message": "权限配置"
+  },
+  "redirectToUrlPlaceholder": {
+    "message": "重定向到 URL..."
+  },
+  "redirectInputTitle": {
+    "message": "输入重定向目标 URL，回车生效，清空后回车取消"
+  },
+  "extractHtmlJson": {
+    "message": "提取 HTML 中的 JSON 数据"
+  },
+  "extension_reloaded": {
+    "message": "插件重新加载，面板已自动刷新"
+  },
+  "allRequests": {
+    "message": "全部请求"
+  },
+  "allRequestsEnabledHint": {
+    "message": "全部请求开关已打开，请重新扫码抓包！"
+  },
+  "saveFailed": {
+    "message": "保存失败"
+  },
+  "searchShortcut": {
+    "message": "搜索 (⌘F)"
+  },
+  "highlightEnable": {
+    "message": "开启高亮"
+  },
+  "highlightDisable": {
+    "message": "关闭高亮"
+  },
+  "highlightPartial": {
+    "message": "性能保护：按滚动位置高亮附近 60KB 内容"
+  },
+  "regexCaptureGroupHint": {
+    "message": "\\1 \\2 引用捕获组"
+  },
+  "hintEnterNavigate": {
+    "message": "Enter: 跳转"
+  },
+  "openInNewPage": {
+    "message": "在新页面中打开"
+  },
+  "dnrIndicatorTitle": {
+    "message": "DNR 规则 ($1)"
+  },
+  "dnrLabelUaOverride": {
+    "message": "User-Agent 覆盖"
+  },
+  "dnrLabelTimezoneOverride": {
+    "message": "时区覆盖 → $1"
+  },
+  "dnrLabelTimeOverride": {
+    "message": "页面时间覆盖"
+  },
+  "dnrLabelResourceRedirect": {
+    "message": "资源重定向 → $1"
+  },
+  "dnrLabelEnvSwitch": {
+    "message": "Protocol 环境 → $1"
+  },
+  "dnrDisableRule": {
+    "message": "关闭"
+  },
+  "dnrHitCount": {
+    "message": "命中 $1 次"
+  },
+  "dnrIndicatorMode": {
+    "message": "页面提示"
+  },
+  "dnrIndicatorModeNumber": {
+    "message": "数字"
+  },
+  "dnrIndicatorModeDot": {
+    "message": "圆点"
+  },
+  "dnrIndicatorModeOff": {
+    "message": "关闭"
+  },
+  "requestImportAction": {
+    "message": "数据导入"
+  },
+  "importData": {
+    "message": "导入数据"
+  },
+  "importGuide": {
+    "message": "导入 Mock 数据"
+  },
+  "dataSourceSmart": {
+    "message": "智能识别"
+  },
+  "dataSourceJson": {
+    "message": "JSON 导入"
+  },
+  "jsonInputPlaceholder": {
+    "message": "粘贴响应 JSON（单个对象或数组）。缺少请求名称时请在上方填写；格式转换由已安装协议能力提供。"
+  },
+  "jsonApiPlaceholder": {
+    "message": "API 名称（无 api 字段的数据需填写或选择）"
+  },
+  "jsonApiRequired": {
+    "message": "请填写或选择 API 名称"
+  },
+  "jsonInvalidJson": {
+    "message": "JSON 格式无效，请检查后重试"
+  },
+  "requestImportSuccess": {
+    "message": "成功导入 $COUNT$ 条 Mock",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "requestImportFailed": {
+    "message": "导入失败，请重试。未完成的数据已保留。"
+  },
+  "jsonNoEntries": {
+    "message": "未解析到有效的接口数据"
+  },
+  "searchApiPlaceholder": {
+    "message": "搜索接口名或响应内容..."
+  },
+  "smartInputPlaceholder": {
+    "message": "粘贴 日志平台 链接、测试平台 链接/ID、TraceId 或 mtop 接口名..."
+  },
+  "smartDetectedTraceId": {
+    "message": "识别为 EagleEye TraceId"
+  },
+  "traceIdFetchChainFailed": {
+    "message": "获取调用链路日志失败"
+  },
+  "eagleeyeLoginRequired": {
+    "message": "EagleEye 登录态已失效，请先登录后重试"
+  },
+  "traceIdNoProtocolFound": {
+    "message": "调用链中未找到 mtop 接口"
+  },
+  "pickApiFromRequestsTitle": {
+    "message": "从当前请求列表中选择"
+  },
+  "pickApiFromRequestsSearch": {
+    "message": "搜索接口名..."
+  },
+  "pickApiFromRequestsEmpty": {
+    "message": "暂无可选接口"
+  },
+  "traceIdNoUserIdFound": {
+    "message": "调用链中未能解析出用户 ID，无法查询 日志平台"
+  },
+  "agentPermRequestTitle": {
+    "message": "Agent 权限申请"
+  },
+  "agentPermRequestDesc": {
+    "message": "Agent 正在请求访问以下域名的权限，授权后 Agent 将可携带 Cookie 向该域名发送请求："
+  },
+  "agentPermRequestAllow": {
+    "message": "允许"
+  },
+  "agentPermRequestDeny": {
+    "message": "拒绝"
+  },
+  "agentPermRequestFailed": {
+    "message": "授权失败，请重试"
+  },
+  "agentPermRequestBrowserDenied": {
+    "message": "浏览器已拒绝授权，请重试或手动在扩展设置中添加域名"
+  },
+  "sourceTrace": {
+    "message": "源码追溯"
+  },
+  "sourceTraceTip": {
+    "message": "选中页面元素，定位接口字段与源码"
+  },
+  "traceElement": {
+    "message": "元素"
+  },
+  "traceComponent": {
+    "message": "组件"
+  },
+  "traceSource": {
+    "message": "源码"
+  },
+  "traceNoSource": {
+    "message": "无源码信息（生产构建或未注入 JSX source）"
+  },
+  "traceProjectRoot": {
+    "message": "项目根目录（用于打开源码）"
+  },
+  "traceProjectRootHint": {
+    "message": "项目根目录绝对路径（webpack/Next.js 源码为相对路径，需拼接后才能在编辑器打开）"
+  },
+  "traceSetRoot": {
+    "message": "设为可点击"
+  },
+  "traceRaxNoSource": {
+    "message": "Rax 项目源码定位暂不支持"
+  },
+  "traceMatchCount": {
+    "message": "命中 {n} 个字段"
+  },
+  "traceNoMatch": {
+    "message": "未匹配到接口字段"
+  },
+  "traceJumpField": {
+    "message": "跳转到该字段"
+  },
+  "traceHighlightOnPage": {
+    "message": "高亮页面元素"
+  },
+  "traceHighlightFailed": {
+    "message": "高亮失败"
+  },
+  "traceErrorNoFiber": {
+    "message": "该元素未挂载 React 组件"
+  },
+  "traceErrorNotFound": {
+    "message": "未找到目标元素"
+  },
+  "traceErrorGeneric": {
+    "message": "追溯失败"
+  },
+  "traceDegraded": {
+    "message": "该元素未挂载 React 组件，仅基于元素文本/属性做字段匹配"
+  },
+  "traceCopyPath": {
+    "message": "复制字段路径"
+  },
+  "traceCopyPrompt": {
+    "message": "复制为 Agent prompt（含元素/组件/字段，可直接粘给 AI 找源码）"
+  },
+  "tracePromptCopied": {
+    "message": "已复制 prompt，粘给 Agent 可定位源码"
+  },
+  "traceEditor": {
+    "message": "编辑器"
+  },
+  "traceMockBtn": {
+    "message": "一键 Mock"
+  },
+  "traceMockAll": {
+    "message": "一键 Mock 所有匹配字段（在原值后追加 \" 0\"、\" 1\" 等索引，刷新后能在页面上直接对上原文）"
+  },
+  "traceMockApplied": {
+    "message": "已对 {n} 个字段下发 Mock，刷新页面后会在原值后看到 0、1 …"
+  },
+  "traceMockFailed": {
+    "message": "下发 Mock 失败"
+  },
+  "agentChatVisualization": {
+    "message": "图表"
+  },
+  "agentChatVisualizationLoading": {
+    "message": "正在加载图表…"
+  },
+  "agentChatVisualizationUnavailable": {
+    "message": "无法加载图表"
+  },
+  "agentChatTitle": {
+    "message": "Agent 对话"
+  },
+  "agentChatOpenToolPanel": {
+    "message": "打开 Agent"
+  },
+  "agentChatCloseToolPanel": {
+    "message": "关闭 Agent"
+  },
+  "agentFloatingButton": {
+    "message": "侧边栏悬浮入口"
+  },
+  "agentFloatingButtonDesc": {
+    "message": "在已授权页面上显示用于打开 Agent 侧边栏的悬浮按钮"
+  },
+  "commandToggleAgentSidePanel": {
+    "message": "切换 Agent 侧边栏"
+  },
+  "commandToggleAgentSidePanelAlternate": {
+    "message": "切换 Agent 侧边栏（Option / Alt）"
+  },
+  "agentChatReady": {
+    "message": "就绪"
+  },
+  "agentChatCurrentModel": {
+    "message": "当前模型：$1"
+  },
+  "agentChatStatusIdle": {
+    "message": "空闲"
+  },
+  "agentChatStatusRunning": {
+    "message": "运行中"
+  },
+  "agentChatStatusWaiting": {
+    "message": "等待确认"
+  },
+  "agentChatStatusError": {
+    "message": "连接异常"
+  },
+  "agentChatSessionUnavailable": {
+    "message": "Agent 会话当前不可用"
+  },
+  "agentChatTabBindingChanged": {
+    "message": "当前标签页已关联到另一段对话，请重试"
+  },
+  "agentChatUnavailable": {
+    "message": "不可用"
+  },
+  "agentChatNotInstalled": {
+    "message": "未安装"
+  },
+  "agentChatProvider": {
+    "message": "Agent 提供方"
+  },
+  "agentChatSelectContextDirectory": {
+    "message": "选择参考目录"
+  },
+  "agentChatNoContextDirectoryLabel": {
+    "message": "选择项目"
+  },
+  "agentChatNoContextDirectory": {
+    "message": "未选择参考目录；Agent 权限由审批控制。"
+  },
+  "agentChatContextDirectorySelected": {
+    "message": "参考目录：$1"
+  },
+  "agentChatContextDirectoryBound": {
+    "message": "当前对话的参考目录：$1"
+  },
+  "agentChatClearContextDirectory": {
+    "message": "移除参考目录"
+  },
+  "agentChatSelectElement": {
+    "message": "选择页面元素"
+  },
+  "agentChatCancelElementPicker": {
+    "message": "取消选择元素"
+  },
+  "agentChatRemoveSelectedElement": {
+    "message": "移除已选元素"
+  },
+  "agentChatSelectedElementFallback": {
+    "message": "已选页面元素"
+  },
+  "agentChatEnableElementComments": {
+    "message": "开启页面元素评论"
+  },
+  "agentChatDisableElementComments": {
+    "message": "结束页面元素评论"
+  },
+  "agentChatElementCommentTitle": {
+    "message": "元素评论"
+  },
+  "agentChatElementCommentNumber": {
+    "message": "注释$1"
+  },
+  "agentChatElementCommentPlaceholder": {
+    "message": "描述希望如何修改这个元素…"
+  },
+  "agentChatCancelElementComment": {
+    "message": "取消"
+  },
+  "agentChatEditElementComment": {
+    "message": "编辑元素评论"
+  },
+  "agentChatMoveElementCommentPanel": {
+    "message": "移动评论面板"
+  },
+  "agentChatAddElementComment": {
+    "message": "添加并继续"
+  },
+  "agentChatConfirmElementComment": {
+    "message": "添加"
+  },
+  "agentChatElementCommentModeHint": {
+    "message": "评论页面元素：单击选择一次，双击连续选择"
+  },
+  "agentChatRemoveElementComment": {
+    "message": "移除元素评论"
+  },
+  "agentChatElementStyleChanges": {
+    "message": "样式"
+  },
+  "agentChatElementStyleValuePlaceholder": {
+    "message": "例如 16px"
+  },
+  "agentChatElementStyleTextContent": {
+    "message": "文本内容"
+  },
+  "agentChatElementStyleColor": {
+    "message": "文本颜色"
+  },
+  "agentChatElementStyleBackgroundColor": {
+    "message": "背景"
+  },
+  "agentChatElementStyleOpacity": {
+    "message": "透明度"
+  },
+  "agentChatElementStyleFontFamily": {
+    "message": "字体"
+  },
+  "agentChatElementStyleFontSize": {
+    "message": "字号"
+  },
+  "agentChatElementStyleFontWeight": {
+    "message": "字重"
+  },
+  "agentChatElementStyleLineHeight": {
+    "message": "行高"
+  },
+  "agentChatElementStyleLetterSpacing": {
+    "message": "字间距"
+  },
+  "agentChatElementStyleTextAlign": {
+    "message": "文本对齐"
+  },
+  "agentChatElementStyleMargin": {
+    "message": "外边距"
+  },
+  "agentChatElementStylePadding": {
+    "message": "内边距"
+  },
+  "agentChatElementStyleBorderRadius": {
+    "message": "圆角"
+  },
+  "agentChatElementStyleBorderColor": {
+    "message": "边框颜色"
+  },
+  "agentChatElementStyleBorderWidth": {
+    "message": "边框宽度"
+  },
+  "agentChatElementStyleWidth": {
+    "message": "宽度"
+  },
+  "agentChatElementStyleHeight": {
+    "message": "高度"
+  },
+  "agentChatPastedImage": {
+    "message": "已粘贴图片 $1"
+  },
+  "agentChatRemoveImage": {
+    "message": "移除图片 $1"
+  },
+  "agentChatTooManyImages": {
+    "message": "最多粘贴 $1 张图片"
+  },
+  "agentChatImageTooLarge": {
+    "message": "单张图片不能超过 $1 MB"
+  },
+  "agentChatImagesTooLarge": {
+    "message": "图片总大小不能超过 $1 MB"
+  },
+  "agentChatUnsupportedImage": {
+    "message": "仅支持 PNG、JPEG、WebP 和 GIF 图片"
+  },
+  "agentChatProviderImageUnsupported": {
+    "message": "当前 Agent 提供方不支持图片输入"
+  },
+  "agentChatImageReadFailed": {
+    "message": "图片读取失败，请重新粘贴"
+  },
+  "agentChatReplyImageUnsupported": {
+    "message": "回复 Agent 请求时暂不支持图片"
+  },
+  "agentChatStop": {
+    "message": "停止"
+  },
+  "agentChatNew": {
+    "message": "新建对话"
+  },
+  "agentChatMoreActions": {
+    "message": "更多操作"
+  },
+  "agentChatConversationHistory": {
+    "message": "选择已有对话"
+  },
+  "agentChatSearchConversations": {
+    "message": "搜索对话或参考目录"
+  },
+  "agentChatLoadingConversations": {
+    "message": "正在加载对话…"
+  },
+  "agentChatNoConversations": {
+    "message": "暂无可继续的对话"
+  },
+  "agentChatUntitledConversation": {
+    "message": "未命名对话"
+  },
+  "agentChatLoadMoreConversations": {
+    "message": "加载更多"
+  },
+  "agentChatResumingConversation": {
+    "message": "正在恢复对话"
+  },
+  "agentChatSwitchingProvider": {
+    "message": "正在切换 Agent…"
+  },
+  "agentChatRefreshConversation": {
+    "message": "刷新对话"
+  },
+  "agentChatRefreshingConversation": {
+    "message": "正在刷新对话…"
+  },
+  "agentChatCopyConversation": {
+    "message": "复制会话"
+  },
+  "agentChatCopyConversationDescription": {
+    "message": "复制当前会话中保留的用户与 Agent 消息"
+  },
+  "agentChatCopyDebugTrace": {
+    "message": "复制调试记录"
+  },
+  "agentChatCopyDebugTraceDescription": {
+    "message": "复制会话、工具调用参数与结果、错误等调试信息；敏感字段会自动脱敏"
+  },
+  "agentChatConversationCopied": {
+    "message": "会话已复制"
+  },
+  "agentChatDebugTraceCopied": {
+    "message": "调试记录已复制"
+  },
+  "agentChatCopyFailed": {
+    "message": "复制失败"
+  },
+  "agentChatTaskNoActiveTab": {
+    "message": "当前没有可关联的浏览器标签页"
+  },
+  "agentChatTaskProviderUnavailable": {
+    "message": "Codex 当前不可用，请检查安装或登录状态"
+  },
+  "agentChatTaskCreateFailed": {
+    "message": "Codex 对话创建失败"
+  },
+  "agentChatTaskSubmitFailed": {
+    "message": "任务未能提交给 Codex"
+  },
+  "agentChatTaskEmptyPrompt": {
+    "message": "Agent 任务内容不能为空"
+  },
+  "agentChatTaskBusy": {
+    "message": "Codex 正在处理其他任务，请稍后重试"
+  },
+  "agentChatTaskReset": {
+    "message": "Codex 对话已切换，任务未提交"
+  },
+  "agentChatConnecting": {
+    "message": "正在连接 Native Host…"
+  },
+  "agentChatStartingProvider": {
+    "message": "正在创建 $1 会话…"
+  },
+  "agentChatStartingProviderDetail": {
+    "message": "正在初始化会话，首次响应可能需要一点时间。"
+  },
+  "agentChatNativeHostUpdateStatus": {
+    "message": "Native Host 需要更新"
+  },
+  "agentChatNativeHostInstallStatus": {
+    "message": "Native Host 未连接"
+  },
+  "agentChatNativeHostUpdateTitle": {
+    "message": "更新 Native Host"
+  },
+  "agentChatNativeHostInstallTitle": {
+    "message": "安装 Native Host"
+  },
+  "agentChatNativeHostUpdateDescription": {
+    "message": "当前 Native Host 不支持侧边栏对话，更新后才能继续使用。"
+  },
+  "agentChatNativeHostInstallDescription": {
+    "message": "本地 Native Host 未连接，安装后才能使用侧边栏对话。"
+  },
+  "browserManagerNativeHostUpdateDescription": {
+    "message": "当前 Native Host 不支持浏览器管理，更新后才能查看和管理浏览器。"
+  },
+  "browserManagerNativeHostInstallDescription": {
+    "message": "本地 Native Host 未连接，安装后才能查看和管理浏览器。"
+  },
+  "agentChatExtensionVersion": {
+    "message": "插件版本"
+  },
+  "agentChatNativeHostVersion": {
+    "message": "Native Host 版本"
+  },
+  "agentChatNativeHostVersionUnknown": {
+    "message": "未知"
+  },
+  "agentChatNativeHostUpdateCommand": {
+    "message": "在终端运行"
+  },
+  "agentChatNativeHostReconnect": {
+    "message": "已更新，重新连接"
+  },
+  "agentChatNativeHostInstallReconnect": {
+    "message": "已安装，重新连接"
+  },
+  "agentChatNativeHostReconnectHint": {
+    "message": "更新命令执行完成后再重新连接"
+  },
+  "agentChatNativeHostInstallReconnectHint": {
+    "message": "安装命令执行完成后再重新连接"
+  },
+  "agentChatEmptyTitle": {
+    "message": "开始和 $1 对话"
+  },
+  "agentChatGuidePageTitle": {
+    "message": "操作页面"
+  },
+  "agentChatGuidePageDescription": {
+    "message": "点击、输入、滚动、导航并读取页面内容"
+  },
+  "agentChatGuidePagePrompt": {
+    "message": "查看当前页面，告诉我可以帮我完成哪些操作"
+  },
+  "agentChatGuideRequestTitle": {
+    "message": "分析请求"
+  },
+  "agentChatGuideRequestDescription": {
+    "message": "检查接口请求、响应、耗时和 API Schema"
+  },
+  "agentChatGuideRequestPrompt": {
+    "message": "分析当前页面最近的网络请求，帮我找出异常接口"
+  },
+  "agentChatGuideLogTitle": {
+    "message": "排查日志"
+  },
+  "agentChatGuideLogDescription": {
+    "message": "查看控制台错误、日志与埋点事件"
+  },
+  "agentChatGuideLogPrompt": {
+    "message": "分析当前页面的错误日志和埋点事件，帮我定位问题"
+  },
+  "agentChatGuideMockTitle": {
+    "message": "Mock 与规则"
+  },
+  "agentChatGuideMockDescription": {
+    "message": "设置接口 Mock、重定向和请求规则"
+  },
+  "agentChatGuideMockPrompt": {
+    "message": "查看当前页面的接口，帮我设计一个合适的 Mock 或请求规则"
+  },
+  "agentChatDecline": {
+    "message": "拒绝"
+  },
+  "agentChatApprove": {
+    "message": "允许"
+  },
+  "agentChatApprovalTitle": {
+    "message": "允许 Agent 执行这个操作？"
+  },
+  "agentChatApprovalCommandTitle": {
+    "message": "允许 Agent 运行这条命令？"
+  },
+  "agentChatApprovalFileChangeTitle": {
+    "message": "允许 Agent 修改文件？"
+  },
+  "agentChatApprovalPermissionsTitle": {
+    "message": "授予 Agent 这些权限？"
+  },
+  "agentChatApprovalToolTitle": {
+    "message": "允许 Agent 使用这个工具？"
+  },
+  "agentChatApprovalDescription": {
+    "message": "Agent 需要你的确认才能继续"
+  },
+  "agentChatApprovalCommand": {
+    "message": "将要运行"
+  },
+  "agentChatApprovalFiles": {
+    "message": "涉及文件"
+  },
+  "agentChatApprovalPermissions": {
+    "message": "请求权限"
+  },
+  "agentChatApprovalTool": {
+    "message": "请求工具"
+  },
+  "agentChatApprovalDirectory": {
+    "message": "工作目录"
+  },
+  "agentChatApprovalNetwork": {
+    "message": "网络访问"
+  },
+  "agentChatApprovalFileSystem": {
+    "message": "文件访问"
+  },
+  "agentChatApprovalShowDetails": {
+    "message": "查看完整请求"
+  },
+  "agentChatReply": {
+    "message": "在输入框回复"
+  },
+  "agentChatRequestPending": {
+    "message": "有 $1 个 Agent 请求等待处理"
+  },
+  "agentChatReplyingTo": {
+    "message": "正在回复 $1"
+  },
+  "agentChatReplyPlaceholder": {
+    "message": "输入回复；也可以直接输入 JSON 响应对象"
+  },
+  "agentChatInputPlaceholder": {
+    "message": "输入消息…"
+  },
+  "agentChatSend": {
+    "message": "发送"
+  },
+  "agentChatInputHint": {
+    "message": "Enter 发送，Shift + Enter 换行"
+  },
+  "agentChatEnableAutoApprove": {
+    "message": "开启自动审批"
+  },
+  "agentChatDisableAutoApprove": {
+    "message": "关闭自动审批"
+  },
+  "agentChatOpenCodexApp": {
+    "message": "在 Codex App 中打开"
+  },
+  "agentChatOpenCodexWorkspace": {
+    "message": "在 Codex App 中打开文件夹"
+  },
+  "agentChatTemporaryUnsupported": {
+    "message": "暂不支持临时会话"
+  },
+  "agentChatQoderSessionReconnected": {
+    "message": "Qoder 无法恢复此前的会话，最新消息已转入新会话。"
+  },
+  "agentChatResend": {
+    "message": "重发"
+  },
+  "agentChatQoderSignIn": {
+    "message": "登录 Qoder"
+  },
+  "agentChatQoderSignInRequired": {
+    "message": "Qoder 需要登录"
+  },
+  "agentChatQoderSignInHint": {
+    "message": "请在浏览器完成 Qoder 登录，然后重新发送消息。"
+  },
+  "agentChatQoderSignInPending": {
+    "message": "请在浏览器完成授权，返回这里后重发。"
+  },
+  "agentChatQoderSignInComplete": {
+    "message": "登录成功，请重新发送消息。"
+  },
+  "agentChatQoderSignInFallback": {
+    "message": "浏览器登录未完成。请在终端运行 $1，登录后重新发送消息。"
+  },
+  "agentChatSetupTitle": {
+    "message": "$1 需要配置"
+  },
+  "agentChatSetupDescription": {
+    "message": "请先在本机安装 CLI 并完成登录，然后重新打开 Agent Chat；只有桌面聊天客户端无法提供这条本地直连能力。"
+  },
+  "agentChatSetupManagedDescription": {
+    "message": "安装使用此 Agent 所需的本地组件。"
+  },
+  "agentChatSetupInstallProvider": {
+    "message": "安装 $1"
+  },
+  "agentChatSetupInstalling": {
+    "message": "正在安装…"
+  },
+  "agentChatSetupInstalled": {
+    "message": "$1 已安装"
+  },
+  "agentChatSetupLoginIfNeeded": {
+    "message": "如需登录，请在终端运行"
+  },
+  "agentChatSetupContinue": {
+    "message": "进入对话"
+  },
+  "agentChatSetupError": {
+    "message": "检测详情"
+  },
+  "agentChatSetupInstall": {
+    "message": "1. 安装"
+  },
+  "agentChatSetupLogin": {
+    "message": "2. 登录"
+  },
+  "agentChatSetupQoderLogin": {
+    "message": "2. 启动 Qoder CLI，然后输入 /login"
+  },
+  "agentChatSetupDocs": {
+    "message": "查看官方安装文档"
+  },
+  "agentSkillsManage": {
+    "message": "管理 Skills"
+  },
+  "agentSkillsTitle": {
+    "message": "$1 Skills"
+  },
+  "agentSkillsBack": {
+    "message": "返回技能列表"
+  },
+  "agentSkillsOpenPage": {
+    "message": "在 $1 查看"
+  },
+  "agentSkillsPreview": {
+    "message": "预览"
+  },
+  "agentSkillsBrowse": {
+    "message": "搜索技能"
+  },
+  "agentSkillsInstalled": {
+    "message": "已安装"
+  },
+  "agentSkillsInstallTo": {
+    "message": "安装到"
+  },
+  "agentSkillsGlobal": {
+    "message": "全局"
+  },
+  "agentSkillsProject": {
+    "message": "当前项目"
+  },
+  "agentSkillsSystem": {
+    "message": "系统"
+  },
+  "agentSkillsAdmin": {
+    "message": "管理员"
+  },
+  "agentSkillsBuiltIn": {
+    "message": "内置"
+  },
+  "agentSkillsUnknownScope": {
+    "message": "未知范围"
+  },
+  "agentSkillsCheckUpdates": {
+    "message": "检查更新"
+  },
+  "agentSkillsRefresh": {
+    "message": "刷新已安装技能"
+  },
+  "agentSkillsSearchPlaceholder": {
+    "message": "搜索技能名称、能力或来源…"
+  },
+  "agentSkillsLoginRequired": {
+    "message": "请先登录 $1，然后重试。"
+  },
+  "agentSkillsMarkdownUnavailable": {
+    "message": "该技能暂无可读取的 SKILL.md。"
+  },
+  "agentSkillsInvalidResponse": {
+    "message": "$1 返回了无法识别的响应，请确认登录状态。"
+  },
+  "agentSkillsNoResults": {
+    "message": "没有找到匹配的技能"
+  },
+  "agentSkillsNoDescription": {
+    "message": "暂无描述"
+  },
+  "agentSkillsInstalls": {
+    "message": "$1 次安装"
+  },
+  "agentSkillsInstall": {
+    "message": "安装"
+  },
+  "agentSkillsUpdateAvailable": {
+    "message": "可更新"
+  },
+  "agentSkillsUpdate": {
+    "message": "更新"
+  },
+  "agentSkillsUninstall": {
+    "message": "卸载"
+  },
+  "agentSkillsNoneInstalled": {
+    "message": "当前范围没有已安装的技能"
+  },
+  "copyFailed": {
+    "message": "复制失败"
+  },
+  "appSimulationVersion": {
+    "message": "版本"
+  },
+  "appSimulationVersionPlaceholder": {
+    "message": "如 10.0.0"
+  },
+  "browserManagerProviderConfigure": {
+    "message": "配置 Provider"
+  },
+  "browserManagerLocal": {
+    "message": "本地"
+  },
+  "browserManagerAdd": {
+    "message": "新增"
+  },
+  "browserManagerPersistentHint": {
+    "message": "关闭后保留登录态和浏览器数据"
+  },
+  "browserManagerHeadlessHint": {
+    "message": "在后台运行，不显示浏览器窗口"
+  },
+  "browserManagerAccount": {
+    "message": "测试账号平台 账号"
+  },
+  "browserManagerAccountHint": {
+    "message": "启动后自动登录到所选测试账号"
+  },
+  "browserManagerAccountNone": {
+    "message": "不自动登录"
+  },
+  "browserManagerAccountUnavailable": {
+    "message": "所选 测试账号平台 账号已不可用，请重新选择"
+  },
+  "browserManagerAccountLoginFailed": {
+    "message": "测试账号平台 账号登录失败"
+  },
+  "browserManagerSyncLoginHint": {
+    "message": "将当前浏览器中所选站点的 Cookie 写入目标浏览器"
+  },
+  "controlSessions": {
+    "message": "浏览器控制会话"
+  },
+  "agentUserTabGroup": {
+    "message": "Mearl · 待操作"
+  },
+  "controlSessionUser": {
+    "message": "由你控制"
+  },
+  "controlSessionAgent": {
+    "message": "Agent"
+  },
+  "controlSessionView": {
+    "message": "查看页面"
+  },
+  "controlSessionReturn": {
+    "message": "交还 Agent"
+  },
+  "controlSessionTakeOver": {
+    "message": "接管"
+  },
+  "controlSessionFinish": {
+    "message": "结束会话"
+  },
+  "controlSessionTask": {
+    "message": "Agent 浏览器任务"
+  },
+  "controlSessionPages": {
+    "message": "$1 个页面"
+  },
+  "browserManagerRequired": {
+    "message": "必填"
+  },
+  "browserManagerSelectOption": {
+    "message": "请选择"
+  },
+  "browserManagerSearchOptions": {
+    "message": "搜索名称或 ID"
+  },
+  "browserManagerNoOptions": {
+    "message": "没有可选项"
+  },
+  "browserManagerConnectionMode": {
+    "message": "连接方式"
+  },
+  "browserManagerLoadingOptions": {
+    "message": "正在查询可用选项…"
+  },
+  "browserManagerRefreshOptions": {
+    "message": "刷新"
+  },
+  "browserViewUnavailable": {
+    "message": "扩展界面暂不可用，请关闭后重试。"
+  },
+  "browserCaptureUnavailable": {
+    "message": "抓包能力暂不可用，请重试。"
+  },
+  "agentSkillsRateLimited": {
+    "message": "目录服务请求过于频繁，请稍后重试，或打开技能页面查看。"
+  },
+  "agentSkillsRequestFailed": {
+    "message": "无法连接技能目录，请重试，或打开技能页面查看。"
+  },
+  "agentSkillsManagerChanged": {
+    "message": "Skill 管理工具已变更，正在刷新目录，请重新选择后安装。"
+  },
+  "presetInstallTitle": {
+    "message": "启用 Mearl 能力"
+  },
+  "presetInstallSourceNotice": {
+    "message": "此网站未预先配置为安装来源。以下授权仅用于本次安装，不会将网站加入自动更新信任目录。"
+  },
+  "presetInstallSourceTitle": {
+    "message": "确认安装来源"
+  },
+  "presetInstallRequestingPage": {
+    "message": "请求网站"
+  },
+  "presetInstallCatalogSource": {
+    "message": "配置目录"
+  },
+  "presetInstallPresetSource": {
+    "message": "能力配置来源"
+  },
+  "presetInstallReadSourceHint": {
+    "message": "确认来源后读取配置，下一步将展示能力名称和所需站点权限，确认安装后才会启用。"
+  },
+  "presetInstallReadSource": {
+    "message": "继续，读取配置"
+  },
+  "presetInstallConfirmHint": {
+    "message": "请确认能力来源及其可访问的站点。安装包含的本机能力将通过已连接的 Mearl 本地服务执行；所需浏览器权限由浏览器另行确认。"
+  },
+  "presetInstallConfirmOnce": {
+    "message": "确认并安装本次配置"
+  },
+  "presetInstallCancel": {
+    "message": "取消"
+  },
+  "presetInstallReplaceSources": {
+    "message": "覆盖并修复…"
+  },
+  "presetInstallReplaceTitle": {
+    "message": "覆盖并修复以下 Skill？"
+  },
+  "presetInstallReplaceHint": {
+    "message": "来源冲突的 Skill 将按当前配置重装；已安装的 Skill 只修复插件注册。同名工具指向旧目录时，将替换为当前配置的注册。已完成的组件会保留。"
+  },
+  "presetInstallComponentRegistrationConflict": {
+    "message": "同名工具仍注册在其他目录"
+  },
+  "presetInstallComponentRegistrationPending": {
+    "message": "插件注册尚未完成"
+  },
+  "presetInstallReplaceConfirm": {
+    "message": "确认覆盖并重试"
+  },
+  "presetInstallHostUpdateRequired": {
+    "message": "当前 Mearl 本地服务尚不支持此操作，请更新并重启本地服务后重试。"
+  },
+  "presetInstallReplacementChanged": {
+    "message": "待覆盖的 Skill 状态已变化，请重新检查后再确认。"
+  },
+  "presetInstallSourceChanged": {
+    "message": "请求网站或配置来源不匹配。请返回原网站重新发起安装。"
+  },
+  "presetInstallDescription": {
+    "message": "一次配置，在原有工具和调试界面中使用。"
+  },
+  "presetInstallLoading": {
+    "message": "正在读取安装信息…"
+  },
+  "presetInstallWorking": {
+    "message": "正在校验并启用能力，请稍候…"
+  },
+  "presetInstallPermissions": {
+    "message": "启用这些能力需要访问以下站点。点击后由浏览器完成授权。"
+  },
+  "presetInstallAllow": {
+    "message": "允许并启用"
+  },
+  "presetInstallPermissionFailed": {
+    "message": "浏览器尚未允许所需站点。可以重新授权后继续，当前配置已保留。"
+  },
+  "presetInstallBrowserReady": {
+    "message": "浏览器能力已启用"
+  },
+  "presetInstallLocalPending": {
+    "message": "此预设还包含通过本机服务提供的能力，浏览器部分已可以直接使用。"
+  },
+  "presetInstallComplete": {
+    "message": "已可在原有 Popup、调试面板和应用模拟中使用。"
+  },
+  "presetInstallSetupHint": {
+    "message": "在终端运行一次安装命令，完成本机服务和关联能力配置："
+  },
+  "presetInstallCopy": {
+    "message": "复制安装命令"
+  },
+  "presetInstallCopied": {
+    "message": "已复制"
+  },
+  "presetInstallCopyFailed": {
+    "message": "复制失败，请选中命令手动复制。"
+  },
+  "presetInstallRefresh": {
+    "message": "重新检查"
+  },
+  "presetInstallGuide": {
+    "message": "返回安装引导"
+  },
+  "presetInstallSessionExpired": {
+    "message": "安装信息已过期或更新。请返回安装引导重新启用。"
+  },
+  "presetInstallFailed": {
+    "message": "暂时未能完成启用，请重试。当前能力配置已保留。"
+  },
+  "presetInstallIntegrityFailed": {
+    "message": "安装数据未通过完整性校验，已停止启用。请检查 Mearl 安装状态；当前能力配置已保留。"
+  },
+  "presetInstallConfigurationFailed": {
+    "message": "能力配置与当前 Mearl 不兼容。请更新 Mearl 或联系能力提供方，当前能力配置已保留。"
+  },
+  "presetInstallNativeSync": {
+    "message": "这套能力已关联本机服务，请运行 setup 命令一并更新，保留已有配置。"
+  },
+  "presetInstallAllReady": {
+    "message": "所选能力已全部启用"
+  },
+  "presetInstallLocalIncomplete": {
+    "message": "部分本机能力尚未完成，可以直接重试。已经完成的组件会保留。"
+  },
+  "presetInstallLocalRetry": {
+    "message": "重试本机安装"
+  },
+  "presetInstallLocalPendingTitle": {
+    "message": "本机能力尚未全部启用"
+  },
+  "presetPermissionsRequired": {
+    "message": "Preset $1 需要域名权限"
+  },
+  "presetPermissionsGrant": {
+    "message": "授权 preset 域名"
+  },
+  "requestCasesButton": {
+    "message": "用例"
+  },
+  "requestCasesServices": {
+    "message": "用例／抓包"
+  },
+  "accountsServices": {
+    "message": "测试账号"
+  },
+  "requestImportServices": {
+    "message": "请求导入"
+  },
+  "trackingMetadataServices": {
+    "message": "埋点数据"
+  },
+  "captureLoginRequired": {
+    "message": "请先登录"
+  },
+  "dataService": {
+    "message": "数据平台"
+  },
+  "presetInstallPendingItems": {
+    "message": "尚未完成的本机组件"
+  },
+  "presetInstallComponentMissing": {
+    "message": "尚未安装"
+  },
+  "presetInstallComponentConflict": {
+    "message": "已有其他来源的安装"
+  },
+  "presetInstallCatalogPending": {
+    "message": "工具目录尚未同步"
+  },
+  "presetInstallHostPending": {
+    "message": "等待本机服务加载"
+  },
+  "presetInstallComponentPending": {
+    "message": "尚未完成配置"
+  },
+  "presetInstallConflictHint": {
+    "message": "安装器遇到来源冲突时会暂停整批安装。现有组件已保留，请先处理冲突后重试。"
+  }
+}

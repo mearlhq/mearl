@@ -1,0 +1,61 @@
+{
+  "name": "@mearl/daemon-core",
+  "version": "3.0.0",
+  "description": "Shared Node daemon lifecycle primitives for Mearl — process liveness, JSON record registry, log rotation, and a detached daemon manager",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./capabilities": {
+      "types": "./dist/node-capabilities.d.ts",
+      "import": "./dist/node-capabilities.js"
+    },
+    "./installation": {
+      "types": "./dist/preset-installation.d.ts",
+      "import": "./dist/preset-installation.js"
+    },
+    "./page-runtimes": {
+      "types": "./dist/page-runtimes.d.ts",
+      "import": "./dist/page-runtimes.js"
+    }
+  },
+  "files": [
+    "README.en.md",
+    "dist",
+    "!dist/**/*.map"
+  ],
+  "scripts": {
+    "build": "rm -rf dist/ && tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build"
+  },
+  "keywords": [
+    "mearl",
+    "daemon"
+  ],
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20.18.0"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.1",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@mearl/preset": "workspace:*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mearlhq/mearl.git",
+    "directory": "packages/daemon-core"
+  }
+}

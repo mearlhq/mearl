@@ -1,0 +1,84 @@
+---
+import { ArrowUpRight, Languages, Menu, Moon, Sun } from '@lucide/astro';
+import GitHubIcon from '../components/GitHubIcon.astro';
+import ThemeBootstrap from '../components/ThemeBootstrap.astro';
+import { docsNavigation, referenceLinks, releaseLine, repositoryUrl, siteBase, sitePath, type Locale, type Page } from '../lib/site';
+import { siteCopy } from '../lib/site-copy';
+import '../styles/marketing.css';
+import '../styles/docs.css';
+
+interface Props {
+  title: string;
+  description: string;
+  locale: Locale;
+  page: Page;
+}
+const { title, description, locale, page } = Astro.props;
+const t = siteCopy[locale];
+const otherLocale = locale === 'en' ? 'zh-CN' : 'en';
+const localeLink = sitePath(otherLocale, page);
+const home = sitePath(locale);
+---
+<!doctype html>
+<html lang={locale} data-theme-light-label={t.light} data-theme-dark-label={t.dark} data-copied={t.copied} data-copy-failed={t.copyFailed}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <title>{title}</title>
+    <link rel="icon" href={`${siteBase}favicon.ico`} />
+    {Astro.site && (
+      <>
+        <link rel="canonical" href={new URL(sitePath(locale, page), Astro.site).href} />
+        <link rel="alternate" hreflang={otherLocale} href={new URL(localeLink, Astro.site).href} />
+        <link rel="alternate" hreflang={locale} href={new URL(sitePath(locale, page), Astro.site).href} />
+        <link rel="alternate" hreflang="x-default" href={new URL(sitePath('zh-CN', page), Astro.site).href} />
+      </>
+    )}
+    <ThemeBootstrap />
+  </head>
+  <body class="docs-site">
+    <a class="skip-link" href="#main">{t.skip}</a>
+    <header class="site-header">
+      <div class="docs-header">
+        <a class="brand" href={home}><img src={`${siteBase}icons/icon.svg`} alt="" width="28" height="28" /><span>Mearl</span></a>
+        <span class="docs-version">{releaseLine}</span>
+        <button class="nav-toggle" type="button" aria-label={t.openNav} aria-expanded="false" aria-controls="site-navigation"><Menu size={18} aria-hidden="true" /></button>
+        <nav class="nav-links" id="site-navigation" aria-label={t.nav}>
+          <div class="docs-desktop-nav">
+            <a href={home} aria-current={page === 'home' ? 'page' : undefined}>{t.overview}</a>
+            <a href={sitePath(locale, 'extension')} aria-current={page === 'extension' ? 'page' : undefined}>{t.chromeExtension}</a>
+            <a href={sitePath(locale, 'quick-start')} aria-current={page === 'quick-start' ? 'page' : undefined}>{t.documentation}</a>
+            <a href={sitePath(locale, 'installation')} aria-current={page === 'installation' ? 'page' : undefined}>{t.start}</a>
+          </div>
+          <div class="docs-mobile-nav">
+            {docsNavigation(locale).map(group => (
+              <div>
+                <p>{group.label}</p>
+                {group.links.map(link => <a href={sitePath(locale, link.page)} aria-current={link.page === page ? 'page' : undefined}>{link.label}</a>)}
+              </div>
+            ))}
+            <div>
+              <p>{t.reference}</p>
+              {referenceLinks(locale).map(link => <a href={link.href} aria-current={link.page === page ? 'page' : undefined}>{link.label}</a>)}
+            </div>
+          </div>
+        </nav>
+        <div class="docs-tools">
+          <a class="docs-language" href={localeLink} hreflang={otherLocale} lang={otherLocale} data-locale-link={page.startsWith('reference/') ? 'page' : 'section'}><Languages size={16} aria-hidden="true" />{t.language}</a>
+          <button class="theme-toggle" type="button" aria-label={t.dark} title={t.dark}><Moon class="theme-icon theme-icon-moon" aria-hidden="true" /><Sun class="theme-icon theme-icon-sun" aria-hidden="true" /></button>
+          <a class="docs-github" href={repositoryUrl} aria-label={t.source} title={t.source}><GitHubIcon /></a>
+        </div>
+      </div>
+    </header>
+    <main id="main"><slot /></main>
+    <footer class="docs-footer">
+      <div><strong>Mearl</strong><p>{t.footerLead}</p></div>
+      <nav aria-label={t.reference}>
+        <a href={`${repositoryUrl}/releases`}>{t.releases} <ArrowUpRight size={13} aria-hidden="true" /></a>
+        <a href={`${repositoryUrl}/issues`}>{t.issues} <ArrowUpRight size={13} aria-hidden="true" /></a>
+      </nav>
+    </footer>
+    <script>import '../scripts/welcome.js';</script>
+  </body>
+</html>

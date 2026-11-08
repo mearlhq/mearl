@@ -1,0 +1,80 @@
+{
+  "name": "@mearl/native-host",
+  "version": "3.0.0",
+  "description": "Native Messaging Host for Mearl \u2014 bridges Chrome Extension and local socket server",
+  "type": "module",
+  "engines": {
+    "node": ">=20.18.0"
+  },
+  "main": "dist/install.js",
+  "types": "dist/install.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/install.d.ts",
+      "default": "./dist/install.js"
+    },
+    "./runtime": "./dist/index.js",
+    "./capabilities": {
+      "types": "./dist/node-capabilities.d.ts",
+      "import": "./dist/node-capabilities.js"
+    }
+  },
+  "bin": {
+    "mearl-native-host": "./dist/index.js"
+  },
+  "files": [
+    "README.en.md",
+    "dist/index.js",
+    "dist/plugin-worker.js",
+    "dist/plugin-task-host.js",
+    "dist/pluginModelSessionWorker.js",
+    "dist/install.js",
+    "dist/install.d.ts",
+    "dist/node-capabilities.js",
+    "dist/**/*.d.ts",
+    "dist/THIRD_PARTY_NOTICES.txt"
+  ],
+  "scripts": {
+    "build": "rm -rf dist/ && node build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build",
+    "postinstall": "node dist/index.js --init || true"
+  },
+  "keywords": [
+    "mearl",
+    "chrome-extension",
+    "native-messaging"
+  ],
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org"
+  },
+  "dependencies": {
+    "uqr": "^0.1.2",
+    "semver": "^7.8.5",
+    "ws": "^8.18.3",
+    "@mearl/app-profiles": "workspace:*",
+    "@mearl/browser-core": "workspace:*",
+    "@mearl/client": "workspace:*",
+    "@mearl/daemon-core": "workspace:*",
+    "@mearl/provider": "workspace:*",
+    "@mearl/setup": "workspace:*",
+    "@types/node": "^24.9.1",
+    "@types/ws": "^8.18.1",
+    "@mearl/agent-runtime": "workspace:*",
+    "@mearl/preset": "workspace:*",
+    "tough-cookie": "^6.0.0",
+    "@mearl/plugin-tracking": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/semver": "^7.7.1",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.8.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mearlhq/mearl.git",
+    "directory": "packages/native-host"
+  }
+}

@@ -1,0 +1,242 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light dark;
+}
+
+@theme {
+  /* Font size tokens — all in rem so they scale with html font-size */
+  --text-3xs: 0.5625rem;   /* 9px  at default 16px root */
+  --text-2xs: 0.625rem;    /* 10px at default 16px root */
+  --text-xxs: 0.6875rem;   /* 11px at default 16px root */
+  --animate-agent-chat-dot: agent-chat-dot 1.2s ease-in-out infinite;
+  --animate-toolbox-agent-drawer: toolbox-agent-drawer 200ms ease-out;
+
+  @keyframes toolbox-agent-drawer {
+    from {
+      translate: 100% 0;
+      opacity: 0;
+    }
+
+    to {
+      translate: 0 0;
+      opacity: 1;
+    }
+  }
+
+  @keyframes agent-chat-dot {
+    0%,
+    60%,
+    100% {
+      opacity: 0.28;
+      transform: translateY(0);
+    }
+
+    30% {
+      opacity: 1;
+      transform: translateY(-2px);
+    }
+  }
+
+  /* Colors - Tailwind will auto-generate utilities like bg-toolbar, text-primary, etc. */
+  --color-toolbar: #f3f3f3;
+  --color-toolbar-border: #d0d0d0;
+  --color-text-primary: #2c2c2c;
+  --color-text-secondary: #6e6e6e;
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f8f9fa;
+  --color-bg-list: #fafbfc;
+  --color-bg-hover: #f0f1f3;
+  --color-bg-selected: #f5f5f5;
+  --color-border: #e1e4e8;
+  --color-accent-blue: #2a57c9;
+  --color-accent-bg: #e8e8e8;
+  --color-warning-bg: #fef9c3;
+  --color-warning-border: #fde68a;
+  --color-warning-text: #92400e;
+  --color-warning-btn: #b45309;
+  --color-scrollbar-track: #f6f8fa;
+  --color-scrollbar-thumb: #d1d5db;
+  --color-scrollbar-thumb-hover: #9ca3af;
+  /* JSON / syntax highlight colors */
+  --color-json-string: #00c951;
+  --color-json-number: #2b7fff;
+  --color-json-boolean: #ad46ff;
+  --color-json-null: #6e6e6e;
+  --color-json-key: #2a57c9;
+}
+
+/* Dark mode overrides */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-toolbar: #1f1f1f;
+    --color-toolbar-border: #343434;
+    --color-text-primary: #e4e4e7;
+    --color-text-secondary: #a1a1aa;
+    --color-bg-primary: #0f0f0f;
+    --color-bg-secondary: #1a1a1a;
+    --color-bg-list: #0f0f0f;
+    --color-bg-hover: #262626;
+    --color-bg-selected: #1f1f1f;
+    --color-border: #30363d;
+    --color-accent-blue: #58a6ff;
+    --color-accent-bg: #0c2d6b;
+    --color-warning-bg: #1c1500;
+    --color-warning-border: #4a3500;
+    --color-warning-text: #fbbf24;
+    --color-warning-btn: #d97706;
+    --color-scrollbar-track: #1a1a1a;
+    --color-scrollbar-thumb: #3b3b3b;
+    --color-scrollbar-thumb-hover: #555555;
+    /* JSON / syntax highlight colors */
+    --color-json-string: #00c951;
+    --color-json-number: #2b7fff;
+    --color-json-boolean: #ad46ff;
+    --color-json-null: #a1a1aa;
+    --color-json-key: #58a6ff;
+  }
+}
+
+body {
+  @apply bg-bg-primary text-text-primary;
+}
+
+:focus,
+:focus-visible {
+  outline: none;
+}
+
+/* Camera shutter animation */
+@keyframes shutter {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(0.45); }
+  100% { transform: scale(1); }
+}
+
+.animate-shutter {
+  animation: shutter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes check-pop {
+  0%   { transform: scale(0.4); opacity: 0; }
+  60%  { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-check-pop {
+  animation: check-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Custom scrollbar styles */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-scrollbar-thumb) var(--color-scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  @apply bg-scrollbar-track;
+}
+
+*::-webkit-scrollbar-thumb {
+  @apply bg-scrollbar-thumb rounded-[5px] border-2 border-scrollbar-track;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  @apply bg-scrollbar-thumb-hover;
+}
+
+*::-webkit-scrollbar-corner {
+  @apply bg-scrollbar-track;
+}
+
+/* Prism syntax highlight theme */
+.prism-highlight .token.comment,
+.prism-highlight .token.prolog,
+.prism-highlight .token.doctype,
+.prism-highlight .token.cdata {
+  color: #6a9a6e;
+}
+@media (prefers-color-scheme: dark) {
+  .prism-highlight .token.comment,
+  .prism-highlight .token.prolog,
+  .prism-highlight .token.doctype,
+  .prism-highlight .token.cdata {
+    color: #6a9955;
+  }
+}
+
+.prism-highlight .token.punctuation {
+  color: #555;
+}
+@media (prefers-color-scheme: dark) {
+  .prism-highlight .token.punctuation {
+    color: #aaa;
+  }
+}
+
+.prism-highlight .token.tag,
+.prism-highlight .token.deleted {
+  color: #c0392b;
+}
+@media (prefers-color-scheme: dark) {
+  .prism-highlight .token.tag,
+  .prism-highlight .token.deleted {
+    color: #f47067;
+  }
+}
+
+/* JSON keys / HTML attr names → blue */
+.prism-highlight .token.attr-name {
+  color: var(--color-json-key);
+}
+
+/* CSS property names → blue */
+.prism-highlight .token.property {
+  color: var(--color-json-key);
+}
+
+.prism-highlight .token.string,
+.prism-highlight .token.attr-value,
+.prism-highlight .token.char,
+.prism-highlight .token.inserted {
+  color: var(--color-json-string);
+}
+
+.prism-highlight .token.number,
+.prism-highlight .token.unit,
+.prism-highlight .token.hexcode {
+  color: var(--color-json-number);
+}
+
+.prism-highlight .token.boolean {
+  color: var(--color-json-boolean);
+}
+
+.prism-highlight .token.keyword,
+.prism-highlight .token.rule,
+.prism-highlight .token.important,
+.prism-highlight .token.atrule {
+  color: var(--color-json-boolean);
+}
+
+/* CSS selectors / class names → green */
+.prism-highlight .token.selector,
+.prism-highlight .token.function,
+.prism-highlight .token.class-name {
+  color: var(--color-json-string);
+}
+
+.prism-highlight .token.url {
+  color: var(--color-json-string);
+  text-decoration: underline;
+}
+
+/* JSON-specific tokens (keys are attr-name, null/true/false are keyword/boolean) */
+.prism-highlight .token.null.keyword {
+  color: var(--color-json-null);
+}

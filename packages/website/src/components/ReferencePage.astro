@@ -1,0 +1,30 @@
+---
+import type { MarkdownInstance } from 'astro';
+import { ArrowUpRight } from '@lucide/astro';
+import DocsLayout from '../layouts/DocsLayout.astro';
+import { localizedDocFile, referenceDocs, repositoryUrl } from '../lib/reference-docs.mjs';
+import type { Locale, Reference } from '../lib/site';
+import { siteCopy } from '../lib/site-copy';
+
+interface Props { locale: Locale; reference: Reference }
+const { locale, reference } = Astro.props;
+const file = localizedDocFile(referenceDocs[reference], locale);
+const sources = import.meta.glob<MarkdownInstance<Record<string, unknown>>>([
+  '../../../../packages/{client,mcp-server,provider,preset,setup,extension}/README{,.en}.md',
+  '../../../../skills/README{,.en}.md',
+  '../../../../docs/capability-model{,.en}.md',
+], { eager: true });
+const source = Object.values(sources).find(document => document.file.replaceAll('\\', '/').endsWith(`/${file}`));
+if (!source) throw new Error(`Missing website reference document: ${file}`);
+const { Content } = source;
+const headings = source.getHeadings();
+const title = headings.find(heading => heading.depth === 1)?.text ?? reference;
+const topics = headings.filter(heading => heading.depth === 2).map(({ slug, text }) => ({ id: slug, label: text }));
+---
+<DocsLayout title={`${title} · Mearl`} description={title} {locale} page={`reference/${reference}`} {topics}>
+  <div class="docs-reference-source">
+    <span>{siteCopy[locale].reference}</span>
+    <a href={`${repositoryUrl}/blob/main/${file}`}>{siteCopy[locale].source}<ArrowUpRight size={13} aria-hidden="true" /></a>
+  </div>
+  <div class="docs-markdown"><Content /></div>
+</DocsLayout>

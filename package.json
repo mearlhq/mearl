@@ -1,0 +1,51 @@
+{
+  "name": "mearl",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Mearl open-source core and portable Skills",
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=22.23.4"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "pnpm -r typecheck",
+    "verify:node-runtime": "node scripts/verify-node-runtime.mjs",
+    "check:skills": "node packages/client/build-guides.mjs --check && node skills/notes-memory/scripts/build-toolbox.mjs --check && node skills/tinypng-compress/scripts/build-toolbox.mjs --check && node skills/design-overlay/scripts/build-toolbox.mjs --check",
+    "check:preset-browser": "node scripts/check-preset-browser.mjs",
+    "check:core-browser": "node scripts/check-core-browser.mjs",
+    "dev:website": "pnpm --filter @mearl/preset build && pnpm --filter @mearl/website dev",
+    "build:website": "pnpm --filter @mearl/website... build",
+    "bump": "node scripts/bump-version.mjs",
+    "publish:beta": "node scripts/publish.mjs --channel beta",
+    "publish": "node scripts/publish.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.1",
+    "esbuild": "^0.28.2",
+    "fake-indexeddb": "^6.2.6",
+    "happy-dom": "^21.0.4",
+    "htm": "^3.1.1",
+    "lucide-react": "^0.562.0",
+    "preact": "^10.29.0",
+    "react": "^19.1.0",
+    "typescript": "^5.8.3",
+    "vitest": "4.1.12",
+    "@mearl/browser-core": "workspace:*",
+    "@mearl/client": "workspace:*"
+  },
+  "type": "module",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "node-pty"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mearlhq/mearl.git"
+  }
+}

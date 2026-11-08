@@ -1,0 +1,74 @@
+{
+  "name": "@mearl/browser-core",
+  "version": "3.0.0",
+  "description": "Shared pure-logic utilities for Mearl — usable in both browser extension and Node.js environments",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./appProfileRuntime": {
+      "types": "./dist/appProfileRuntime.d.ts",
+      "import": "./dist/appProfileRuntime.js"
+    },
+    "./deviceChromeView": {
+      "types": "./dist/deviceChromeView.d.ts",
+      "import": "./dist/deviceChromeView.js"
+    },
+    "./agentChat": {
+      "types": "./dist/agentChat.d.ts",
+      "import": "./dist/agentChat.js"
+    },
+    "./agentSkills": {
+      "types": "./dist/agentSkills.d.ts",
+      "import": "./dist/agentSkills.js"
+    },
+    "./pluginModels": {
+      "types": "./dist/pluginModels.d.ts",
+      "import": "./dist/pluginModels.js"
+    },
+    "./browserActionProtocol": {
+      "types": "./dist/browserActionProtocol.d.ts",
+      "import": "./dist/browserActionProtocol.js"
+    },
+    "./sseParser": {
+      "types": "./dist/sseParser.d.ts",
+      "import": "./dist/sseParser.js"
+    },
+    "./queryString": {
+      "types": "./dist/queryString.d.ts",
+      "import": "./dist/queryString.js"
+    },
+    "./rootWebViewDocument": {
+      "types": "./dist/rootWebViewDocument.d.ts",
+      "import": "./dist/rootWebViewDocument.js"
+    }
+  },
+  "files": [
+    "README.en.md",
+    "dist",
+    "!dist/**/*.map"
+  ],
+  "scripts": {
+    "build": "rm -rf dist/ && tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build"
+  },
+  "keywords": [
+    "mearl"
+  ],
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mearlhq/mearl.git",
+    "directory": "packages/browser-core"
+  }
+}

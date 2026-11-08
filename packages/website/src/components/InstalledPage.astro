@@ -1,0 +1,124 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { CircleCheck, ArrowUpRight } from '@lucide/astro';
+import PinIcon from './PinIcon.astro';
+import { setupCommand, siteBase, sitePath, type Locale } from '../lib/site';
+import { siteCopy } from '../lib/site-copy';
+import { installedCopy } from '../lib/installed-copy';
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+const t = installedCopy[locale];
+const common = siteCopy[locale];
+---
+
+<BaseLayout
+  title={`Mearl · ${t.installed}`}
+  description={t.lead}
+  {locale}
+  page="installed"
+>
+  <div class="page-frame installed-page" data-mearl-install-page="ready">
+    <section class="start-section installed-start" aria-labelledby="installed-start-title">
+      <header class="installed-heading">
+        <div>
+          <p class="installed-status"><CircleCheck size={16} aria-hidden="true" />{t.installed}</p>
+          <h1 id="installed-start-title">{t.title}</h1>
+          <p class="hero-lead">{t.lead}</p>
+        </div>
+        <div class="hero-actions"><a class="button button-primary" href={sitePath(locale, 'extension') + '#toolbox'}>{common.extensionTry}</a><a class="button button-secondary" href={sitePath(locale, 'installation') + '#agent'}>{common.agentInstall}</a></div>
+      </header>
+      <div class="guide-status" data-guide data-config-url={`${siteBase}installation.json`} hidden>
+        <p role="status" aria-live="polite" data-guide-status></p>
+        <div class="guide-actions"><button class="button button-secondary" type="button" data-guide-detect>{t.detect}</button><button class="button button-secondary" type="button" data-guide-cancel hidden>{t.cancel}</button><a class="text-link" data-guide-link>{t.openGuide} <ArrowUpRight size={13} aria-hidden="true" /></a></div>
+      </div>
+      <div class="start-grid installed-steps" role="list" aria-label={common.start}>
+        <article role="listitem">
+          <span>POPUP</span>
+          <h2>{t.pin}</h2>
+          <p class="installed-step-description">{t.pinLead}</p>
+          <div class="installed-browser" aria-hidden="true">
+            <div class="installed-browser-bar">{t.extensions}</div>
+            <div class="installed-extension-row"><img src={`${siteBase}icons/icon.svg`} alt="" width="24" height="24" /><b>Mearl</b><span class="installed-pin"><PinIcon /></span></div>
+          </div>
+          <small class="installed-step-note">{t.pinNote}</small>
+        </article>
+        <article role="listitem">
+          <span>DEVTOOLS</span>
+          <h2>{t.devtools}</h2>
+          <p class="installed-step-description">{t.devtoolsLead}</p>
+          <div class="installed-shortcut" aria-hidden="true"><kbd>F12</kbd></div>
+          <small class="installed-step-note">{t.devtoolsNote}</small>
+        </article>
+        <article class="start-primary" role="listitem">
+          <span>AGENT &amp; CLI</span>
+          <h2>{t.agent}</h2>
+          <p class="installed-step-description">{t.agentLead}</p>
+          <div class="start-command-stack installed-commands">
+            <div><small>{t.setup}</small><div class="command-box"><code id="installed-setup-command">{setupCommand}</code><button type="button" data-copy-target="#installed-setup-command">{common.copy}</button></div></div>
+            <div><small>{t.check}</small><div class="command-box command-secondary"><code id="installed-check-command">mearl check</code><button type="button" data-copy-target="#installed-check-command">{common.copy}</button></div></div>
+          </div>
+          <small class="installed-step-note">{t.agentNote}</small>
+        </article>
+      </div>
+      <p class="start-note"><a class="installed-role-link" href={`${sitePath(locale)}#workflow`}>{common.useCasesTitle}<ArrowUpRight size={13} aria-hidden="true" /></a></p>
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .guide-status { margin-bottom: 24px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-soft); }
+  .guide-status[hidden], .guide-status [hidden] { display: none; }
+  .guide-status p { margin: 0 0 8px; color: var(--muted); font-size: var(--text-small); }
+  .guide-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+  .guide-actions .button { min-height: 32px; padding: 6px 10px; font-size: var(--text-small); }
+  .installed-role-link { display: inline-flex; align-items: center; gap: 5px; color: var(--blue); text-decoration: none; }
+  .installed-role-link:hover { color: var(--blue-hover); }
+  .installed-page { min-height: var(--hero-viewport-height); }
+  .installed-start { min-height: var(--hero-viewport-height); }
+  .installed-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; margin-bottom: 32px; }
+  .installed-heading h1 { margin: 14px 0; font-size: var(--text-hero-title); font-weight: 750; line-height: 1.14; letter-spacing: -.055em; }
+  .installed-heading .hero-actions { flex-shrink: 0; margin: 0; }
+  .installed-status { display: flex; align-items: center; gap: 7px; margin: 0; color: var(--muted); font-size: var(--text-small); }
+  .installed-status svg { width: 16px; height: 16px; fill: none; stroke: var(--green); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .installed-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .installed-steps article { min-width: 0; min-height: 0; padding: 26px; }
+  .installed-steps h2 { margin: 24px 0 9px; font-size: 17px; font-weight: 680; }
+  .installed-steps .installed-step-description { min-height: 76px; margin-bottom: 0; line-height: 1.8; }
+  .installed-step-note { display: block; margin-top: 18px; color: var(--muted); font-size: var(--text-small); line-height: 1.8; }
+  .installed-browser { width: 100%; margin-top: 24px; overflow: hidden; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+  .installed-browser-bar { padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--surface-soft); color: var(--muted); font-size: var(--text-small); }
+  .installed-extension-row { display: flex; align-items: center; gap: 10px; padding: 16px 14px; font-size: var(--text-small); }
+  .installed-extension-row b { font-weight: 600; }
+  .installed-pin { display: grid; place-items: center; margin-left: auto; width: 30px; height: 30px; border-radius: 4px; background: var(--blue-soft); color: var(--blue); }
+  .installed-shortcut { width: 100%; min-height: 104px; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 24px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-soft); color: var(--muted); }
+  .installed-shortcut kbd { padding: 7px 9px; border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 4px; color: var(--ink); background: var(--surface); font-family: var(--mono); font-size: var(--text-small); }
+  .installed-commands { width: 100%; grid-template-columns: minmax(0, 1fr); }
+  .installed-commands .command-box code { white-space: normal; overflow-wrap: anywhere; }
+  @media (min-width: 981px) {
+    .installed-start { display: flex; flex-direction: column; justify-content: center; padding-block: clamp(32px, 5svh, 64px); }
+  }
+  @media (max-width: 980px) {
+    .installed-heading { align-items: flex-start; flex-direction: column; gap: 24px; }
+    .installed-steps { grid-template-columns: 1fr; }
+    .installed-steps .installed-step-description { min-height: 0; }
+    .installed-browser, .installed-shortcut, .installed-commands { max-width: 420px; }
+  }
+  @media (max-width: 720px) {
+    .installed-page, .installed-start { min-height: 0; }
+    .installed-start { padding-block: 32px; }
+    .installed-heading { gap: 20px; margin-bottom: 24px; }
+    .installed-heading .hero-actions { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .installed-heading .button { min-height: 44px; padding-inline: 10px; }
+    .installed-heading .hero-lead, .installed-steps .installed-step-description { font-size: 15px; }
+    .installed-steps { gap: 12px; overflow: visible; border: 0; }
+    .installed-steps article, .installed-steps article:last-child { padding: 20px; border: 1px solid var(--line); border-radius: 8px; }
+    .installed-steps h2 { margin-top: 16px; font-size: 18px; }
+    .installed-browser, .installed-shortcut { margin-top: 18px; }
+    .installed-shortcut { min-height: 84px; }
+    .installed-step-note { margin-top: 14px; }
+    .installed-commands { padding-top: 18px; }
+    .installed-commands .command-box { min-height: 48px; gap: 6px; padding-left: 10px; }
+    .installed-commands .command-box code { font-size: 13px; }
+    .installed-commands .command-box button { min-height: 40px; }
+  }
+</style>

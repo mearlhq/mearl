@@ -1,0 +1,16 @@
+---
+import { ArrowUpRight, Download } from '@lucide/astro';
+import { latestExtensionDownload } from '../lib/extension-download';
+import { chromeStoreUrl, type Locale } from '../lib/site';
+import { siteCopy } from '../lib/site-copy';
+
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+const t = siteCopy[locale];
+const offlineZip = await latestExtensionDownload();
+---
+<div class="docs-install-links">
+  {offlineZip && <a class="button button-primary" href={offlineZip.url}>{t.offlineInstall} <span class="docs-zip-version">{offlineZip.version}</span><Download size={14} aria-hidden="true" /></a>}
+  <a class:list={['button', offlineZip ? 'button-secondary' : 'button-primary']} href={chromeStoreUrl}>{t.storeInstall}<ArrowUpRight size={13} aria-hidden="true" /></a>
+</div>
+{offlineZip && <p class="docs-install-note">{t.offlineLead} <code>chrome://extensions/</code>{locale === 'en' ? ', ' : ''}{t.offlineSteps}</p>}

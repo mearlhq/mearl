@@ -1,0 +1,16 @@
+---
+import { MessageSquare, Terminal } from '@lucide/astro';
+import { siteCopy } from '../lib/site-copy';
+import type { Locale } from '../lib/site';
+
+interface Props { locale: Locale; id: string; command: string; label: string; prompt?: boolean }
+const { locale, id, command, label, prompt = false } = Astro.props;
+const Icon = prompt ? MessageSquare : Terminal;
+---
+<div class:list={['docs-code', { 'docs-prompt': prompt }]}>
+  <div class="docs-code-bar">
+    <span><Icon size={15} aria-hidden="true" />{label}</span>
+    <button type="button" data-copy-target={`#${id}`}>{siteCopy[locale].copy}</button>
+  </div>
+  {prompt ? <p id={id}>{command}</p> : <pre><code id={id}>{command}</code></pre>}
+</div>

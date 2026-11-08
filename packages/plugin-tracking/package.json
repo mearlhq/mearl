@@ -1,0 +1,45 @@
+{
+  "name": "@mearl/plugin-tracking",
+  "version": "3.0.0",
+  "description": "Optional Aplus, RUM and ARMS tracking capability for Mearl",
+  "type": "module",
+  "license": "Apache-2.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime.d.ts",
+      "import": "./dist/runtime.js"
+    }
+  },
+  "files": [
+    "README.en.md",
+    "dist",
+    "!dist/**/__tests__/**",
+    "!dist/**/*.test.d.ts"
+  ],
+  "scripts": {
+    "build": "rm -rf dist/ && tsc && node build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "engines": {
+    "node": ">=20.18.0"
+  },
+  "dependencies": {
+    "@mearl/browser-core": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "typescript": "^5.8.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mearlhq/mearl.git",
+    "directory": "packages/plugin-tracking"
+  }
+}

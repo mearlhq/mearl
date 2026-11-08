@@ -1,0 +1,3350 @@
+{
+  "appBridgeWebPageEnvironment": { "message": "Web page environment" },
+  "appBridgeWebPageEnvironmentReload": { "message": "Switching environments reloads the current web page." },
+  "appProfileInstallTitle": { "message": "Add App emulation" },
+  "appProfileInstallAction": { "message": "Add App emulation" },
+  "appProfileInstallOfficial": { "message": "Official App emulation" },
+  "appProfileInstallWeChat": { "message": "WeChat emulation" },
+  "appProfileInstallDescription": { "message": "Install App emulation from a GitHub repository or an HTTPS bundle URL. Only install code from a source you trust." },
+  "appProfileInstallSource": { "message": "App emulation source" },
+  "appProfileInstallPermissionDenied": { "message": "Permission to read the emulation source was denied." },
+  "appProfileInstallFailed": { "message": "Could not install App emulation." },
+  "appProfileInstallPending": { "message": "Installing…" },
+  "appProfileInstallSubmit": { "message": "Install" },
+  "appProfileInstallSuccess": { "message": "Installed $1" },
+  "requestProtocolLabel": { "message": "Protocol" },
+  "accountRequestFailed": {
+    "message": "Request failed"
+  },
+  "toolboxUserScriptsTitle": {
+    "message": "Allow user scripts to continue"
+  },
+  "toolboxUserScriptsHint": {
+    "message": "Enable “Allow User Scripts” in the Mearl extension details. On Chrome 135–137, enable Developer mode on the Extensions page instead. Then return to your web page and retry."
+  },
+  "toolboxUserScriptsOpen": {
+    "message": "Open extension details"
+  },
+  "extName": {
+    "message": "Mearl"
+  },
+  "extDescription": {
+    "message": "Agent-driven browser toolkit: automation, verification, observability"
+  },
+  "openAgentSidePanelFromPage": {
+    "message": "Open Mearl side panel"
+  },
+  "openAgentSidePanelFailed": {
+    "message": "Could not open the Mearl side panel. Try again."
+  },
+  "scanQrCode": {
+    "message": "Scan QR Code"
+  },
+  "qrCopied": {
+    "message": "✅ Copied: $content$",
+    "placeholders": {
+      "content": {
+        "content": "$1"
+      }
+    }
+  },
+  "qrNotFound": {
+    "message": "⚠️ No QR code detected. Copy the image and paste it into the Mearl popup to try again."
+  },
+  "qrFailed": {
+    "message": "❌ QR code recognition failed. Copy the image and paste it into the Mearl popup to try again."
+  },
+  "qrPasteDetected": {
+    "message": "QR code content detected and displayed"
+  },
+  "qrPasteNotFound": {
+    "message": "No QR code was detected in the pasted image"
+  },
+  "qrPasteFailed": {
+    "message": "The QR code in the pasted image could not be decoded"
+  },
+  "preserveLog": {
+    "message": "Preserve log"
+  },
+  "modify": {
+    "message": "Modify"
+  },
+  "clear": {
+    "message": "Clear"
+  },
+  "prevMatch": {
+    "message": "Previous"
+  },
+  "nextMatch": {
+    "message": "Next"
+  },
+  "clearAllRequests": {
+    "message": "Clear all requests"
+  },
+  "requests": {
+    "message": "requests"
+  },
+  "noRequests": {
+    "message": "No requests"
+  },
+  "filterRequests": {
+    "message": "API name (supports regex)"
+  },
+  "collapseFilterBar": {
+    "message": "Collapse filters"
+  },
+  "expandFilterBar": {
+    "message": "Expand filters"
+  },
+  "requestsWillAppearHere": {
+    "message": "Listening for requests"
+  },
+  "noMatchingRequests": {
+    "message": "No matching requests"
+  },
+  "switchToProtocolHint": {
+    "message": "$1 requests in Protocol mode — click to switch"
+  },
+  "switchToRequestsHint": {
+    "message": "$1 requests in Requests mode — click to switch"
+  },
+  "enableResponseModification": {
+    "message": "Enable response modification"
+  },
+  "enableResponseModificationFailed": {
+    "message": "Failed to enable response modification. Please try again."
+  },
+  "responseModificationDebuggerBusy": {
+    "message": "Failed to enable response modification: another debugging tool is attached to this page. Disconnect it and try again."
+  },
+  "showAllSpmNodes": {
+    "message": "Highlight SPM"
+  },
+  "showAllSpmNodesTooltip": {
+    "message": "Highlight all SPM nodes on page (green=abcd, orange=click, blue=spm)"
+  },
+  "heatmap": {
+    "message": "Heatmap data"
+  },
+  "heatmapCurrentSpmAB": {
+    "message": "Page AB"
+  },
+  "heatmapNoSpmAB": {
+    "message": "Page AB not detected. Refresh the page or check if SPM is tagged."
+  },
+  "heatmapLoginRequired": {
+    "message": "Please log in to $1 first"
+  },
+  "heatmapOpenLogin": {
+    "message": "Open login page"
+  },
+  "heatmapMeasureExpired": {
+    "message": "Server-side metric field has changed. Please contact the extension maintainer."
+  },
+  "heatmapMeasureExpUv": {
+    "message": "Exp"
+  },
+  "heatmapMeasureClkUv": {
+    "message": "Click"
+  },
+  "heatmapMeasureClkRate": {
+    "message": "CTR"
+  },
+  "heatmapMeasureIpvUv": {
+    "message": "Lead IPV"
+  },
+  "heatmapMeasureTrdUv": {
+    "message": "Trade UV"
+  },
+  "heatmapMeasureTrdAmt": {
+    "message": "Trade amt"
+  },
+  "heatmapDataDateTooltip": {
+    "message": "Data date is yesterday (T-1, Analytics service's default aggregation window)"
+  },
+  "blockApi": {
+    "message": "Hide API"
+  },
+  "unblockApi": {
+    "message": "Unhide"
+  },
+  "basicInfo": {
+    "message": "Basic Info"
+  },
+  "apiName": {
+    "message": "API Name"
+  },
+  "requestMethod": {
+    "message": "Method"
+  },
+  "statusCode": {
+    "message": "Status Code"
+  },
+  "requestEnvironment": {
+    "message": "Environment"
+  },
+  "requestEnvironmentProd": {
+    "message": "Production"
+  },
+  "requestEnvironmentPreRelease": {
+    "message": "Pre-release"
+  },
+  "requestEnvironmentUnknown": {
+    "message": "Unknown"
+  },
+  "duration": {
+    "message": "Duration"
+  },
+  "durationMs": {
+    "message": "$1ms"
+  },
+  "timestamp": {
+    "message": "Timestamp"
+  },
+  "queryParams": {
+    "message": "Query Parameters"
+  },
+  "viewDetails": {
+    "message": "View Details"
+  },
+  "view": {
+    "message": "View"
+  },
+  "viewInRequestTab": {
+    "message": "View full request data in Request tab"
+  },
+  "fullscreen": {
+    "message": "Fullscreen"
+  },
+  "requestBody": {
+    "message": "Request Body"
+  },
+  "responseBody": {
+    "message": "Response Body"
+  },
+  "copy": {
+    "message": "Copy"
+  },
+  "jsonParseError": {
+    "message": "Failed to parse JSON. Please check the format."
+  },
+  "pinField": {
+    "message": "Pin field"
+  },
+  "unpinField": {
+    "message": "Unpin field"
+  },
+  "pinnedFields": {
+    "message": "Pinned Fields"
+  },
+  "fullResponse": {
+    "message": "Full Response"
+  },
+  "fullRequest": {
+    "message": "Full Request"
+  },
+  "requestHeaders": {
+    "message": "Request Headers"
+  },
+  "responseHeaders": {
+    "message": "Response Headers"
+  },
+  "headersSize": {
+    "message": "Headers Size"
+  },
+  "headersTab": {
+    "message": "Headers"
+  },
+  "requestTab": {
+    "message": "Request"
+  },
+  "responseTab": {
+    "message": "Response"
+  },
+  "noRequestBody": {
+    "message": "No request body"
+  },
+  "noResponseBody": {
+    "message": "No response body"
+  },
+  "sseMessages": {
+    "message": "SSE Messages"
+  },
+  "totalMessages": {
+    "message": "Total Messages"
+  },
+  "streaming": {
+    "message": "Streaming"
+  },
+  "waitingForMessages": {
+    "message": "Waiting for messages..."
+  },
+  "noSseMessages": {
+    "message": "No SSE messages"
+  },
+  "sseViewByMessage": {
+    "message": "By message"
+  },
+  "sseViewAggregated": {
+    "message": "Aggregated"
+  },
+  "sseAggregatedTip": {
+    "message": "Merge streaming frames field-by-field and concatenate incremental text into one object"
+  },
+  "sseAggregatedFromPrefix": {
+    "message": "Merged from "
+  },
+  "sseAggregatedFromSuffix": {
+    "message": " frames"
+  },
+  "sseDragToScrubFrames": {
+    "message": "Drag, click to type, or ↑↓ to set aggregated frame count — live preview"
+  },
+  "sseHeartbeatSkipped": {
+    "message": "· $1 heartbeat frame(s) skipped"
+  },
+  "sseOtherEvents": {
+    "message": "other event(s)"
+  },
+  "save": {
+    "message": "Save"
+  },
+  "selectColor": {
+    "message": "Choose color"
+  },
+  "formatJson": {
+    "message": "Format"
+  },
+  "cancel": {
+    "message": "Cancel"
+  },
+  "dragToReorder": {
+    "message": "Drag to reorder"
+  },
+  "resetResponse": {
+    "message": "Reset Response"
+  },
+  "responseDurationMs": {
+    "message": "Duration (ms)"
+  },
+  "responseDurationPlaceholder": {
+    "message": "e.g. 1000"
+  },
+  "proxyRequest": {
+    "message": "Proxy Request"
+  },
+  "copyValue": {
+    "message": "Copy Value"
+  },
+  "copyPath": {
+    "message": "Copy Path"
+  },
+  "copyType": {
+    "message": "Copy Type"
+  },
+  "addProperty": {
+    "message": "Add Property"
+  },
+  "addElement": {
+    "message": "Add Element"
+  },
+  "removeField": {
+    "message": "Remove Field"
+  },
+  "renameKey": {
+    "message": "Click to rename key"
+  },
+  "editInModal": {
+    "message": "Edit in Modal"
+  },
+  "editInModalTitle": {
+    "message": "Edit JSON"
+  },
+  "recursiveExpand": {
+    "message": "Recursive Expand"
+  },
+  "recursiveCollapse": {
+    "message": "Recursive Collapse"
+  },
+  "collapseAbove": {
+    "message": "Collapse Above"
+  },
+  "confirm": {
+    "message": "Confirm"
+  },
+  "insertIndex": {
+    "message": "index"
+  },
+  "insertIndexHint": {
+    "message": "Leave empty to append at end"
+  },
+  "blocked": {
+    "message": "hidden"
+  },
+  "blockedApis": {
+    "message": "Hidden"
+  },
+  "gzipSize": {
+    "message": "gzip"
+  },
+  "searchInJson": {
+    "message": "Search in JSON..."
+  },
+  "searchSseMessages": {
+    "message": "Search all messages"
+  },
+  "jsonViewModeTree": {
+    "message": "Tree"
+  },
+  "jsonViewModeCode": {
+    "message": "Code"
+  },
+  "pickElementForSearch": {
+    "message": "Click a page element to extract its text as search term"
+  },
+  "pickingElement": {
+    "message": "Click an element on the page to extract text..."
+  },
+  "pickTouchHint": {
+    "message": "Tap to select · drag to preview"
+  },
+  "errorBoundary_title": {
+    "message": "Application Error"
+  },
+  "errorBoundary_description": {
+    "message": "Sorry, the application encountered an error. You can try the following actions to recover:"
+  },
+  "errorBoundary_reload": {
+    "message": "Reload"
+  },
+  "errorBoundary_clearCache": {
+    "message": "Clear Cache & Retry"
+  },
+  "errorBoundary_errorDetails": {
+    "message": "Error Details"
+  },
+  "welcomeDescription": {
+    "message": "Agent-driven · Auto-verify · Debug observability"
+  },
+  "welcomeSuccess": {
+    "message": "Welcome"
+  },
+  "welcomeTipPopup": {
+    "message": "Format and edit JSON/URLs"
+  },
+  "welcomeTipPanel": {
+    "message": "Inspect requests and events, and mock responses"
+  },
+  "welcomeTipSidepanel": {
+    "message": "Chat with agents and automate the browser"
+  },
+  "welcomeTipDeviceCapture": {
+    "message": "Capture and mock mobile traffic"
+  },
+  "openInNewTab": {
+    "message": "Open in new tab"
+  },
+  "import": {
+    "message": "Import"
+  },
+  "invalidJsonFormat": {
+    "message": "Invalid JSON format"
+  },
+  "close": {
+    "message": "Close"
+  },
+  "modified_count": {
+    "message": "modified"
+  },
+  "edit": {
+    "message": "Edit"
+  },
+  "mockConditions": {
+    "message": "Conditions"
+  },
+  "responsePreview": {
+    "message": "Response Data"
+  },
+  "noConditionsHint": {
+    "message": "Match request body fields. Always active when empty."
+  },
+  "conditionsPlaceholder": {
+    "message": "e.g. { \"itemId\": \"123456\" }"
+  },
+  "conditionsMultiMockHint": {
+    "message": "Multiple conditional mocks can be added for the same API, matched by conditions in priority order"
+  },
+  "remove": {
+    "message": "Remove"
+  },
+  "removeAllOverrides": {
+    "message": "Remove All"
+  },
+  "emptyListGuide": {
+    "message": "No APIs hidden yet"
+  },
+  "emptyListGuideDescription": {
+    "message": "Right-click any request in the list and select \"Hide API\" to add it here"
+  },
+  "copyFullTraceid": {
+    "message": "Copy full Trace ID"
+  },
+  "shareLogLink": {
+    "message": "Copy Log service link"
+  },
+  "viewInHsfOps": {
+    "message": "View in HSF Console"
+  },
+  "hsfNotFound": {
+    "message": "HSF interface info not found"
+  },
+  "requestMetadataLoginOpenFailed": {
+    "message": "Couldn't open sign-in. Check extension site permissions and retry."
+  },
+  "hsfInterface": {
+    "message": "HSF Interface"
+  },
+  "encodedPrefix": {
+    "message": "Prefix"
+  },
+  "encoded": {
+    "message": "Encoded"
+  },
+  "clickToToggleFormat": {
+    "message": "Click to toggle format"
+  },
+  "queryString": {
+    "message": "Query"
+  },
+  "hintPaste": {
+    "message": "V Paste"
+  },
+  "hintUndo": {
+    "message": "Z Undo"
+  },
+  "hintCodeSearch": {
+    "message": "F: Search"
+  },
+  "hideShortcuts": {
+    "message": "Hide shortcuts"
+  },
+  "showShortcuts": {
+    "message": "Show shortcuts"
+  },
+  "imagePreview": {
+    "message": "Image Preview"
+  },
+  "clickToViewImage": {
+    "message": "Click to view image"
+  },
+  "commandClickToViewImage": {
+    "message": "Command-click to preview image"
+  },
+  "failedToLoadImage": {
+    "message": "Failed to load image"
+  },
+  "resend": {
+    "message": "Resend"
+  },
+  "resendRequest": {
+    "message": "Resend Request"
+  },
+  "editRequest": {
+    "message": "Editing"
+  },
+  "cancelEdit": {
+    "message": "Cancel"
+  },
+  "confirmSend": {
+    "message": "Send"
+  },
+  "resendError": {
+    "message": "Failed to send request"
+  },
+  "sending": {
+    "message": "Sending..."
+  },
+  "settings": {
+    "message": "Settings"
+  },
+  "moreSettings": {
+    "message": "More Settings"
+  },
+  "extensionUpdateAvailable": {
+    "message": "Version v$1 is available"
+  },
+  "extensionUpdateNow": {
+    "message": "Update Now"
+  },
+  "extensionUpdating": {
+    "message": "Updating..."
+  },
+  "extensionChangelog": {
+    "message": "Changelog"
+  },
+  "extensionUpdateReloading": {
+    "message": "Update complete. Reloading the extension"
+  },
+  "extensionUpdateFailed": {
+    "message": "Extension update failed"
+  },
+  "extensionAlreadyLatest": {
+    "message": "The extension is already up to date"
+  },
+  "userManual": {
+    "message": "User Manual"
+  },
+  "settingsTitle": {
+    "message": "Mearl Settings"
+  },
+  "settingsGroupGeneral": {
+    "message": "General"
+  },
+  "settingsGroupRequest": {
+    "message": "Request & Debug"
+  },
+  "settingsGroupIntegration": {
+    "message": "Services"
+  },
+  "appBridgeConfig": {
+    "message": "App simulation settings"
+  },
+  "deviceChromeScreenshotCopied": {
+    "message": "Copied"
+  },
+  "deviceChromeScreenshotDownloaded": {
+    "message": "Downloaded"
+  },
+  "deviceChromeScreenshotFailed": {
+    "message": "Capture failed"
+  },
+  "appBridgeCloseConfig": {
+    "message": "Close app simulation settings"
+  },
+  "appBridgePagePaused": {
+    "message": "While this panel is open, the page receives hidden events. Closing it restores the page and dispatches foreground events."
+  },
+  "appBridgeV10Title": {
+    "message": "V10 page capability"
+  },
+  "appBridgeUnreadTitle": {
+    "message": "Unread message state"
+  },
+  "appBridgePushTitle": {
+    "message": "Push notification state"
+  },
+  "appBridgeEnabled": {
+    "message": "Enabled"
+  },
+  "appBridgeDisabled": {
+    "message": "Disabled"
+  },
+  "appBridgeUnreadPoint": {
+    "message": "Red dot"
+  },
+  "appBridgeUnreadBubble": {
+    "message": "Number badge"
+  },
+  "appBridgeUnreadCount": {
+    "message": "Unread count"
+  },
+  "appBridgeKeepCustom": {
+    "message": "Keep existing advanced config"
+  },
+  "appBridgeNoCuratedOptions": {
+    "message": "This endpoint has no key responses to configure yet"
+  },
+  "appBridgeLanguage": {
+    "message": "Language"
+  },
+  "appBridgeLanguageZhCN": {
+    "message": "Simplified Chinese"
+  },
+  "appBridgeLanguageZhTW": {
+    "message": "Traditional Chinese (Taiwan)"
+  },
+  "appBridgeLanguageZhHK": {
+    "message": "Traditional Chinese (Hong Kong)"
+  },
+  "appBridgeLanguageEnUS": {
+    "message": "English"
+  },
+  "appBridgeLanguageReloadHint": {
+    "message": "The page reloads after switching languages"
+  },
+  "settingsSaving": {
+    "message": "Saving..."
+  },
+  "language": {
+    "message": "Language"
+  },
+  "fontSize": {
+    "message": "Font Size"
+  },
+  "fontSizeSmall": {
+    "message": "Smaller"
+  },
+  "fontSizeDefault": {
+    "message": "Default"
+  },
+  "fontSizeLarge": {
+    "message": "Larger"
+  },
+  "fontSizeMax": {
+    "message": "Maximum"
+  },
+  "chinese": {
+    "message": "简体中文"
+  },
+  "english": {
+    "message": "English"
+  },
+  "sseMonitoring": {
+    "message": "SSE Real-time Monitoring"
+  },
+  "sseMonitoringDesc": {
+    "message": "Intercept fetch requests to monitor Server-Sent Events streaming responses"
+  },
+  "sseMonitoringDisabledHint": {
+    "message": "Reload the page after enabling"
+  },
+  "enableSseMonitoring": {
+    "message": "Enable SSE Monitoring"
+  },
+  "sseViewRawResponse": {
+    "message": "View raw response"
+  },
+  "envSwitch": {
+    "message": "Protocol Environment"
+  },
+  "envSwitchDesc": {
+    "message": "Takes effect after reloading the page. Rewrite the page's Protocol gateway requests to the target environment, CORS handled automatically"
+  },
+  "envSwitchReloadHint": {
+    "message": "Reload the page to apply the change"
+  },
+  "envSwitchChangeFailed": {
+    "message": "Failed to change Protocol environment. Please try again."
+  },
+  "envSwitchOff": {
+    "message": "Default"
+  },
+  "deviceSimulation": {
+    "message": "Device Emulation"
+  },
+  "deviceSimulationApp": {
+    "message": "App"
+  },
+  "deviceSimulationMobileDevice": {
+    "message": "Mobile Device"
+  },
+  "deviceSimulationCustom": {
+    "message": "Custom"
+  },
+  "deviceSimulationChangeFailed": {
+    "message": "Failed to switch device emulation"
+  },
+  "deviceSimulationAuto": {
+    "message": "Automatically enable App and device simulation"
+  },
+  "deviceSimulationAutoHint": {
+    "message": "Use the last selected App and device when visiting pages under $1"
+  },
+  "deviceSimulationAutoEnabledHint": {
+    "message": "Automatic simulation is enabled for $1; click to turn it off"
+  },
+  "deviceSimulationAutoUnavailable": {
+    "message": "Automatic simulation by root domain is unavailable on this page"
+  },
+  "deviceSimulationAutoChangeFailed": {
+    "message": "Failed to update automatic simulation"
+  },
+  "deviceSimulationIosAdaptive": {
+    "message": "iOS (Adaptive)"
+  },
+  "deviceSimulationAndroidAdaptive": {
+    "message": "Android (Adaptive)"
+  },
+  "deviceSimulationIphone17Pro": {
+    "message": "iPhone 17 Pro"
+  },
+  "deviceSimulationIphoneDuoFolded": {
+    "message": "iPhone Duo (Folded)"
+  },
+  "deviceSimulationIphoneDuoUnfolded": {
+    "message": "iPhone Duo (Unfolded)"
+  },
+  "deviceSimulationIphone17e": {
+    "message": "iPhone 17e"
+  },
+  "deviceSimulationPixel11": {
+    "message": "Pixel 11"
+  },
+  "deviceSimulationIpadMiniA17Pro": {
+    "message": "iPad mini (A17 Pro)"
+  },
+  "deviceSimulationGalaxyS26": {
+    "message": "Galaxy S26"
+  },
+  "deviceSimulationPuraXMax": {
+    "message": "HUAWEI Pura X Max"
+  },
+  "deviceSimulationEnableLandscape": {
+    "message": "Enable landscape"
+  },
+  "deviceSimulationDisableLandscape": {
+    "message": "Disable landscape"
+  },
+  "deviceSimulationSplitScreen": {
+    "message": "Split-screen simulation"
+  },
+  "deviceSimulationSplitScreenHint": {
+    "message": "Keep Home on the left and open subsequent pages on the right"
+  },
+  "deviceSimulationFitToWindow": {
+    "message": "Fit to window"
+  },
+  "deviceSimulationFitToWindowHint": {
+    "message": "Scale the device view to fit without changing its viewport or DPR"
+  },
+  "appSimulationShowMore": {
+    "message": "Show more"
+  },
+  "appSimulationCancelHint": {
+    "message": "Click again to stop simulation"
+  },
+  "appSimulationChangeFailed": {
+    "message": "Failed to switch App simulation"
+  },
+  "deviceSimulationShell": {
+    "message": "System bars"
+  },
+  "deviceSimulationShellHint": {
+    "message": "Simulate the status bar and bottom controls"
+  },
+  "deviceSimulationPhoneFrame": {
+    "message": "Phone frame"
+  },
+  "deviceSimulationPhoneFrameHint": {
+    "message": "Center the device in a phone frame"
+  },
+  "devicePreviewPanel": { "message": "Debug" },
+  "devicePreviewToolbar": { "message": "Device toolbar" },
+  "devicePreviewToolbarCollapse": { "message": "Collapse device toolbar" },
+  "deviceSimulationEnableFromPage": { "message": "Enable app simulation" },
+  "deviceSimulationNoApp": { "message": "No app" },
+  "deviceSimulationDisable": { "message": "Turn off device simulation" },
+  "devicePreviewCapturing": { "message": "Capturing" },
+  "devicePreviewCaptureUnavailable": { "message": "Capture unavailable" },
+  "devicePreviewPanelResize": { "message": "Resize debug panel" },
+  "mcpService": {
+    "message": "Agent Service"
+  },
+  "agentPreventForeground": {
+    "message": "Do not disturb"
+  },
+  "agentPreventForegroundDesc": {
+    "message": "Enabled by default. Agent activation keeps pages running in the background without switching tabs or focusing windows; turn off to allow foreground activation"
+  },
+  "mcpServiceDesc": {
+    "message": "Allow AI assistants to directly access browser requests, mock configs, and console logs"
+  },
+  "externalServices": {
+    "message": "External Services"
+  },
+  "externalServicesDesc": {
+    "message": "Installed capabilities provide the defaults. You can adjust each service; disabling it hides its UI and stops related requests."
+  },
+  "enabled": {
+    "message": "Enabled"
+  },
+  "disabled": {
+    "message": "Disabled"
+  },
+  "settingsSaved": {
+    "message": "Settings saved"
+  },
+  "settingsSaveFailed": {
+    "message": "Failed to save"
+  },
+  "rulesConfig": {
+    "message": "Request Rules"
+  },
+  "rulesConfigDesc": {
+    "message": "Intercept, redirect, or modify requests; changes are saved and applied automatically"
+  },
+  "rulesSaveFailed": {
+    "message": "Failed to save or apply rules: $1"
+  },
+  "rulesConfigDocs": {
+    "message": "View documentation"
+  },
+  "rulesDisabledTitle": {
+    "message": "Request rules are off"
+  },
+  "rulesDisabledHint": {
+    "message": "Turn on the switch above to add and manage rules"
+  },
+  "rulePriority": {
+    "message": "Priority"
+  },
+  "ruleDescriptionPlaceholder": {
+    "message": "Note"
+  },
+  "ruleActionRedirect": {
+    "message": "Redirect"
+  },
+  "ruleActionRedirectDesc": {
+    "message": "Redirect matching requests to another URL"
+  },
+  "ruleActionBlock": {
+    "message": "Block"
+  },
+  "ruleActionBlockDesc": {
+    "message": "Block the request from being sent"
+  },
+  "ruleActionAllow": {
+    "message": "Allow"
+  },
+  "ruleActionAllowDesc": {
+    "message": "Skip other matching rules and allow the request"
+  },
+  "ruleActionUpgradeScheme": {
+    "message": "Upgrade Https"
+  },
+  "ruleActionUpgradeSchemeDesc": {
+    "message": "Automatically upgrade Http requests to Https"
+  },
+  "ruleActionModifyHeaders": {
+    "message": "Modify Headers"
+  },
+  "ruleActionModifyHeadersDesc": {
+    "message": "Add, set, or remove request/response headers for matching requests"
+  },
+  "ruleRequestHeaders": {
+    "message": "Request header operations"
+  },
+  "ruleResponseHeaders": {
+    "message": "Response header operations"
+  },
+  "rulePermissionTitle": {
+    "message": "Grant rule domain access"
+  },
+  "rulePermissionDescription": {
+    "message": "These domains need access permission for the rules to take effect. Cancelling keeps your rules saved."
+  },
+  "rulePermissionMissing": {
+    "message": "Rules need domain access: $1"
+  },
+  "rulePermissionGrant": {
+    "message": "Grant access"
+  },
+  "rulePermissionFailed": {
+    "message": "Access was not granted. Try again or check the extension's site access settings."
+  },
+  "rulePermissionUnscoped": {
+    "message": "Some URL patterns have no finite domain scope. Narrow the filter or check the relevant site access in extension settings."
+  },
+  "ruleHeaderOpSet": {
+    "message": "Set"
+  },
+  "ruleHeaderOpAppend": {
+    "message": "Append"
+  },
+  "ruleHeaderOpRemove": {
+    "message": "Remove"
+  },
+  "ruleHeaderAdd": {
+    "message": "Add header"
+  },
+  "ruleMatchUrl": {
+    "message": "Match URL"
+  },
+  "ruleTargetUrl": {
+    "message": "Target URL"
+  },
+  "ruleRegexSubstitution": {
+    "message": "Regex"
+  },
+  "ruleFixedUrl": {
+    "message": "Fixed"
+  },
+  "ruleRegexFilter": {
+    "message": "Regex"
+  },
+  "ruleUrlFilter": {
+    "message": "Wildcard"
+  },
+  "ruleInitiatorDomains": {
+    "message": "Initiator domains"
+  },
+  "ruleInitiatorDomainsHint": {
+    "message": "supports path regex with captures"
+  },
+  "ruleInitiatorDomainsPlaceholder": {
+    "message": "edith.example.com\nedith.example.com/clam/([^/]+)/  ← \\a = group 1"
+  },
+  "ruleResourceTypes": {
+    "message": "Resource types"
+  },
+  "ruleResourceTypesHint": {
+    "message": "leave unchecked for all"
+  },
+  "ruleAddRule": {
+    "message": "Add rule"
+  },
+  "ruleModeForm": {
+    "message": "Form"
+  },
+  "ruleModeJson": {
+    "message": "JSON"
+  },
+  "ruleN": {
+    "message": "Rule $1"
+  },
+  "rulesCurrentCount": {
+    "message": "$1 applied"
+  },
+  "rulesJsonParseError": {
+    "message": "JSON parse error: $1"
+  },
+  "ruleAddBlank": {
+    "message": "Blank Rule"
+  },
+  "rulePresetProtocolI18nDesc": {
+    "message": "Add x-i18n-language: en-US to Protocol requests"
+  },
+  "rulePresetAlidnDevRedirectDesc": {
+    "message": "Redirect CDN assets to the development environment"
+  },
+  "requestCasesTitle": {
+    "message": "Test platform Test Cases"
+  },
+  "requestCasesLoading": {
+    "message": "Loading..."
+  },
+  "requestCasesFailed": {
+    "message": "Failed"
+  },
+  "hsfMaintainer": {
+    "message": "Maintainer"
+  },
+  "requestCasesNoData": {
+    "message": "No data"
+  },
+  "requestCasesTransferSearchPlaceholder": {
+    "message": "Search suites..."
+  },
+  "requestCasesRetry": {
+    "message": "Retry"
+  },
+  "accountLoginRequired": {
+    "message": "Not logged in to Test account service. Please log in first."
+  },
+  "accountLogin": {
+    "message": "Login to $1"
+  },
+  "account": {
+    "message": "Account"
+  },
+  "accountShowCount": {
+    "message": "Click to show request count"
+  },
+  "accountShowNickname": {
+    "message": "Click to show nickname"
+  },
+  "accountsLoadFailed": {
+    "message": "Failed to load accounts: $1"
+  },
+  "accountSearchPlaceholder": {
+    "message": "Enter account name or account ID"
+  },
+  "accountCurrentAccount": {
+    "message": "Current logged-in account"
+  },
+  "accountQuickBorrow": {
+    "message": "Quick Borrow"
+  },
+  "accountOpenPortal": {
+    "message": "Open Test account service Portal"
+  },
+  "accountMobileSsoQr": {
+    "message": "Mobile QR Code Login"
+  },
+  "accountSwitchToHarmony": {
+    "message": "Switch to HarmonyOS"
+  },
+  "accountSwitchToAndroidIos": {
+    "message": "Switch to Android / iOS"
+  },
+  "accountQrCodeFailed": {
+    "message": "Failed to get QR code"
+  },
+  "accountAutoLoginCountdown": {
+    "message": "Auto login in $1s"
+  },
+  "accountAutoLoginPending": {
+    "message": "Logging in..."
+  },
+  "retry": {
+    "message": "Retry"
+  },
+  "saveToRequestCases": {
+    "message": "Save Mock to Test platform"
+  },
+  "updateTestCase": {
+    "message": "Update test case"
+  },
+  "sceneNamePlaceholder": {
+    "message": "Scene name"
+  },
+  "scanQrCodeToEnableMock": {
+    "message": "Scan to mock this API"
+  },
+  "showQRCode": {
+    "message": "Show QR Code"
+  },
+  "hideQRCode": {
+    "message": "Hide QR Code"
+  },
+  "copyQRCode": {
+    "message": "Copy QR code image"
+  },
+  "qrCodeCopied": {
+    "message": "QR code copied"
+  },
+  "copyQRCodeFailed": {
+    "message": "Failed to copy QR code"
+  },
+  "queryPresets": {
+    "message": "Query presets"
+  },
+  "presetImmersiveTitleBar": {
+    "message": "Immersive title bar"
+  },
+  "noQueryPresets": {
+    "message": "No presets yet — click + to add"
+  },
+  "addPreset": {
+    "message": "Add preset"
+  },
+  "deletePreset": {
+    "message": "Delete"
+  },
+  "presetNamePlaceholder": {
+    "message": "Name"
+  },
+  "presetParamsPlaceholder": {
+    "message": "Params a=1&b=2"
+  },
+  "realDeviceCapture": {
+    "message": "Device Capture"
+  },
+  "popupToolFormatter": {
+    "message": "Data Formatter"
+  },
+  "popupToolBrowsers": {
+    "message": "Browsers"
+  },
+  "popupToolRules": {
+    "message": "Request Rules"
+  },
+  "popupToolDeviceCapture": {
+    "message": "Device Capture"
+  },
+  "popupToolToolbox": {
+    "message": "Toolbox"
+  },
+  "toolboxTitle": {
+    "message": "Toolbox"
+  },
+  "toolboxInstallTools": {
+    "message": "Install tools"
+  },
+  "toolboxCatalogLoadFailed": {
+    "message": "Unable to load available tools. Please try again."
+  },
+  "toolboxCatalogRefreshing": {
+    "message": "Checking tool sources in the remaining directories…"
+  },
+  "toolboxCatalogSourceFailed": {
+    "message": "Could not load the “$1” tool catalog. Please retry."
+  },
+  "toolboxCatalogSourceCached": {
+    "message": "Could not refresh the “$1” tool catalog. Showing its locally cached entries."
+  },
+  "toolboxCatalogConflict": {
+    "message": "Plugin $2 from “$1” conflicts with a higher-priority source and was skipped."
+  },
+  "toolboxCatalogEmpty": {
+    "message": "No tools available to install."
+  },
+  "toolboxOfficial": {
+    "message": "Official"
+  },
+  "toolboxNoInstalledTools": {
+    "message": "No additional tools installed. Choose Install tools to add one."
+  },
+  "toolboxInstall": {
+    "message": "Install"
+  },
+  "toolboxInstalling": {
+    "message": "Installing"
+  },
+  "toolboxUninstalling": {
+    "message": "Uninstalling…"
+  },
+  "toolboxInstalled": {
+    "message": "Installed"
+  },
+  "toolboxInstallTool": {
+    "message": "Install $1"
+  },
+  "toolboxToolInstalled": {
+    "message": "$1 is installed"
+  },
+  "toolboxInstallSuccess": {
+    "message": "$1 installed"
+  },
+  "toolboxInstallFailed": {
+    "message": "Installation failed: $1"
+  },
+  "toolboxInstallListFailed": {
+    "message": "Tool installed, but the list could not refresh. Refresh the toolbox to try again."
+  },
+  "toolboxReconnectFailed": {
+    "message": "Unable to reconnect to the local host"
+  },
+  "toolboxNativeHostInstallDescription": {
+    "message": "Install the local Mearl service to install and run additional tools. Run the command below, then reconnect."
+  },
+  "extensionUiServiceRequired": {
+    "message": "This operation requires a Mearl extension page."
+  },
+  "nativeHostProtocolMismatch": {
+    "message": "The extension and local service protocols do not match. Update both, restart the local service, and reconnect."
+  },
+  "toolboxNativeHostUpdateDescription": {
+    "message": "Update the local Mearl service to install and run these tools."
+  },
+  "toolboxDescription": {
+    "message": "Open built-in tools and registered plugin tools"
+  },
+  "toolboxBack": {
+    "message": "Back to toolbox"
+  },
+  "toolboxDeviceCaptureTitle": {
+    "message": "Real Device Debugging"
+  },
+  "toolboxDeviceCaptureDescription": {
+    "message": "Connect a device, inspect requests, and debug responses"
+  },
+  "toolboxFormatterDescription": {
+    "message": "Format and inspect JSON and other content"
+  },
+  "toolboxChatDescription": {
+    "message": "Chat with an agent about the current browser tab"
+  },
+  "toolboxRulesDescription": {
+    "message": "Manage request interception and redirect rules"
+  },
+  "toolboxBrowsersDescription": {
+    "message": "View and manage connected browsers"
+  },
+  "toolboxClipboardImageTooLarge": {
+    "message": "Encoded clipboard image exceeds 16 MiB"
+  },
+  "toolboxClipboardTextTooLarge": {
+    "message": "Clipboard text exceeds 16 MiB"
+  },
+  "toolboxClipboardImageInvalid": {
+    "message": "Choose a valid PNG, JPEG or WebP image"
+  },
+  "toolboxClipboardWriteFailed": {
+    "message": "Unable to copy the image. Check clipboard permissions and retry"
+  },
+  "toolboxClipboardImageDimensionsTooLarge": {
+    "message": "Image exceeds the clipboard limit (16 megapixels). Download it instead"
+  },
+  "toolboxClipboardReadFailed": {
+    "message": "Could not read clipboard image"
+  },
+  "toolboxSwitchTool": {
+    "message": "Switch tool"
+  },
+  "toolboxSort": {
+    "message": "Reorder tools"
+  },
+  "toolboxTopToolsDivider": {
+    "message": "Header tools divider"
+  },
+  "toolboxTopToolsDividerHint": {
+    "message": "Drag up or down, or use arrow keys, to change the number of header tools"
+  },
+  "toolboxAllToolsInHeader": {
+    "message": "All tools are in the header. Move the divider to return tools to the toolbox."
+  },
+  "toolboxSortReset": {
+    "message": "Reset tool order"
+  },
+  "toolboxMoveUp": {
+    "message": "Move $1 up"
+  },
+  "toolboxMoveDown": {
+    "message": "Move $1 down"
+  },
+  "toolboxRefresh": {
+    "message": "Refresh tools"
+  },
+  "toolboxRefreshSuccess": {
+    "message": "Tool list refreshed"
+  },
+  "toolboxRefreshFailed": {
+    "message": "Refresh failed: $1"
+  },
+  "toolboxSkillDisable": {
+    "message": "Disable Skill"
+  },
+  "toolboxSkillEnable": {
+    "message": "Enable Skill"
+  },
+  "toolboxSkillDisabled": {
+    "message": "Skill disabled"
+  },
+  "toolboxSkillDisabledSuccess": {
+    "message": "Skill disabled; toolbox remains available. Restart your Agent or start a new session."
+  },
+  "toolboxSkillEnabledSuccess": {
+    "message": "Skill enabled. Restart your Agent or start a new session."
+  },
+  "toolboxSkillToggleFailed": {
+    "message": "Failed to change Skill status: $1"
+  },
+  "toolboxPluginUpdate": {
+    "message": "Check and update “$1”"
+  },
+  "toolboxPluginChecking": {
+    "message": "Checking for updates…"
+  },
+  "toolboxPluginUpToDate": {
+    "message": "“$1” is up to date"
+  },
+  "toolboxPluginUpdateSuccess": {
+    "message": "“$1” has been updated"
+  },
+  "toolboxPluginUpdateListFailed": {
+    "message": "The tool was updated, but the list could not be loaded. Refresh the list."
+  },
+  "toolboxPluginRefreshSuccess": {
+    "message": "$1 refreshed"
+  },
+  "toolboxPluginRefreshListFailed": {
+    "message": "Tool refreshed, but the tool list could not be updated. Please retry."
+  },
+  "toolboxPopupOnly": {
+    "message": "This tool only supports the Mearl popup. Open Mearl from the browser toolbar."
+  },
+  "toolboxPluginRefresh": {
+    "message": "Refresh $1"
+  },
+  "toolboxPluginUninstall": {
+    "message": "Uninstall $1"
+  },
+  "toolboxPluginUninstallConfirmInline": {
+    "message": "Uninstall skill?"
+  },
+  "toolboxLoading": {
+    "message": "Loading registered tools…"
+  },
+  "toolboxUnavailable": {
+    "message": "The toolbox is temporarily unavailable: $1"
+  },
+  "toolboxToolMissing": {
+    "message": "Tool id is missing"
+  },
+  "toolboxToolOpenFailed": {
+    "message": "Failed to open tool"
+  },
+  "toolboxToolOpening": {
+    "message": "Opening tool…"
+  },
+  "toolboxSkillUpdate": {
+    "message": "Update"
+  },
+  "toolboxSkillUpdating": {
+    "message": "Updating…"
+  },
+  "toolboxSkillRefreshToApply": {
+    "message": "Updated. Refresh this page to apply"
+  },
+  "toolboxSkillUpdateFailed": {
+    "message": "Skill update failed: $1"
+  },
+  "toolboxToolFrame": {
+    "message": "Plugin tool"
+  },
+  "browserManagerTitle": {
+    "message": "Browser Manager"
+  },
+  "browserManagerDescription": {
+    "message": "Manage local and Provider browsers"
+  },
+  "browserManagerRefresh": {
+    "message": "Refresh browser list"
+  },
+  "browserManagerNew": {
+    "message": "New"
+  },
+  "browserManagerLoading": {
+    "message": "Loading browsers…"
+  },
+  "browserManagerEmpty": {
+    "message": "No browsers yet"
+  },
+  "browserManagerEmptyHint": {
+    "message": "Add a local or registered Provider browser"
+  },
+  "browserManagerRegular": {
+    "message": "Current browser"
+  },
+  "browserManagerOwned": {
+    "message": "Managed"
+  },
+  "browserManagerAttached": {
+    "message": "Attached"
+  },
+  "browserManagerStatusConnected": {
+    "message": "Connected"
+  },
+  "browserManagerStatusPairing": {
+    "message": "Waiting for scan"
+  },
+  "browserManagerStatusConnecting": {
+    "message": "Running, connecting"
+  },
+  "browserManagerStatusStopped": {
+    "message": "Stopped"
+  },
+  "browserManagerStart": {
+    "message": "Start"
+  },
+  "browserManagerClose": {
+    "message": "Close"
+  },
+  "browserManagerCloseConfirmInline": {
+    "message": "Close?"
+  },
+  "browserManagerCloseDone": {
+    "message": "Browser closed"
+  },
+  "browserManagerProfile": {
+    "message": "Profile"
+  },
+  "browserManagerCleanup": {
+    "message": "Delete profile"
+  },
+  "browserManagerCleanupConfirmInline": {
+    "message": "Delete profile?"
+  },
+  "browserManagerCleanupDone": {
+    "message": "Persistent profile deleted"
+  },
+  "browserManagerDetach": {
+    "message": "Detach"
+  },
+  "browserManagerDetachConfirm": {
+    "message": "Detach this computer? The cloud Session will keep running."
+  },
+  "browserManagerDetachDone": {
+    "message": "Detached; the cloud Session is still running"
+  },
+  "browserManagerCreate": {
+    "message": "New Browser"
+  },
+  "browserManagerName": {
+    "message": "Instance name"
+  },
+  "browserManagerNamePlaceholder": {
+    "message": "Leave blank to generate automatically"
+  },
+  "browserManagerSessionId": {
+    "message": "Session ID"
+  },
+  "browserManagerSessionIdPlaceholder": {
+    "message": "For example, s-xxxxxxxx"
+  },
+  "browserManagerOptional": {
+    "message": "Optional"
+  },
+  "browserManagerPersistent": {
+    "message": "Persistent profile"
+  },
+  "browserManagerHeadless": {
+    "message": "Headless mode"
+  },
+  "browserManagerSyncLogin": {
+    "message": "Sync login state"
+  },
+  "browserManagerCookieScope": {
+    "message": "Sync scope"
+  },
+  "browserManagerCookieScopeTitle": {
+    "message": "Sync login state"
+  },
+  "browserManagerCookieScopeNone": {
+    "message": "Nothing selected"
+  },
+  "browserManagerCookiePresetMearl": {
+    "message": "Mearl services"
+  },
+  "browserManagerCookiePresetMearlHint": {
+    "message": "Base login state for Test account service, Test platform, and related services"
+  },
+  "browserManagerCookieOtherSites": {
+    "message": "Other sites"
+  },
+  "browserManagerCookieSiteCount": {
+    "message": "$1 sites"
+  },
+  "browserManagerCookieCurrentSite": {
+    "message": "Current site: $1"
+  },
+  "browserManagerCookieDomainPlaceholder": {
+    "message": "Enter multiple addresses separated by spaces, commas, or semicolons"
+  },
+  "browserManagerCookieDomainHint": {
+    "message": "Add multiple addresses separated by spaces, commas, or semicolons"
+  },
+  "browserManagerCookieDomainInvalid": {
+    "message": "Enter a valid HTTP(S) domain or URL"
+  },
+  "browserManagerCookieAdd": {
+    "message": "Add"
+  },
+  "browserManagerCookieOverwriteHint": {
+    "message": "Cookies with the same name in the target browser will be overwritten."
+  },
+  "browserManagerCookiePermissionDenied": {
+    "message": "Site access is required to read these cookies"
+  },
+  "browserManagerSyncLoginDone": {
+    "message": "Login state synced"
+  },
+  "browserManagerCopyAccess": {
+    "message": "Copy browser access address"
+  },
+  "browserManagerCopyAccessDone": {
+    "message": "Browser access address copied"
+  },
+  "browserManagerLaunch": {
+    "message": "Launch"
+  },
+  "browserManagerLaunchDone": {
+    "message": "Browser is ready"
+  },
+  "browserManagerCancel": {
+    "message": "Cancel"
+  },
+  "browserManagerShowDetails": {
+    "message": "Show details"
+  },
+  "browserManagerHideDetails": {
+    "message": "Hide details"
+  },
+  "browserManagerBrowserId": {
+    "message": "Browser ID"
+  },
+  "browserManagerSource": {
+    "message": "Source"
+  },
+  "browserManagerSourceLocal": {
+    "message": "This computer"
+  },
+  "browserManagerSourceRemote": {
+    "message": "Remote connector"
+  },
+  "browserManagerTransport": {
+    "message": "Connection"
+  },
+  "browserManagerTransportExtension": {
+    "message": "Browser extension"
+  },
+  "browserManagerTransportCdp": {
+    "message": "CDP"
+  },
+  "browserManagerTransportProvider": {
+    "message": "External provider"
+  },
+  "browserManagerProvider": {
+    "message": "Provider"
+  },
+  "browserManagerProviderVersion": {
+    "message": "Provider version"
+  },
+  "browserManagerPairingScan": {
+    "message": "Scan to connect device"
+  },
+  "browserManagerPairingCode": {
+    "message": "Pairing code"
+  },
+  "browserManagerCdpPort": {
+    "message": "CDP port"
+  },
+  "browserManagerContextId": {
+    "message": "Context ID"
+  },
+  "browserManagerContextName": {
+    "message": "Context name"
+  },
+  "browserManagerImageId": {
+    "message": "Image ID"
+  },
+  "browserManagerCreatedAt": {
+    "message": "Created"
+  },
+  "browserManagerExtensionVersion": {
+    "message": "Extension version"
+  },
+  "browserManagerNativeHostVersion": {
+    "message": "Native Host version"
+  },
+  "browserManagerCopiedCookies": {
+    "message": "Copied cookies"
+  },
+  "browserManagerYes": {
+    "message": "Yes"
+  },
+  "browserManagerNo": {
+    "message": "No"
+  },
+  "clickButtonToLogin": {
+    "message": "Click the button below to login"
+  },
+  "loginRequestCases": {
+    "message": "Login to Test platform"
+  },
+  "startCapture": {
+    "message": "Start Capture"
+  },
+  "deviceCaptureImportNeedRequest": {
+    "message": "Capture this API on the device first, then import the mock"
+  },
+  "deviceCaptureImportNeedDeviceId": {
+    "message": "deviceId not available. Ensure Test platform device capture is connected"
+  },
+  "scanQrCodeCapture": {
+    "message": "Scan QR Code"
+  },
+  "deviceOnline": {
+    "message": "Device Online"
+  },
+  "deviceOffline": {
+    "message": "Device Offline"
+  },
+  "harmonyOS": {
+    "message": "HarmonyOS"
+  },
+  "scanQrCodeToStart": {
+    "message": "Scan the QR code with your phone to start capturing"
+  },
+  "userIdLabel": {
+    "message": "User ID"
+  },
+  "mcpIntegration": {
+    "message": "Agent Integration"
+  },
+  "mcpConnected": {
+    "message": "Connected"
+  },
+  "mcpDisconnected": {
+    "message": "Disconnected"
+  },
+  "mcpIntegrationConnected": {
+    "message": "Agent Integration (Connected)"
+  },
+  "mcpIntegrationDisconnected": {
+    "message": "Agent Integration (Disconnected)"
+  },
+  "agentDescription": {
+    "message": "Allow AI assistants (Claude, Codex, Cursor) to directly access browser request data and console logs."
+  },
+  "cloudModeDescription": {
+    "message": "After installing the skill in the cloud, have the agent configure cloud mode, then connect using the address below."
+  },
+  "mcpQuickSetup": {
+    "message": "Quick Setup"
+  },
+  "mcpSetupHint": {
+    "message": "Takes effect after restarting the AI client"
+  },
+  "agentFullDocs": {
+    "message": "Get More Skills"
+  },
+  "agentCapabilities": {
+    "message": "You can ask like this"
+  },
+  "agentExample1": {
+    "message": "Get x API params and generate code"
+  },
+  "agentExample2": {
+    "message": "Get/modify the response of API x"
+  },
+  "agentExample3": {
+    "message": "Get error logs from the page console"
+  },
+  "agentExample4": {
+    "message": "Fetch URL x via proxy request"
+  },
+  "agentExample5": {
+    "message": "Add a rule to redirect requests from domain a to domain b"
+  },
+  "agentAllCapabilities": {
+    "message": "All Available Capabilities"
+  },
+  "agentCapCategoryData": {
+    "message": "Data"
+  },
+  "agentCapGetRequests": {
+    "message": "Get requests"
+  },
+  "agentCapGetLogs": {
+    "message": "Get console logs"
+  },
+  "agentCapGetEvents": {
+    "message": "Get tracking events"
+  },
+  "agentCapGetScreenshot": {
+    "message": "Screenshot"
+  },
+  "agentCapGetSelectedElement": {
+    "message": "Get selected element"
+  },
+  "agentCapCategoryMock": {
+    "message": "Mock & Requests"
+  },
+  "agentCapSetMock": {
+    "message": "Set mock"
+  },
+  "agentCapGetMocks": {
+    "message": "View mocks"
+  },
+  "agentCapAddRule": {
+    "message": "Add request rule"
+  },
+  "agentCapProxyRequest": {
+    "message": "Send Http request (with Cookies)"
+  },
+  "agentCapSendCapturedRequest": {
+    "message": "Send Protocol request"
+  },
+  "agentCapCategoryBrowser": {
+    "message": "Browser Automation"
+  },
+  "agentCapTabManage": {
+    "message": "Tab management"
+  },
+  "agentCapPageNavigate": {
+    "message": "Navigate"
+  },
+  "agentCapPageSnapshot": {
+    "message": "Page snapshot"
+  },
+  "agentCapPageClick": {
+    "message": "Click element"
+  },
+  "agentCapPageType": {
+    "message": "Type text"
+  },
+  "agentCapPagePress": {
+    "message": "Press key"
+  },
+  "agentCapPageScroll": {
+    "message": "Scroll page"
+  },
+  "agentCapPageWait": {
+    "message": "Wait for load/element"
+  },
+  "agentCapPageEval": {
+    "message": "Execute JavaScript"
+  },
+  "agentCapPageUpload": {
+    "message": "Upload file"
+  },
+  "agentCapPageFrames": {
+    "message": "List frames"
+  },
+  "agentCapSetDeviceEmulation": {
+    "message": "Device emulation"
+  },
+  "skillQuickSetup": {
+    "message": "Quick Setup"
+  },
+  "skillSetupCli": {
+    "message": "CLI"
+  },
+  "skillSetupAgent": {
+    "message": "Agent"
+  },
+  "skillSetupAgentPrompt": {
+    "message": "Read $1 to complete setup"
+  },
+  "cloudServerPlaceholder": {
+    "message": "Paste a cloud-connector command or URL"
+  },
+  "connect": {
+    "message": "Connect"
+  },
+  "disconnect": {
+    "message": "Disconnect"
+  },
+  "connected": {
+    "message": "Connected"
+  },
+  "cloudConnections": {
+    "message": "Cloud Connections"
+  },
+  "cloudConnectorConnectSuccess": {
+    "message": "Cloud connector connected"
+  },
+  "cloudConnectorConnectFailed": {
+    "message": "Failed to connect cloud connector: $1"
+  },
+  "cloudConnectorDisconnectSuccess": {
+    "message": "Cloud connector disconnected"
+  },
+  "cloudConnectorDisconnectFailed": {
+    "message": "Failed to disconnect cloud connector: $1"
+  },
+  "translate": {
+    "message": "Translate"
+  },
+  "traditionalChinese": {
+    "message": "Traditional Chinese"
+  },
+  "translating": {
+    "message": "Translating..."
+  },
+  "translateError": {
+    "message": "Translation error: $1"
+  },
+  "translateNotSupportedDesc": {
+    "message": "Translation API is available in Chrome 138+ stable. Please upgrade to the latest version of Chrome."
+  },
+  "translateEnableSteps": {
+    "message": "Upgrade Steps"
+  },
+  "translateStep1": {
+    "message": "Go to Chrome Settings → About Chrome"
+  },
+  "translateStep2": {
+    "message": "Check and install the latest version (Chrome 138+ required)"
+  },
+  "translateStep3": {
+    "message": "Restart browser to use translation features"
+  },
+  "translateLearnMore": {
+    "message": "Learn more about Chrome Built-in AI"
+  },
+  "translateModelDownloading": {
+    "message": "Translation model is downloading, please wait..."
+  },
+  "downloadProgress": {
+    "message": "Download Progress"
+  },
+  "translateDownloadHint": {
+    "message": "First time usage requires downloading the language model. It will be available automatically after download."
+  },
+  "translateFailedDesc": {
+    "message": "An error occurred during translation. Please try again later."
+  },
+  "translateRetryHint": {
+    "message": "If the problem persists, please check your network connection or restart the browser."
+  },
+  "globalTranslation": {
+    "message": "Live Translation"
+  },
+  "globalTranslationDesc": {
+    "message": "Takes effect after enabling response modification. Translates Chinese content in real time as APIs load."
+  },
+  "globalTranslationNone": {
+    "message": "Off"
+  },
+  "translationDict": {
+    "message": "Translation Dictionary"
+  },
+  "translationDictDesc": {
+    "message": "Custom translation overrides. These take priority over AI translations"
+  },
+  "translationDictAdd": {
+    "message": "Add Entry"
+  },
+  "translationDictAddNew": {
+    "message": "New Dictionary Entry"
+  },
+  "translationDictOriginal": {
+    "message": "Original (Chinese)"
+  },
+  "translationDictSearch": {
+    "message": "Search original or translation..."
+  },
+  "translationDictEmpty": {
+    "message": "Dictionary is empty. Click \"Add Entry\" to create a custom translation."
+  },
+  "translationDictExport": {
+    "message": "Export Dictionary"
+  },
+  "translationDictImport": {
+    "message": "Import Dictionary"
+  },
+  "translationDictImportSuccess": {
+    "message": "Imported $1 entries successfully"
+  },
+  "translationDictImportError": {
+    "message": "Import failed: invalid JSON format"
+  },
+  "translationDictClickToEdit": {
+    "message": "Click to edit"
+  },
+  "translationDictFromCache": {
+    "message": "From Cache"
+  },
+  "translationDictCacheTitle": {
+    "message": "Translation Cache"
+  },
+  "translationDictCacheDesc": {
+    "message": "These are AI translations from the current session. Select entries to save them permanently in the dictionary"
+  },
+  "translationDictCacheEmpty": {
+    "message": "No translation cache yet"
+  },
+  "translationDictCacheSearch": {
+    "message": "Search cache..."
+  },
+  "translationDictCacheSelected": {
+    "message": "$1 selected"
+  },
+  "translationDictCacheImport": {
+    "message": "Add to Dictionary"
+  },
+  "translationDictCacheImportSuccess": {
+    "message": "Added $1 entries"
+  },
+  "translationDictCacheCount": {
+    "message": "$1 cached"
+  },
+  "translationDictEntries": {
+    "message": "entries"
+  },
+  "export": {
+    "message": "Export"
+  },
+  "add": {
+    "message": "Add"
+  },
+  "delete": {
+    "message": "Delete"
+  },
+  "refresh": {
+    "message": "Refresh"
+  },
+  "selectAll": {
+    "message": "Select All"
+  },
+  "inDict": {
+    "message": "In Dict"
+  },
+  "loading": {
+    "message": "Loading..."
+  },
+  "downloadingModel": {
+    "message": "Downloading model..."
+  },
+  "customUserAgent": {
+    "message": "Custom User-Agent"
+  },
+  "customUserAgentDesc": {
+    "message": "Applies only to the current tab after refresh, affecting request headers and navigator.userAgent"
+  },
+  "uaReset": {
+    "message": "Reset"
+  },
+  "customDateTime": {
+    "message": "Custom Timezone and Time"
+  },
+  "customDateTimeDesc": {
+    "message": "Applies only to the current tab; timezone changes immediately, and the page clock runs from the selected time"
+  },
+  "customTime": {
+    "message": "Custom Time"
+  },
+  "customTimeNow": {
+    "message": "Use Current Time"
+  },
+  "customTimeClear": {
+    "message": "Clear Time"
+  },
+  "timezoneSystem": {
+    "message": "Default"
+  },
+  "timezoneShanghai": {
+    "message": "Shanghai"
+  },
+  "timezoneTokyo": {
+    "message": "Tokyo"
+  },
+  "timezoneSingapore": {
+    "message": "Singapore"
+  },
+  "timezoneLondon": {
+    "message": "London"
+  },
+  "timezoneNewYork": {
+    "message": "New York"
+  },
+  "timezoneLosAngeles": {
+    "message": "Los Angeles"
+  },
+  "modeApiDebug": {
+    "message": "API Debug"
+  },
+  "modeRumVerify": {
+    "message": "RUM Verify"
+  },
+  "switchMode": {
+    "message": "Switch Mode"
+  },
+  "switchRequestSubMode": {
+    "message": "Switch Protocol / Requests mode"
+  },
+  "rumWaitingForEvents": {
+    "message": "Listening for events"
+  },
+  "selectAllOfSource": {
+    "message": "Enable all"
+  },
+  "deselectAllOfSource": {
+    "message": "Disable all"
+  },
+  "rumFilterEvents": {
+    "message": "Filter events (regex supported)"
+  },
+  "rumSuccess": {
+    "message": "Success"
+  },
+  "rumFailed": {
+    "message": "Failed"
+  },
+  "rumSelectEvent": {
+    "message": "Select an event"
+  },
+  "rumEventType": {
+    "message": "Event Type"
+  },
+  "rumSubType": {
+    "message": "Sub Type"
+  },
+  "rumResult": {
+    "message": "Result"
+  },
+  "rumEventFields": {
+    "message": "Event Fields"
+  },
+  "timingData": {
+    "message": "Timing Data"
+  },
+  "trackingSource": {
+    "message": "Source"
+  },
+  "aplusExpdata": {
+    "message": "Exposure Data"
+  },
+  "aplusValidation": {
+    "message": "Validation"
+  },
+  "aplusValidationPass": {
+    "message": "All checks passed"
+  },
+  "aplusHighlightOnPageTitle": {
+    "message": "Click to inspect element in Elements panel"
+  },
+  "aplusHighlightButtonTitle": {
+    "message": "Click to highlight element on page"
+  },
+  "aplusSpmName": {
+    "message": "SPM Name"
+  },
+  "aplusValidSpmUrlFormat": {
+    "message": "spm-url format invalid (expected A.B.C.D): $1"
+  },
+  "aplusValidExpMissing": {
+    "message": "EXP event missing expdata"
+  },
+  "aplusValidExpdataMissingSpm": {
+    "message": "expdata[$1] missing spm field"
+  },
+  "aplusValidExpdataSpmFormat": {
+    "message": "expdata[$1].spm format invalid"
+  },
+  "aplusValidClkMissingPointSpm": {
+    "message": "CLK event missing click-point SPM (gokey.spm)"
+  },
+  "aplusValidClkSpmFormat": {
+    "message": "gokey.spm format invalid (expected C.D or A.B.C.D): $1"
+  },
+  "aplusValidClkMissingSpmCnt": {
+    "message": "CLK event missing spm-cnt"
+  },
+  "aplusValidPvMissingSpmUrl": {
+    "message": "PV event missing spm-url"
+  },
+  "aplusValidChecksExpdataCount": {
+    "message": "expdata: $1 items"
+  },
+  "aplusValidSpmUndefinedSegment": {
+    "message": "spm contains undefined/null segment (uninitialized variable): $1"
+  },
+  "aplusValidExpdataSpmUndefined": {
+    "message": "expdata[$1].spm contains undefined/null segment (uninitialized variable): $2"
+  },
+  "aplusValidSpmChineseChar": {
+    "message": "spm contains Chinese characters, use alphanumeric only: $1"
+  },
+  "aplusValidSpmInvalidChar": {
+    "message": "spm contains invalid characters (only 0-9 a-z A-Z _ / - . allowed): $1"
+  },
+  "aplusValidSpmCntSegments": {
+    "message": "spm-cnt has too few segments (expected appId.B.C.D.token, at least 5): $1"
+  },
+  "aplusValidSpmCntPrefix": {
+    "message": "spm-cnt first two segments (appId, page ID) must be numeric, likely an unreplaced placeholder: $1"
+  },
+  "query": {
+    "message": "Query"
+  },
+  "queryTtidName": {
+    "message": "Query TTID Name"
+  },
+  "querySpmName": {
+    "message": "Query SPM Name"
+  },
+  "queryResultUnknown": {
+    "message": "Unknown"
+  },
+  "queryResultError": {
+    "message": "Error"
+  },
+  "agentPermissions": {
+    "message": "Domain Permissions"
+  },
+  "agentPermissionsDesc": {
+    "message": "Configure domains that the agent is allowed to access (proxy requests, script execution, etc.)"
+  },
+  "agentPermissionsAllDomains": {
+    "message": "All domains"
+  },
+  "agentPermissionsAllDomainsFailed": {
+    "message": "Failed to update all-domain access"
+  },
+  "agentPermissionsBuiltIn": {
+    "message": "built-in"
+  },
+  "agentPermissionsInputPlaceholder": {
+    "message": "Domain, e.g. example.com"
+  },
+  "agentPermissionsGrant": {
+    "message": "Grant"
+  },
+  "agentPermissionsRevoke": {
+    "message": "Revoke"
+  },
+  "agentPermissionsRevokeFailed": {
+    "message": "Failed to revoke: unable to save config"
+  },
+  "agentPermissionsGrantFailed": {
+    "message": "Grant failed — user cancelled or invalid domain"
+  },
+  "agentPermissionsEnable": {
+    "message": "Enable"
+  },
+  "agentPermissionsDisable": {
+    "message": "Disable"
+  },
+  "hostPermissionNoticeTitle": {
+    "message": "Permission needed for this site"
+  },
+  "hostPermissionNoticeDesc": {
+    "message": "Current page domain $1 is outside default host permissions. Some features are unavailable."
+  },
+  "hostPermissionGrant": {
+    "message": "Grant this site"
+  },
+  "hostPermissionGranted": {
+    "message": "Site permission granted"
+  },
+  "hostPermissionGrantFailed": {
+    "message": "Grant failed — user cancelled or blocked by browser"
+  },
+  "contentScriptNeedsPermission": {
+    "message": "This site isn't authorized — page actions are unavailable"
+  },
+  "permissionsConfig": {
+    "message": "Permissions"
+  },
+  "redirectToUrlPlaceholder": {
+    "message": "Redirect to URL..."
+  },
+  "redirectInputTitle": {
+    "message": "Enter redirect target URL, press Enter to apply, clear and Enter to cancel"
+  },
+  "extractHtmlJson": {
+    "message": "Extract JSON from HTML"
+  },
+  "extension_reloaded": {
+    "message": "Extension reloaded, panel has been automatically refreshed"
+  },
+  "allRequests": {
+    "message": "All Requests"
+  },
+  "allRequestsEnabledHint": {
+    "message": "All requests switch is enabled. Please scan QR code again to capture!"
+  },
+  "saveFailed": {
+    "message": "Save failed"
+  },
+  "searchShortcut": {
+    "message": "Search (⌘F)"
+  },
+  "highlightEnable": {
+    "message": "Enable highlight"
+  },
+  "highlightDisable": {
+    "message": "Disable highlight"
+  },
+  "highlightPartial": {
+    "message": "Performance protection: highlight nearby 60KB content based on scroll position"
+  },
+  "regexCaptureGroupHint": {
+    "message": "\\1 \\2 reference capture groups"
+  },
+  "hintEnterNavigate": {
+    "message": "Enter: navigate"
+  },
+  "openInNewPage": {
+    "message": "Open in new page"
+  },
+  "dnrIndicatorTitle": {
+    "message": "DNR Rules ($1)"
+  },
+  "dnrLabelUaOverride": {
+    "message": "User-Agent Override"
+  },
+  "dnrLabelTimezoneOverride": {
+    "message": "Timezone Override → $1"
+  },
+  "dnrLabelTimeOverride": {
+    "message": "Page Time Override"
+  },
+  "dnrLabelResourceRedirect": {
+    "message": "Resource Redirect → $1"
+  },
+  "dnrLabelEnvSwitch": {
+    "message": "Protocol Environment → $1"
+  },
+  "dnrDisableRule": {
+    "message": "Disable"
+  },
+  "dnrHitCount": {
+    "message": "$1 requests matched"
+  },
+  "dnrIndicatorMode": {
+    "message": "Indicator"
+  },
+  "dnrIndicatorModeNumber": {
+    "message": "Number"
+  },
+  "dnrIndicatorModeDot": {
+    "message": "Dot"
+  },
+  "dnrIndicatorModeOff": {
+    "message": "Off"
+  },
+  "requestImportAction": {
+    "message": "Data Import"
+  },
+  "importData": {
+    "message": "Import Data"
+  },
+  "importGuide": {
+    "message": "Import Mock Data"
+  },
+  "dataSourceSmart": {
+    "message": "Smart Detect"
+  },
+  "dataSourceJson": {
+    "message": "JSON Import"
+  },
+  "jsonInputPlaceholder": {
+    "message": "Paste response JSON (object or array). Fill in the request name above when absent; installed protocol capabilities may provide format conversion."
+  },
+  "jsonApiPlaceholder": {
+    "message": "API name (required for data without an 'api' field)"
+  },
+  "jsonApiRequired": {
+    "message": "Please fill or select an API name"
+  },
+  "jsonInvalidJson": {
+    "message": "Invalid JSON, please check and retry"
+  },
+  "requestImportSuccess": {
+    "message": "Imported $COUNT$ mocks",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "requestImportFailed": {
+    "message": "Import failed. Unprocessed data has been retained for retry."
+  },
+  "jsonNoEntries": {
+    "message": "No valid API entries parsed"
+  },
+  "searchApiPlaceholder": {
+    "message": "Search API name or response content..."
+  },
+  "smartInputPlaceholder": {
+    "message": "Paste Log service URL, Test platform URL/ID, TraceId, or mtop API name..."
+  },
+  "smartDetectedTraceId": {
+    "message": "Detected as EagleEye TraceId"
+  },
+  "traceIdFetchChainFailed": {
+    "message": "Failed to fetch call chain logs"
+  },
+  "eagleeyeLoginRequired": {
+    "message": "Your EagleEye session has expired. Please sign in and try again."
+  },
+  "traceIdNoProtocolFound": {
+    "message": "No mtop API found in call chain"
+  },
+  "pickApiFromRequestsTitle": {
+    "message": "Pick from current request list"
+  },
+  "pickApiFromRequestsSearch": {
+    "message": "Search API name..."
+  },
+  "pickApiFromRequestsEmpty": {
+    "message": "No APIs available"
+  },
+  "traceIdNoUserIdFound": {
+    "message": "Could not extract user ID from call chain, unable to query Log service"
+  },
+  "agentPermRequestTitle": {
+    "message": "Agent Permission Request"
+  },
+  "agentPermRequestDesc": {
+    "message": "An agent is requesting access to the following domain. Once granted, the agent will be able to send requests with your cookies:"
+  },
+  "agentPermRequestAllow": {
+    "message": "Allow"
+  },
+  "agentPermRequestDeny": {
+    "message": "Deny"
+  },
+  "agentPermRequestFailed": {
+    "message": "Authorization failed. Please try again."
+  },
+  "agentPermRequestBrowserDenied": {
+    "message": "Browser denied the permission. Please try again or add the domain manually in the extension options."
+  },
+  "sourceTrace": {
+    "message": "Source Trace"
+  },
+  "sourceTraceTip": {
+    "message": "Pick element to locate API fields and source"
+  },
+  "traceElement": {
+    "message": "Element"
+  },
+  "traceComponent": {
+    "message": "Component"
+  },
+  "traceSource": {
+    "message": "Source"
+  },
+  "traceNoSource": {
+    "message": "No source info (production build or JSX source not injected)"
+  },
+  "traceProjectRoot": {
+    "message": "Project root (for opening source)"
+  },
+  "traceProjectRootHint": {
+    "message": "Absolute path to project root (webpack/Next.js source paths are relative and need this prefix to open in your editor)"
+  },
+  "traceSetRoot": {
+    "message": "Make clickable"
+  },
+  "traceRaxNoSource": {
+    "message": "Source location is not yet supported for Rax projects"
+  },
+  "traceMatchCount": {
+    "message": "{n} matched fields"
+  },
+  "traceNoMatch": {
+    "message": "No fields matched"
+  },
+  "traceJumpField": {
+    "message": "Jump to field"
+  },
+  "traceHighlightOnPage": {
+    "message": "Highlight on page"
+  },
+  "traceHighlightFailed": {
+    "message": "Highlight failed"
+  },
+  "traceErrorNoFiber": {
+    "message": "No React component found on this element"
+  },
+  "traceErrorNotFound": {
+    "message": "Element not found"
+  },
+  "traceErrorGeneric": {
+    "message": "Trace failed"
+  },
+  "traceDegraded": {
+    "message": "No React fiber. Matching by element text/attributes only."
+  },
+  "traceCopyPath": {
+    "message": "Copy field path"
+  },
+  "traceCopyPrompt": {
+    "message": "Copy as agent prompt (element + component + fields, paste to AI to locate source)"
+  },
+  "tracePromptCopied": {
+    "message": "Prompt copied, paste to your agent to locate source"
+  },
+  "traceEditor": {
+    "message": "Editor"
+  },
+  "traceMockBtn": {
+    "message": "Mock all"
+  },
+  "traceMockAll": {
+    "message": "Mock all matched fields (appends \" 0\", \" 1\" ... to original values so you can spot each field on the page after refresh)"
+  },
+  "traceMockApplied": {
+    "message": "Mocked {n} fields. After refresh you will see 0, 1 ... appended to original values"
+  },
+  "traceMockFailed": {
+    "message": "Failed to apply mocks"
+  },
+  "agentChatVisualization": {
+    "message": "Visualization"
+  },
+  "agentChatVisualizationLoading": {
+    "message": "Loading visualization…"
+  },
+  "agentChatVisualizationUnavailable": {
+    "message": "Could not load the chart."
+  },
+  "agentChatTitle": {
+    "message": "Agent Chat"
+  },
+  "agentChatOpenToolPanel": {
+    "message": "Open Agent"
+  },
+  "agentChatCloseToolPanel": {
+    "message": "Close Agent"
+  },
+  "agentFloatingButton": {
+    "message": "Sidebar floating entry"
+  },
+  "agentFloatingButtonDesc": {
+    "message": "Show a floating button on authorized pages to open the Agent side panel"
+  },
+  "commandToggleAgentSidePanel": {
+    "message": "Toggle Agent Side Panel"
+  },
+  "commandToggleAgentSidePanelAlternate": {
+    "message": "Toggle Agent Side Panel (Option / Alt)"
+  },
+  "agentChatReady": {
+    "message": "Ready"
+  },
+  "agentChatCurrentModel": {
+    "message": "Current model: $1"
+  },
+  "agentChatStatusIdle": {
+    "message": "Idle"
+  },
+  "agentChatStatusRunning": {
+    "message": "Running"
+  },
+  "agentChatStatusWaiting": {
+    "message": "Waiting for approval"
+  },
+  "agentChatStatusError": {
+    "message": "Connection error"
+  },
+  "agentChatSessionUnavailable": {
+    "message": "Agent session is unavailable"
+  },
+  "agentChatTabBindingChanged": {
+    "message": "This tab was linked to another conversation. Please try again."
+  },
+  "agentChatUnavailable": {
+    "message": "Unavailable"
+  },
+  "agentChatNotInstalled": {
+    "message": "Not installed"
+  },
+  "agentChatProvider": {
+    "message": "Agent provider"
+  },
+  "agentChatSelectContextDirectory": {
+    "message": "Select reference directory"
+  },
+  "agentChatNoContextDirectoryLabel": {
+    "message": "Select project"
+  },
+  "agentChatNoContextDirectory": {
+    "message": "No reference directory selected. Agent permissions are controlled through approvals."
+  },
+  "agentChatContextDirectorySelected": {
+    "message": "Reference directory: $1"
+  },
+  "agentChatContextDirectoryBound": {
+    "message": "Reference directory for this conversation: $1"
+  },
+  "agentChatClearContextDirectory": {
+    "message": "Remove reference directory"
+  },
+  "agentChatSelectElement": {
+    "message": "Select page element"
+  },
+  "agentChatCancelElementPicker": {
+    "message": "Cancel element selection"
+  },
+  "agentChatRemoveSelectedElement": {
+    "message": "Remove selected element"
+  },
+  "agentChatSelectedElementFallback": {
+    "message": "Selected page element"
+  },
+  "agentChatEnableElementComments": {
+    "message": "Comment on page elements"
+  },
+  "agentChatDisableElementComments": {
+    "message": "Stop commenting on page elements"
+  },
+  "agentChatElementCommentTitle": {
+    "message": "Element comment"
+  },
+  "agentChatElementCommentNumber": {
+    "message": "Annotation $1"
+  },
+  "agentChatElementCommentPlaceholder": {
+    "message": "Describe how this element should change…"
+  },
+  "agentChatCancelElementComment": {
+    "message": "Cancel"
+  },
+  "agentChatEditElementComment": {
+    "message": "Edit element comment"
+  },
+  "agentChatMoveElementCommentPanel": {
+    "message": "Move comment panel"
+  },
+  "agentChatAddElementComment": {
+    "message": "Add & continue"
+  },
+  "agentChatConfirmElementComment": {
+    "message": "Add"
+  },
+  "agentChatElementCommentModeHint": {
+    "message": "Comment on page elements: click for one selection, double-click for continuous selection"
+  },
+  "agentChatRemoveElementComment": {
+    "message": "Remove element comment"
+  },
+  "agentChatElementStyleChanges": {
+    "message": "Styles"
+  },
+  "agentChatElementStyleValuePlaceholder": {
+    "message": "For example, 16px"
+  },
+  "agentChatElementStyleTextContent": {
+    "message": "Text content"
+  },
+  "agentChatElementStyleColor": {
+    "message": "Text color"
+  },
+  "agentChatElementStyleBackgroundColor": {
+    "message": "Background"
+  },
+  "agentChatElementStyleOpacity": {
+    "message": "Opacity"
+  },
+  "agentChatElementStyleFontFamily": {
+    "message": "Font"
+  },
+  "agentChatElementStyleFontSize": {
+    "message": "Font size"
+  },
+  "agentChatElementStyleFontWeight": {
+    "message": "Font weight"
+  },
+  "agentChatElementStyleLineHeight": {
+    "message": "Line height"
+  },
+  "agentChatElementStyleLetterSpacing": {
+    "message": "Letter spacing"
+  },
+  "agentChatElementStyleTextAlign": {
+    "message": "Text align"
+  },
+  "agentChatElementStyleMargin": {
+    "message": "Margin"
+  },
+  "agentChatElementStylePadding": {
+    "message": "Padding"
+  },
+  "agentChatElementStyleBorderRadius": {
+    "message": "Radius"
+  },
+  "agentChatElementStyleBorderColor": {
+    "message": "Border color"
+  },
+  "agentChatElementStyleBorderWidth": {
+    "message": "Border width"
+  },
+  "agentChatElementStyleWidth": {
+    "message": "Width"
+  },
+  "agentChatElementStyleHeight": {
+    "message": "Height"
+  },
+  "agentChatPastedImage": {
+    "message": "Pasted image $1"
+  },
+  "agentChatRemoveImage": {
+    "message": "Remove image $1"
+  },
+  "agentChatTooManyImages": {
+    "message": "Paste up to $1 images"
+  },
+  "agentChatImageTooLarge": {
+    "message": "Each image must be no larger than $1 MB"
+  },
+  "agentChatImagesTooLarge": {
+    "message": "Images must total no more than $1 MB"
+  },
+  "agentChatUnsupportedImage": {
+    "message": "Only PNG, JPEG, WebP, and GIF images are supported"
+  },
+  "agentChatProviderImageUnsupported": {
+    "message": "This Agent provider does not support image input"
+  },
+  "agentChatImageReadFailed": {
+    "message": "The image could not be read. Paste it again."
+  },
+  "agentChatReplyImageUnsupported": {
+    "message": "Images are not supported when replying to an Agent request"
+  },
+  "agentChatStop": {
+    "message": "Stop"
+  },
+  "agentChatNew": {
+    "message": "New chat"
+  },
+  "agentChatMoreActions": {
+    "message": "More actions"
+  },
+  "agentChatConversationHistory": {
+    "message": "Choose existing conversation"
+  },
+  "agentChatSearchConversations": {
+    "message": "Search conversations or reference directories"
+  },
+  "agentChatLoadingConversations": {
+    "message": "Loading conversations…"
+  },
+  "agentChatNoConversations": {
+    "message": "No conversations to continue"
+  },
+  "agentChatUntitledConversation": {
+    "message": "Untitled conversation"
+  },
+  "agentChatLoadMoreConversations": {
+    "message": "Load more"
+  },
+  "agentChatResumingConversation": {
+    "message": "Resuming conversation"
+  },
+  "agentChatSwitchingProvider": {
+    "message": "Switching Agent…"
+  },
+  "agentChatRefreshConversation": {
+    "message": "Refresh conversation"
+  },
+  "agentChatRefreshingConversation": {
+    "message": "Refreshing conversation…"
+  },
+  "agentChatCopyConversation": {
+    "message": "Copy conversation"
+  },
+  "agentChatCopyConversationDescription": {
+    "message": "Copy the retained user and Agent messages from this conversation"
+  },
+  "agentChatCopyDebugTrace": {
+    "message": "Copy debug trace"
+  },
+  "agentChatCopyDebugTraceDescription": {
+    "message": "Copy the conversation, tool inputs and results, errors, and other debug context with sensitive fields redacted"
+  },
+  "agentChatConversationCopied": {
+    "message": "Conversation copied"
+  },
+  "agentChatDebugTraceCopied": {
+    "message": "Debug trace copied"
+  },
+  "agentChatCopyFailed": {
+    "message": "Copy failed"
+  },
+  "agentChatTaskNoActiveTab": {
+    "message": "There is no active browser tab to associate with this task"
+  },
+  "agentChatTaskProviderUnavailable": {
+    "message": "Codex is unavailable. Check its installation or sign-in status."
+  },
+  "agentChatTaskCreateFailed": {
+    "message": "The Codex conversation could not be created"
+  },
+  "agentChatTaskSubmitFailed": {
+    "message": "The task could not be submitted to Codex"
+  },
+  "agentChatTaskEmptyPrompt": {
+    "message": "The Agent task prompt cannot be empty"
+  },
+  "agentChatTaskBusy": {
+    "message": "Codex is handling another task. Try again later."
+  },
+  "agentChatTaskReset": {
+    "message": "The Codex conversation changed before the task was submitted"
+  },
+  "agentChatConnecting": {
+    "message": "Connecting to Native Host…"
+  },
+  "agentChatStartingProvider": {
+    "message": "Creating $1 conversation…"
+  },
+  "agentChatStartingProviderDetail": {
+    "message": "Initializing the conversation. The first response may take a moment."
+  },
+  "agentChatNativeHostUpdateStatus": {
+    "message": "Native Host update required"
+  },
+  "agentChatNativeHostInstallStatus": {
+    "message": "Native Host not connected"
+  },
+  "agentChatNativeHostUpdateTitle": {
+    "message": "Update Native Host"
+  },
+  "agentChatNativeHostInstallTitle": {
+    "message": "Install Native Host"
+  },
+  "agentChatNativeHostUpdateDescription": {
+    "message": "The current Native Host does not support side panel chat. Update it to continue."
+  },
+  "agentChatNativeHostInstallDescription": {
+    "message": "The local Native Host is not connected. Install it to use side panel chat."
+  },
+  "browserManagerNativeHostUpdateDescription": {
+    "message": "The current Native Host does not support browser management. Update it to view and manage browsers."
+  },
+  "browserManagerNativeHostInstallDescription": {
+    "message": "The local Native Host is not connected. Install it to view and manage browsers."
+  },
+  "agentChatExtensionVersion": {
+    "message": "Extension version"
+  },
+  "agentChatNativeHostVersion": {
+    "message": "Native Host version"
+  },
+  "agentChatNativeHostVersionUnknown": {
+    "message": "Unknown"
+  },
+  "agentChatNativeHostUpdateCommand": {
+    "message": "Run in a terminal"
+  },
+  "agentChatNativeHostReconnect": {
+    "message": "Updated, reconnect"
+  },
+  "agentChatNativeHostInstallReconnect": {
+    "message": "Installed, reconnect"
+  },
+  "agentChatNativeHostReconnectHint": {
+    "message": "Reconnect after the update command finishes"
+  },
+  "agentChatNativeHostInstallReconnectHint": {
+    "message": "Reconnect after the install command finishes"
+  },
+  "agentChatEmptyTitle": {
+    "message": "Start a conversation with $1"
+  },
+  "agentChatGuidePageTitle": {
+    "message": "Operate page"
+  },
+  "agentChatGuidePageDescription": {
+    "message": "Click, type, scroll, navigate, and read page content"
+  },
+  "agentChatGuidePagePrompt": {
+    "message": "Inspect the current page and tell me what tasks you can help complete"
+  },
+  "agentChatGuideRequestTitle": {
+    "message": "Analyze requests"
+  },
+  "agentChatGuideRequestDescription": {
+    "message": "Inspect API requests, responses, timing, and schemas"
+  },
+  "agentChatGuideRequestPrompt": {
+    "message": "Analyze recent network requests on the current page and identify abnormal APIs"
+  },
+  "agentChatGuideLogTitle": {
+    "message": "Inspect logs"
+  },
+  "agentChatGuideLogDescription": {
+    "message": "Review console errors, logs, and tracking events"
+  },
+  "agentChatGuideLogPrompt": {
+    "message": "Analyze errors and tracking events on the current page and help locate the issue"
+  },
+  "agentChatGuideMockTitle": {
+    "message": "Mocks and rules"
+  },
+  "agentChatGuideMockDescription": {
+    "message": "Configure API mocks, redirects, and request rules"
+  },
+  "agentChatGuideMockPrompt": {
+    "message": "Inspect APIs on the current page and help design a suitable mock or request rule"
+  },
+  "agentChatDecline": {
+    "message": "Decline"
+  },
+  "agentChatApprove": {
+    "message": "Approve"
+  },
+  "agentChatApprovalTitle": {
+    "message": "Allow the agent to perform this action?"
+  },
+  "agentChatApprovalCommandTitle": {
+    "message": "Allow the agent to run this command?"
+  },
+  "agentChatApprovalFileChangeTitle": {
+    "message": "Allow the agent to modify files?"
+  },
+  "agentChatApprovalPermissionsTitle": {
+    "message": "Grant these permissions to the agent?"
+  },
+  "agentChatApprovalToolTitle": {
+    "message": "Allow the agent to use this tool?"
+  },
+  "agentChatApprovalDescription": {
+    "message": "The agent needs your approval before it can continue"
+  },
+  "agentChatApprovalCommand": {
+    "message": "Command"
+  },
+  "agentChatApprovalFiles": {
+    "message": "Files"
+  },
+  "agentChatApprovalPermissions": {
+    "message": "Requested permissions"
+  },
+  "agentChatApprovalTool": {
+    "message": "Tool"
+  },
+  "agentChatApprovalDirectory": {
+    "message": "Working directory"
+  },
+  "agentChatApprovalNetwork": {
+    "message": "Network access"
+  },
+  "agentChatApprovalFileSystem": {
+    "message": "File access"
+  },
+  "agentChatApprovalShowDetails": {
+    "message": "View full request"
+  },
+  "agentChatReply": {
+    "message": "Reply in composer"
+  },
+  "agentChatRequestPending": {
+    "message": "$1 agent requests need a response"
+  },
+  "agentChatReplyingTo": {
+    "message": "Replying to $1"
+  },
+  "agentChatReplyPlaceholder": {
+    "message": "Enter a reply or a JSON response object"
+  },
+  "agentChatInputPlaceholder": {
+    "message": "Type a message…"
+  },
+  "agentChatSend": {
+    "message": "Send"
+  },
+  "agentChatInputHint": {
+    "message": "Enter to send, Shift + Enter for a new line"
+  },
+  "agentChatEnableAutoApprove": {
+    "message": "Enable auto approval"
+  },
+  "agentChatDisableAutoApprove": {
+    "message": "Disable auto approval"
+  },
+  "agentChatOpenCodexApp": {
+    "message": "Open in Codex App"
+  },
+  "agentChatOpenCodexWorkspace": {
+    "message": "Open folder in Codex App"
+  },
+  "agentChatTemporaryUnsupported": {
+    "message": "Temporary conversations are not supported"
+  },
+  "agentChatQoderSessionReconnected": {
+    "message": "Qoder could not recover the previous session. The latest message is in a new session."
+  },
+  "agentChatResend": {
+    "message": "Resend"
+  },
+  "agentChatQoderSignIn": {
+    "message": "Sign in to Qoder"
+  },
+  "agentChatQoderSignInRequired": {
+    "message": "Qoder sign-in required"
+  },
+  "agentChatQoderSignInHint": {
+    "message": "Sign in to Qoder in your browser, then send your message again."
+  },
+  "agentChatQoderSignInPending": {
+    "message": "Complete sign-in in your browser, then return here and resend."
+  },
+  "agentChatQoderSignInComplete": {
+    "message": "Signed in. Send your message again."
+  },
+  "agentChatQoderSignInFallback": {
+    "message": "Could not complete browser sign-in. Run $1 in your terminal, then send your message again."
+  },
+  "agentChatSetupTitle": {
+    "message": "$1 needs setup"
+  },
+  "agentChatSetupDescription": {
+    "message": "Install the CLI locally, sign in, then reopen Agent Chat. The desktop chat app alone cannot provide this native connection."
+  },
+  "agentChatSetupManagedDescription": {
+    "message": "Install the missing local components for this Agent."
+  },
+  "agentChatSetupInstallProvider": {
+    "message": "Install $1"
+  },
+  "agentChatSetupInstalling": {
+    "message": "Installing…"
+  },
+  "agentChatSetupInstalled": {
+    "message": "$1 is installed"
+  },
+  "agentChatSetupLoginIfNeeded": {
+    "message": "Sign in from a terminal if needed"
+  },
+  "agentChatSetupContinue": {
+    "message": "Continue to chat"
+  },
+  "agentChatSetupError": {
+    "message": "Detection details"
+  },
+  "agentChatSetupInstall": {
+    "message": "1. Install"
+  },
+  "agentChatSetupLogin": {
+    "message": "2. Sign in"
+  },
+  "agentChatSetupQoderLogin": {
+    "message": "2. Start Qoder CLI, then enter /login"
+  },
+  "agentChatSetupDocs": {
+    "message": "View official setup guide"
+  },
+  "agentSkillsManage": {
+    "message": "Manage Skills"
+  },
+  "agentSkillsTitle": {
+    "message": "$1 Skills"
+  },
+  "agentSkillsBack": {
+    "message": "Back to skills"
+  },
+  "agentSkillsOpenPage": {
+    "message": "View on $1"
+  },
+  "agentSkillsPreview": {
+    "message": "Preview"
+  },
+  "agentSkillsBrowse": {
+    "message": "Search skills"
+  },
+  "agentSkillsInstalled": {
+    "message": "Installed"
+  },
+  "agentSkillsInstallTo": {
+    "message": "Install to"
+  },
+  "agentSkillsGlobal": {
+    "message": "Global"
+  },
+  "agentSkillsProject": {
+    "message": "Current project"
+  },
+  "agentSkillsSystem": {
+    "message": "System"
+  },
+  "agentSkillsAdmin": {
+    "message": "Admin"
+  },
+  "agentSkillsBuiltIn": {
+    "message": "Built-in"
+  },
+  "agentSkillsUnknownScope": {
+    "message": "Unknown scope"
+  },
+  "agentSkillsCheckUpdates": {
+    "message": "Check updates"
+  },
+  "agentSkillsRefresh": {
+    "message": "Refresh installed skills"
+  },
+  "agentSkillsSearchPlaceholder": {
+    "message": "Search by skill name, capability, or source…"
+  },
+  "agentSkillsLoginRequired": {
+    "message": "Sign in to $1, then try again."
+  },
+  "agentSkillsMarkdownUnavailable": {
+    "message": "This skill does not have a readable SKILL.md."
+  },
+  "agentSkillsInvalidResponse": {
+    "message": "$1 returned an unrecognized response. Check your sign-in status."
+  },
+  "agentSkillsNoResults": {
+    "message": "No matching skills found"
+  },
+  "agentSkillsNoDescription": {
+    "message": "No description"
+  },
+  "agentSkillsInstalls": {
+    "message": "$1 installs"
+  },
+  "agentSkillsInstall": {
+    "message": "Install"
+  },
+  "agentSkillsUpdateAvailable": {
+    "message": "Update available"
+  },
+  "agentSkillsUpdate": {
+    "message": "Update"
+  },
+  "agentSkillsUninstall": {
+    "message": "Uninstall"
+  },
+  "agentSkillsNoneInstalled": {
+    "message": "No skills are installed in the current scope"
+  },
+  "copyFailed": {
+    "message": "Copy failed"
+  },
+  "appSimulationVersion": {
+    "message": "Version"
+  },
+  "appSimulationVersionPlaceholder": {
+    "message": "e.g. 10.0.0"
+  },
+  "browserManagerProviderConfigure": {
+    "message": "Configure Provider"
+  },
+  "browserManagerLocal": {
+    "message": "Local"
+  },
+  "browserManagerAdd": {
+    "message": "Add"
+  },
+  "browserManagerPersistentHint": {
+    "message": "Keep login state and browser data after closing"
+  },
+  "browserManagerHeadlessHint": {
+    "message": "Run in the background without showing a browser window"
+  },
+  "browserManagerAccount": {
+    "message": "Test account service account"
+  },
+  "browserManagerAccountHint": {
+    "message": "Automatically sign in to the selected test account after launch"
+  },
+  "browserManagerAccountNone": {
+    "message": "Do not sign in automatically"
+  },
+  "browserManagerAccountUnavailable": {
+    "message": "The selected Test account service account is no longer available. Choose another account."
+  },
+  "browserManagerAccountLoginFailed": {
+    "message": "Failed to sign in to the Test account service account"
+  },
+  "browserManagerSyncLoginHint": {
+    "message": "Copy cookies for the selected sites from this browser to the target"
+  },
+  "controlSessions": {
+    "message": "Browser control sessions"
+  },
+  "agentUserTabGroup": {
+    "message": "Mearl · Action needed"
+  },
+  "controlSessionUser": {
+    "message": "Your control"
+  },
+  "controlSessionAgent": {
+    "message": "Agent"
+  },
+  "controlSessionView": {
+    "message": "View page"
+  },
+  "controlSessionReturn": {
+    "message": "Return to agent"
+  },
+  "controlSessionTakeOver": {
+    "message": "Take over"
+  },
+  "controlSessionFinish": {
+    "message": "Finish session"
+  },
+  "controlSessionTask": {
+    "message": "Agent browser task"
+  },
+  "controlSessionPages": {
+    "message": "$1 pages"
+  },
+  "browserManagerRequired": {
+    "message": "Required"
+  },
+  "browserManagerSelectOption": {
+    "message": "Select an option"
+  },
+  "browserManagerSearchOptions": {
+    "message": "Search by name or ID"
+  },
+  "browserManagerNoOptions": {
+    "message": "No options available"
+  },
+  "browserManagerConnectionMode": {
+    "message": "Connection mode"
+  },
+  "browserManagerLoadingOptions": {
+    "message": "Loading available options…"
+  },
+  "browserManagerRefreshOptions": {
+    "message": "Refresh"
+  },
+  "browserViewUnavailable": {
+    "message": "The extension view is unavailable. Close it and try again."
+  },
+  "browserCaptureUnavailable": {
+    "message": "Capture is temporarily unavailable. Please retry."
+  },
+  "agentSkillsRateLimited": {
+    "message": "The catalog rate limit was reached. Try again later or open the skill page."
+  },
+  "agentSkillsRequestFailed": {
+    "message": "Unable to reach the skill catalog. Try again or open the skill page."
+  },
+  "agentSkillsManagerChanged": {
+    "message": "The Skill manager changed. The catalog is refreshing; select the skill again to install."
+  },
+  "presetInstallTitle": {
+    "message": "Enable Mearl capabilities"
+  },
+  "presetInstallSourceNotice": {
+    "message": "This website is not a preconfigured installation source. Approval applies to this installation only and does not trust the website for automatic updates."
+  },
+  "presetInstallSourceTitle": {
+    "message": "Confirm installation source"
+  },
+  "presetInstallRequestingPage": {
+    "message": "Requesting website"
+  },
+  "presetInstallCatalogSource": {
+    "message": "Configuration catalog"
+  },
+  "presetInstallPresetSource": {
+    "message": "Capability configuration source"
+  },
+  "presetInstallReadSourceHint": {
+    "message": "Confirm the source to read its configuration. Review the capability name and required sites in the next step before confirming installation."
+  },
+  "presetInstallReadSource": {
+    "message": "Continue and read configuration"
+  },
+  "presetInstallConfirmHint": {
+    "message": "Review the capability source and sites it can access. Included local capabilities run through the connected Mearl local service. The browser separately confirms any required site permissions."
+  },
+  "presetInstallConfirmOnce": {
+    "message": "Confirm this installation"
+  },
+  "presetInstallCancel": {
+    "message": "Cancel"
+  },
+  "presetInstallReplaceSources": {
+    "message": "Replace and repair…"
+  },
+  "presetInstallReplaceTitle": {
+    "message": "Replace and repair these Skills?"
+  },
+  "presetInstallReplaceHint": {
+    "message": "Reinstall Skills with source conflicts from this configuration. Installed Skills only need plugin registration repair. Tools registered under the same name in another directory will be replaced. Completed components are retained."
+  },
+  "presetInstallComponentRegistrationConflict": {
+    "message": "A tool with the same name is registered in another directory"
+  },
+  "presetInstallComponentRegistrationPending": {
+    "message": "Plugin registration is incomplete"
+  },
+  "presetInstallReplaceConfirm": {
+    "message": "Confirm replacement and retry"
+  },
+  "presetInstallHostUpdateRequired": {
+    "message": "The current Mearl local service does not support this operation. Update and restart it, then try again."
+  },
+  "presetInstallReplacementChanged": {
+    "message": "The Skills selected for replacement have changed. Refresh their status and confirm again."
+  },
+  "presetInstallSourceChanged": {
+    "message": "The requesting website or configuration source does not match. Return to the original website and start again."
+  },
+  "presetInstallDescription": {
+    "message": "Set up once and use capabilities in your existing tools and panels."
+  },
+  "presetInstallLoading": {
+    "message": "Reading installation details…"
+  },
+  "presetInstallWorking": {
+    "message": "Verifying and enabling capabilities…"
+  },
+  "presetInstallPermissions": {
+    "message": "These capabilities need access to the following sites. Continue to grant access in your browser."
+  },
+  "presetInstallAllow": {
+    "message": "Allow and enable"
+  },
+  "presetInstallPermissionFailed": {
+    "message": "Required site access was not granted. You can retry; your current configuration is preserved."
+  },
+  "presetInstallBrowserReady": {
+    "message": "Browser capabilities enabled"
+  },
+  "presetInstallLocalPending": {
+    "message": "This preset also includes local-service capabilities. Browser capabilities are ready to use."
+  },
+  "presetInstallComplete": {
+    "message": "Use them in your existing Popup, DevTools panel, and app simulation."
+  },
+  "presetInstallSetupHint": {
+    "message": "Run this setup command once in your terminal to configure the local service and related capabilities:"
+  },
+  "presetInstallCopy": {
+    "message": "Copy setup command"
+  },
+  "presetInstallCopied": {
+    "message": "Copied"
+  },
+  "presetInstallCopyFailed": {
+    "message": "Could not copy. Select the command and copy it manually."
+  },
+  "presetInstallRefresh": {
+    "message": "Check again"
+  },
+  "presetInstallGuide": {
+    "message": "Open installation guide"
+  },
+  "presetInstallSessionExpired": {
+    "message": "Installation details expired or changed. Return to the guide and try again."
+  },
+  "presetInstallFailed": {
+    "message": "Could not finish setup. Retry; your current capabilities are preserved."
+  },
+  "presetInstallIntegrityFailed": {
+    "message": "Setup stopped because installation data failed integrity checks. Check your Mearl installation; your current capabilities are preserved."
+  },
+  "presetInstallConfigurationFailed": {
+    "message": "This capability configuration is incompatible with your Mearl version. Update Mearl or contact the capability provider; your current capabilities are preserved."
+  },
+  "presetInstallNativeSync": {
+    "message": "This preset is linked to local services. Run the setup command to update all components together and keep your settings."
+  },
+  "presetInstallAllReady": {
+    "message": "All selected capabilities are ready"
+  },
+  "presetInstallLocalIncomplete": {
+    "message": "Some local components still need attention. Retry to continue; completed components are retained."
+  },
+  "presetInstallLocalRetry": {
+    "message": "Retry local installation"
+  },
+  "presetInstallLocalPendingTitle": {
+    "message": "Local capabilities are not ready yet"
+  },
+  "presetPermissionsRequired": {
+    "message": "Preset $1 requires domain access"
+  },
+  "presetPermissionsGrant": {
+    "message": "Authorize preset domains"
+  },
+  "requestCasesButton": {
+    "message": "Cases"
+  },
+  "requestCasesServices": {
+    "message": "Cases / Capture"
+  },
+  "accountsServices": {
+    "message": "Accounts"
+  },
+  "requestImportServices": {
+    "message": "Request import"
+  },
+  "trackingMetadataServices": {
+    "message": "Tracking data"
+  },
+  "captureLoginRequired": {
+    "message": "Please sign in first"
+  },
+  "dataService": {
+    "message": "Data service"
+  },
+  "presetInstallPendingItems": {
+    "message": "Pending local components"
+  },
+  "presetInstallComponentMissing": {
+    "message": "Not installed"
+  },
+  "presetInstallComponentConflict": {
+    "message": "Already installed from another source"
+  },
+  "presetInstallCatalogPending": {
+    "message": "Tool catalog has not been synced"
+  },
+  "presetInstallHostPending": {
+    "message": "Waiting for the local service to load"
+  },
+  "presetInstallComponentPending": {
+    "message": "Setup is incomplete"
+  },
+  "presetInstallConflictHint": {
+    "message": "The installer pauses the batch when sources conflict. Existing components are preserved. Resolve the conflicts before retrying."
+  }
+}

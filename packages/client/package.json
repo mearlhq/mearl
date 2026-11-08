@@ -1,0 +1,94 @@
+{
+  "name": "@mearl/client",
+  "version": "3.0.0",
+  "description": "Unified Mearl SDK & CLI for local and remote browsers",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./local": {
+      "types": "./dist/local.d.ts",
+      "import": "./dist/local.js"
+    },
+    "./action-timeouts": {
+      "types": "./dist/actionTimeouts.d.ts",
+      "import": "./dist/actionTimeouts.js"
+    },
+    "./commands": {
+      "types": "./dist/commands.d.ts",
+      "import": "./dist/commands.js"
+    },
+    "./check": {
+      "types": "./dist/check.d.ts",
+      "import": "./dist/check.js"
+    },
+    "./native-host": {
+      "types": "./dist/nativeHost.d.ts",
+      "import": "./dist/nativeHost.js"
+    },
+    "./cli": {
+      "types": "./dist/cli.d.ts",
+      "import": "./dist/cli.js"
+    },
+    "./plugin": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js"
+    },
+    "./script": {
+      "types": "./dist/script.d.ts",
+      "import": "./dist/script.js"
+    }
+  },
+  "bin": {
+    "mearl": "./dist/bin.js"
+  },
+  "files": [
+    "README.en.md",
+    "dist",
+    "!dist/**/*.map"
+  ],
+  "scripts": {
+    "build": "rm -rf dist/ && tsc && node build-guides.mjs && chmod +x dist/bin.js",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build"
+  },
+  "keywords": [
+    "mearl",
+    "chrome-extension",
+    "devtools",
+    "socket-client"
+  ],
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20.18.0"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org"
+  },
+  "dependencies": {
+    "@mearl/daemon-core": "workspace:*",
+    "@mearl/cloud-types": "workspace:*",
+    "@mearl/provider": "workspace:*",
+    "commander": "^14.0.3",
+    "fastest-levenshtein": "^1.0.16",
+    "ws": "^8.18.0",
+    "@mearl/agent-runtime": "workspace:*",
+    "@mearl/browser-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.1",
+    "@types/ws": "^8.18.1",
+    "typescript": "^5.8.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mearlhq/mearl.git",
+    "directory": "packages/client"
+  }
+}

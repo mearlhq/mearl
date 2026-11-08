@@ -1,0 +1,144 @@
+---
+import { ArrowRight, ArrowUpRight } from '@lucide/astro';
+import DocsLayout from '../layouts/DocsLayout.astro';
+import ArchitectureFlow from './ArchitectureFlow.astro';
+import CodeBlock from './CodeBlock.astro';
+import ExtensionInstallLinks from './ExtensionInstallLinks.astro';
+import ProductScreenshot from './ProductScreenshot.astro';
+import QuickStart from './QuickStart.astro';
+import { guideContent } from '../lib/guides';
+import { docPath, repositoryUrl, setupCommand, sitePath, type Guide, type Locale } from '../lib/site';
+import { siteCopy } from '../lib/site-copy';
+
+interface Props { locale: Locale; page: Guide }
+const { locale, page } = Astro.props;
+const t = siteCopy[locale];
+const install = page === 'installation';
+const quick = page === 'quick-start';
+const guide = install || quick ? undefined : guideContent[page][locale];
+const title = guide?.title ?? (install ? t.installTitle : t.quickTitle);
+const description = guide?.lead ?? (install ? t.installSummary : t.quickSummary);
+const topics = guide?.sections.map(section => ({ id: section.id, label: section.title })) ?? (install ? [
+  { id: 'installation', label: t.installExtension },
+  { id: 'agent', label: t.agentInstall },
+  { id: 'verify', label: t.verifySetup },
+  { id: 'mcp', label: t.installMcp },
+] : [
+  { id: 'quick-start', label: t.quickRun },
+  { id: 'existing-tab', label: t.quickExisting },
+  { id: 'next', label: t.nextSteps },
+  { id: 'connect', label: t.quickTroubleshoot },
+]);
+---
+<DocsLayout title={`${title} · Mearl`} {description} {locale} {page} {topics}>
+  <header class="docs-detail">
+    <p class="docs-eyebrow"><span></span>{install || quick ? t.start : t.docsNav}</p>
+    <h1>{title}</h1>
+    <p class="docs-lead">{description}</p>
+    {install && <div class="docs-guide-links">
+      <a href="#installation">{t.installExtension}<ArrowRight size={14} aria-hidden="true" /></a>
+      <a href="#agent">{t.agentInstall}<ArrowRight size={14} aria-hidden="true" /></a>
+    </div>}
+    {quick && <div class="docs-guide-links"><a href={sitePath(locale, 'installation')}>{t.setupGuide}<ArrowRight size={14} aria-hidden="true" /></a></div>}
+  </header>
+
+  {guide?.routes && <div class="docs-topic-grid docs-task-grid">
+    {guide.routes.map(({ id, title, text }) => (
+      <a href={`#${id}`}><strong>{title}<ArrowRight size={15} aria-hidden="true" /></strong><span>{text}</span></a>
+    ))}
+  </div>}
+
+  {guide?.sections.map(section => (
+    <section class="docs-section" id={section.id}>
+      <h2>{section.title}</h2>
+      <p>{section.text}</p>
+      {section.items && <ul class="docs-guide-list">{section.items.map(item => <li>{item}</li>)}</ul>}
+      {section.flow && <ArchitectureFlow flow={section.flow} />}
+      {section.steps && <ol class="docs-guide-list">{section.steps.map(step => <li>{step}</li>)}</ol>}
+      {section.command && <CodeBlock {locale} id={`${section.id}-command`} command={section.command} label="Shell" />}
+      {Array.isArray(section.screenshot) ? (
+        <div class="docs-figure-pair">
+          {section.screenshot.map(screenshot => <ProductScreenshot {screenshot} {locale} />)}
+        </div>
+      ) : section.screenshot && <ProductScreenshot screenshot={section.screenshot} {locale} />}
+      {section.links && <div class="docs-guide-links">
+        {section.links.map(link => {
+          const href = 'url' in link ? link.url : 'page' in link ? sitePath(locale, link.page)
+            : link.shared ? `${repositoryUrl}/blob/main/${link.path}` : docPath(locale, link.path);
+          const Icon = href.startsWith('/') ? ArrowRight : ArrowUpRight;
+          return <a href={href}>{link.label}<Icon size={14} aria-hidden="true" /></a>;
+        })}
+      </div>}
+    </section>
+  ))}
+
+  {install && (
+    <>
+      <section class="docs-section" id="installation">
+        <h2>{t.installExtension}</h2>
+        <p>{t.extensionInstallLead}</p>
+        <ExtensionInstallLinks {locale} />
+        <a class="docs-next" href={sitePath(locale, 'extension') + '#toolbox'}>{t.extensionTry}<ArrowRight size={16} aria-hidden="true" /></a>
+      </section>
+      <section class="docs-section" id="agent">
+        <h2>{t.agentInstall}</h2>
+        <p>{t.requirements}</p>
+        <p>{t.installLead}</p>
+        <CodeBlock {locale} id="install-command" command={setupCommand} label="Shell" />
+        <div class="docs-install-extension">
+          <p>{t.agentExtensionStep}</p>
+          <ExtensionInstallLinks {locale} />
+        </div>
+        <div class="docs-guide-links"><a href={docPath(locale, 'packages/setup/README.md')}>{t.setupGuide}<ArrowRight size={14} aria-hidden="true" /></a></div>
+      </section>
+      <section class="docs-section" id="verify">
+        <h2>{t.verifySetup}</h2>
+        <p>{t.verifySetupLead}</p>
+        <CodeBlock {locale} id="check-command" command="mearl check" label="Shell" />
+        <p class="docs-follow-up">{t.verifyResult}</p>
+        <a class="docs-next" href={sitePath(locale, 'quick-start')}>{t.continueToQuick}<ArrowRight size={16} aria-hidden="true" /></a>
+      </section>
+      <section class="docs-section" id="mcp">
+        <h2>{t.installMcp}</h2>
+        <p>{t.installMcpLead}</p>
+        <CodeBlock {locale} id="mcp-command" command={`${setupCommand} --mcp`} label="Shell" />
+        <div class="docs-guide-links"><a href={docPath(locale, 'packages/mcp-server/README.md')}>{t.mcp}<ArrowRight size={14} aria-hidden="true" /></a></div>
+      </section>
+    </>
+  )}
+
+  {quick && (
+    <>
+      <section class="docs-section" id="quick-start">
+        <h2>{t.quickRun}</h2>
+        <QuickStart {locale} />
+      </section>
+      <section class="docs-section" id="existing-tab">
+        <h2>{t.quickExisting}</h2>
+        <p>{t.quickExistingLead}</p>
+        <CodeBlock {locale} id="existing-tab-prompt" command={t.quickExistingPrompt} label={t.promptLabel} prompt />
+        <p class="docs-follow-up">{t.quickExistingResult}</p>
+      </section>
+      <section class="docs-section" id="next">
+        <h2>{t.nextSteps}</h2>
+        <div class="docs-guide-links">
+          <a href={sitePath(locale, 'authenticated-requests')}>{t.authenticatedRequests}<ArrowRight size={14} aria-hidden="true" /></a>
+          <a href={sitePath(locale, 'web-debugging') + '#trace'}>{t.caseGuide}<ArrowRight size={14} aria-hidden="true" /></a>
+          <a href={sitePath(locale, 'skill-plugins') + '#reuse-workflow'}>{t.reuseGuide}<ArrowRight size={14} aria-hidden="true" /></a>
+        </div>
+        <p class="docs-follow-up">{t.quickNote} <a href={docPath(locale, 'packages/client/README.md')}>{t.cli}</a> · <a href={docPath(locale, 'packages/mcp-server/README.md')}>{t.mcp}</a></p>
+      </section>
+      <section class="docs-section" id="connect">
+        <details class="docs-disclosure">
+          <summary>{t.quickTroubleshoot}</summary>
+          <p>{t.quickTroubleshootLead}</p>
+          <CodeBlock {locale} id="quick-browser-list" command="mearl browser_list" label="Shell" />
+          <div class="docs-guide-links">
+            <a href={sitePath(locale, 'installation') + '#verify'}>{t.verifySetup}<ArrowRight size={14} aria-hidden="true" /></a>
+            <a href={sitePath(locale, 'installation') + '#mcp'}>{t.installMcp}<ArrowRight size={14} aria-hidden="true" /></a>
+          </div>
+        </details>
+      </section>
+    </>
+  )}
+</DocsLayout>

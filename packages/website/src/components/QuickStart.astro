@@ -1,0 +1,17 @@
+---
+import { firstTask, type Locale } from '../lib/site';
+import { siteCopy } from '../lib/site-copy';
+import CodeBlock from './CodeBlock.astro';
+
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+const t = siteCopy[locale];
+---
+<p>{t.quickLead}</p>
+<CodeBlock {locale} id="agent-prompt" command={t.agentPrompt} label={t.promptLabel} prompt />
+<p class="docs-follow-up" id="result"><strong>{t.quickResult}</strong> {t.quickResultLead}</p>
+<details class="docs-disclosure">
+  <summary>{t.terminalExample}</summary>
+  <p>{t.terminalLead}</p>
+  <CodeBlock {locale} id="quick-command" command={firstTask} label="Bash" />
+</details>

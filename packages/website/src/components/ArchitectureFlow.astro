@@ -1,0 +1,54 @@
+---
+import { ArrowRight } from '@lucide/astro';
+
+interface Props {
+  flow: {
+    caption: string;
+    nodes: { title: string; text: string }[];
+  };
+}
+const { flow } = Astro.props;
+---
+<figure class="architecture-flow">
+  <figcaption>{flow.caption}</figcaption>
+  <ol role="list">
+    {flow.nodes.map((node, index) => (
+      <li>
+        <div>
+          <strong>{node.title}</strong>
+          <span>{node.text}</span>
+        </div>
+        {index < flow.nodes.length - 1 && <ArrowRight size={16} aria-hidden="true" />}
+      </li>
+    ))}
+  </ol>
+</figure>
+
+<style>
+  .architecture-flow { container-type: inline-size; margin: 16px 0; }
+  figcaption { margin-bottom: 8px; color: var(--docs-title); font-size: 14px; font-weight: 650; }
+  ol { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; gap: 6px; padding: 0; margin: 0; list-style: none; }
+  li { display: flex; align-items: center; gap: 6px; }
+  li:last-child { margin-right: 22px; }
+  li > div {
+    align-self: stretch;
+    display: grid;
+    align-content: start;
+    gap: 5px;
+    flex: 1;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid var(--docs-border);
+    border-radius: 8px;
+    background: var(--docs-panel);
+  }
+  strong { color: var(--docs-title); font-size: 14px; }
+  span { color: var(--muted); font-size: 13px; }
+  svg { flex: none; color: var(--blue); }
+  @container (max-width: 590px) {
+    ol { grid-auto-flow: row; gap: 5px; }
+    li { flex-direction: column; }
+    li:last-child { margin-right: 0; }
+    svg { transform: rotate(90deg); }
+  }
+</style>

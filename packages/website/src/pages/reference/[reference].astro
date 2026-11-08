@@ -1,0 +1,11 @@
+---
+import ReferencePage from '../../components/ReferencePage.astro';
+import { referenceDocs } from '../../lib/reference-docs.mjs';
+import type { Reference } from '../../lib/site';
+
+export function getStaticPaths() {
+  return Object.keys(referenceDocs).map(reference => ({ params: { reference } }));
+}
+const reference = Astro.params.reference as Reference;
+---
+<ReferencePage locale="zh-CN" {reference} />

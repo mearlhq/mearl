@@ -1,0 +1,65 @@
+{
+  "name": "@mearl/cloud-connector",
+  "version": "3.0.0",
+  "description": "Cloud connector for Mearl \u2014 bridges cloud agents to a local native-host",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./contracts": {
+      "types": "./dist/contracts.d.ts",
+      "import": "./dist/contracts.js"
+    }
+  },
+  "bin": {
+    "mearl-cloud-connector": "./dist/cli.js"
+  },
+  "files": [
+    "README.en.md",
+    "dist",
+    "!dist/**/*.map",
+    "!dist/**/__tests__/**",
+    "!dist/**/*.test.d.ts"
+  ],
+  "scripts": {
+    "build": "rm -rf dist/ && node build.mjs",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build"
+  },
+  "keywords": [
+    "mearl",
+    "cloud-connector",
+    "websocket"
+  ],
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20.18.0"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org"
+  },
+  "dependencies": {
+    "@mearl/client": "workspace:*",
+    "@mearl/cloud-types": "workspace:*",
+    "@mearl/daemon-core": "workspace:*",
+    "commander": "^14.0.3",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.1",
+    "@types/ws": "^8.5.13",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.8.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mearlhq/mearl.git",
+    "directory": "packages/cloud/cloud-connector"
+  }
+}

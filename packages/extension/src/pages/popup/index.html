@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mearl</title>
+  <style data-popup-viewport>
+    html,
+    body,
+    #root {
+      min-width: 680px;
+      min-height: 560px;
+    }
+
+    html {
+      color-scheme: light dark;
+    }
+
+    body {
+      margin: 0;
+    }
+
+    [data-popup-bootstrap] {
+      width: 680px;
+      height: 560px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: CanvasText;
+      background: Canvas;
+    }
+
+    [data-popup-bootstrap]::after {
+      width: 18px;
+      height: 18px;
+      box-sizing: border-box;
+      border: 2px solid transparent;
+      border-top-color: currentColor;
+      border-radius: 9999px;
+      opacity: 0.35;
+      content: '';
+      animation: popup-bootstrap-spin 0.8s linear infinite;
+    }
+
+    @keyframes popup-bootstrap-spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"><div data-popup-bootstrap aria-hidden="true"></div></div>
+  <script type="module" src="./index.tsx"></script>
+</body>
+</html>

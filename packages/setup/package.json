@@ -1,0 +1,107 @@
+{
+  "name": "@mearl/setup",
+  "version": "3.0.0",
+  "description": "One-shot environment setup and configuration for Mearl",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    "./npm-registry": {
+      "types": "./dist/npmRegistry.d.ts",
+      "import": "./dist/npmRegistry.js"
+    },
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package-manager": {
+      "types": "./dist/packageManager.d.ts",
+      "import": "./dist/packageManager.js"
+    },
+    "./plugin": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js"
+    },
+    "./native-host": {
+      "types": "./dist/nativeHost.d.ts",
+      "import": "./dist/nativeHost.js"
+    },
+    "./version": {
+      "types": "./dist/version.d.ts",
+      "import": "./dist/version.js"
+    },
+    "./browser-extension": {
+      "types": "./dist/browserExtension.d.ts",
+      "import": "./dist/browserExtension.js"
+    },
+    "./skills": {
+      "types": "./dist/skills.d.ts",
+      "import": "./dist/skills.js"
+    },
+    "./skill-sources": {
+      "types": "./dist/skillSources.d.ts",
+      "import": "./dist/skillSources.js"
+    },
+    "./preset": {
+      "types": "./dist/preset.d.ts",
+      "import": "./dist/preset.js"
+    },
+    "./skill-source-receipts": {
+      "types": "./dist/skillSourceReceipts.d.ts",
+      "import": "./dist/skillSourceReceipts.js"
+    }
+  },
+  "bin": {
+    "mearl-setup": "./dist/bin.js"
+  },
+  "files": [
+    "README.en.md",
+    "dist",
+    "!dist/**/*.map",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "rm -rf dist/ && tsc && chmod +x dist/bin.js",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build"
+  },
+  "keywords": [
+    "mearl",
+    "setup",
+    "installer",
+    "update",
+    "uninstall"
+  ],
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20.18.0"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org"
+  },
+  "dependencies": {
+    "@mearl/client": "workspace:*",
+    "@mearl/provider": "workspace:*",
+    "commander": "^14.0.3",
+    "ws": "^8.18.3",
+    "@mearl/daemon-core": "workspace:*",
+    "@mearl/preset": "workspace:*",
+    "semver": "^7.8.5",
+    "@mearl/browser-core": "workspace:*",
+    "adm-zip": "^0.6.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.1",
+    "@types/ws": "^8.18.1",
+    "typescript": "^5.8.3",
+    "@types/semver": "^7.7.1",
+    "@types/adm-zip": "^0.5.7"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mearlhq/mearl.git",
+    "directory": "packages/setup"
+  }
+}

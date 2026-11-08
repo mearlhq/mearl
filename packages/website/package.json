@@ -1,0 +1,28 @@
+{
+  "name": "@mearl/website",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Mearl product website and installation guide",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev --host 127.0.0.1",
+    "build": "astro build",
+    "typecheck": "astro check && node --check astro.config.mjs",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@astrojs/markdown-satteri": "0.4.5",
+    "@lucide/astro": "^1.62.0",
+    "astro": "^7.2.10",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "@mearl/preset": "workspace:*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mearlhq/mearl.git",
+    "directory": "packages/website"
+  }
+}

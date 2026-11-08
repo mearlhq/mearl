@@ -1,0 +1,49 @@
+{
+  "name": "@mearl/plugin-qoder",
+  "version": "3.0.0",
+  "description": "Optional Qoder CLI agent and cloud connector capability for Mearl",
+  "type": "module",
+  "license": "Apache-2.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "mearl-qoder": "dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "README.en.md",
+    "dist",
+    "docs",
+    "!dist/**/__tests__/**",
+    "!dist/**/*.test.d.ts"
+  ],
+  "scripts": {
+    "build": "rm -rf dist/ && tsc && node build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "engines": {
+    "node": ">=20.18.0"
+  },
+  "dependencies": {
+    "@agentclientprotocol/sdk": "^1.2.1",
+    "@mearl/agent-runtime": "workspace:*",
+    "@mearl/browser-core": "workspace:*",
+    "@mearl/cloud-connector": "workspace:*",
+    "@mearl/client": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "esbuild": "^0.28.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mearlhq/mearl.git",
+    "directory": "packages/plugin-qoder"
+  }
+}

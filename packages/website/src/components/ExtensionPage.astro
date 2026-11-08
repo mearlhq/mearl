@@ -1,0 +1,132 @@
+---
+import { ArrowRight } from '@lucide/astro';
+import DocsLayout from '../layouts/DocsLayout.astro';
+import ProductScreenshot from './ProductScreenshot.astro';
+import { docPath, sitePath, type Locale } from '../lib/site';
+import { siteCopy } from '../lib/site-copy';
+import { extensionCopy } from '../lib/extension-copy';
+
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+const t = siteCopy[locale];
+const copy = extensionCopy[locale];
+const entryPoints = [
+  { id: 'agent-chat', title: copy.chatTitle, text: copy.chatEntry },
+  { id: 'devtools', title: copy.devtoolsTitle, text: copy.devtoolsEntry },
+  { id: 'toolbox', title: copy.toolsTitle, text: copy.toolsEntry },
+];
+const topics = entryPoints.map(({ id, title }) => ({ id, label: title }));
+---
+<DocsLayout title={`${t.chromeExtension} · Mearl`} description={t.extensionLead} {locale} page="extension" {topics}>
+  <header class="docs-detail">
+    <p class="docs-eyebrow"><span></span>{t.gettingStarted}</p>
+    <h1>{t.chromeExtension}</h1>
+    <p class="docs-lead">{t.extensionLead}</p>
+    <div class="docs-topic-grid docs-task-grid">
+      {entryPoints.map(({ id, title, text }) => (
+        <a href={`#${id}`}><strong>{title}<ArrowRight size={15} aria-hidden="true" /></strong><span>{text}</span></a>
+      ))}
+    </div>
+  </header>
+  <section class="docs-section" id="agent-chat">
+    <h2>{copy.chatTitle}</h2>
+    <p>{copy.chatText}</p>
+    <blockquote class="docs-example-prompt">{copy.prompt}</blockquote>
+    <ProductScreenshot screenshot="agentChart" {locale} />
+    <div class="docs-guide-links">
+      <a href={sitePath(locale, 'installation') + '#agent'}>{t.agentInstall}<ArrowRight size={14} aria-hidden="true" /></a>
+    </div>
+  </section>
+  <section class="docs-section" id="devtools">
+    <h2>{copy.devtoolsTitle}</h2>
+    <p>{copy.devtoolsText}</p>
+    <ol class="docs-guide-list">
+      {copy.devtoolsSteps.map(step => <li>{step}</li>)}
+    </ol>
+    <ProductScreenshot screenshot="ordersResponse" {locale} />
+    <div class="docs-guide-links">
+      <a href={sitePath(locale, 'web-debugging')}>{t.debugging}<ArrowRight size={14} aria-hidden="true" /></a>
+    </div>
+  </section>
+  <section class="docs-section" id="toolbox">
+    <h2>{copy.toolsTitle}</h2>
+    <p>{copy.toolsLead}</p>
+    <div class="popup-workflow">
+      <h3>{copy.formatterTitle}</h3>
+      <p>{copy.formatterText}</p>
+      <ProductScreenshot screenshot="json" {locale} />
+      <details class="docs-disclosure">
+        <summary>{copy.urlExample}</summary>
+        <ProductScreenshot screenshot="formatter" {locale} />
+      </details>
+    </div>
+    <div class="popup-workflow popup-example-split">
+      <div>
+        <h3>{copy.rulesTitle}</h3>
+        <p>{copy.rulesText}</p>
+      </div>
+      <ProductScreenshot screenshot="requestRule" {locale} />
+    </div>
+    <div class="popup-workflow">
+      <h3>{copy.moreToolsTitle}</h3>
+      <dl>
+        {copy.moreTools.map(tool => (
+          <div>
+            <dt>{tool.title}</dt>
+            <dd>{tool.text}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+    <div class="popup-workflow">
+      <h3>{copy.pluginsTitle}</h3>
+      <p>{copy.pluginsText}</p>
+      <details class="docs-disclosure">
+        <summary>{copy.pinTitle}</summary>
+        <p>{copy.pinText}</p>
+        <ProductScreenshot screenshot="toolOrder" {locale} />
+      </details>
+    </div>
+    <div class="docs-guide-links">
+      <a href={sitePath(locale, 'skill-plugins')}>{t.skillPlugins}<ArrowRight size={14} aria-hidden="true" /></a>
+      <a href={sitePath(locale, 'reference/skills')}>{t.skills}<ArrowRight size={14} aria-hidden="true" /></a>
+      <a href={`${sitePath(locale, 'emulation')}#wechat-miniprogram`}>{copy.miniProgramLink}<ArrowRight size={14} aria-hidden="true" /></a>
+    </div>
+  </section>
+  <div class="docs-guide-links">
+    <a href={docPath(locale, 'packages/extension/README.md')}>{t.extensionReference}<ArrowRight size={14} aria-hidden="true" /></a>
+  </div>
+</DocsLayout>
+
+<style>
+  .popup-workflow + .popup-workflow {
+    border-top: 1px solid var(--docs-border);
+    margin-top: 24px;
+    padding-top: 20px;
+  }
+  .popup-workflow h3 { margin: 0 0 6px; color: var(--docs-title); font-size: 17px; }
+  .popup-workflow p + h3 { margin-top: 16px; }
+  .popup-workflow p { margin: 0; color: var(--muted); }
+  .popup-workflow dl { display: grid; gap: 12px; margin: 10px 0 0; }
+  .popup-workflow dt { color: var(--docs-title); font-weight: 650; }
+  .popup-workflow dd { margin: 2px 0 0; color: var(--muted); }
+  .popup-example-split {
+    display: grid;
+    align-items: start;
+    gap: 16px;
+  }
+  .popup-example-split { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
+  .popup-workflow :global(.docs-figure) { max-width: 600px; }
+  .popup-example-split :global(.docs-figure) { margin: 0; }
+  .docs-example-prompt {
+    margin: 0;
+    padding: 12px 16px;
+    border: 1px solid var(--docs-border);
+    border-radius: 8px;
+    background: var(--docs-panel);
+    color: var(--docs-title);
+  }
+  @media (max-width: 820px) {
+    .popup-example-split { grid-template-columns: minmax(0, 1fr); }
+  }
+</style>

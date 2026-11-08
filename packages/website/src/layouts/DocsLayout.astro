@@ -1,0 +1,46 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import { docsNavigation, referenceLinks, sitePath, type Locale, type Page } from '../lib/site';
+import { siteCopy } from '../lib/site-copy';
+
+interface Props {
+  title: string;
+  description: string;
+  locale: Locale;
+  page: Page;
+  topics: Array<{ label: string; id: string }>;
+}
+const { title, description, locale, page, topics } = Astro.props;
+const t = siteCopy[locale];
+---
+<BaseLayout {title} {description} {locale} {page}>
+  <div class="docs-grid">
+    <aside class="docs-sidebar">
+      <nav aria-label={t.docsNav}>
+        {docsNavigation(locale).map(group => (
+          <>
+            <p>{group.label}</p>
+            {group.links.map(link => <a href={sitePath(locale, link.page)} aria-current={link.page === page ? 'page' : undefined}>{link.label}</a>)}
+          </>
+        ))}
+        <p>{t.reference}</p>
+        {referenceLinks(locale).map(link => <a href={link.href} aria-current={link.page === page ? 'page' : undefined}>{link.label}</a>)}
+      </nav>
+    </aside>
+    <article class="docs-article">
+      {topics.length > 0 && <details class="docs-toc-mobile">
+        <summary>{t.onPage}</summary>
+        <nav aria-label={t.onPage}>
+          {topics.map(topic => <a href={`#${topic.id}`}>{topic.label}</a>)}
+        </nav>
+      </details>}
+      <slot />
+    </article>
+    <aside class="docs-toc">
+      <nav aria-label={t.onPage}>
+        <p>{t.onPage}</p>
+        {topics.map(topic => <a href={`#${topic.id}`}>{topic.label}</a>)}
+      </nav>
+    </aside>
+  </div>
+</BaseLayout>
