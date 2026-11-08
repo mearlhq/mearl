@@ -90,6 +90,9 @@ it('replays the latest parent selection after a live open, including switching b
     await initInstallationBridge();
     select('one');
     await flush();
+    expect(document.querySelector<HTMLElement>('[data-bridge-label]')!.hidden).toBe(true);
+    const fallback = document.querySelector<HTMLAnchorElement>('[data-bridge-fallback]')!;
+    expect(fallback.hidden).toBe(false);
     let finish!: () => void;
     send.mockImplementation((_id, input, callback) =>
       input.operation === 'open'
@@ -103,7 +106,7 @@ it('replays the latest parent selection after a live open, including switching b
     select('one');
     finish();
     await flush();
-    expect(document.querySelector('[data-bridge-label]')!.textContent).toBe('First');
+    expect(fallback.hash).toBe('#preset=one');
     const next = new MouseEvent('click');
     Object.defineProperty(next, 'isTrusted', { value: true });
     button().dispatchEvent(next);
@@ -111,7 +114,7 @@ it('replays the latest parent selection after a live open, including switching b
     select('two');
     finish();
     await flush();
-    expect(document.querySelector('[data-bridge-label]')!.textContent).toBe('Second');
+    expect(fallback.hash).toBe('#preset=two');
     expect(send.mock.calls.at(-1)![1]).toMatchObject({ operation: 'status', presetId: 'two' });
     const count = send.mock.calls.length;
     window.dispatchEvent(

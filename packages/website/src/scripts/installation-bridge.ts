@@ -73,6 +73,7 @@ export async function initInstallationBridge(): Promise<void> {
   install.disabled = true;
   fallback.hidden = true;
   heading.hidden = true;
+  label.hidden = false;
   label.textContent = t.loading;
   status.textContent = '';
   window.addEventListener(
@@ -111,7 +112,8 @@ export async function initInstallationBridge(): Promise<void> {
     const turn = ++generation;
     selected = id;
     choice.value = id;
-    label.textContent = presets[id].label;
+    if (embedded) label.hidden = true;
+    else label.textContent = presets[id].label;
     fallback.href = new URL(`connect.html#preset=${encodeURIComponent(id)}`, site.url).href;
     fallback.hidden = !embedded;
     status.textContent = t.connecting;
