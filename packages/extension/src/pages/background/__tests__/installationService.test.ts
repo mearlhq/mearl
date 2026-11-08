@@ -6,8 +6,6 @@ import { getAgentAllowedOrigins } from '../../../shared/proxyPermissions';
 import {
   INSTALLATION_ACTION,
   INSTALLATION_BRIDGE_URL,
-  INSTALLATION_CONNECT_URL,
-  INSTALLATION_CONNECT_EN_URL,
   INSTALLATION_SITE,
   INSTALLATION_VIEW_PATH,
 } from '../../../shared/installation';
@@ -103,46 +101,16 @@ const internal = (operation: string, session: string, authorize?: boolean) => ({
   ...(authorize ? { authorize } : {}),
 });
 
-describe('automatic setup from the configured guide', () => {
-  it('opens a normal installation session when no preset has been selected', async () => {
-    const { service, install } = make();
-    const result = await service.external(input('openIfMissing'), owner());
-    expect(result).toHaveProperty('session');
-    expect(install).not.toHaveBeenCalled();
+it('leaves the guide idle after status checks and rejects legacy automatic open requests', async () => {
+  const { service, install } = make();
+  await expect(service.external(input('status'), owner())).resolves.toMatchObject({
+    browserReady: false,
   });
-
-  it('keeps one pending installation view across guide documents', async () => {
-    const { service } = make();
-    await service.external(input('openIfMissing'), owner());
-    frame.documentId = 'new-guide-document';
-    await expect(
-      service.external(input('openIfMissing'), { ...owner(), documentId: frame.documentId }),
-    ).resolves.toEqual({});
-    expect(chrome.tabs.create).toHaveBeenCalledOnce();
-  });
-
-  it.each(['activeRevision', 'installationToken'] as const)(
-    'preserves an existing browser selection recorded by %s',
-    async key => {
-      selection[key] = 'existing';
-      const { service } = make();
-      await expect(service.external(input('openIfMissing'), owner())).resolves.toEqual({});
-      expect(chrome.tabs.create).not.toHaveBeenCalled();
-    },
+  await expect(service.external(input('openIfMissing'), owner())).rejects.toThrow(
+    'INVALID_INSTALLATION_REQUEST',
   );
-
-  it('preserves a preset selected on the connected local host', async () => {
-    const service = createInstallationService({
-      configuration: async () => config,
-      registry: { captureInstallationSelection: async () => selection } as any,
-      native: {
-        capture: async () => ({ protocol: 1, selection: 'node:' + 'a'.repeat(64) }),
-        request: vi.fn(),
-      },
-    });
-    await expect(service.external(input('openIfMissing'), owner())).resolves.toEqual({});
-    expect(chrome.tabs.create).not.toHaveBeenCalled();
-  });
+  expect(chrome.tabs.create).not.toHaveBeenCalled();
+  expect(install).not.toHaveBeenCalled();
 });
 
 beforeEach(() => {
@@ -336,33 +304,20 @@ describe('website installation authority', () => {
     topUrl = 'https://guide.example.test/untrusted.html';
     await expect(service.external(input(), owner())).rejects.toThrow('PARENT_DENIED');
   });
-  it.each([INSTALLATION_CONNECT_URL, INSTALLATION_CONNECT_EN_URL])(
-    'accepts the public connector %s but no other site pages',
-    async connectUrl => {
+  it.each(['bridge.html', 'connect.html', 'en/connect.html'])(
+    'rejects top-level installation requests from %s',
+    async path => {
       const { service } = make();
-      topUrl = connectUrl;
+      topUrl = new URL(path, INSTALLATION_SITE).href;
       await expect(
-        service.external(input('status'), {
+        service.external(input('open'), {
           ...owner(),
-          url: connectUrl,
+          url: topUrl,
           frameId: 0,
           documentId: 'top-document',
         }),
-      ).resolves.toMatchObject({ connected: true });
-      for (const url of [
-        INSTALLATION_BRIDGE_URL,
-        new URL('en/installation.html', INSTALLATION_SITE).href,
-      ]) {
-        topUrl = url;
-        await expect(
-          service.external(input('status'), {
-            ...owner(),
-            url,
-            frameId: 0,
-            documentId: 'top-document',
-          }),
-        ).rejects.toThrow('SOURCE_DENIED');
-      }
+      ).rejects.toThrow('SOURCE_DENIED');
+      expect(chrome.tabs.create).not.toHaveBeenCalled();
     },
   );
   it('reports ready only for the catalog source and identity', async () => {

@@ -28,8 +28,6 @@ it('falls back only for absent connections and keeps known local selection corru
   const client = createNativeInstallationClient(() => ({
     requestNativeHost,
     supportsPresetInstallation,
-    getStatus: () => ({ connected: false }),
-    hasNativeConnection: () => false,
   }));
   await expect(client.capture()).rejects.toThrow('Invalid preset receipt');
   requestNativeHost.mockRejectedValue(new Error('Native host disconnected'));
@@ -41,21 +39,4 @@ it('falls back only for absent connections and keeps known local selection corru
   expect(await client.capture()).toBeUndefined();
   expect(requestNativeHost).not.toHaveBeenCalled();
   expect(vi.getTimerCount()).toBe(0);
-});
-it('requires a known selection for automatic installation when a native connection exists', async () => {
-  const requestNativeHost = vi.fn(async () => ({ protocol: 1, selection: null }));
-  const supportsPresetInstallation = vi.fn(async () => true);
-  let pendingConnection = true;
-  const client = createNativeInstallationClient(() => ({
-    requestNativeHost,
-    supportsPresetInstallation,
-    getStatus: () => ({ connected: false }),
-    hasNativeConnection: () => pendingConnection,
-  }));
-  await expect(client.capture(true)).resolves.toEqual({ protocol: 1, selection: null });
-  supportsPresetInstallation.mockResolvedValue(false);
-  await expect(client.capture(true)).rejects.toThrow('INSTALLATION_NATIVE_SELECTION_UNAVAILABLE');
-  await expect(client.capture()).resolves.toBeUndefined();
-  pendingConnection = false;
-  await expect(client.capture(true)).resolves.toBeUndefined();
 });

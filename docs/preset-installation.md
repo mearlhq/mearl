@@ -89,9 +89,9 @@ npx @mearl/setup --preset https://example.com/presets/team.json
 
 部署用的 `installation.json` 可在 `guide` 之外声明 `presets`，每项只有展示名称、HTTPS preset 清单地址和所需 Chrome 站点范围。范围允许明确的 HTTP、HTTPS 与 `*` 协议以及子域通配，不能声明全站权限；清单来源自身也计入最多 64 项范围。目录限制 32 套配置、64 KiB，不包含安装脚本、CLI 参数或任意命令。
 
-公共 `bridge.html` 嵌在已配置引导页的直接子 frame，`connect.html` 提供同站独立连接页。手动安装时，引导只能选择已登记的 preset ID 和主题，真实按钮在公共 frame 中。扩展核对实际 frame、活动 document 和引导页路径，并自行从固定公共地址读取同一目录。
+公共 `bridge.html` 嵌在已配置引导页的直接子 frame。手动安装时，引导只能选择已登记的 preset ID 和主题，真实按钮在公共 frame 中。扩展核对实际 frame、活动 document 和引导页路径，并自行从固定公共地址读取同一目录。
 
-已配置的引导页可以通过安装桥为当前选择发起首次安装。扩展检查浏览器和已连接本机宿主的选择记录，两者均无 preset 时才打开安装页。已有配置时，引导页保留手动更新和切换入口。
+引导页打开时检查所选 preset 的状态。点击启用或更新能力后，扩展打开安装页，用户在其中完成所需授权。
 
 扩展打开自己的安装页。已有权限时直接准备，否则在该页按钮的前台点击中请求 Chrome 站点授权，并记录原有 Agent 域授权。Chrome 保留目录的协议范围，Agent 沿用宿主的域名合同。资源下载还核对 HTTPS、目录协议/主机范围及当前 Chrome 权限，沿用宿主 Cookie 注入，禁止重定向并限制整批 120 秒；资源、图、摘要、App、UI 和运行时配置验证后才替换当前选择，提交前重查目录及授权。
 

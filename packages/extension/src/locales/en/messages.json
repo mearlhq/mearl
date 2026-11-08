@@ -3275,9 +3275,6 @@
   "presetInstallRefresh": {
     "message": "Check again"
   },
-  "presetInstallGuide": {
-    "message": "Open installation guide"
-  },
   "presetInstallSessionExpired": {
     "message": "Installation details expired or changed. Return to the guide and try again."
   },

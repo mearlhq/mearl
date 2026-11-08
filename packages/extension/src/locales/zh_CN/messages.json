@@ -3271,9 +3271,6 @@
   "presetInstallRefresh": {
     "message": "重新检查"
   },
-  "presetInstallGuide": {
-    "message": "返回安装引导"
-  },
   "presetInstallSessionExpired": {
     "message": "安装信息已过期或更新。请返回安装引导重新启用。"
   },

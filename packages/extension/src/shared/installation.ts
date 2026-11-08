@@ -5,10 +5,9 @@ export const INSTALLATION_ACTION = 'mearlInstallation';
 export const INSTALLATION_VIEW_PATH = 'src/pages/installation/index.html';
 export const INSTALLATION_SITE = new URL(site.url);
 export const INSTALLATION_BRIDGE_URL = new URL('bridge.html', INSTALLATION_SITE).href;
-export const INSTALLATION_CONNECT_URL = new URL('connect.html', INSTALLATION_SITE).href;
-export const INSTALLATION_CONNECT_EN_URL = new URL('en/connect.html', INSTALLATION_SITE).href;
 declare const __MEARL_INSTALLATION_CONFIG_URL__: string;
-export const DIRECT_INSTALLATION_CONFIG_URL = typeof __MEARL_INSTALLATION_CONFIG_URL__ === 'string' ? __MEARL_INSTALLATION_CONFIG_URL__ : '';
+export const DIRECT_INSTALLATION_CONFIG_URL =
+  typeof __MEARL_INSTALLATION_CONFIG_URL__ === 'string' ? __MEARL_INSTALLATION_CONFIG_URL__ : '';
 
 export interface InstallationView {
   session: string;

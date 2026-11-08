@@ -1,15 +1,9 @@
 ---
-import { ArrowUpRight } from "@lucide/astro";
-import { installationBridgeCopy } from '../lib/installation-bridge-copy';
-import type { Locale } from '../lib/site';
-interface Props { embedded?: boolean; locale?: Locale }
-const { embedded = false, locale = 'zh-CN' } = Astro.props;
-const t = installationBridgeCopy[locale];
+import { installationBridgeCopy as t } from '../lib/installation-bridge-copy';
 ---
-<div class:list={['installation-bridge', { embedded }]} data-installation-bridge data-embedded={String(embedded)}>
-  <div class="bridge-heading" hidden data-bridge-heading><label for="preset-choice">{t.choose}</label><select id="preset-choice" data-bridge-choice></select></div>
+<div class="installation-bridge" data-installation-bridge>
   <p class="bridge-label" data-bridge-label>{t.connectingGuide}</p>
-  <div class="bridge-controls"><button type="button" class="button button-primary" disabled data-bridge-install>{t.enable}</button><a class="text-link" hidden data-bridge-fallback target="_blank" rel="noreferrer">{t.openConnect} <ArrowUpRight size={13} aria-hidden="true" /></a></div>
+  <div class="bridge-controls"><button type="button" class="button button-primary" disabled data-bridge-install>{t.enable}</button></div>
   <p class="bridge-status" role="status" aria-live="polite" data-bridge-status></p>
 </div>
 <script>import '../scripts/installation-bridge';</script>
@@ -18,10 +12,6 @@ const t = installationBridgeCopy[locale];
   .installation-bridge p { margin: 0; font-size: 13px; line-height: 1.6; }
   .bridge-label { color: var(--ink); font-weight: 600; }
   .bridge-status { color: var(--muted); }
-  .bridge-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
   .bridge-controls .button { min-height: 32px; padding: 6px 12px; font-size: 13px; }
-  .bridge-controls .text-link { text-decoration: none; }
-  .bridge-heading label { display: block; margin-bottom: 6px; font-size: 13px; color: var(--muted); }
-  .bridge-heading select { width: 100%; min-height: 32px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; }
   .installation-bridge [hidden] { display: none; }
 </style>

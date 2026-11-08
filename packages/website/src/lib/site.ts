@@ -1,16 +1,30 @@
 import extensionPackage from '../../../extension/package.json';
 import installationSite from '@mearl/preset/installation-site.json';
-import { localizedDocFile, localePrefix, referenceDocs, referenceRoute, repositoryUrl } from './reference-docs.mjs';
+import {
+  localizedDocFile,
+  localePrefix,
+  referenceDocs,
+  referenceRoute,
+  repositoryUrl,
+} from './reference-docs.mjs';
 import { siteCopy } from './site-copy';
 
 export type Locale = 'en' | 'zh-CN';
 export const guidePages = [
-  'installation', 'quick-start', 'browsers', 'browser-automation', 'web-debugging', 'authenticated-requests', 'emulation',
-  'ego-lite', 'skill-plugins', 'bb-browser',
+  'installation',
+  'quick-start',
+  'browsers',
+  'browser-automation',
+  'web-debugging',
+  'authenticated-requests',
+  'emulation',
+  'ego-lite',
+  'skill-plugins',
+  'bb-browser',
 ] as const;
 export type Guide = (typeof guidePages)[number];
 export type Reference = keyof typeof referenceDocs;
-export type Page = 'home' | 'extension' | 'installed' | 'connect' | Guide | `reference/${Reference}`;
+export type Page = 'home' | 'extension' | 'installed' | Guide | `reference/${Reference}`;
 
 export { repositoryUrl };
 export const chromeStoreUrl = `https://chromewebstore.google.com/detail/mearl/${installationSite.extensionId}`;

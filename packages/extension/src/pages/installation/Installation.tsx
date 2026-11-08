@@ -3,7 +3,6 @@ import { CheckCircle2, Loader2, ShieldCheck, Copy, RefreshCw } from 'lucide-reac
 import { t } from '../panel/utils/i18n';
 import {
   INSTALLATION_ACTION,
-  INSTALLATION_CONNECT_URL,
   setupPresetCommand,
   type InstallationView,
 } from '../../shared/installation';
@@ -527,14 +526,21 @@ export function Installation() {
                 <RefreshCw className="w-3 h-3" />
                 {t('presetInstallRefresh')}
               </button>
-              <a
-                className="text-xs text-blue-500 hover:underline"
-                href={`${INSTALLATION_CONNECT_URL}#preset=${encodeURIComponent(view?.presetId ?? '')}`}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                type="button"
+                onClick={() => {
+                  void chrome.tabs
+                    .getCurrent()
+                    .then(tab => {
+                      if (tab?.id !== undefined) return chrome.tabs.remove(tab.id);
+                      window.close();
+                    })
+                    .catch(() => window.close());
+                }}
+                className="rounded border border-border bg-bg-secondary px-3 py-1.5 text-xs hover:bg-bg-primary"
               >
-                {t('presetInstallGuide')}
-              </a>
+                {t('close')}
+              </button>
             </div>
           )}
         </div>

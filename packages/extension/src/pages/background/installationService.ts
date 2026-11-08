@@ -30,8 +30,6 @@ import {
   INSTALLATION_ACTION,
   INSTALLATION_SITE,
   INSTALLATION_BRIDGE_URL,
-  INSTALLATION_CONNECT_URL,
-  INSTALLATION_CONNECT_EN_URL,
   INSTALLATION_VIEW_PATH,
   DIRECT_INSTALLATION_CONFIG_URL,
   type InstallationView,
@@ -118,7 +116,7 @@ interface NativeInstallation {
 }
 export interface InstallationDependencies {
   native?: {
-    capture: (requireKnownSelection?: boolean) => Promise<NativeInstallation | undefined>;
+    capture: () => Promise<NativeInstallation | undefined>;
     request: (data: Record<string, unknown>, timeoutMs: number) => Promise<any>;
   };
   configuration?: () => Promise<InstallationConfig>;
@@ -151,8 +149,8 @@ export function createInstallationService(dependencies: InstallationDependencies
     }
   >();
 
-  async function captureNative(session: InstallationSession, requireKnownSelection?: boolean) {
-    const captured = await dependencies.native?.capture(requireKnownSelection);
+  async function captureNative(session: InstallationSession) {
+    const captured = await dependencies.native?.capture();
     if (
       captured &&
       (captured.protocol !== 1 ||
@@ -277,24 +275,15 @@ export function createInstallationService(dependencies: InstallationDependencies
     const frame = await chrome.webNavigation.getFrame({ tabId: sender.tab.id, frameId });
     if (!frame || frame.documentId !== sender.documentId || !samePage(frame.url, sender.url!))
       throw new Error('INSTALLATION_SOURCE_CHANGED');
-    if (frameId === 0) {
-      if (
-        ![INSTALLATION_CONNECT_URL, INSTALLATION_CONNECT_EN_URL].some(url =>
-          samePage(frame.url, url),
-        )
-      )
-        throw new Error('INSTALLATION_SOURCE_DENIED');
-    } else {
-      if (
-        !samePage(frame.url, INSTALLATION_BRIDGE_URL) ||
-        frame.parentFrameId !== 0 ||
-        !config.guide
-      )
-        throw new Error('INSTALLATION_SOURCE_DENIED');
-      const top = await chrome.webNavigation.getFrame({ tabId: sender.tab.id, frameId: 0 });
-      if (!top || !samePage(top.url, config.guide.url))
-        throw new Error('INSTALLATION_PARENT_DENIED');
-    }
+    if (
+      frameId === 0 ||
+      !samePage(frame.url, INSTALLATION_BRIDGE_URL) ||
+      frame.parentFrameId !== 0 ||
+      !config.guide
+    )
+      throw new Error('INSTALLATION_SOURCE_DENIED');
+    const top = await chrome.webNavigation.getFrame({ tabId: sender.tab.id, frameId: 0 });
+    if (!top || !samePage(top.url, config.guide.url)) throw new Error('INSTALLATION_PARENT_DENIED');
     return { tabId: sender.tab.id, frameId, documentId: sender.documentId };
   }
 
@@ -423,21 +412,10 @@ export function createInstallationService(dependencies: InstallationDependencies
     preset: InstallationPreset,
     config: InstallationConfig,
     owner: InstallationSession['owner'],
-    options: { active?: boolean; reuseViewTabId?: number; onlyIfMissing?: boolean } = {},
+    options: { active?: boolean; reuseViewTabId?: number } = {},
   ) {
-    const { active = true, reuseViewTabId, onlyIfMissing } = options;
+    const { active = true, reuseViewTabId } = options;
     const sessions = await availableSessions();
-    if (onlyIfMissing) {
-      const pending = await Promise.all(
-        sessions.map(async ([, value]) => {
-          if (running.has(value.id)) return true;
-          if (value.completed || value.viewTabId === undefined) return false;
-          const tab = await chrome.tabs.get(value.viewTabId).catch(() => undefined);
-          return isInstallationView(tab?.pendingUrl ?? tab?.url, value.id);
-        }),
-      );
-      if (pending.some(Boolean)) return {};
-    }
     const current = sessions.find(
       ([, value]) =>
         (reuseViewTabId === undefined || value.viewTabId === reuseViewTabId) &&
@@ -460,16 +438,9 @@ export function createInstallationService(dependencies: InstallationDependencies
     session.expires = now() + SESSION_LIFETIME;
     if (!running.has(session.id)) {
       session.completed = false;
-      await captureNative(session, onlyIfMissing);
+      await captureNative(session);
       session.selection = await registry().captureInstallationSelection();
     }
-    if (
-      onlyIfMissing &&
-      (session.selection.activeRevision !== null ||
-        session.selection.installationToken !== null ||
-        session.nativeSelection)
-    )
-      return {};
     return showView(session, active, reuseViewTabId);
   }
 
@@ -931,14 +902,12 @@ export function createInstallationService(dependencies: InstallationDependencies
       const input = inputRecord(value, ['action', 'operation', 'presetId']);
       if (
         input.action !== INSTALLATION_ACTION ||
-        !['open', 'openIfMissing', 'status'].includes(String(input.operation)) ||
+        !['open', 'status'].includes(String(input.operation)) ||
         typeof input.presetId !== 'string'
       )
         throw new Error('INVALID_INSTALLATION_REQUEST');
       const config = await configuration();
       const owner = await senderIdentity(sender, config);
-      const onlyIfMissing = input.operation === 'openIfMissing';
-      if (onlyIfMissing && owner.frameId === 0) throw new Error('INSTALLATION_SOURCE_DENIED');
       if (!Object.hasOwn(config.presets ?? {}, input.presetId))
         throw new Error('INSTALLATION_PRESET_UNAVAILABLE');
       const preset = config.presets![input.presetId];
@@ -953,7 +922,7 @@ export function createInstallationService(dependencies: InstallationDependencies
       }
       const next = opening
         .catch(() => {})
-        .then(() => open(input.presetId as string, preset, config, owner, { onlyIfMissing }));
+        .then(() => open(input.presetId as string, preset, config, owner));
       opening = next;
       return next;
     },

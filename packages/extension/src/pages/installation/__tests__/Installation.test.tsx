@@ -50,7 +50,7 @@ it('restarts an expired automatic view and navigates to its fresh session', asyn
   expect(send.mock.calls.map(([message]) => message.operation)).toEqual(['inspect', 'restart']);
   expect(chrome.permissions.request).not.toHaveBeenCalled();
 });
-it('does not restart a lost website confirmation as a different trusted installation', async () => {
+it('lets users retry or close an expired website confirmation without restarting it', async () => {
   vi.stubGlobal('location', {
     href: 'chrome-extension://installed-extension/src/pages/installation/index.html?session=expired&source=website',
     search: '?session=expired&source=website',
@@ -60,6 +60,11 @@ it('does not restart a lost website confirmation as a different trusted installa
   await screen.findByRole('alert');
   fireEvent.click(screen.getByText('presetInstallRefresh'));
   await waitFor(() => expect(send).toHaveBeenCalledTimes(2));
+  const getCurrent = vi.fn(async () => ({ id: 42 }));
+  const remove = vi.fn(async () => {});
+  vi.stubGlobal('chrome', { ...chrome, tabs: { getCurrent, remove } });
+  fireEvent.click(screen.getByRole('button', { name: 'close' }));
+  await waitFor(() => expect(remove).toHaveBeenCalledWith(42));
   expect(send.mock.calls.map(([message]) => message.operation)).toEqual(['inspect', 'inspect']);
 });
 it('applies an already authorized selection automatically and refreshes a completed view without installing again', async () => {

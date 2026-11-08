@@ -1,8 +1,6 @@
 import type { InstallationDependencies } from './installationService';
 
 interface Bridge {
-  getStatus(): { connected: boolean };
-  hasNativeConnection(): boolean;
   supportsPresetInstallation(timeoutMs: number): Promise<boolean>;
   requestNativeHost(action: string, data: Record<string, unknown>, timeoutMs: number): Promise<any>;
 }
@@ -12,9 +10,8 @@ export function createNativeInstallationClient(
   bridge: () => Bridge,
 ): NonNullable<InstallationDependencies['native']> {
   return {
-    capture: async (requireKnownSelection = false) => {
+    capture: async () => {
       const target = bridge();
-      const wasConnected = requireKnownSelection && target.getStatus().connected;
       const deadline = Date.now() + 1500;
       let timer: ReturnType<typeof setTimeout> | undefined;
       let captured: Awaited<ReturnType<NonNullable<InstallationDependencies['native']>['capture']>>;
@@ -43,8 +40,6 @@ export function createNativeInstallationClient(
       } finally {
         clearTimeout(timer);
       }
-      if (requireKnownSelection && !captured && (wasConnected || target.hasNativeConnection()))
-        throw new Error('INSTALLATION_NATIVE_SELECTION_UNAVAILABLE');
       return captured;
     },
     request: (data, timeoutMs) =>
