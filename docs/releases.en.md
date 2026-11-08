@@ -20,6 +20,10 @@ Publishing uses npm's trusted `publish.yml` OIDC identity. Validated tarballs ar
 
 Manually select `stable` on `main`. First prepare, review, and commit consistent version files, `changelogs/v<version>.md`, and `changelogs/v<version>.en.md`. The workflow reads that stable version and uses the Chinese notes as the GitHub Release body, with a link to the English notes. npm uses `latest`.
 
+After npm publishing and GitHub Release creation, **Submit Chrome Web Store review** submits the same verified extension ZIP. The store publishes it automatically after approval. This job runs only for manual `stable` releases from `main`.
+
+Restrict the `chrome-webstore` GitHub environment to deployments from `main`. Set the publisher ID as the environment variable `CHROME_WEBSTORE_PUBLISHER_ID` and the authorized [Chrome Web Store service account](https://developer.chrome.com/docs/webstore/service-accounts) JSON as the environment secret `CHROME_WEBSTORE_SERVICE_ACCOUNT_JSON`. If submission fails, check the upload and review status in the Developer Dashboard. If the same version is already uploaded as a draft, submit it from the dashboard. Rerunning a failed job uses the original artifact.
+
 Repository visibility determines access to GitHub extension attachments. Development validation can load local `packages/extension/dist_chrome`; release validation uses the extracted matching prerelease ZIP.
 
 ## Windows release smoke checks

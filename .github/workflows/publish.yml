@@ -7,9 +7,11 @@ on:
     paths:
       - .github/workflows/publish.yml
       - scripts/ci-release.mjs
+      - scripts/chrome-webstore.mjs
       - scripts/publish.mjs
       - scripts/bump-version.mjs
       - scripts/__tests__/ci-release.test.mjs
+      - scripts/__tests__/chrome-webstore.test.mjs
       - scripts/__tests__/publish.test.mjs
       - scripts/__tests__/bump-version.test.mjs
   workflow_dispatch:
@@ -154,3 +156,32 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/ci-release.mjs github --channel "$RELEASE_CHANNEL" --artifacts "$RUNNER_TEMP/mearl-release-artifacts"
+
+  chrome-webstore:
+    name: Submit Chrome Web Store review
+    needs: [build, publish]
+    if: github.repository == 'mearlhq/mearl' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.channel == 'stable'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: chrome-webstore
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: mearl-${{ needs.build.outputs.version }}
+          path: ${{ runner.temp }}/mearl-release-artifacts
+      - name: Submit the verified extension ZIP
+        env:
+          CHROME_WEBSTORE_PUBLISHER_ID: ${{ vars.CHROME_WEBSTORE_PUBLISHER_ID }}
+          CHROME_WEBSTORE_SERVICE_ACCOUNT_JSON: ${{ secrets.CHROME_WEBSTORE_SERVICE_ACCOUNT_JSON }}
+        run: node scripts/chrome-webstore.mjs "$RUNNER_TEMP/mearl-release-artifacts"

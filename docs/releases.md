@@ -20,6 +20,10 @@ Beta 是迭代制品。Action 查询所有公开包的 npm 版本，在源码目
 
 正式版在 `main` 手动选择 `stable`。先准备、审核并提交一致的版本文件，以及 `changelogs/v<version>.md` 和 `changelogs/v<version>.en.md`。工作流读取正式版本，并将中文版作为 GitHub Release 正文；正文链接到英文版。npm 使用 `latest` 标签。
 
+npm 发布和 GitHub Release 完成后，**Submit Chrome Web Store review** 用同一份已校验的扩展 ZIP 提审。审核通过后商店自动上架。只有从 `main` 手动触发的 `stable` 运行会执行这一步。
+
+在 GitHub 的 `chrome-webstore` Environment 中限定部署分支为 `main`，将发布者 ID 配为变量 `CHROME_WEBSTORE_PUBLISHER_ID`，将获授权的 [Chrome Web Store 服务账号](https://developer.chrome.com/docs/webstore/service-accounts) JSON 配为 secret `CHROME_WEBSTORE_SERVICE_ACCOUNT_JSON`。提审失败后先到开发者后台确认上传和审核状态。若同版本已上传为草稿，可直接在后台提交审核。重跑失败的 job 会沿用原制品。
+
 GitHub 扩展附件的下载权限由仓库可见性决定。开发验证可加载本地 `packages/extension/dist_chrome`；发行验证使用同版预发布 ZIP 解压后的目录。
 
 ## Windows 发行包回查
