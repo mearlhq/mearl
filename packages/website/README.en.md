@@ -35,7 +35,9 @@ Set `MEARL_INSTALLATION_CONFIG_FILE` to an absolute JSON file path when building
 
 The guide and npm registry must use HTTPS origins distinct from the public website. The registry is a directory URL without a query or fragment; it need not share the guide origin. The site redirects only to the configured guide URL after a successful npm ping; URL parameters and ping responses cannot supply a destination, command or plugin source.
 
-The `Deploy installation website` GitHub Actions workflow is **manual only**. It reads the optional repository secret `MEARL_INSTALLATION_CONFIG`, validates it during the website build and uploads the configured output to GitHub Pages. An unset secret produces the default configuration. Set Pages to use GitHub Actions before explicitly running this workflow. No website is published by a normal push or pull request. Deployment configuration becomes readable in the deployed `installation.json`; it must not contain credentials or confidential data.
+Set the Pages deployment source to GitHub Actions. The `Deploy installation website` workflow runs automatically when a push to `main` changes the website code, build dependencies, reference documents rendered on the site, or deployment configuration. Other pushes skip the website workflow. You can also run it manually after updating the repository secret.
+
+The workflow reads the optional repository secret `MEARL_INSTALLATION_CONFIG`, validates it during the website build, and uploads the configured output to GitHub Pages. An unset secret produces the default configuration. Deployment configuration becomes readable in the deployed `installation.json`. Keep credentials and confidential data out of it.
 
 ## Environment detection
 

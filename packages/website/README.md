@@ -35,7 +35,9 @@ pnpm build:website
 
 引导和 npm registry 必须使用与公共网站不同的 HTTPS origin。registry 为不含查询参数和片段的目录 URL，无需与引导同源。只有 npm ping 成功后才重定向到配置的引导 URL；URL 参数和 ping 响应不能提供目标地址、命令或插件来源。
 
-GitHub Actions 的 `Deploy installation website` 工作流**仅手动触发**。它读取可选仓库密钥 `MEARL_INSTALLATION_CONFIG`，在构建时校验，再将配置后的产物上传至 GitHub Pages。未设置密钥时使用默认配置。显式运行前需将 Pages 设为使用 GitHub Actions。普通 push 或 pull request 不发布网站。部署配置会在发布的 `installation.json` 中公开，不得包含凭据或机密数据。
+将 Pages 的部署来源设为 GitHub Actions。`Deploy installation website` 工作流在 `main` 收到涉及官网代码、构建依赖、站内参考文档或部署配置的推送时自动运行。其他推送跳过官网工作流。更新仓库密钥后也可以手动运行。
+
+工作流读取可选仓库密钥 `MEARL_INSTALLATION_CONFIG`，在构建时校验，再将配置后的产物上传至 GitHub Pages。未设置密钥时使用默认配置。部署配置会在发布的 `installation.json` 中公开，不得包含凭据或机密数据。
 
 ## 环境检测
 

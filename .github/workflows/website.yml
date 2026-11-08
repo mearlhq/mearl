@@ -1,6 +1,26 @@
 name: Deploy installation website
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/website.yml'
+      - 'packages/website/**'
+      - 'packages/preset/**'
+      - 'packages/extension/package.json'
+      - 'packages/extension/README*.md'
+      - 'packages/client/README*.md'
+      - 'packages/mcp-server/README*.md'
+      - 'packages/provider/README*.md'
+      - 'packages/setup/README*.md'
+      - 'skills/README*.md'
+      - 'docs/capability-model*.md'
+      - '.npmrc'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig.base.json'
+      - 'vitest.shared.ts'
   workflow_dispatch:
 
 permissions:

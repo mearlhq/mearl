@@ -43,7 +43,7 @@ Do not run separate formatting commands unless requested. Respect configured Git
 
 Publishing packages, changing release versions, changing repository visibility and deploying websites require an explicit user request. Do not rewrite history. Preserve pnpm's clean-worktree, publish-branch and remote synchronization checks; do not use `--no-git-checks`.
 
-Release through `.github/workflows/publish.yml`, following `docs/releases.md`. The `beta` and `patch` channels select versions automatically and inject them into an exported build tree. The `stable` channel requires committed version files and release notes. Website deployment uses the separate, manually triggered `.github/workflows/website.yml`.
+Release through `.github/workflows/publish.yml`, following `docs/releases.md`. The `beta` and `patch` channels select versions automatically and inject them into an exported build tree. The `stable` channel requires committed version files and release notes. The separate `.github/workflows/website.yml` deploys on website-related pushes to `main` and also accepts manual runs.
 
 Match validation to the requested scope. Release tasks end with the successful authorized publication and its version and installation or download entry point.
 
