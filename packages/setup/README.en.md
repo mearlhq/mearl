@@ -19,7 +19,8 @@ npx @mearl/setup plugin install <skills add arguments...>
 npx @mearl/setup plugin uninstall <name>
 npx @mearl/setup provider <install|update|uninstall> <package|id>
 npx @mearl/setup profile install <source> [--browser <id-or-name>]
-npx @mearl/setup preset repair [--replace-skill <name> ...]
+npx @mearl/setup preset apply [source]
+npx @mearl/setup preset <update|status|uninstall>
 ```
 
 Browser Providers install and evolve independently. After installation, run `mearl <providerId>` to inspect that version's capabilities,
@@ -52,13 +53,15 @@ The installation host's local plugin catalog determines preset-managed capabilit
 
 New registrations created by Native preset batches are setup-managed and retain that ownership through Agent updates. Existing user registrations in the same directory and custom user aliases retain their ownership. Managed removal encountering user aliases sharing a Skill removes only managed registrations and keeps Skill files.
 
-GUI and CLI share the preset installer and override rules. If a saved installation is incomplete, `preset repair` retries accepted local resources without redownloading the preset or implicitly replacing conflicting sources. Explicit repeated `--replace-skill` authorizes replacing those Skills' sources or same-name plugin registrations for this invocation:
+GUI and CLI share the preset installer and override rules. `preset apply` accepts a URL or local file path. Omitting the source retries from the saved snapshot. `preset update` rereads the current source. Repeat `--replace-skill` during a retry to authorize replacing those Skill sources or same-name plugin registrations for this invocation.
 
 ```bash
-npx @mearl/setup preset repair --replace-skill example-skill --replace-skill another-skill
+npx @mearl/setup preset apply --replace-skill example-skill --replace-skill another-skill
 ```
 
 Already installed Skills receive registration repair only; source conflicts reinstall. Unlisted conflicts still block installation, and undeclared tool names or changed installation identities are rejected. Replacement authorization does not persist into later repairs or automatic updates. Missing browser permissions still require extension authorization. Output uses preset JSON: ready exits `0`, pending components `3`, installation failure `1`, and invalid arguments `2`.
+
+Run `preset uninstall` to remove the local preset and matching selections in connected extensions. Removal clears preset-managed capability packages and setup-managed registrations in the selected plugin catalog. It preserves independent capabilities, Skill files, Providers, and browser permissions. [See what preset removal covers](../../docs/preset-installation.en.md)
 
 Automatic registration defaults to the installation directory name; an entry can declare `name` for a shorter command.
 Reinstallation refreshes same-name bindings. JavaScript entries must default-export `register(app)`; Python entries must export a `register(app)` function. See the

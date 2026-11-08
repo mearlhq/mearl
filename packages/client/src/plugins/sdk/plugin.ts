@@ -15,10 +15,7 @@ import { normalizePluginPageRuntime } from './pluginPageDefinition.js';
 import type { PluginPageRuntime } from '@mearl/browser-core';
 import { loadPluginAppProfiles } from './pluginAppProfiles.js';
 import type { AppProfileContribution } from '@mearl/browser-core';
-export type {
-  AppProfileContribution,
-  AppProfileDefinition,
-} from '@mearl/browser-core';
+export type { AppProfileContribution, AppProfileDefinition } from '@mearl/browser-core';
 export { invokePageEvalWithArgs } from '../../pageEvalArguments.js';
 import { readInstalledSkillMetadata } from '../skillManifest.js';
 import { dirname, extname, resolve } from 'node:path';
@@ -94,6 +91,7 @@ export {
   OFFICIAL_PLUGINS,
   readOfficialPluginCatalog,
   replaceOfficialPluginCatalog,
+  uninstallOfficialPluginCatalog,
   validateOfficialPluginCatalog,
   type PluginCatalogSelection,
   type PluginCatalog,
@@ -583,7 +581,8 @@ export async function loadPlugin(
       if (module.description !== undefined && typeof module.description !== 'string')
         throw new Error('入口的 description 导出必须为字符串');
       description = module.description;
-      if (module.setup !== undefined && typeof module.setup !== 'function') throw new Error('入口的 setup 导出必须为函数');
+      if (module.setup !== undefined && typeof module.setup !== 'function')
+        throw new Error('入口的 setup 导出必须为函数');
       setup = module.setup;
       if (module.defaultCommand !== undefined && typeof module.defaultCommand !== 'string')
         throw new Error('入口的 defaultCommand 导出必须为字符串');
@@ -599,7 +598,12 @@ export async function loadPlugin(
       else if (!appProfiles) throw new Error('入口必须默认导出 register(app) 函数');
     }
     if (commands.size === 0 && !appProfiles) throw new Error('入口未注册任何命令');
-    if (defaultCommand !== undefined && (!commands.has(defaultCommand) || commands.get(defaultCommand)?.toolboxOnly || commands.get(defaultCommand)?.runtimeOnly))
+    if (
+      defaultCommand !== undefined &&
+      (!commands.has(defaultCommand) ||
+        commands.get(defaultCommand)?.toolboxOnly ||
+        commands.get(defaultCommand)?.runtimeOnly)
+    )
       throw new Error('defaultCommand 必须指向公开命令');
     for (const command of Object.keys(taskRecovery?.commands ?? {})) {
       if (
@@ -690,16 +694,23 @@ export async function loadPlugin(
     if (payload !== undefined && Object.keys(namedInput).length > 0) {
       throw new PluginError('PLUGIN_INVALID_INPUT', '插件业务选项与 --payload 调用不能混用');
     }
-    const defaultPayload = defaultCommand && toolboxPage === false && isObject(payload) && !Object.hasOwn(payload, 'command');
+    const defaultPayload =
+      defaultCommand &&
+      toolboxPage === false &&
+      isObject(payload) &&
+      !Object.hasOwn(payload, 'command');
     if (payload !== undefined && !defaultPayload && !isPluginInvocation(payload)) {
       throw new PluginError(
         'PLUGIN_INVALID_INPUT',
         '--payload 必须为 {"command":"...","input":{...}}',
       );
     }
-    const envelope = (defaultPayload ? { command: defaultCommand, input: payload } : payload) as { command: string; input: Record<string, any> } | undefined;
-    const positionalOffset = defaultCommand && !commands.has(positionals[0]) && toolboxPage === false ? 0 : 1;
-    const commandName = envelope?.command ?? (positionalOffset === 0 ? defaultCommand! : positionals[0] ?? '');
+    const envelope = (defaultPayload ? { command: defaultCommand, input: payload } : payload) as
+      { command: string; input: Record<string, any> } | undefined;
+    const positionalOffset =
+      defaultCommand && !commands.has(positionals[0]) && toolboxPage === false ? 0 : 1;
+    const commandName =
+      envelope?.command ?? (positionalOffset === 0 ? defaultCommand! : (positionals[0] ?? ''));
     const hidden = toolboxPage === 'recovery' || toolboxPage === 'migration';
     const selected = find(commandName, hidden ? false : toolboxPage);
     const command = selected.command;
@@ -729,7 +740,9 @@ export async function loadPlugin(
           command.registeredArguments
             .map((argument, index) => [
               argument.name(),
-              argument.variadic ? positionals.slice(index + positionalOffset) : positionals[index + positionalOffset],
+              argument.variadic
+                ? positionals.slice(index + positionalOffset)
+                : positionals[index + positionalOffset],
             ])
             .filter(([, value]) => value !== undefined),
         );
@@ -852,11 +865,16 @@ export async function loadPlugin(
     version: readPluginVersion(entry),
     commandHelp(namespace: string): string {
       return publicCommands()
-        .map(({ command, signature }) => `  ${namespace} ${command.name() === defaultCommand ? signature.slice(defaultCommand.length).trim() : signature}  ${command.description()}`)
+        .map(
+          ({ command, signature }) =>
+            `  ${namespace} ${command.name() === defaultCommand ? signature.slice(defaultCommand.length).trim() : signature}  ${command.description()}`,
+        )
         .join('\n');
     },
     help(namespace: string, name?: string): string {
-      const selected = name ? [find(defaultCommand && !commands.has(name) ? defaultCommand : name)] : publicCommands();
+      const selected = name
+        ? [find(defaultCommand && !commands.has(name) ? defaultCommand : name)]
+        : publicCommands();
       if (!selected.length) {
         const location = toolbox
           ? `请在 Mearl ${toolbox.displayMode === 'popup' ? 'Popup' : '工具箱'} 中打开「${toolbox.title}」使用。`
@@ -867,7 +885,8 @@ export async function loadPlugin(
       return [
         '用法：',
         ...selected.map(
-          ({ command, signature }) => `  ${namespace} ${command.name() === defaultCommand ? signature.slice(defaultCommand.length).trim() : signature}  ${command.description()}`,
+          ({ command, signature }) =>
+            `  ${namespace} ${command.name() === defaultCommand ? signature.slice(defaultCommand.length).trim() : signature}  ${command.description()}`,
         ),
         ...(examples.length
           ? ['', '示例：', ...examples.map(example => `  ${namespace} ${example}`)]

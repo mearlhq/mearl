@@ -32,22 +32,64 @@ it('publishes package-owned operations and keeps catalog configuration fixed to 
   const store = new BrowserBundleStore({ indexedDB: factory, mearlApiVersion: '1.0.0' });
   stores.push(store);
   const files = {
-    'runtime.cjs': new TextEncoder().encode('module.exports = (_, config) => ({ identity: () => config })'),
-    'extension.json': new TextEncoder().encode(JSON.stringify({ schemaVersion: 1, operations: { identity: { hook: 'identity.panel' } }, logins: { accounts: { url: 'https://example.com/login', title: { en: 'Accounts' } } } })),
+    'runtime.cjs': new TextEncoder().encode(
+      'module.exports = (_, config) => ({ identity: () => config })',
+    ),
+    'extension.json': new TextEncoder().encode(
+      JSON.stringify({
+        schemaVersion: 1,
+        operations: { identity: { hook: 'identity.panel' } },
+        logins: { accounts: { url: 'https://example.com/login', title: { en: 'Accounts' } } },
+      }),
+    ),
   };
-  const manifest: BundleManifest = { schemaVersion: 1, id: 'identity', version: '1.0.0', defaults: { tenant: 'first' }, resources: Object.fromEntries(await Promise.all(Object.entries(files).map(async ([name, bytes]) => [name, { sha256: await bundleDigest(bytes), byteLength: bytes.length }]))), contributions: { extension: 'extension.json', browserRuntimes: { extension: { entry: 'runtime.cjs', bindings: { 'identity.panel': 'identity' } } } } };
-  const load = async (url: string) => url.endsWith('bundle.json') ? new TextEncoder().encode(JSON.stringify(manifest)) : files[url.split('/').pop() as keyof typeof files];
+  const manifest: BundleManifest = {
+    schemaVersion: 1,
+    id: 'identity',
+    version: '1.0.0',
+    defaults: { tenant: 'first' },
+    resources: Object.fromEntries(
+      await Promise.all(
+        Object.entries(files).map(async ([name, bytes]) => [
+          name,
+          { sha256: await bundleDigest(bytes), byteLength: bytes.length },
+        ]),
+      ),
+    ),
+    contributions: {
+      extension: 'extension.json',
+      browserRuntimes: {
+        extension: { entry: 'runtime.cjs', bindings: { 'identity.panel': 'identity' } },
+      },
+    },
+  };
+  const load = async (url: string) =>
+    url.endsWith('bundle.json')
+      ? new TextEncoder().encode(JSON.stringify(manifest))
+      : files[url.split('/').pop() as keyof typeof files];
   const registry = createBrowserCapabilityRegistry(store, load);
-  const first = await registry.install({ id: 'identity', source: 'https://example.com/bundle.json', expectedRevision: null });
+  const first = await registry.install({
+    id: 'identity',
+    source: 'https://example.com/bundle.json',
+    expectedRevision: null,
+  });
   const captured = await registry.captureSelection();
   const catalog = browserCapabilityCatalog(captured);
-  expect((await registry.settings(captured)).extension?.operations?.identity).toEqual({ hook: 'identity.panel' });
+  expect((await registry.settings(captured)).extension?.operations?.identity).toEqual({
+    hook: 'identity.panel',
+  });
   const original = await catalog.runtimes();
   expect(original.snapshot.modules.identity.config).toEqual({ tenant: 'first' });
   manifest.defaults = { tenant: 'second' };
-  await registry.install({ id: 'identity', source: 'https://example.com/bundle.json', expectedRevision: first.revision });
+  await registry.install({
+    id: 'identity',
+    source: 'https://example.com/bundle.json',
+    expectedRevision: first.revision,
+  });
   const updated = await registry.captureSelection();
-  expect((await browserCapabilityCatalog(updated).runtimes()).snapshot.modules.identity.config).toEqual({ tenant: 'second' });
+  expect(
+    (await browserCapabilityCatalog(updated).runtimes()).snapshot.modules.identity.config,
+  ).toEqual({ tenant: 'second' });
   expect(await catalog.runtimes()).toBe(original);
   expect(original.snapshot.modules.identity.config).toEqual({ tenant: 'first' });
 });
@@ -193,23 +235,46 @@ describe('browser app profile bundles', () => {
     const profilesSource = 'https://example.com/portable/bundle.json';
     const files = new Map<string, Uint8Array>();
     const profilePaths = ['reader.json', 'writer.json'];
-    const resources = Object.fromEntries(await Promise.all(profilePaths.map(async (path, index) => {
-      const app = index === 0 ? 'reader' : 'writer';
-      const bytes = new TextEncoder().encode(JSON.stringify({
-        ...APP_PROFILES.reader, name: `portable/${app}`, defaultAppId: app,
-      }));
-      files.set(new URL(path, profilesSource).href, bytes);
-      return [path, { sha256: await bundleDigest(bytes), byteLength: bytes.length }];
-    })));
-    files.set(profilesSource, new TextEncoder().encode(JSON.stringify({
-      schemaVersion: 1, id: 'portable', version: '1.0.0', resources, contributions: { appProfiles: profilePaths },
-    })));
-    const registry = createBrowserCapabilityRegistry(f.store, async url => files.get(url) ?? f.load(url));
+    const resources = Object.fromEntries(
+      await Promise.all(
+        profilePaths.map(async (path, index) => {
+          const app = index === 0 ? 'reader' : 'writer';
+          const bytes = new TextEncoder().encode(
+            JSON.stringify({
+              ...APP_PROFILES.reader,
+              name: `portable/${app}`,
+              defaultAppId: app,
+            }),
+          );
+          files.set(new URL(path, profilesSource).href, bytes);
+          return [path, { sha256: await bundleDigest(bytes), byteLength: bytes.length }];
+        }),
+      ),
+    );
+    files.set(
+      profilesSource,
+      new TextEncoder().encode(
+        JSON.stringify({
+          schemaVersion: 1,
+          id: 'portable',
+          version: '1.0.0',
+          resources,
+          contributions: { appProfiles: profilePaths },
+        }),
+      ),
+    );
+    const registry = createBrowserCapabilityRegistry(
+      f.store,
+      async url => files.get(url) ?? f.load(url),
+    );
     await registry.applyPreset({ source: presetSource, expectedRevision: null });
     await expect(registry.get('constructor')).resolves.toBeUndefined();
     const before = await registry.catalog();
     const result = await registry.installProfile(profilesSource);
-    expect(result.profiles.map(profile => profile.id)).toEqual(['portable/reader', 'portable/writer']);
+    expect(result.profiles.map(profile => profile.id)).toEqual([
+      'portable/reader',
+      'portable/writer',
+    ]);
     const after = await registry.catalog();
     expect(after.presetRevision).toBe(before.presetRevision);
     expect(after.profiles.map(profile => profile.id)).toEqual(['reader', 'writer']);
@@ -295,12 +360,51 @@ describe('browser app profile bundles', () => {
     const reopened = new BrowserBundleStore({ mearlApiVersion: '1.0.0', indexedDB: f.factory });
     stores.push(reopened);
     const registry = createBrowserCapabilityRegistry(reopened, f.load);
-    expect(await synchronizeBrowserPreset({ operation: 'status' }, transport, registry)).toEqual(
-      state,
-    );
+    expect(
+      await synchronizeBrowserPreset({ operation: 'status' }, transport, registry),
+    ).toMatchObject({
+      ...state,
+      installationToken: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
     expect((await registry.get('reader'))?.definition.pageRuntime?.sha256).toBe(
       f.definition.pageRuntime!.sha256,
     );
+  });
+
+  it('uninstalls the captured preset and retains code pinned by active documents', async () => {
+    const f = await registryFixture('simulation/reader', true);
+    const prepared = await prepareBrowserPreset(presetSource, {
+      mearlApiVersion: '1.0.0',
+      load: f.load,
+    });
+    const transport = await transfer(prepared);
+    await synchronizeBrowserPreset(
+      { operation: 'sync', installationRevision: 'a'.repeat(64) },
+      transport,
+      f.registry,
+    );
+    const sha256 = f.definition.pageRuntime!.sha256;
+    await f.store.pinPageRuntimes({ 'tab:1': sha256 });
+    const status = await synchronizeBrowserPreset({ operation: 'status' }, transport, f.registry);
+    const uninstall = {
+      operation: 'uninstall' as const,
+      browserRevision: status.browserRevision!,
+      installationToken: status.installationToken!,
+    };
+    await expect(
+      synchronizeBrowserPreset({ ...uninstall, installationToken: null }, transport, f.registry),
+    ).rejects.toMatchObject({ code: 'BUNDLE_CONFLICT' });
+    expect(await synchronizeBrowserPreset(uninstall, transport, f.registry)).toMatchObject({
+      accepted: true,
+      browserRevision: null,
+      installationRevision: null,
+    });
+    expect((await f.store.list()).bundles).toEqual([]);
+    expect(await f.store.pageRuntimeSource(sha256)).toContain('module.exports.install');
+    await f.store.pinPageRuntimes({ 'tab:1': null });
+    await expect(f.store.pageRuntimeSource(sha256)).rejects.toMatchObject({
+      code: 'BUNDLE_INTEGRITY',
+    });
   });
 
   it('repairs corrupt installation association while ignoring unrelated independent package errors', async () => {
@@ -320,7 +424,9 @@ describe('browser app profile bundles', () => {
     });
     expect((await f.registry.installationStatus()).ready).toBe(false);
     const broken = await f.store.list();
-    await expect(f.registry.applyPreset({ source: presetSource, expectedRevision: broken.activeRevision })).rejects.toThrow('NATIVE_SYNC_REQUIRED');
+    await expect(
+      f.registry.applyPreset({ source: presetSource, expectedRevision: broken.activeRevision }),
+    ).rejects.toThrow('NATIVE_SYNC_REQUIRED');
     expect((await f.store.list()).installationToken).toBe(broken.installationToken);
     expect((await f.store.list()).installationError).toBe(broken.installationError);
     expect(
@@ -473,10 +579,16 @@ describe('browser app profile bundles', () => {
   it('checks all UI contributions on install but reads request UI independently of other views', async () => {
     const { registry, manifest, store, load } = await registryFixture();
     manifest.contributions!.browserViews = { requestCases: 'reader.json' };
-    await expect(registry.install({ id: 'simulation', source, expectedRevision: null })).rejects.toThrow();
+    await expect(
+      registry.install({ id: 'simulation', source, expectedRevision: null }),
+    ).rejects.toThrow();
     expect(await store.get('simulation')).toBeUndefined();
     // A persisted package can remain byte-valid while a contribution fails host validation.
-    const bundle = await prepareBundle(source, { load, expectedId: 'simulation', mearlApiVersion: '1.0.0' });
+    const bundle = await prepareBundle(source, {
+      load,
+      expectedId: 'simulation',
+      mearlApiVersion: '1.0.0',
+    });
     await store.install(bundle, null);
     await expect(registry.requestUi()).resolves.toBeUndefined();
     await expect(registry.view('requestCases')).rejects.toThrow();
@@ -641,38 +753,40 @@ describe('browser bundle service boundary', () => {
   });
 });
 
-it.each(['accountsEnabled', 'requestCasesEnabled', 'requestImportEnabled', 'trackingMetadataEnabled'])(
-  'rejects request UI setting %s before capability execution or persistence',
-  async key => {
-    const f = await registryFixture('simulation/reader', true);
-    const bytes = new TextEncoder().encode(
-      JSON.stringify({
-        ...legacyBrowserRequestUi,
-        setting: { ...legacyBrowserRequestUi.setting, key },
-      }),
-    );
-    f.manifest.resources['ui.json'] = {
-      sha256: await bundleDigest(bytes),
-      byteLength: bytes.length,
-    };
-    f.manifest.contributions!.requestUi = 'ui.json';
-    f.manifest.contributions!.browserRuntimes = {
-      extension: {
-        entry: 'runtime.cjs',
-        bindings: {
-          [legacyBrowserRequestUi.details.hook]: 'details',
-          ...(legacyBrowserRequestUi.save ? { [legacyBrowserRequestUi.save.hook]: 'save' } : {}),
-        },
+it.each([
+  'accountsEnabled',
+  'requestCasesEnabled',
+  'requestImportEnabled',
+  'trackingMetadataEnabled',
+])('rejects request UI setting %s before capability execution or persistence', async key => {
+  const f = await registryFixture('simulation/reader', true);
+  const bytes = new TextEncoder().encode(
+    JSON.stringify({
+      ...legacyBrowserRequestUi,
+      setting: { ...legacyBrowserRequestUi.setting, key },
+    }),
+  );
+  f.manifest.resources['ui.json'] = {
+    sha256: await bundleDigest(bytes),
+    byteLength: bytes.length,
+  };
+  f.manifest.contributions!.requestUi = 'ui.json';
+  f.manifest.contributions!.browserRuntimes = {
+    extension: {
+      entry: 'runtime.cjs',
+      bindings: {
+        [legacyBrowserRequestUi.details.hook]: 'details',
+        ...(legacyBrowserRequestUi.save ? { [legacyBrowserRequestUi.save.hook]: 'save' } : {}),
       },
-    };
-    const load = f.load.getMockImplementation()!;
-    f.load.mockImplementation(async url => (url.endsWith('/ui.json') ? bytes : load(url)));
-    await expect(
-      f.registry.install({ id: 'simulation', source, expectedRevision: null }),
-    ).rejects.toThrow('another service');
-    expect((await f.store.list()).bundles).toHaveLength(0);
-  },
-);
+    },
+  };
+  const load = f.load.getMockImplementation()!;
+  f.load.mockImplementation(async url => (url.endsWith('/ui.json') ? bytes : load(url)));
+  await expect(
+    f.registry.install({ id: 'simulation', source, expectedRevision: null }),
+  ).rejects.toThrow('another service');
+  expect((await f.store.list()).bundles).toHaveLength(0);
+});
 
 it('applies inherited simulation defaults and installer overrides from the accepted browser installation, including offline reopen', async () => {
   const f = await registryFixture('simulation/reader', true);
@@ -726,31 +840,72 @@ it('retains Native association and user overrides on an unchanged browser update
   const f = await registryFixture('simulation/reader', true);
   Object.assign(f.preset.appProfiles, { shop: 'simulation/reader' });
   Object.assign(f.preset, { defaults: { simulation: { app: 'reader' } } });
-  const prepared = await prepareBrowserPreset(presetSource, { mearlApiVersion: '1.0.0', load: f.load });
+  const prepared = await prepareBrowserPreset(presetSource, {
+    mearlApiVersion: '1.0.0',
+    load: f.load,
+  });
   const overrides = { simulation: { app: 'shop' } };
-  await synchronizeBrowserPreset({ operation: 'sync', installationRevision: 'a'.repeat(64) }, await transfer(prepared, 'a'.repeat(64), overrides), f.registry);
+  await synchronizeBrowserPreset(
+    { operation: 'sync', installationRevision: 'a'.repeat(64) },
+    await transfer(prepared, 'a'.repeat(64), overrides),
+    f.registry,
+  );
   const previous = await f.registry.captureInstallationSelection();
-  await f.registry.applyPreset({ source: presetSource, expectedRevision: previous.activeRevision, expectedSelection: previous });
-  expect((await f.store.list()).installation).toEqual({ revision: 'a'.repeat(64), browserRevision: prepared.snapshot.revision, overrides });
+  await f.registry.applyPreset({
+    source: presetSource,
+    expectedRevision: previous.activeRevision,
+    expectedSelection: previous,
+  });
+  expect((await f.store.list()).installation).toEqual({
+    revision: 'a'.repeat(64),
+    browserRevision: prepared.snapshot.revision,
+    overrides,
+  });
   expect(await f.registry.settings()).toMatchObject({ simulation: { app: 'shop' } });
   const accepted = await f.store.list();
   f.preset.version = '2.0.0';
-  await expect(f.registry.applyPreset({ source: presetSource, expectedRevision: accepted.activeRevision })).rejects.toThrow('NATIVE_SYNC_REQUIRED');
+  await expect(
+    f.registry.applyPreset({ source: presetSource, expectedRevision: accepted.activeRevision }),
+  ).rejects.toThrow('NATIVE_SYNC_REQUIRED');
   expect((await f.store.list()).installation).toEqual(accepted.installation);
   expect((await f.store.list()).activeRevision).toBe(accepted.activeRevision);
 });
 it('rejects an installation selection whose association changed before or during preparation', async () => {
   const f = await registryFixture('simulation/reader', true);
-  const prepared = await prepareBrowserPreset(presetSource, { mearlApiVersion: '1.0.0', load: f.load });
+  const prepared = await prepareBrowserPreset(presetSource, {
+    mearlApiVersion: '1.0.0',
+    load: f.load,
+  });
   const previous = await f.registry.captureInstallationSelection();
-  await synchronizeBrowserPreset({ operation: 'sync', installationRevision: 'a'.repeat(64) }, await transfer(prepared), f.registry);
+  await synchronizeBrowserPreset(
+    { operation: 'sync', installationRevision: 'a'.repeat(64) },
+    await transfer(prepared),
+    f.registry,
+  );
   const cacheScope = (await f.registry.settings()).cacheScope;
   expect((await f.registry.settings()).cacheScope).toBe(cacheScope);
-  await expect(f.registry.applyPreset({ source: presetSource, expectedRevision: previous.activeRevision, expectedSelection: previous })).rejects.toThrow('changed');
+  await expect(
+    f.registry.applyPreset({
+      source: presetSource,
+      expectedRevision: previous.activeRevision,
+      expectedSelection: previous,
+    }),
+  ).rejects.toThrow('changed');
   const current = await f.registry.captureInstallationSelection();
-  await expect(f.registry.applyPreset({ source: presetSource, expectedRevision: current.activeRevision, expectedSelection: current, confirm: async () => {
-    await synchronizeBrowserPreset({ operation: 'sync', installationRevision: 'b'.repeat(64) }, await transfer(prepared, 'b'.repeat(64)), f.registry);
-  } })).rejects.toThrow('changed');
+  await expect(
+    f.registry.applyPreset({
+      source: presetSource,
+      expectedRevision: current.activeRevision,
+      expectedSelection: current,
+      confirm: async () => {
+        await synchronizeBrowserPreset(
+          { operation: 'sync', installationRevision: 'b'.repeat(64) },
+          await transfer(prepared, 'b'.repeat(64)),
+          f.registry,
+        );
+      },
+    }),
+  ).rejects.toThrow('changed');
   expect((await f.store.list()).installation?.revision).toBe('b'.repeat(64));
   expect((await f.registry.settings()).cacheScope).not.toBe(cacheScope);
 });
@@ -803,57 +958,140 @@ it('keeps unknown settings pending while accepting the supported browser default
   expect((await f.registry.settings()).simulation.app).toBe('reader');
 });
 
-it.each([{ services: { exampleEnabled: false } }])('keeps independent Node-only state and applies core browser defaults without extra packages %j', async defaults => {
-  const f = await registryFixture(); await f.registry.applyPreset({ source: presetSource, expectedRevision: null });
-  const before = await f.store.list(); const original = f.load.getMockImplementation()!;
-  const nodeOnly = 'https://example.com/presets/node-only.json'; const coreDefaults = 'https://example.com/presets/core-defaults.json';
-  f.load.mockImplementation(async url => url === nodeOnly ? new TextEncoder().encode(JSON.stringify({ schemaVersion: 1, id: 'node-only', version: '1.0.0', packages: { 'example-device': { source: '../example-device.json', targets: ['node'] } } })) : url === coreDefaults ? new TextEncoder().encode(JSON.stringify({ schemaVersion: 1, id: 'core-defaults', version: '1.0.0', defaults })) : original(url));
-  expect(await f.registry.applyPreset({ source: nodeOnly, expectedRevision: before.activeRevision, keepIndependentBrowser: true })).toMatchObject({ browserRequired: false, pending: [{ kind: 'packages', id: 'example-device', runtime: 'node' }] });
-  expect((await f.store.list()).activeRevision).toBe(before.activeRevision);
-  expect((await f.store.list()).revisions).toEqual(before.revisions);
-  await f.registry.applyPreset({ source: coreDefaults, expectedRevision: before.activeRevision, keepIndependentBrowser: true });
-  expect((await f.store.list()).activation?.snapshot.source).toBe(coreDefaults);
-  expect(await f.registry.settings()).toMatchObject({ ...defaults, pending: [] });
-});
+it.each([{ services: { exampleEnabled: false } }])(
+  'keeps independent Node-only state and applies core browser defaults without extra packages %j',
+  async defaults => {
+    const f = await registryFixture();
+    await f.registry.applyPreset({ source: presetSource, expectedRevision: null });
+    const before = await f.store.list();
+    const original = f.load.getMockImplementation()!;
+    const nodeOnly = 'https://example.com/presets/node-only.json';
+    const coreDefaults = 'https://example.com/presets/core-defaults.json';
+    f.load.mockImplementation(async url =>
+      url === nodeOnly
+        ? new TextEncoder().encode(
+            JSON.stringify({
+              schemaVersion: 1,
+              id: 'node-only',
+              version: '1.0.0',
+              packages: {
+                'example-device': { source: '../example-device.json', targets: ['node'] },
+              },
+            }),
+          )
+        : url === coreDefaults
+          ? new TextEncoder().encode(
+              JSON.stringify({ schemaVersion: 1, id: 'core-defaults', version: '1.0.0', defaults }),
+            )
+          : original(url),
+    );
+    expect(
+      await f.registry.applyPreset({
+        source: nodeOnly,
+        expectedRevision: before.activeRevision,
+        keepIndependentBrowser: true,
+      }),
+    ).toMatchObject({
+      browserRequired: false,
+      pending: [{ kind: 'packages', id: 'example-device', runtime: 'node' }],
+    });
+    expect((await f.store.list()).activeRevision).toBe(before.activeRevision);
+    expect((await f.store.list()).revisions).toEqual(before.revisions);
+    await f.registry.applyPreset({
+      source: coreDefaults,
+      expectedRevision: before.activeRevision,
+      keepIndependentBrowser: true,
+    });
+    expect((await f.store.list()).activation?.snapshot.source).toBe(coreDefaults);
+    expect(await f.registry.settings()).toMatchObject({ ...defaults, pending: [] });
+  },
+);
 
 it('captures only the browser selection associated with the accepted Native revision', async () => {
   const f = await registryFixture('simulation/reader', true);
-  const prepared = await prepareBrowserPreset(presetSource, { mearlApiVersion: '1.0.0', load: f.load });
-  const accepted = 'a'.repeat(64), replacement = 'b'.repeat(64);
-  await synchronizeBrowserPreset({ operation: 'sync', installationRevision: accepted }, await transfer(prepared, accepted), f.registry);
+  const prepared = await prepareBrowserPreset(presetSource, {
+    mearlApiVersion: '1.0.0',
+    load: f.load,
+  });
+  const accepted = 'a'.repeat(64),
+    replacement = 'b'.repeat(64);
+  await synchronizeBrowserPreset(
+    { operation: 'sync', installationRevision: accepted },
+    await transfer(prepared, accepted),
+    f.registry,
+  );
   const selection = await f.registry.captureInstallationSelection(accepted);
   expect(selection.installationToken).toBeTruthy();
-  await synchronizeBrowserPreset({ operation: 'sync', installationRevision: replacement }, await transfer(prepared, replacement), f.registry);
-  await expect(f.registry.captureInstallationSelection(accepted)).rejects.toThrow('INSTALLATION_SELECTION_CHANGED');
+  await synchronizeBrowserPreset(
+    { operation: 'sync', installationRevision: replacement },
+    await transfer(prepared, replacement),
+    f.registry,
+  );
+  await expect(f.registry.captureInstallationSelection(accepted)).rejects.toThrow(
+    'INSTALLATION_SELECTION_CHANGED',
+  );
   expect(await f.registry.captureInstallationSelection(replacement)).not.toEqual(selection);
 });
-
 
 it('reports missing preset authorization without disabling installed browser capabilities', async () => {
   const f = await registryFixture('simulation/reader', true);
   Object.assign(f.preset.appProfiles, { shop: 'simulation/reader' });
   Object.assign(f.preset, { permissions: { origins: ['https://accounts.example.test/*'] } });
-  const prepared = await prepareBrowserPreset(presetSource, { mearlApiVersion: '1.0.0', load: f.load });
+  const prepared = await prepareBrowserPreset(presetSource, {
+    mearlApiVersion: '1.0.0',
+    load: f.load,
+  });
   const transport = await transfer(prepared);
   const stored: Record<string, unknown> = { proxyCookieAllowedOrigins: [] };
-  chrome.storage = { ...chrome.storage, sync: { get: vi.fn((keys, callback: any) => callback(Object.fromEntries((keys as string[]).map(key => [key, stored[key]])))) } } as any;
+  chrome.storage = {
+    ...chrome.storage,
+    sync: {
+      get: vi.fn((keys, callback: any) =>
+        callback(Object.fromEntries((keys as string[]).map(key => [key, stored[key]]))),
+      ),
+    },
+  } as any;
   chrome.permissions = { ...chrome.permissions, contains: vi.fn(async () => true) } as any;
-  expect(await synchronizeBrowserPreset({ operation: 'sync', installationRevision: 'a'.repeat(64) }, transport, f.registry)).toMatchObject({ browserReady: true, ready: false, settingsReady: false, permissionPending: ['https://accounts.example.test/*'] });
+  expect(
+    await synchronizeBrowserPreset(
+      { operation: 'sync', installationRevision: 'a'.repeat(64) },
+      transport,
+      f.registry,
+    ),
+  ).toMatchObject({
+    browserReady: true,
+    ready: false,
+    settingsReady: false,
+    permissionPending: ['https://accounts.example.test/*'],
+  });
   stored.proxyCookieAllowedOrigins = ['*://accounts.example.test/*'];
-  expect(await f.registry.installationStatus()).toMatchObject({ ready: true, settingsReady: true, permissionPending: [] });
+  expect(await f.registry.installationStatus()).toMatchObject({
+    ready: true,
+    settingsReady: true,
+    permissionPending: [],
+  });
   chrome.permissions.contains = vi.fn(async () => false);
-  expect(await f.registry.installationStatus()).toMatchObject({ ready: false, permissionPending: ['https://accounts.example.test/*'] });
+  expect(await f.registry.installationStatus()).toMatchObject({
+    ready: false,
+    permissionPending: ['https://accounts.example.test/*'],
+  });
 });
 
 it('validates browser contributions before cross-host activation without changing installed state', async () => {
   const f = await registryFixture();
   await f.registry.applyPreset({ source: presetSource, expectedRevision: null });
   const before = await f.registry.captureInstallationSelection();
-  const prepared = await prepareBrowserPreset(presetSource, { load: f.load, mearlApiVersion: '1.0.0' });
+  const prepared = await prepareBrowserPreset(presetSource, {
+    load: f.load,
+    mearlApiVersion: '1.0.0',
+  });
   await f.registry.validatePreparedPreset(prepared);
   expect(await f.registry.captureInstallationSelection()).toEqual(before);
   f.preset.appProfiles.reader = 'simulation/missing';
-  const invalid = await prepareBrowserPreset(presetSource, { load: f.load, mearlApiVersion: '1.0.0' });
+  const invalid = await prepareBrowserPreset(presetSource, {
+    load: f.load,
+    mearlApiVersion: '1.0.0',
+  });
   await expect(f.registry.validatePreparedPreset(invalid)).rejects.toThrow('not provided');
   expect(await f.registry.captureInstallationSelection()).toEqual(before);
 });

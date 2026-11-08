@@ -65,22 +65,54 @@ it('keeps unsupported settings pending instead of reporting them as applied', ()
       {},
       available,
     ),
-  ).toEqual({ simulation: { app: 'reader' }, pending: ['extension.unknown', 'simulation.timezone'] });
+  ).toEqual({
+    simulation: { app: 'reader' },
+    pending: ['extension.unknown', 'simulation.timezone'],
+  });
+});
+
+it('keeps local setup management out of browser readiness', () => {
+  const management = {
+    setup: {
+      package: '@example/setup',
+      version: 'latest',
+      registry: 'https://registry.example.test/',
+      runtime: '>=3.0.0 <4',
+    },
+  };
+  expect(resolveBrowserPresetSettings({ management }, {}, available)).toEqual({
+    simulation: {},
+    pending: [],
+  });
 });
 
 it('merges service defaults and installer overrides without writing user preferences', () => {
   const defaults = { services: { reportsEnabled: true, accountsEnabled: true } };
   const overrides = { services: { reportsEnabled: false } };
   expect(resolveBrowserPresetSettings(defaults, overrides, available)).toMatchObject({
-    services: { reportsEnabled: false, accountsEnabled: true }, pending: [],
+    services: { reportsEnabled: false, accountsEnabled: true },
+    pending: [],
   });
   expect(defaults.services.reportsEnabled).toBe(true);
 });
-it.each([null, [], { reportsEnabled: 'yes' }, { agentEnabled: 1 }, { invalid: true }, { 'invalid-settingEnabled': true }])('rejects malformed service defaults %#', services => {
-  expect(() => resolveBrowserPresetSettings({ services } as unknown as JsonObject, {}, available)).toThrow('BUNDLE_INVALID');
+it.each([
+  null,
+  [],
+  { reportsEnabled: 'yes' },
+  { agentEnabled: 1 },
+  { invalid: true },
+  { 'invalid-settingEnabled': true },
+])('rejects malformed service defaults %#', services => {
+  expect(() =>
+    resolveBrowserPresetSettings({ services } as unknown as JsonObject, {}, available),
+  ).toThrow('BUNDLE_INVALID');
 });
 
 it('accepts an installed short preset alias while rejecting uninstalled targets', () => {
-  expect(resolveBrowserPresetSettings({ simulation: { app: 'maps' } }, {}, new Set(['maps']))).toMatchObject({ simulation: { app: 'maps' }, pending: [] });
-  expect(() => resolveBrowserPresetSettings({ simulation: { app: 'maps' } }, {}, new Set())).toThrow('BUNDLE_INVALID');
+  expect(
+    resolveBrowserPresetSettings({ simulation: { app: 'maps' } }, {}, new Set(['maps'])),
+  ).toMatchObject({ simulation: { app: 'maps' }, pending: [] });
+  expect(() =>
+    resolveBrowserPresetSettings({ simulation: { app: 'maps' } }, {}, new Set()),
+  ).toThrow('BUNDLE_INVALID');
 });

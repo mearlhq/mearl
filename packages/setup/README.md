@@ -19,7 +19,8 @@ npx @mearl/setup plugin install <skills add 参数...>
 npx @mearl/setup plugin uninstall <name>
 npx @mearl/setup provider <install|update|uninstall> <package|id>
 npx @mearl/setup profile install <来源> [--browser <标识或名称>]
-npx @mearl/setup preset repair [--replace-skill <name> ...]
+npx @mearl/setup preset apply [来源]
+npx @mearl/setup preset <update|status|uninstall>
 ```
 
 浏览器 Provider 独立安装和演进。安装后运行 `mearl <providerId>` 查看该版本声明的能力、
@@ -52,13 +53,15 @@ mearl tabs summary
 
 Native preset 批次新建的插件注册使用 setup 托管归属，后续通过 Agent 更新仍保留该归属；同目录已有的用户注册保持原归属，自定义用户别名也会保留。托管卸载遇到用户别名共用同一 Skill 时，只清除托管注册并保留 Skill 文件。
 
-GUI 和 CLI 使用同一套 preset 安装器及覆盖规则。已保存的安装尚未完成时，运行 `preset repair` 从接受的本地资源重试，不重新下载 preset，也不隐式覆盖冲突来源。显式重复指定 `--replace-skill` 即授权本次替换这些 Skill 的来源或同名旧插件注册：
+GUI 和 CLI 使用同一套 preset 安装器及覆盖规则。`preset apply` 接受 URL 或本地文件路径。省略来源时使用已保存的快照重试。`preset update` 重新读取当前来源。重试时可显式重复指定 `--replace-skill`，授权本次替换这些 Skill 的来源或同名旧插件注册。
 
 ```bash
-npx @mearl/setup preset repair --replace-skill example-skill --replace-skill another-skill
+npx @mearl/setup preset apply --replace-skill example-skill --replace-skill another-skill
 ```
 
 已安装的 Skill 仅修复注册；来源冲突项重新安装。未列出的冲突仍会阻止安装，声明外的工具名与变更后的安装身份也会被拒绝。覆盖授权不会保留到后续普通修复或自动更新。缺少浏览器权限时仍需在扩展中授权。输出沿用 preset JSON，已就绪退出 `0`、仍有待完成项退出 `3`、安装失败退出 `1`，无效参数退出 `2`。
+
+运行 `preset uninstall` 清理本机 preset 和匹配的已连接扩展。卸载会移除 preset 托管的能力包和当前目录中由 setup 托管的插件注册，保留独立安装的能力、Skill 文件、Provider 和浏览器权限。[查看卸载范围](../../docs/preset-installation.md)
 
 自动注册默认使用安装目录名；入口可声明 `name` 指定简短命令名。
 重装会刷新同名绑定。JavaScript 入口必须默认导出 `register(app)`，Python 入口必须导出 `register(app)` 函数；完整协议见

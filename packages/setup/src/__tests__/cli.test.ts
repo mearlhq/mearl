@@ -15,7 +15,12 @@ describe('parseSetupArgs', () => {
     const installProfile = vi.fn().mockResolvedValue({ id: 'profiles' });
     const runPreset = vi.fn();
     vi.spyOn(console, 'log').mockImplementation(() => {});
-    expect(await main(['profile', 'install', 'example/profiles@v1.0.0', '--browser', 'local'], false, { installProfile, runPreset })).toBe(0);
+    expect(
+      await main(['profile', 'install', 'example/profiles@v1.0.0', '--browser', 'local'], false, {
+        installProfile,
+        runPreset,
+      }),
+    ).toBe(0);
     expect(installProfile).toHaveBeenCalledWith('example/profiles@v1.0.0', 'local');
     expect(runPreset).not.toHaveBeenCalled();
   });
@@ -23,26 +28,48 @@ describe('parseSetupArgs', () => {
     vi.stubEnv('MEARL_SETUP_DEFAULT_PRESET', 'https://default.example.test/preset.json');
     const runLifecycle = vi.fn(async () => true);
     expect(await main(['--yes'], false, { runLifecycle })).toBe(0);
-    expect(runLifecycle).toHaveBeenCalledWith(expect.objectContaining({ defaultPresetSource: 'https://default.example.test/preset.json', operation: 'install' }), expect.any(Object));
+    expect(runLifecycle).toHaveBeenCalledWith(
+      expect.objectContaining({
+        defaultPresetSource: 'https://default.example.test/preset.json',
+        operation: 'install',
+      }),
+      expect.any(Object),
+    );
   });
   it('prepares full setup capabilities before replacing extension files and stops if preparation fails', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const installBrowserExtension = vi.fn();
     const runLifecycle = vi.fn();
     vi.mocked(prepareSetupPreset).mockRejectedValueOnce(new Error('offline resources'));
-    expect(await main(['extension', '--full', '--yes'], false, { installBrowserExtension, runLifecycle })).toBe(1);
+    expect(
+      await main(['extension', '--full', '--yes'], false, {
+        installBrowserExtension,
+        runLifecycle,
+      }),
+    ).toBe(1);
     expect(installBrowserExtension).not.toHaveBeenCalled();
     expect(runLifecycle).not.toHaveBeenCalled();
   });
   it('delegates preset operations and distinguishes pending readiness from failure', async () => {
-    expect(parseSetupArgs(['preset', 'apply', './preset.json'])).toMatchObject({ operation: 'preset', presetCommand: 'apply', presetSource: './preset.json' });
-    expect(parseSetupArgs(['preset', 'update'])).toMatchObject({ operation: 'preset', presetCommand: 'update' });
-    expect(parseSetupArgs(['preset', 'status'])).toMatchObject({ operation: 'preset', presetCommand: 'status' });
-    expect(() => parseSetupArgs(['preset', 'apply'])).toThrow('preset requires');
+    expect(parseSetupArgs(['preset', 'apply', './preset.json'])).toMatchObject({
+      operation: 'preset',
+      presetCommand: 'apply',
+      presetSource: './preset.json',
+    });
+    expect(parseSetupArgs(['preset', 'update'])).toMatchObject({
+      operation: 'preset',
+      presetCommand: 'update',
+    });
+    expect(parseSetupArgs(['preset', 'status'])).toMatchObject({
+      operation: 'preset',
+      presetCommand: 'status',
+    });
     expect(() => parseSetupArgs(['preset', 'status', 'extra'])).toThrow('preset requires');
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    const runPreset = vi.fn().mockResolvedValue({ ready: false, pending: [{ reason: 'BROWSER_SYNC_REQUIRED' }] });
+    const runPreset = vi
+      .fn()
+      .mockResolvedValue({ ready: false, pending: [{ reason: 'BROWSER_SYNC_REQUIRED' }] });
     expect(await main(['preset', 'apply', './preset.json'], false, { runPreset })).toBe(3);
     expect(runPreset).toHaveBeenCalledExactlyOnceWith('apply', './preset.json');
     runPreset.mockResolvedValueOnce({ ready: true });
@@ -50,41 +77,65 @@ describe('parseSetupArgs', () => {
     runPreset.mockRejectedValueOnce(new Error('activation rejected'));
     expect(await main(['preset', 'update'], false, { runPreset })).toBe(1);
   });
-  it('repairs the accepted preset and passes only explicitly listed replacements', async () => {
+  it('reapplies the saved preset and passes only explicitly listed replacements', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const runPreset = vi.fn().mockResolvedValue({ ready: true });
-    const args = ['preset', 'repair', '--replace-skill', 'example-skill', '--replace-skill', 'mearl'];
-    expect(parseSetupArgs(args)).toMatchObject({ operation: 'preset', presetCommand: 'repair', presetReplaceSkills: ['example-skill', 'mearl'] });
+    const args = [
+      'preset',
+      'apply',
+      '--replace-skill',
+      'example-skill',
+      '--replace-skill',
+      'mearl',
+    ];
+    expect(parseSetupArgs(args)).toMatchObject({
+      operation: 'preset',
+      presetCommand: 'apply',
+      presetReplaceSkills: ['example-skill', 'mearl'],
+    });
     expect(await main(args, false, { runPreset })).toBe(0);
-    expect(runPreset).toHaveBeenCalledExactlyOnceWith('repair', undefined, { replaceSkills: ['example-skill', 'mearl'] });
-    runPreset.mockClear().mockResolvedValue({ ready: false, pending: [{ reason: 'SKILL_NOT_INSTALLED' }] });
-    expect(await main(['preset', 'repair'], false, { runPreset })).toBe(3);
-    expect(runPreset).toHaveBeenCalledExactlyOnceWith('repair', undefined);
+    expect(runPreset).toHaveBeenCalledExactlyOnceWith('apply', undefined, {
+      replaceSkills: ['example-skill', 'mearl'],
+    });
+    runPreset
+      .mockClear()
+      .mockResolvedValue({ ready: false, pending: [{ reason: 'SKILL_NOT_INSTALLED' }] });
+    expect(await main(['preset', 'apply'], false, { runPreset })).toBe(3);
+    expect(runPreset).toHaveBeenCalledExactlyOnceWith('apply', undefined);
+    runPreset.mockClear().mockResolvedValue({ ready: true });
+    expect(await main(['preset', 'uninstall'], false, { runPreset })).toBe(0);
+    expect(runPreset).toHaveBeenCalledExactlyOnceWith('uninstall', undefined);
   });
   it.each([
-    ['preset', 'repair', '--replace-skill'],
-    ['preset', 'repair', '--replace-skill', '../other'],
-    ['preset', 'repair', '--replace-skill', 'mearl', '--replace-skill', 'mearl'],
-    ['preset', 'repair', '--force'],
-    ['preset', 'repair', 'extra'],
+    ['preset', 'apply', '--replace-skill'],
+    ['preset', 'apply', '--replace-skill', '../other'],
+    ['preset', 'apply', '--replace-skill', 'mearl', '--replace-skill', 'mearl'],
+    ['preset', 'apply', '--force'],
+    ['preset', 'apply', './preset.json', '--replace-skill', 'mearl'],
+    ['preset', 'apply', './preset.json', 'extra'],
+    ['preset', 'uninstall', 'extra'],
+    ['preset', 'repair'],
     ['preset', 'status', '--replace-skill', 'mearl'],
-  ])('rejects invalid repair arguments before starting an installer: %j', async (...args) => {
+  ])('rejects invalid preset arguments before starting an installer: %j', async (...args) => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const runPreset = vi.fn();
     expect(await main(args, false, { runPreset })).toBe(2);
     expect(runPreset).not.toHaveBeenCalled();
   });
-  it('documents repair options without running an installer', async () => {
+  it('documents apply options without running an installer', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     const runPreset = vi.fn();
-    expect(await main(['preset', 'repair', '--help'], false, { runPreset })).toBe(0);
+    expect(await main(['preset', 'apply', '--help'], false, { runPreset })).toBe(0);
     expect(log).toHaveBeenCalledWith(expect.stringContaining('--replace-skill <name>'));
     expect(runPreset).not.toHaveBeenCalled();
   });
   it('delegates the selected preset to environment setup and checks actual readiness', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const revision = 'a'.repeat(64);
-    const runLifecycle = vi.fn(async (_options, dependencies) => { dependencies.onPresetStatus({ revision, ready: true }); return true; });
+    const runLifecycle = vi.fn(async (_options, dependencies) => {
+      dependencies.onPresetStatus({ revision, ready: true });
+      return true;
+    });
     const runPreset = vi.fn().mockResolvedValue({ revision, ready: true });
     const args = ['--preset', 'https://guide.example.test/presets/team.json', '--yes'];
     expect(parseSetupArgs(args)).toMatchObject({ operation: 'install', presetSource: args[1] });
@@ -92,15 +143,20 @@ describe('parseSetupArgs', () => {
     expect(await main(args, false, { runLifecycle, runPreset })).toBe(0);
     expect(runLifecycle.mock.calls[0][0]).toMatchObject({ presetSource: args[1] });
     expect(runPreset.mock.calls).toEqual([['status']]);
-    expect(runLifecycle.mock.invocationCallOrder[0]).toBeLessThan(runPreset.mock.invocationCallOrder[0]);
-    runLifecycle.mockResolvedValueOnce(false); runPreset.mockClear();
+    expect(runLifecycle.mock.invocationCallOrder[0]).toBeLessThan(
+      runPreset.mock.invocationCallOrder[0],
+    );
+    runLifecycle.mockResolvedValueOnce(false);
+    runPreset.mockClear();
     expect(await main(args, false, { runLifecycle, runPreset })).toBe(1);
     expect(runPreset).not.toHaveBeenCalled();
     runPreset.mockResolvedValue({ revision, ready: false });
     expect(await main(args, false, { runLifecycle, runPreset })).toBe(3);
   });
   it('parses and delegates Provider lifecycle commands', async () => {
-    expect(parseSetupArgs(['provider', 'install', '@example/mearl-provider-device@next'])).toMatchObject({
+    expect(
+      parseSetupArgs(['provider', 'install', '@example/mearl-provider-device@next']),
+    ).toMatchObject({
       operation: 'provider',
       providerCommand: 'install',
       providerTarget: '@example/mearl-provider-device@next',
@@ -144,7 +200,15 @@ describe('parseSetupArgs', () => {
   });
 
   it('passes plugin install arguments through, including flags owned by skills', async () => {
-    const args = ['https://github.com/mearlhq/mearl', '--skill', 'browser-tab-manager', '-a', 'codex', '--yes', '--help'];
+    const args = [
+      'https://github.com/mearlhq/mearl',
+      '--skill',
+      'browser-tab-manager',
+      '-a',
+      'codex',
+      '--yes',
+      '--help',
+    ];
     expect(parseSetupArgs(['plugin', 'install', ...args])).toMatchObject({
       operation: 'plugin',
       pluginInstallArgs: args,
@@ -192,9 +256,9 @@ describe('parseSetupArgs', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(await main(['plugin', './skill'], false, { registerPlugin, runLifecycle })).toBe(0);
     expect(registerPlugin).toHaveBeenCalledWith('./skill');
-    expect(
-      await main(['plugin', 'tabs', './skill'], false, { registerPlugin, runLifecycle }),
-    ).toBe(0);
+    expect(await main(['plugin', 'tabs', './skill'], false, { registerPlugin, runLifecycle })).toBe(
+      0,
+    );
     expect(registerPlugin).toHaveBeenCalledWith('./skill', 'tabs');
     expect(runLifecycle).not.toHaveBeenCalled();
     registerPlugin.mockRejectedValueOnce(new Error('entry missing'));
@@ -373,7 +437,10 @@ describe('parseSetupArgs', () => {
     expect(() => parseSetupArgs(['upgrade'])).toThrow('Unknown operation');
     expect(() => parseSetupArgs(['install', '--all'])).toThrow('Unknown option');
     expect(() => parseSetupArgs(['example-cloud'])).toThrow('Unknown operation');
-    expect(parseSetupArgs(['--cloud-mode', 'qoder', '--cloud'])).toMatchObject({ profiles: ['cloud'], cloudMode: 'qoder' });
+    expect(parseSetupArgs(['--cloud-mode', 'qoder', '--cloud'])).toMatchObject({
+      profiles: ['cloud'],
+      cloudMode: 'qoder',
+    });
     expect(() => parseSetupArgs(['qoder-cloud'])).toThrow('Unknown operation');
     expect(() => parseSetupArgs(['qoder'])).toThrow('Unknown operation');
   });
@@ -427,15 +494,20 @@ describe('parseSetupArgs', () => {
   it('runs Qoder cloud through the ordinary cloud lifecycle', async () => {
     const runLifecycle = vi.fn().mockResolvedValue(true);
 
-    await expect(main(['--cloud-mode', 'qoder', '--yes'], false, { runLifecycle })).resolves.toBe(0);
-    expect(runLifecycle).toHaveBeenCalledWith({
-      operation: 'install',
-      profiles: ['cloud'],
-      cloudMode: 'qoder',
-      skipSkill: false,
-      targetLine: undefined,
-      yes: true,
-    }, { onPresetStatus: expect.any(Function) });
+    await expect(main(['--cloud-mode', 'qoder', '--yes'], false, { runLifecycle })).resolves.toBe(
+      0,
+    );
+    expect(runLifecycle).toHaveBeenCalledWith(
+      {
+        operation: 'install',
+        profiles: ['cloud'],
+        cloudMode: 'qoder',
+        skipSkill: false,
+        targetLine: undefined,
+        yes: true,
+      },
+      { onPresetStatus: expect.any(Function) },
+    );
   });
 
   it('downloads an unpacked extension in non-interactive mode for manual loading', async () => {
@@ -465,7 +537,8 @@ describe('parseSetupArgs', () => {
       loaded: true,
       path: '/home/test/.mearl/chrome-extension',
       version: '2.8.0',
-      archiveUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip',
+      archiveUrl:
+        'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip',
     });
 
     await expect(main(['extension', '--force'], true, { installBrowserExtension })).resolves.toBe(
@@ -495,7 +568,8 @@ describe('parseSetupArgs', () => {
       loaded: true,
       path: '/home/test/.mearl/chrome-extension',
       version: '2.8.0',
-      archiveUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip',
+      archiveUrl:
+        'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip',
     });
 
     await expect(
@@ -504,12 +578,15 @@ describe('parseSetupArgs', () => {
         runLifecycle,
       }),
     ).resolves.toBe(0);
-    expect(runLifecycle).toHaveBeenCalledWith({
-      operation: 'install',
-      profiles: ['local'],
-      skipSkill: false,
-      yes: true,
-    }, { onPresetStatus: expect.any(Function) });
+    expect(runLifecycle).toHaveBeenCalledWith(
+      {
+        operation: 'install',
+        profiles: ['local'],
+        skipSkill: false,
+        yes: true,
+      },
+      { onPresetStatus: expect.any(Function) },
+    );
     expect(installBrowserExtension.mock.invocationCallOrder[0]).toBeLessThan(
       runLifecycle.mock.invocationCallOrder[0]!,
     );
@@ -523,7 +600,8 @@ describe('parseSetupArgs', () => {
       loaded: true,
       path: '/home/test/.mearl/chrome-extension',
       version: '2.8.0',
-      archiveUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip',
+      archiveUrl:
+        'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip',
     });
 
     await expect(
@@ -545,7 +623,8 @@ describe('parseSetupArgs', () => {
       loaded: false,
       path: '/home/test/.mearl/chrome-extension',
       version: '2.8.0',
-      archiveUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip',
+      archiveUrl:
+        'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip',
       cdpError: 'Chrome remote debugging is not enabled',
     });
 
@@ -564,7 +643,8 @@ describe('parseSetupArgs', () => {
       loaded: false,
       path: '/home/test/.mearl/chrome-extension',
       version: '2.8.0',
-      archiveUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip',
+      archiveUrl:
+        'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip',
       cdpError: 'Chrome remote debugging is not enabled',
     });
 
@@ -585,7 +665,8 @@ describe('parseSetupArgs', () => {
       loaded: false,
       path: '/home/test/.mearl/chrome-extension',
       version: '2.8.0',
-      archiveUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip',
+      archiveUrl:
+        'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip',
       cdpError: "'Extensions.loadUnpacked' wasn't found",
     });
 
@@ -605,8 +686,21 @@ it('reports actual preset readiness after the base Skill phase and rejects a rep
   vi.spyOn(console, 'error').mockImplementation(() => {});
   const revision = 'a'.repeat(64);
   const runPreset = vi.fn().mockResolvedValueOnce({ revision, ready: false });
-  const runLifecycle = vi.fn(async (_options, deps) => { deps.onPresetStatus({ revision, ready: true }); return true; });
-  expect(await main(['--preset', 'https://example.test/team.json', '--yes'], false, { runLifecycle, runPreset })).toBe(3);
+  const runLifecycle = vi.fn(async (_options, deps) => {
+    deps.onPresetStatus({ revision, ready: true });
+    return true;
+  });
+  expect(
+    await main(['--preset', 'https://example.test/team.json', '--yes'], false, {
+      runLifecycle,
+      runPreset,
+    }),
+  ).toBe(3);
   runPreset.mockResolvedValueOnce({ revision: 'b'.repeat(64), ready: true });
-  expect(await main(['--preset', 'https://example.test/team.json', '--yes'], false, { runLifecycle, runPreset })).toBe(1);
+  expect(
+    await main(['--preset', 'https://example.test/team.json', '--yes'], false, {
+      runLifecycle,
+      runPreset,
+    }),
+  ).toBe(1);
 });

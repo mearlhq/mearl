@@ -12,7 +12,10 @@ import type {
   PageDownloadParams,
 } from './browserActionProtocol.js';
 import { isAgentServiceAction, type AgentServiceActionMap } from './agentServiceProtocol.js';
-import type { BrowserEnhancementRequest, BrowserEnhancementResponse } from './browserEnhancement.js';
+import type {
+  BrowserEnhancementRequest,
+  BrowserEnhancementResponse,
+} from './browserEnhancement.js';
 import {
   isToolboxServiceAction,
   type ToolboxServiceActionMap,
@@ -154,12 +157,26 @@ export function isExtensionUiServiceAction(value: unknown): value is ExtensionUi
 }
 
 export interface HostToExtensionActionMap {
-  __browser_enhancement: { request: BrowserEnhancementRequest; response: BrowserEnhancementResponse };
+  __browser_enhancement: {
+    request: BrowserEnhancementRequest;
+    response: BrowserEnhancementResponse;
+  };
   __preset_installation: { request: Record<string, unknown>; response: unknown };
   __profile_install: { request: { source: string }; response: unknown };
   __preset_browser: {
-    request: { operation: 'sync'; installationRevision: string } | { operation: 'status' };
-    response: { installationRevision: string | null; browserRevision: string | null; ready: boolean; settingsReady: boolean; accepted?: boolean; error?: string };
+    request:
+      | { operation: 'sync'; installationRevision: string }
+      | { operation: 'status' }
+      | { operation: 'uninstall'; browserRevision: string; installationToken: string | null };
+    response: {
+      installationRevision: string | null;
+      browserRevision: string | null;
+      ready: boolean;
+      settingsReady: boolean;
+      installationToken?: string | null;
+      accepted?: boolean;
+      error?: string;
+    };
   };
   __export_cookies: { request: { domains: string[] }; response: { cookies: unknown[] } };
   __capture_download: { request: PageDownloadParams; response: unknown };
@@ -226,9 +243,7 @@ export function isPrivateExtensionServiceAction(value: unknown): boolean {
 }
 
 export type ExtensionRpcErrorCode =
-  | 'PROTOCOL_MISMATCH'
-  | 'UNSUPPORTED_ACTION'
-  | 'EXTENSION_UI_REQUIRED';
+  'PROTOCOL_MISMATCH' | 'UNSUPPORTED_ACTION' | 'EXTENSION_UI_REQUIRED';
 export class ExtensionRpcError extends Error {
   constructor(
     readonly code: ExtensionRpcErrorCode,

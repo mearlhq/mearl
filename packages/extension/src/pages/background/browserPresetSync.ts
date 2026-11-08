@@ -1,25 +1,39 @@
-import {
-  receiveBrowserPreset,
-  type PresetTransferTransport,
-} from '@mearl/preset/bundles';
+import { receiveBrowserPreset, type PresetTransferTransport } from '@mearl/preset/bundles';
+import type { HostToExtensionActionMap } from '@mearl/browser-core';
 import { BROWSER_BUNDLE_API_VERSION, browserCapabilityRegistry } from './browserCapabilityRegistry';
 
 export async function synchronizeBrowserPreset(
-  input: { operation: 'status' } | { operation: 'sync'; installationRevision: string },
+  input: HostToExtensionActionMap['__preset_browser']['request'],
   transport: PresetTransferTransport,
   registry = browserCapabilityRegistry(),
-  accepted?: { expected: Awaited<ReturnType<typeof registry.captureInstallationSelection>>; confirm: () => Promise<void> },
+  accepted?: {
+    expected: Awaited<ReturnType<typeof registry.captureInstallationSelection>>;
+    confirm: () => Promise<void>;
+  },
 ) {
-  if (input.operation === 'status') return registry.installationStatus();
+  if (input.operation === 'status') return registry.installationStatus(true);
+  if (input.operation === 'uninstall') {
+    const isRevision = (value: unknown): value is string =>
+      typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+    if (
+      !isRevision(input.browserRevision) ||
+      (input.installationToken !== null && !isRevision(input.installationToken))
+    )
+      throw new Error('Expected a browser preset revision and installation token');
+    return registry.uninstallPreset(input.browserRevision, input.installationToken);
+  }
   if (
     input.operation !== 'sync' ||
     typeof input.installationRevision !== 'string' ||
     !/^[a-f0-9]{64}$/.test(input.installationRevision)
   )
     throw new Error('Expected a preset installation revision');
-  const previous = accepted?.expected ?? await registry.captureInstallationSelection();
+  const previous = accepted?.expected ?? (await registry.captureInstallationSelection());
   const current = await registry.installationStatus();
-  if (current.ready && current.installationRevision === input.installationRevision) { await accepted?.confirm(); return current; }
+  if (current.ready && current.installationRevision === input.installationRevision) {
+    await accepted?.confirm();
+    return current;
+  }
   try {
     const received = await receiveBrowserPreset(input.installationRevision, {
       transport,
@@ -30,7 +44,10 @@ export async function synchronizeBrowserPreset(
         prepared: received.prepared,
         installation: received.installation,
         expected: previous,
-        confirm: async () => { await received.confirm(); await accepted?.confirm(); },
+        confirm: async () => {
+          await received.confirm();
+          await accepted?.confirm();
+        },
       });
     } finally {
       await received.release().catch(() => {});

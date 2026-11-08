@@ -3,8 +3,16 @@
 import { Command, CommanderError } from 'commander';
 import { invoke, listLiveBrowsers } from '@mearl/client/local';
 import { parseProfileSource } from '@mearl/preset/bundles';
-import { downloadMearlBrowserExtension, installMearlBrowserExtension, isUnsupportedCdpMethodError } from './browserExtension.js';
-import { runMearlLifecycle, type MearlLifecycleOperation, type MearlLifecycleOptions } from './lifecycle.js';
+import {
+  downloadMearlBrowserExtension,
+  installMearlBrowserExtension,
+  isUnsupportedCdpMethodError,
+} from './browserExtension.js';
+import {
+  runMearlLifecycle,
+  type MearlLifecycleOperation,
+  type MearlLifecycleOptions,
+} from './lifecycle.js';
 import type { MearlProfile } from './profiles.js';
 import { isMearlReleaseLine } from './version.js';
 import { ensureOfficialPlugin, installPlugins, setupPlugin, uninstallPlugin } from './plugin.js';
@@ -28,7 +36,7 @@ interface ParsedArgs {
   operation?: MearlLifecycleOperation | 'extension' | 'plugin' | 'provider' | 'preset' | 'profile';
   profileSource?: string;
   profileBrowser?: string;
-  presetCommand?: 'apply' | 'update' | 'status' | 'repair';
+  presetCommand?: Exclude<Parameters<typeof runPresetCommand>[0], 'repair'>;
   presetSource?: string;
   presetReplaceSkills?: string[];
   pluginName?: string;
@@ -93,22 +101,43 @@ function commanderError(error: CommanderError): Error {
 
 export function parseSetupArgs(argv: string[]): ParsedArgs {
   if (argv[0] === 'profile') {
-    if (argv.length === 2 && (argv[1] === '--help' || argv[1] === '-h')) return { ...baseParsedArgs(), help: true };
-    if (argv[1] !== 'install' || !argv[2] || (argv.length !== 3 && !(argv.length === 5 && argv[3] === '--browser' && argv[4]))) {
-      throw new Error('profile requires install <GitHub owner/repo[@ref] or HTTPS bundle URL> [--browser <id-or-name>]');
+    if (argv.length === 2 && (argv[1] === '--help' || argv[1] === '-h'))
+      return { ...baseParsedArgs(), help: true };
+    if (
+      argv[1] !== 'install' ||
+      !argv[2] ||
+      (argv.length !== 3 && !(argv.length === 5 && argv[3] === '--browser' && argv[4]))
+    ) {
+      throw new Error(
+        'profile requires install <GitHub owner/repo[@ref] or HTTPS bundle URL> [--browser <id-or-name>]',
+      );
     }
     parseProfileSource(argv[2]);
-    return { ...baseParsedArgs(), operation: 'profile', profileSource: argv[2], profileBrowser: argv[4] };
+    return {
+      ...baseParsedArgs(),
+      operation: 'profile',
+      profileSource: argv[2],
+      profileBrowser: argv[4],
+    };
   }
   if (argv[0] === 'preset') {
-    if (argv[1] === 'repair') {
-      const command = new Command('preset repair')
+    if (argv.length === 2 && (argv[1] === '--help' || argv[1] === '-h'))
+      return { ...baseParsedArgs(), help: true };
+    if (argv[1] === 'apply') {
+      const command = new Command('preset apply')
         .exitOverride()
         .configureOutput({ writeErr: () => {}, writeOut: () => {} })
         .allowExcessArguments(false)
-        .option('--replace-skill <name>', 'Replace the named Skill source or conflicting plugin registration', (name: string, previous: string[]) => [...previous, name], []);
-      try { command.parse(argv.slice(2), { from: 'user' }); }
-      catch (error) {
+        .argument('[source]')
+        .option(
+          '--replace-skill <name>',
+          'Replace the named Skill source or conflicting plugin registration',
+          (name: string, previous: string[]) => [...previous, name],
+          [],
+        );
+      try {
+        command.parse(argv.slice(2), { from: 'user' });
+      } catch (error) {
         if (error instanceof CommanderError) {
           if (error.code === 'commander.helpDisplayed') return { ...baseParsedArgs(), help: true };
           throw commanderError(error);
@@ -116,12 +145,31 @@ export function parseSetupArgs(argv: string[]): ParsedArgs {
         throw error;
       }
       const names = command.opts<{ replaceSkill: string[] }>().replaceSkill;
-      if (names.length > 256 || new Set(names).size !== names.length || names.some(name => !/^[a-z][a-z0-9-]{0,79}$/.test(name))) throw new Error('--replace-skill requires unique valid Skill names (up to 256)');
-      return { ...baseParsedArgs(), operation: 'preset', presetCommand: 'repair', ...(names.length ? { presetReplaceSkills: names } : {}) };
+      if (
+        names.length > 256 ||
+        new Set(names).size !== names.length ||
+        names.some(name => !/^[a-z][a-z0-9-]{0,79}$/.test(name))
+      )
+        throw new Error('--replace-skill requires unique valid Skill names (up to 256)');
+      const source = command.args[0];
+      if (source !== undefined && !source.trim())
+        throw new Error('Expected a preset source URL or path');
+      if (source !== undefined && names.length)
+        throw new Error('--replace-skill requires preset apply without a source');
+      return {
+        ...baseParsedArgs(),
+        operation: 'preset',
+        presetCommand: 'apply',
+        presetSource: source,
+        ...(names.length ? { presetReplaceSkills: names } : {}),
+      };
     }
-    if (argv[1] === 'apply' && argv.length === 3 && argv[2]) return { ...baseParsedArgs(), operation: 'preset', presetCommand: 'apply', presetSource: argv[2] };
-    if ((argv[1] === 'update' || argv[1] === 'status') && argv.length === 2) return { ...baseParsedArgs(), operation: 'preset', presetCommand: argv[1] };
-    throw new Error('preset requires apply <source-url-or-path>, update, repair [--replace-skill <name>], or status');
+    if (
+      (argv[1] === 'update' || argv[1] === 'status' || argv[1] === 'uninstall') &&
+      argv.length === 2
+    )
+      return { ...baseParsedArgs(), operation: 'preset', presetCommand: argv[1] };
+    throw new Error('preset requires apply [source-url-or-path], update, status, or uninstall');
   }
   if (argv[0] === 'provider') {
     const command = argv[1];
@@ -192,12 +240,15 @@ export function parseSetupArgs(argv: string[]): ParsedArgs {
     command.action(() => {
       const options = command.opts<LifecycleCommandOptions>();
 
-      if (options.cloudMode !== undefined && !/^[a-z][a-z0-9-]{0,63}$/.test(options.cloudMode)) throw new Error('--cloud-mode requires a valid installed mode ID');
+      if (options.cloudMode !== undefined && !/^[a-z][a-z0-9-]{0,63}$/.test(options.cloudMode))
+        throw new Error('--cloud-mode requires a valid installed mode ID');
       if (options.targetLine && !isMearlReleaseLine(options.targetLine)) {
         throw new Error('--target-line requires a valid Mearl release line such as 2.3.x');
       }
-      if (operation === 'uninstall' && options.preset) throw new Error('--preset is not available for uninstall');
-      if (options.preset !== undefined && !options.preset.trim()) throw new Error('--preset requires a source');
+      if (operation === 'uninstall' && options.preset)
+        throw new Error('--preset is not available for uninstall');
+      if (options.preset !== undefined && !options.preset.trim())
+        throw new Error('--preset requires a source');
       if (operation === 'uninstall' && options.targetLine) {
         throw new Error('--target-line is not available for uninstall');
       }
@@ -285,10 +336,10 @@ Environment commands:
 
 Integration commands:
   profile install <source>       Install one App profile bundle in a connected extension
-  preset apply <source>          Apply a preset, synchronize hosts and install declared components
+  preset apply [source]          Apply a URL or local file, or retry the saved snapshot
   preset update                  Update the selected preset, preserving user overrides
-  preset repair                  Retry the installed preset using its accepted resources
   preset status                  Report actual readiness (exit 3 when synchronization is pending)
+  preset uninstall               Remove the preset from the local host and connected extensions
   plugin install <arguments...>   Install Skills and register their CLI plugins
   plugin uninstall <name>        Uninstall one CLI plugin
   plugin [name] <path>            Register an existing plugin; name overrides metadata
@@ -316,7 +367,7 @@ Extension options:
   --full                          Install the extension and complete local environment
   --force                         Replace an extension managed by another source
 
-Preset repair options:
+Preset apply options (without a source):
   --replace-skill <name>           Replace one Skill source or conflicting registration; repeat for more
 
 General options:
@@ -333,14 +384,24 @@ Examples:
   npx @mearl/setup uninstall --full
   npx @mearl/setup plugin uninstall tabs
   npx @mearl/setup provider install @example/mearl-provider-device
-  npx @mearl/setup preset repair --replace-skill example-skill
+  npx @mearl/setup preset apply --replace-skill example-skill
   npx @mearl/setup extension --full`;
   console.log(output.replaceAll('npx @mearl/setup', SETUP_COMMAND));
 }
 
-async function runSetupLifecycle(options: MearlLifecycleOptions, dependencies: SetupCliDependencies): Promise<number> {
+async function runSetupLifecycle(
+  options: MearlLifecycleOptions,
+  dependencies: SetupCliDependencies,
+): Promise<number> {
   let preset: Awaited<ReturnType<typeof runPresetCommand>> | undefined;
-  const callback = options.operation === 'uninstall' ? undefined : { onPresetStatus: (status: NonNullable<typeof preset>) => { preset = status; } };
+  const callback =
+    options.operation === 'uninstall'
+      ? undefined
+      : {
+          onPresetStatus: (status: NonNullable<typeof preset>) => {
+            preset = status;
+          },
+        };
   const lifecycle = dependencies.runLifecycle ?? runMearlLifecycle;
   const defaultPresetSource = process.env.MEARL_SETUP_DEFAULT_PRESET;
   const configured = defaultPresetSource ? { ...options, defaultPresetSource } : options;
@@ -351,7 +412,8 @@ async function runSetupLifecycle(options: MearlLifecycleOptions, dependencies: S
     return 0;
   }
   const actual = await (dependencies.runPreset ?? runPresetCommand)('status');
-  if (actual.revision !== preset.revision) throw new Error('The selected preset changed while setup was running');
+  if (actual.revision !== preset.revision)
+    throw new Error('The selected preset changed while setup was running');
   const warnings = [...new Set([...(preset.warnings ?? []), ...(actual.warnings ?? [])])];
   console.log(JSON.stringify({ ...actual, warnings }, null, 2));
   return actual.ready ? 0 : 3;
@@ -359,10 +421,17 @@ async function runSetupLifecycle(options: MearlLifecycleOptions, dependencies: S
 
 async function installProfile(source: string, browser?: string): Promise<unknown> {
   if (!browser) {
-    const extensions = listLiveBrowsers().filter(target => target.transport === 'extension' && (target.status === undefined || target.status === 'connected'));
-    if (extensions.length !== 1) throw new Error(extensions.length
-      ? 'Multiple extensions are connected. Select one with --browser <id-or-name>.'
-      : 'Connect a Mearl extension before installing App profiles.');
+    const extensions = listLiveBrowsers().filter(
+      target =>
+        target.transport === 'extension' &&
+        (target.status === undefined || target.status === 'connected'),
+    );
+    if (extensions.length !== 1)
+      throw new Error(
+        extensions.length
+          ? 'Multiple extensions are connected. Select one with --browser <id-or-name>.'
+          : 'Connect a Mearl extension before installing App profiles.',
+      );
     browser = extensions[0]!.browserId;
   }
   console.error('If the bundle source needs permission, confirm it in the browser.');
@@ -392,7 +461,10 @@ export async function main(
   }
   if (parsed.operation === 'profile') {
     try {
-      const result = await (dependencies.installProfile ?? installProfile)(parsed.profileSource!, parsed.profileBrowser);
+      const result = await (dependencies.installProfile ?? installProfile)(
+        parsed.profileSource!,
+        parsed.profileBrowser,
+      );
       console.log(JSON.stringify(result, null, 2));
       return 0;
     } catch (error) {
@@ -404,7 +476,9 @@ export async function main(
     try {
       const run = dependencies.runPreset ?? runPresetCommand;
       const result = parsed.presetReplaceSkills
-        ? await run(parsed.presetCommand!, parsed.presetSource, { replaceSkills: parsed.presetReplaceSkills })
+        ? await run(parsed.presetCommand!, parsed.presetSource, {
+            replaceSkills: parsed.presetReplaceSkills,
+          })
         : await run(parsed.presetCommand!, parsed.presetSource);
       console.log(JSON.stringify(result, null, 2));
       return result.ready ? 0 : 3;
@@ -492,9 +566,13 @@ export async function main(
   if (parsed.operation === 'extension') {
     if (parsed.extract) {
       try {
-        const result = await (dependencies.downloadBrowserExtension ?? downloadMearlBrowserExtension)();
+        const result = await (
+          dependencies.downloadBrowserExtension ?? downloadMearlBrowserExtension
+        )();
         console.log(`Mearl v${result.version} is ready to load from ${result.path}`);
-        console.log('Open chrome://extensions/, enable Developer mode, click Load unpacked, and select that directory.');
+        console.log(
+          'Open chrome://extensions/, enable Developer mode, click Load unpacked, and select that directory.',
+        );
         return 0;
       } catch (error) {
         console.error(error instanceof Error ? error.message : String(error));
@@ -506,8 +584,14 @@ export async function main(
       return 2;
     }
     if (parsed.full) {
-      try { await (dependencies.preparePreset ?? prepareSetupPreset)({}); }
-      catch (error) { console.error(`Preset preparation: ${error instanceof Error ? error.message : String(error)}`); return 1; }
+      try {
+        await (dependencies.preparePreset ?? prepareSetupPreset)({});
+      } catch (error) {
+        console.error(
+          `Preset preparation: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        return 1;
+      }
     }
     let extensionInstalled = false;
     let extensionFailureIsTerminal = false;
@@ -534,7 +618,9 @@ export async function main(
         );
         if (result.cdpError) {
           console.error(`CDP installation failed: ${result.cdpError}`);
-          console.error(`To load the extension manually, run: ${SETUP_COMMAND} extension --extract`);
+          console.error(
+            `To load the extension manually, run: ${SETUP_COMMAND} extension --extract`,
+          );
           if (isUnsupportedCdpMethodError(result.cdpError)) {
             console.error(
               `This Chrome version does not support installing extensions through CDP. Update Chrome to version 145 or later, then rerun: ${SETUP_COMMAND} extension`,
@@ -555,12 +641,15 @@ export async function main(
 
     let localStatus = 1;
     try {
-      localStatus = await runSetupLifecycle({
-        operation: 'install',
-        profiles: ['local'],
-        skipSkill: false,
-        yes: parsed.yes,
-      }, dependencies);
+      localStatus = await runSetupLifecycle(
+        {
+          operation: 'install',
+          profiles: ['local'],
+          skipSkill: false,
+          yes: parsed.yes,
+        },
+        dependencies,
+      );
     } catch (error) {
       console.error(error instanceof Error ? error.message : String(error));
     }

@@ -27,7 +27,11 @@ export function resolveBrowserPresetSettings(
 ): BrowserPresetSettings {
   const value = mergePresetDefaults(defaults, overrides);
   const settings: BrowserPresetSettings = { simulation: {}, pending: [] };
-  for (const key of Object.keys(value)) if (!['simulation', 'services', 'extension', 'capabilities'].includes(key)) settings.pending.push(key);
+  // Installation management is consumed by the local setup host.
+  for (const key of Object.keys(value)) {
+    if (!['simulation', 'services', 'extension', 'capabilities', 'management'].includes(key))
+      settings.pending.push(key);
+  }
   if (value.capabilities !== undefined) resolveCapabilityConfig(value);
   if (value.extension !== undefined) {
     const parsed = parseBrowserUiSettings(value.extension);
@@ -36,7 +40,16 @@ export function resolveBrowserPresetSettings(
   }
   if (value.services !== undefined) {
     const services = value.services;
-    if (!services || typeof services !== 'object' || Array.isArray(services) || Object.entries(services).some(([key, enabled]) => !/^[a-z][a-zA-Z0-9]{0,95}Enabled$/.test(key) || typeof enabled !== 'boolean')) throw new BundleError('BUNDLE_INVALID', 'Service defaults must map setting keys to booleans');
+    if (
+      !services ||
+      typeof services !== 'object' ||
+      Array.isArray(services) ||
+      Object.entries(services).some(
+        ([key, enabled]) =>
+          !/^[a-z][a-zA-Z0-9]{0,95}Enabled$/.test(key) || typeof enabled !== 'boolean',
+      )
+    )
+      throw new BundleError('BUNDLE_INVALID', 'Service defaults must map setting keys to booleans');
     settings.services = { ...services } as Record<string, boolean>;
   }
   if (value.simulation === undefined) return settings;

@@ -7,15 +7,18 @@
 ```bash
 npx @mearl/setup preset apply https://example.com/presets/team.json
 npx @mearl/setup preset apply ./preset.json
+npx @mearl/setup preset apply
+npx @mearl/setup preset apply --replace-skill example-skill
 npx @mearl/setup preset update
 npx @mearl/setup preset status
-npx @mearl/setup preset repair
-npx @mearl/setup preset repair --replace-skill example-skill
+npx @mearl/setup preset uninstall
 ```
 
 输出为 JSON。退出码 `0` 表示当前所需组件均已确认，`3` 表示已保存的期望状态仍有待安装/同步的组件，`1` 表示失败，`2` 表示命令参数错误。状态检查不下载资源、执行工厂、启动或安装 Native Host。已打开宿主通过现有本机 Socket 通信，不访问云端或自动发现其他设备。
 
-`preset repair` 捕获当前安装 revision，并复用 GUI 的 `resume`、权限同步及组件安装流程，从已接受的本地资源继续安装，不重新解析远端 preset。可重复使用 `--replace-skill <name>` 明确授权本次替换名单中的 Skill 来源或冲突插件注册。名单必须唯一、属于当前启用的 Skill 声明，且在任何宿主重载或组件安装前校验；缺少安装或选择期间发生变更时停止。不带名单的普通修复及后续调用不继承覆盖授权。
+带来源的 `preset apply` 从 URL 或本地文件安装或切换 preset。省略来源时，`preset apply` 用已保存的快照重试。`preset update` 重新读取当前来源并保留用户覆盖。重试时可重复使用 `--replace-skill <name>`，只授权本次替换名单中的 Skill 来源或冲突插件注册。名单必须唯一，且每项都属于当前启用的 Skill 声明。
+
+`preset uninstall` 移除本机 preset 选择、匹配的已连接扩展中的 preset，以及当前 preset 插件目录中由 setup 托管的注册。独立能力包、Skill 文件、Provider、浏览器权限及活动页面仍在使用的代码保留。扩展需要与 Native Host 保持连接才能清理其选择。仅卸载浏览器 preset 时，设置 `MEARL_SOCKET_PATH` 指定目标浏览器的本机 Socket。如果本机已卸载，而某个浏览器的结果仍为 `pending`，重新连接后用同样的方式指定浏览器再试。
 
 ## 确切记录与切换
 
@@ -123,6 +126,8 @@ Node 提交后若浏览器同步失败，同页保留确切安装身份并允许
 本机能力仓库可按明确的 hook 集合加载所需模块，仍校验完整 Node 选择身份、目标字节与提交 guard；安装 CLI 只加载 `skills.manager` 所属模块，不启动其他浏览器/Provider 工厂，也不把局部加载当作整套能力激活回执。损坏或旧版管理器缺少 CLI 入口时明确要求修复 preset，不静默使用另一工具。一次操作保留已捕获实现，下一次操作再读取新选择。
 
 preset 托管的基础 Mearl Skill 不能被普通环境安装覆盖回默认来源。CLI 与 Agent 共用来源/ref、清单身份、版本、禁用冲突及插件注册核验；仅有声明或缺失文件不算就绪，普通 setup/update 会提示通过 preset 修复并报告未完成。未被 preset 托管的基础 Skill 保持原公共来源及安装/核验流程。
+
+同仓库的已安装 Skill 若缺少 ref 记录，安装器会从 preset 指定的 ref 重新安装并核验。该迁移保留 Skill 的启用状态，并要求目录中没有用户自行管理的插件注册。
 
 Native 批次安装或修复新插件注册时使用 setup 托管归属，供既有更新与卸载流程维护。已有同名、同目录的用户注册保留原归属；preset 修复需要替换其他用户别名时会报告冲突。Agent 刷新或插件导出改名保持托管归属，并保留同目录的用户别名；托管卸载遇到共用目录的用户别名时保留 Skill 文件。
 

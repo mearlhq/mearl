@@ -7,15 +7,18 @@
 ```bash
 npx @mearl/setup preset apply https://example.com/presets/team.json
 npx @mearl/setup preset apply ./preset.json
+npx @mearl/setup preset apply
+npx @mearl/setup preset apply --replace-skill example-skill
 npx @mearl/setup preset update
 npx @mearl/setup preset status
-npx @mearl/setup preset repair
-npx @mearl/setup preset repair --replace-skill example-skill
+npx @mearl/setup preset uninstall
 ```
 
 Output is JSON. Exit `0` means all required components are confirmed, `3` means saved desired state has pending installation/synchronization, `1` means failure, and `2` invalid arguments. Status checks neither download resources, execute factories, nor start/install Native Host. Open hosts communicate through existing local Sockets, without cloud access or discovery of other devices.
 
-`preset repair` captures the installation revision and reuses GUI `resume`, permission synchronization, and component installation from accepted local resources, without resolving remote presets again. Repeated `--replace-skill <name>` explicitly authorizes source or conflicting-registration replacements for this invocation. Names must be unique, enabled Skill declarations, validated before host reloads or component installation. Missing installations or changed selections stop execution. Ordinary repairs and later calls do not inherit replacement authorization.
+With a source, `preset apply` installs or switches a preset from a URL or local file. With no source, `preset apply` retries from the saved snapshot. `preset update` rereads the current source and preserves user overrides. Repeat `--replace-skill <name>` when retrying to authorize replacement of those Skill sources or conflicting registrations for that invocation. Each name must be unique and declared as an enabled Skill in the selected preset.
+
+`preset uninstall` removes the local preset selection, matching selections in connected extensions, and setup-managed registrations in the selected preset's plugin catalog. It preserves independent capability packages, Skill files, Providers, browser permissions, and code still in use by open documents. Extensions need a Native Host connection for removal. To remove a browser preset by itself, set `MEARL_SOCKET_PATH` to the target browser's local socket. If the local preset has been removed but a browser still reports `pending`, reconnect the browser and use the same targeting method to retry.
 
 ## Exact records and switching
 
@@ -120,9 +123,11 @@ If browser synchronization fails after Node commit, the same page retains exact 
 
 `setup plugin install/uninstall`, existing-environment Mearl Skill installation/update/removal, and initial `setup --preset` share installed `skills.manager` selection. CLI captures it in-process, preserving arguments, terminal stdin, output, and exit codes without forwarding interaction over Native RPC. Caller timeouts remain; manual plugin installation has no extra two-minute cap. Agent/preset batches keep bounded execution.
 
-Local capability stores can load modules for explicit hook sets while still verifying complete Node identity, target bytes, and commit guards. CLI loads only the `skills.manager` module, without starting other browser/Provider factories or claiming full activation acknowledgment. Corrupt/outdated managers missing CLI entries explicitly require preset repair, without silently using another tool. Each operation retains captured implementation; subsequent operations read new selections.
+Local capability stores can load modules for explicit hook sets while still verifying complete Node identity, target bytes, and commit guards. CLI loads only the `skills.manager` module, without starting other browser/Provider factories or claiming full activation acknowledgment. Corrupt/outdated managers missing CLI entries require retrying with `preset apply`. Each operation retains captured implementation; subsequent operations read new selections.
 
-Ordinary environment installation cannot overwrite preset-managed base Mearl Skills with defaults. CLI and Agent share source/ref, manifest, version, disabled-conflict, and plugin-registration checks. Declarations or missing files do not imply readiness; ordinary setup/update requests preset repair and reports incomplete. Unmanaged base Skills retain public-source installation and verification.
+Ordinary environment installation cannot overwrite preset-managed base Mearl Skills with defaults. CLI and Agent share source/ref, manifest, version, disabled-conflict, and plugin-registration checks. Declarations or missing files do not imply readiness; ordinary setup/update prompts users to retry with `preset apply` and reports incomplete. Unmanaged base Skills retain public-source installation and verification.
+
+When an installed Skill comes from the same repository and its receipt omits the ref, the installer reinstalls and verifies it at the ref declared by the preset. This migration preserves the Skill's enabled state and requires its directory to be free of user-managed plugin registrations.
 
 Native batches create setup-managed registrations for existing update/removal workflows. Same-name same-directory user registrations retain ownership. Repairing other user alias conflicts reports errors. Agent refreshes or exported-name changes preserve managed ownership and same-directory user aliases. Managed removal retains Skill files shared by user aliases.
 

@@ -166,7 +166,7 @@ export function createBrowserCapabilityRegistry(
     notifyRequestUiChanged();
     return browserPresetStatus(prepared.preset, prepared.snapshot.revision);
   }
-  async function installationStatus() {
+  async function installationStatus(includeToken = false) {
     const current = await store.list();
     let browserReady = Boolean(
       current.activation &&
@@ -245,6 +245,7 @@ export function createBrowserCapabilityRegistry(
         : [],
       installationRevision: current.installation?.revision ?? null,
       browserRevision: current.activeRevision,
+      ...(includeToken ? { installationToken: current.installationToken } : {}),
       ready,
       settingsReady: ready && settingsPending.length === 0,
       settingsPending,
@@ -306,6 +307,11 @@ export function createBrowserCapabilityRegistry(
       return browserCapabilityCatalog(current).requestUi();
     },
     installationStatus,
+    async uninstallPreset(browserRevision: string, installationToken: string | null) {
+      await store.uninstallPreset(browserRevision, installationToken);
+      notifyRequestUiChanged();
+      return { accepted: true, ...(await installationStatus()) };
+    },
     async captureInstallationSelection(expectedInstallationRevision?: string) {
       const current = await store.list();
       if (

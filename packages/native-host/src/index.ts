@@ -46,6 +46,7 @@ import {
   extensionRpcErrorCode,
   isExtensionUiServiceAction,
   isHostToExtensionAction,
+  type HostToExtensionActionMap,
   normalizeControlSource,
   shouldObservePageAction,
   validateRequiredActionTabId,
@@ -628,20 +629,38 @@ function getBrowserEnhancementGateway(): BrowserEnhancementGateway {
     controlHost: readProviderControlHost,
     available: () => extensionVersion !== null && extensionRpcVersion === EXTENSION_RPC_VERSION,
     tabs: async deadline => {
-      const result = await sendRequestToExtension('tab_list', {}, providerRequestTimeoutMs('tab_list', {}, deadline), true);
+      const result = await sendRequestToExtension(
+        'tab_list',
+        {},
+        providerRequestTimeoutMs('tab_list', {}, deadline),
+        true,
+      );
       return result.tabs.map((tab: { tabId: number }) => tab.tabId);
     },
-    verifySource: (provider, tabId, deadline) => requestBrowserSocket(
-      provider.socketPath, '__provider_enhancement_target', { tabId }, NATIVE_HOST_VERSION,
-      providerRequestTimeoutMs('page_frames', {}, deadline), provider.providerBrowserId,
-      undefined, { deadline },
-    ),
-    run: (action, data, work) => getControlSessionManager().registry.run(undefined, action, data, work, 'extension'),
-    invoke: (request, deadline) => sendRequestToExtension(
-      '__browser_enhancement', { ...request, deadline },
-      providerRequestTimeoutMs(request.operation === 'invoke' ? request.action : 'page_frames', request, deadline),
-      true,
-    ),
+    verifySource: (provider, tabId, deadline) =>
+      requestBrowserSocket(
+        provider.socketPath,
+        '__provider_enhancement_target',
+        { tabId },
+        NATIVE_HOST_VERSION,
+        providerRequestTimeoutMs('page_frames', {}, deadline),
+        provider.providerBrowserId,
+        undefined,
+        { deadline },
+      ),
+    run: (action, data, work) =>
+      getControlSessionManager().registry.run(undefined, action, data, work, 'extension'),
+    invoke: (request, deadline) =>
+      sendRequestToExtension(
+        '__browser_enhancement',
+        { ...request, deadline },
+        providerRequestTimeoutMs(
+          request.operation === 'invoke' ? request.action : 'page_frames',
+          request,
+          deadline,
+        ),
+        true,
+      ),
   }));
 }
 
@@ -748,10 +767,22 @@ function sendToExtension(message: Record<string, any>): void {
 
 const presetBrowserTransfer = new PresetBrowserTransfer();
 let presetBrowserSync: Promise<unknown> = Promise.resolve();
-function requestPresetBrowser(data: { operation: 'sync'; installationRevision: string } | { operation: 'status' }): Promise<unknown> {
-  if (extensionVersion === null) return Promise.resolve({ installationRevision: null, browserRevision: null, ready: false, settingsReady: false, error: 'EXTENSION_NOT_CONNECTED' });
-  if (data.operation === 'status') return sendRequestToExtension('__preset_browser', data, 15000, true);
-  const next = presetBrowserSync.catch(() => {}).then(() => sendRequestToExtension('__preset_browser', data, 120000, true));
+function requestPresetBrowser(
+  data: HostToExtensionActionMap['__preset_browser']['request'],
+): Promise<HostToExtensionActionMap['__preset_browser']['response']> {
+  if (extensionVersion === null)
+    return Promise.resolve({
+      installationRevision: null,
+      browserRevision: null,
+      ready: false,
+      settingsReady: false,
+      error: 'EXTENSION_NOT_CONNECTED',
+    });
+  if (data.operation === 'status')
+    return sendRequestToExtension('__preset_browser', data, 15000, true);
+  const next = presetBrowserSync
+    .catch(() => {})
+    .then(() => sendRequestToExtension('__preset_browser', data, 120000, true));
   presetBrowserSync = next;
   return next;
 }
@@ -769,16 +800,28 @@ let agentChatManager: AgentChatManager | null = null;
 const managedAgentPrograms = new ManagedAgentPrograms();
 const agentSkillManager = new AgentSkillManager();
 const presetComponentInstaller = new PresetComponentInstaller({ skills: agentSkillManager });
-const invokePresetHost: NonNullable<import('@mearl/setup/preset').PresetInstallerOptions['invoke']> = async (action, data = {}) => {
-    if (action === 'node_capabilities_reload') return nativeCapabilities.synchronize();
-    if (action === 'node_capabilities_status') return nativeCapabilities.status();
-    if (action === 'preset_browser_status') return requestPresetBrowser({ operation: 'status' });
-    if (action === 'preset_browser_sync') return requestPresetBrowser({ operation: 'sync', installationRevision: data.installationRevision });
-    if (action === 'preset_components_install' || action === 'preset_components_status') return action === 'preset_components_install' ? presetComponentInstaller.install(data.installationRevision, { replaceSkills: data.replaceSkills }) : presetComponentInstaller.status(data.installationRevision);
-    throw new Error('Unsupported preset installation service');
-  };
+const invokePresetHost: NonNullable<
+  import('@mearl/setup/preset').PresetInstallerOptions['invoke']
+> = async (action, data = {}) => {
+  if (action === 'node_capabilities_reload') return nativeCapabilities.synchronize();
+  if (action === 'node_capabilities_status') return nativeCapabilities.status();
+  if (action === 'preset_browser_status') return requestPresetBrowser({ operation: 'status' });
+  if (action === 'preset_browser_sync')
+    return requestPresetBrowser({
+      operation: 'sync',
+      installationRevision: data.installationRevision,
+    });
+  if (action === 'preset_components_install' || action === 'preset_components_status')
+    return action === 'preset_components_install'
+      ? presetComponentInstaller.install(data.installationRevision, {
+          replaceSkills: data.replaceSkills,
+        })
+      : presetComponentInstaller.status(data.installationRevision);
+  throw new Error('Unsupported preset installation service');
+};
 const presetInstallation = new NativePresetInstallation({
-  request: (data, timeoutMs) => sendRequestToExtension('__preset_installation', data, timeoutMs, true),
+  request: (data, timeoutMs) =>
+    sendRequestToExtension('__preset_installation', data, timeoutMs, true),
   invoke: invokePresetHost,
 });
 
@@ -794,18 +837,19 @@ function getAgentChatManager(): AgentChatManager {
             return new CodexAgentProvider(log, NATIVE_HOST_VERSION, INSTANCE_SOCKET_PATH);
           },
         },
-
       ],
       event => {
         sendToExtension({ type: 'agent_chat_event', data: event });
       },
       {
         installedProviders: () => {
-          const providers: Array<AgentProviderLoader & { revision: unknown }> = nativeCapabilities.entries('agent.provider.').map(([name, create]) => ({
-            id: name.slice('agent.provider.'.length),
-            revision: create,
-            load: async () => create({ log, version: NATIVE_HOST_VERSION }),
-          }));
+          const providers: Array<AgentProviderLoader & { revision: unknown }> = nativeCapabilities
+            .entries('agent.provider.')
+            .map(([name, create]) => ({
+              id: name.slice('agent.provider.'.length),
+              revision: create,
+              load: async () => create({ log, version: NATIVE_HOST_VERSION }),
+            }));
           if (!providers.some(provider => provider.id === 'qoder')) {
             const managed = managedAgentPrograms.qoderLoader({ log, version: NATIVE_HOST_VERSION });
             if (managed) providers.push(managed);
@@ -820,11 +864,14 @@ function getAgentChatManager(): AgentChatManager {
 
 const agentServiceHandlers = {
   agent_chat_pick_directory: async () => ({ path: await pickWorkspaceDirectory() }),
-  agent_chat_status: async () => managedAgentPrograms.describe(await getAgentChatManager().getStatus()),
+  agent_chat_status: async () =>
+    managedAgentPrograms.describe(await getAgentChatManager().getStatus()),
   agent_chat_install_provider: data =>
     managedAgentPrograms.install(data?.providerId, () => getAgentChatManager().getStatus()),
   agent_chat_login_qoder: async () => ({
-    url: await managedAgentPrograms.loginQoder(() => getAgentChatManager().qoderCredentialsChanged()),
+    url: await managedAgentPrograms.loginQoder(() =>
+      getAgentChatManager().qoderCredentialsChanged(),
+    ),
   }),
   agent_chat_prepare: async data => {
     await getAgentChatManager().prepare(data);
@@ -933,7 +980,11 @@ async function handleExtensionControlMessage(message: any): Promise<void> {
     );
   }
   if (action === 'preset_installation') {
-    if (message.rpcVersion !== EXTENSION_RPC_VERSION) throw new ExtensionRpcError('PROTOCOL_MISMATCH', 'Update the Mearl extension and local service, then reconnect.');
+    if (message.rpcVersion !== EXTENSION_RPC_VERSION)
+      throw new ExtensionRpcError(
+        'PROTOCOL_MISMATCH',
+        'Update the Mearl extension and local service, then reconnect.',
+      );
     sendToExtension({ id, success: true, data: await presetInstallation.handle(data) });
     return;
   }
@@ -942,11 +993,29 @@ async function handleExtensionControlMessage(message: any): Promise<void> {
     return;
   }
   if (action === 'preset_components_status' || action === 'preset_components_install') {
-    sendToExtension({ id, success: true, data: await (action === 'preset_components_install' ? presetComponentInstaller.install(data.installationRevision, { replaceSkills: data.replaceSkills }) : presetComponentInstaller.status(data.installationRevision)) });
+    sendToExtension({
+      id,
+      success: true,
+      data: await (action === 'preset_components_install'
+        ? presetComponentInstaller.install(data.installationRevision, {
+            replaceSkills: data.replaceSkills,
+          })
+        : presetComponentInstaller.status(data.installationRevision)),
+    });
     return;
   }
-  if (action === 'node_capabilities_status' || (action === 'node_capabilities_reload' && data?.structured === true)) {
-    sendToExtension({ id, success: true, data: action === 'node_capabilities_status' ? nativeCapabilities.status() : await nativeCapabilities.synchronize() });
+  if (
+    action === 'node_capabilities_status' ||
+    (action === 'node_capabilities_reload' && data?.structured === true)
+  ) {
+    sendToExtension({
+      id,
+      success: true,
+      data:
+        action === 'node_capabilities_status'
+          ? nativeCapabilities.status()
+          : await nativeCapabilities.synchronize(),
+    });
     return;
   }
   if (action === 'node_capabilities_reload') {
@@ -1028,7 +1097,11 @@ async function handleExtensionControlMessage(message: any): Promise<void> {
   }
 
   if (action === 'app_profile_catalog') {
-    sendToExtension({ id, success: true, data: await listInstalledAppProfiles({ refresh: data?.refresh !== false }) });
+    sendToExtension({
+      id,
+      success: true,
+      data: await listInstalledAppProfiles({ refresh: data?.refresh !== false }),
+    });
     return;
   }
 
@@ -1270,12 +1343,22 @@ function handleExtensionMessage(message: any): void {
       transport: 'extension',
       extensionVersion: extensionVersion ?? undefined,
     });
-    void presetBrowserTransfer.selectedRevision(nativeCapabilities.status().installationRevision)
-      .catch(error => { log('Preset browser selection unavailable:', String(error)); return null; })
-      .then(presetInstallationRevision => sendToExtension({
-        type: 'pong', timestamp: Date.now(), version: NATIVE_HOST_VERSION,
-        rpcVersion: EXTENSION_RPC_VERSION, presetInstallationRevision, presetInstallationProtocol: PRESET_INSTALLATION_PROTOCOL,
-      }));
+    void presetBrowserTransfer
+      .selectedRevision(nativeCapabilities.status().installationRevision)
+      .catch(error => {
+        log('Preset browser selection unavailable:', String(error));
+        return null;
+      })
+      .then(presetInstallationRevision =>
+        sendToExtension({
+          type: 'pong',
+          timestamp: Date.now(),
+          version: NATIVE_HOST_VERSION,
+          rpcVersion: EXTENSION_RPC_VERSION,
+          presetInstallationRevision,
+          presetInstallationProtocol: PRESET_INSTALLATION_PROTOCOL,
+        }),
+      );
     nativeHostUpdateCoordinator.evaluate(message.version, message.checkForUpdates);
     return;
   }
@@ -1454,27 +1537,77 @@ async function dispatchHostRequest(request: any, managed = false): Promise<HostA
   const { action, data = {} } = request;
   const controlSource = normalizeControlSource(request.controlSource);
   if (action === '__provider_enhancement') {
-    if (request.controlSessionId !== undefined) throw new Error('Enhancements do not accept Mearl control sessions');
-    return { data: await getBrowserEnhancementGateway().invoke(
-      request.providerTarget, request.providerControlToken, data, request.deadline,
-      request.providerSourceIdentity, request.providerPageId,
-    ) };
+    if (request.controlSessionId !== undefined)
+      throw new Error('Enhancements do not accept Mearl control sessions');
+    return {
+      data: await getBrowserEnhancementGateway().invoke(
+        request.providerTarget,
+        request.providerControlToken,
+        data,
+        request.deadline,
+        request.providerSourceIdentity,
+        request.providerPageId,
+      ),
+    };
   }
-  if (action === 'preset_components_status' || action === 'preset_components_install') return { data: await (action === 'preset_components_install' ? presetComponentInstaller.install(data.installationRevision, { replaceSkills: data.replaceSkills }) : presetComponentInstaller.status(data.installationRevision)) };
+  if (action === 'preset_components_status' || action === 'preset_components_install')
+    return {
+      data: await (action === 'preset_components_install'
+        ? presetComponentInstaller.install(data.installationRevision, {
+            replaceSkills: data.replaceSkills,
+          })
+        : presetComponentInstaller.status(data.installationRevision)),
+    };
   if (action === 'preset_browser_sync') {
-    if (typeof data.installationRevision !== 'string' || !/^[a-f0-9]{64}$/.test(data.installationRevision)) throw new Error('Expected a preset installation revision');
-    return { data: await requestPresetBrowser({ operation: 'sync', installationRevision: data.installationRevision }) };
+    if (
+      typeof data.installationRevision !== 'string' ||
+      !/^[a-f0-9]{64}$/.test(data.installationRevision)
+    )
+      throw new Error('Expected a preset installation revision');
+    return {
+      data: await requestPresetBrowser({
+        operation: 'sync',
+        installationRevision: data.installationRevision,
+      }),
+    };
   }
-  if (action === 'preset_browser_status') return { data: await requestPresetBrowser({ operation: 'status' }) };
+  if (action === 'preset_browser_status') {
+    const status = await requestPresetBrowser({ operation: 'status' });
+    return { data: { ...status, uninstallSupported: true } };
+  }
+  if (action === 'preset_browser_uninstall') {
+    if (managed || controlSource !== 'local' || request.controlSessionId !== undefined)
+      throw new Error('Preset removal requires local setup');
+    return {
+      data: await requestPresetBrowser({
+        operation: 'uninstall',
+        browserRevision: data.browserRevision,
+        installationToken: data.installationToken,
+      }),
+    };
+  }
   if (action === 'profile_install') {
-    if (controlSource !== 'local' || request.controlSessionId !== undefined) throw new Error('App profile installation requires local setup');
-    if (extensionVersion === null) throw new Error('Connect a Mearl extension before installing App profiles');
+    if (controlSource !== 'local' || request.controlSessionId !== undefined)
+      throw new Error('App profile installation requires local setup');
+    if (extensionVersion === null)
+      throw new Error('Connect a Mearl extension before installing App profiles');
     if (typeof data.source !== 'string') throw new Error('Expected an App profile source');
-    return { data: await sendRequestToExtension('__profile_install', { source: data.source }, 145000, true) };
+    return {
+      data: await sendRequestToExtension(
+        '__profile_install',
+        { source: data.source },
+        145000,
+        true,
+      ),
+    };
   }
   if (action === 'node_capabilities_status') return { data: nativeCapabilities.status() };
-  if (action === 'node_capabilities_reload' && data.structured === true) return { data: await nativeCapabilities.synchronize() };
-  if (action === 'node_capabilities_reload') { await nativeCapabilities.refresh(); return { data: nativeCapabilities.status() }; }
+  if (action === 'node_capabilities_reload' && data.structured === true)
+    return { data: await nativeCapabilities.synchronize() };
+  if (action === 'node_capabilities_reload') {
+    await nativeCapabilities.refresh();
+    return { data: nativeCapabilities.status() };
+  }
   if (action === '__control_session_resolve') {
     return { data: { session: getControlSessionManager().registry.find(data.sessionId) ?? null } };
   }
@@ -1957,7 +2090,10 @@ function cleanupAndExit(code: number): void {
   const finish = (): void => {
     cleanupInstanceSocketFile();
     const deadline = setTimeout(() => process.exit(code), 2_000);
-    void closeAppAuthorizations().finally(() => { clearTimeout(deadline); process.exit(code); });
+    void closeAppAuthorizations().finally(() => {
+      clearTimeout(deadline);
+      process.exit(code);
+    });
   };
 
   if (socketServer) {
@@ -2039,7 +2175,9 @@ async function monitorReconnectableDaemonBrowser(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  await nativeCapabilities.refresh().catch(error => log('Node capabilities unavailable:', String(error)));
+  await nativeCapabilities
+    .refresh()
+    .catch(error => log('Node capabilities unavailable:', String(error)));
   initBrowserRegistry({ log });
   // Reap registry records left behind by native-hosts that crashed without
   // cleanup, so stale entries don't accumulate now that nothing prunes on read.
@@ -2071,9 +2209,23 @@ async function main(): Promise<void> {
   if (discoverCdp) scheduleInventoryExit(DISCOVERY_REQUEST_IDLE_EXIT_MS);
   await startSocketServer();
   if (!discoverCdp && !skipBrowserRegistration) {
-    const updatePreset = createNativePresetAutoUpdater({ directory: nativeCapabilityDirectory(), invoke: invokePresetHost, extensionConnected: () => extensionVersion !== null, browserSelection: () => requestPresetBrowser({ operation: 'status' }) as Promise<{ presetId?: string; presetSource?: string }>, log });
-    setTimeout(() => { void updatePreset(); }, 30_000).unref();
-    setInterval(() => { void updatePreset(); }, 60 * 60_000).unref();
+    const updatePreset = createNativePresetAutoUpdater({
+      directory: nativeCapabilityDirectory(),
+      invoke: invokePresetHost,
+      extensionConnected: () => extensionVersion !== null,
+      browserSelection: () =>
+        requestPresetBrowser({ operation: 'status' }) as Promise<{
+          presetId?: string;
+          presetSource?: string;
+        }>,
+      log,
+    });
+    setTimeout(() => {
+      void updatePreset();
+    }, 30_000).unref();
+    setInterval(() => {
+      void updatePreset();
+    }, 60 * 60_000).unref();
   }
 
   // Managed endpoints reconnect without a local Chrome authorization prompt.

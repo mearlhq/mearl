@@ -1343,7 +1343,7 @@ export class AgentBridge {
 
   private presetSynchronization: Promise<unknown> = Promise.resolve();
   private synchronizePreset(
-    input: { operation: 'status' } | { operation: 'sync'; installationRevision: string },
+    input: HostToExtensionActionMap['__preset_browser']['request'],
   ): Promise<unknown> {
     const run = () =>
       synchronizeBrowserPreset(input, request =>
