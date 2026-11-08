@@ -103,6 +103,48 @@ const internal = (operation: string, session: string, authorize?: boolean) => ({
   ...(authorize ? { authorize } : {}),
 });
 
+describe('automatic setup from the configured guide', () => {
+  it('opens a normal installation session when no preset has been selected', async () => {
+    const { service, install } = make();
+    const result = await service.external(input('openIfMissing'), owner());
+    expect(result).toHaveProperty('session');
+    expect(install).not.toHaveBeenCalled();
+  });
+
+  it('keeps one pending installation view across guide documents', async () => {
+    const { service } = make();
+    await service.external(input('openIfMissing'), owner());
+    frame.documentId = 'new-guide-document';
+    await expect(
+      service.external(input('openIfMissing'), { ...owner(), documentId: frame.documentId }),
+    ).resolves.toEqual({});
+    expect(chrome.tabs.create).toHaveBeenCalledOnce();
+  });
+
+  it.each(['activeRevision', 'installationToken'] as const)(
+    'preserves an existing browser selection recorded by %s',
+    async key => {
+      selection[key] = 'existing';
+      const { service } = make();
+      await expect(service.external(input('openIfMissing'), owner())).resolves.toEqual({});
+      expect(chrome.tabs.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it('preserves a preset selected on the connected local host', async () => {
+    const service = createInstallationService({
+      configuration: async () => config,
+      registry: { captureInstallationSelection: async () => selection } as any,
+      native: {
+        capture: async () => ({ protocol: 1, selection: 'node:' + 'a'.repeat(64) }),
+        request: vi.fn(),
+      },
+    });
+    await expect(service.external(input('openIfMissing'), owner())).resolves.toEqual({});
+    expect(chrome.tabs.create).not.toHaveBeenCalled();
+  });
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
   records = {};

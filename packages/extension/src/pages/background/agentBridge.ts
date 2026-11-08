@@ -1,4 +1,9 @@
-import { extensionPageDialogShortcut, withExtensionPageDialogs, getExtensionPageDialogs, runPageScript } from './pageDialogs';
+import {
+  extensionPageDialogShortcut,
+  withExtensionPageDialogs,
+  getExtensionPageDialogs,
+  runPageScript,
+} from './pageDialogs';
 import { handleGetCapabilities } from './capabilityDiscovery';
 import { handleBrowserEnhancement } from './browserEnhancements';
 import { getEnhancementTabUrl } from './browserEnhancementTarget';
@@ -113,14 +118,10 @@ import { getExtensionInstallationInfo } from '../../shared/extensionInstallation
 import { openToolboxToolTab } from '../../shared/toolboxTab';
 
 type InternalBrowserAction =
-  | keyof HostToExtensionActionMap
-  | 'get_browser_info'
-  | '__toolbox_open'
-  | '__extension_reload';
+  keyof HostToExtensionActionMap | 'get_browser_info' | '__toolbox_open' | '__extension_reload';
 
 type SingleExtensionBrowserAction =
-  | Exclude<ExtensionBrowserAction, 'run_actions'>
-  | InternalBrowserAction;
+  Exclude<ExtensionBrowserAction, 'run_actions'> | InternalBrowserAction;
 
 interface MessageFromAgent {
   id: string;
@@ -250,7 +251,10 @@ export class AgentBridge {
     devtoolsPorts: Map<number, chrome.runtime.Port>,
     devtoolsPagePorts: Map<number, chrome.runtime.Port> = new Map(),
     canHandleAgentActions: () => boolean = () => true,
-    private readonly installation?: (data: any, transport: (request: any) => Promise<any>) => Promise<unknown>,
+    private readonly installation?: (
+      data: any,
+      transport: (request: any) => Promise<any>,
+    ) => Promise<unknown>,
   ) {
     this.devtoolsPorts = devtoolsPorts;
     this.devtoolsPagePorts = devtoolsPagePorts;
@@ -358,6 +362,10 @@ export class AgentBridge {
         : null,
       extensionVersion: getExtensionVersion(),
     };
+  }
+
+  hasNativeConnection(): boolean {
+    return this.nativePort !== null;
   }
 
   destroy(): void {
@@ -778,13 +786,20 @@ export class AgentBridge {
     await this.assertAgentDomainsAuthorized(action, domains);
   }
 
-  private async assertAgentDomainsAuthorized(action: string, domains: Iterable<string>): Promise<void> {
+  private async assertAgentDomainsAuthorized(
+    action: string,
+    domains: Iterable<string>,
+  ): Promise<void> {
     for (const domain of domains) {
       if (!(await isAgentDomainAuthorized(domain))) throw new DomainPermissionError(action, domain);
     }
   }
 
-  private async assertEnhancementActionAuthorized(tabId: number, action: string, navigationOrigin?: string): Promise<void> {
+  private async assertEnhancementActionAuthorized(
+    tabId: number,
+    action: string,
+    navigationOrigin?: string,
+  ): Promise<void> {
     // A missing/transient tab lookup cannot bypass first-navigation or current-domain authorization.
     const currentUrl = await getEnhancementTabUrl(tabId);
     const domains = new Set<string>();
@@ -805,7 +820,8 @@ export class AgentBridge {
     if (shortcut) return shortcut.data;
     const work = () => this.dispatchSingleActionRaw(action, data, ctx, controlSource);
     return typeof data?.tabId === 'number' && action.startsWith('page_')
-      ? withExtensionPageDialogs(data.tabId, work) : work();
+      ? withExtensionPageDialogs(data.tabId, work)
+      : work();
   }
 
   private async dispatchSingleActionRaw(
@@ -817,7 +833,9 @@ export class AgentBridge {
     switch (action) {
       case '__preset_installation':
         if (!this.installation) throw new Error('Preset installation view is unavailable');
-        return this.installation(data, request => this.requestNativeHost('preset_browser_transfer', request));
+        return this.installation(data, request =>
+          this.requestNativeHost('preset_browser_transfer', request),
+        );
       case '__preset_browser':
         return this.synchronizePreset(data);
       case '__profile_install':
@@ -927,13 +945,19 @@ export class AgentBridge {
       case 'page_frames':
         return handlePageFrames(data, () => this.getActiveTabId());
       case '__browser_enhancement':
-        return handleBrowserEnhancement(data, (tabId, action, origin) => this.assertEnhancementActionAuthorized(tabId, action, origin));
+        return handleBrowserEnhancement(data, (tabId, action, origin) =>
+          this.assertEnhancementActionAuthorized(tabId, action, origin),
+        );
       case 'set_device_emulation':
-        return runSerializedQuickSimulationUpdate(data.tabId, () => handleSetDeviceEmulation(data, () => this.getActiveTabId()));
+        return runSerializedQuickSimulationUpdate(data.tabId, () =>
+          handleSetDeviceEmulation(data, () => this.getActiveTabId()),
+        );
       case 'set_app_profile':
         return handleSetAppSimulation(data, () => this.getActiveTabId());
       case 'set_timezone':
-        return runSerializedQuickSimulationUpdate(data.tabId, () => handleSetTimezone(data, () => this.getActiveTabId()));
+        return runSerializedQuickSimulationUpdate(data.tabId, () =>
+          handleSetTimezone(data, () => this.getActiveTabId()),
+        );
       case 'get_cookie':
         return handleGetCookie(data);
       case 'set_cookie':
@@ -1010,8 +1034,12 @@ export class AgentBridge {
   private async handleAgentMessage(message: MessageFromAgent): Promise<void> {
     const signal = this.activityLifetime.signal;
     try {
-      const enhancementRequiresAgent = message.action === '__browser_enhancement' && message.data?.operation !== 'release';
-      if (!this.canHandleAgentActions() && (message.trustedInternal !== true || enhancementRequiresAgent)) {
+      const enhancementRequiresAgent =
+        message.action === '__browser_enhancement' && message.data?.operation !== 'release';
+      if (
+        !this.canHandleAgentActions() &&
+        (message.trustedInternal !== true || enhancementRequiresAgent)
+      ) {
         throw new Error('Agent service is disabled');
       }
       if (!isAgentActionAllowedByInternalBoundary(message.action, message.trustedInternal)) {
@@ -1039,47 +1067,51 @@ export class AgentBridge {
 
       const targetTabId = actionData?.tabId;
       const execute = async () => {
+        if (
+          (AgentBridge.REQUEST_CAPTURING_ACTIONS.has(message.action) &&
+            !(message.action === 'page_eval' && actionData?.executionWorld === 'isolated')) ||
+          (message.action === 'set_cookie' && actionData?.reload === true)
+        ) {
+          await runPageScript(targetTabId, () => prepareTabForAgent(targetTabId, controlSource));
+        } else if (
+          actionTargetsTab(message.action, actionData) &&
+          typeof targetTabId === 'number'
+        ) {
+          markTabControlled(targetTabId, controlSource).catch(() => {});
+        }
 
-      if (
-        (AgentBridge.REQUEST_CAPTURING_ACTIONS.has(message.action) &&
-          !(message.action === 'page_eval' && actionData?.executionWorld === 'isolated')) ||
-        (message.action === 'set_cookie' && actionData?.reload === true)
-      ) {
-        await runPageScript(targetTabId, () => prepareTabForAgent(targetTabId, controlSource));
-      } else if (actionTargetsTab(message.action, actionData) && typeof targetTabId === 'number') {
-        markTabControlled(targetTabId, controlSource).catch(() => {});
-      }
+        let responseData: any;
 
-      let responseData: any;
-
-      if (message.action === 'run_actions') {
-        responseData = await this.handleRunActions(
-          actionData,
-          ctx,
-          controlSource,
-          message.trustedInternal === true,
-        );
-      } else if (shouldObservePageAction(message.action, actionData)) {
-        responseData = await this.handleObservedPageAction(
-          message.action,
-          actionData,
-          ctx,
-          controlSource,
-        );
-      } else {
-        responseData = await this.dispatchSingleAction(
-          message.action,
-          actionData,
-          ctx,
-          controlSource,
-        );
-      }
+        if (message.action === 'run_actions') {
+          responseData = await this.handleRunActions(
+            actionData,
+            ctx,
+            controlSource,
+            message.trustedInternal === true,
+          );
+        } else if (shouldObservePageAction(message.action, actionData)) {
+          responseData = await this.handleObservedPageAction(
+            message.action,
+            actionData,
+            ctx,
+            controlSource,
+          );
+        } else {
+          responseData = await this.dispatchSingleAction(
+            message.action,
+            actionData,
+            ctx,
+            controlSource,
+          );
+        }
 
         return responseData;
       };
       const shortcut = await extensionPageDialogShortcut(message.action, actionData);
-      const responseData = shortcut ? shortcut.data
-        : typeof targetTabId === 'number' && (message.action.startsWith('page_') || message.action === 'run_actions')
+      const responseData = shortcut
+        ? shortcut.data
+        : typeof targetTabId === 'number' &&
+            (message.action.startsWith('page_') || message.action === 'run_actions')
           ? await withExtensionPageDialogs(targetTabId, execute, false).catch(async error => {
               // Page.enable may discover a modal that was already open before this request.
               if (message.action === 'page_snapshot') {
@@ -1132,26 +1164,27 @@ export class AgentBridge {
       const shortcut = await extensionPageDialogShortcut(action, payload);
       if (shortcut) return { success: true, data: shortcut.data };
       const execute = async () => {
-      if (
-        typeof tabId === 'number' &&
-        actionTargetsTab(action, payload) &&
-        !preparedTabIds.has(tabId)
-      ) {
-        await runPageScript(tabId, () => prepareTabForAgent(tabId, controlSource));
-        preparedTabIds.add(tabId);
-      }
-      return {
-        success: true,
-        data: await this.dispatchSingleAction(
-          action as SingleExtensionBrowserAction,
-          payload,
-          ctx,
-          controlSource,
-        ),
-      };
+        if (
+          typeof tabId === 'number' &&
+          actionTargetsTab(action, payload) &&
+          !preparedTabIds.has(tabId)
+        ) {
+          await runPageScript(tabId, () => prepareTabForAgent(tabId, controlSource));
+          preparedTabIds.add(tabId);
+        }
+        return {
+          success: true,
+          data: await this.dispatchSingleAction(
+            action as SingleExtensionBrowserAction,
+            payload,
+            ctx,
+            controlSource,
+          ),
+        };
       };
       return typeof tabId === 'number' && action.startsWith('page_')
-        ? withExtensionPageDialogs(tabId, execute, false) : execute();
+        ? withExtensionPageDialogs(tabId, execute, false)
+        : execute();
     });
   }
 
@@ -1325,9 +1358,21 @@ export class AgentBridge {
   async supportsPresetInstallation(timeoutMs = 1500): Promise<boolean> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      await Promise.race([this.handshakeReady, new Promise(resolve => { timer = setTimeout(resolve, timeoutMs); })]);
-      return this.nativePort !== null && this.currentConnectionGotPong && this.nativeRpcVersion === EXTENSION_RPC_VERSION && this.nativePresetInstallationProtocol === 1;
-    } finally { clearTimeout(timer); }
+      await Promise.race([
+        this.handshakeReady,
+        new Promise(resolve => {
+          timer = setTimeout(resolve, timeoutMs);
+        }),
+      ]);
+      return (
+        this.nativePort !== null &&
+        this.currentConnectionGotPong &&
+        this.nativeRpcVersion === EXTENSION_RPC_VERSION &&
+        this.nativePresetInstallationProtocol === 1
+      );
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async requestNativeHost(action: string, data: any = {}, timeoutMs = 15000): Promise<any> {
@@ -1360,7 +1405,11 @@ export class AgentBridge {
         );
       }
     }
-    if (action === 'preset_installation' && this.nativePresetInstallationProtocol !== 1) throw new ExtensionRpcError('UNSUPPORTED_ACTION', 'The local service requires an update for preset installation.');
+    if (action === 'preset_installation' && this.nativePresetInstallationProtocol !== 1)
+      throw new ExtensionRpcError(
+        'UNSUPPORTED_ACTION',
+        'The local service requires an update for preset installation.',
+      );
     const remainingMs = Math.max(1, timeoutMs - (Date.now() - startedAt));
     const id = `panel_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     return new Promise((resolve, reject) => {

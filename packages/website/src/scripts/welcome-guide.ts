@@ -1,7 +1,10 @@
 import { loadInstallationConfig, readJsonResponse } from '../lib/installation.mjs';
 import { installedCopy } from '../lib/installed-copy';
 
-export interface Guide { url: string; registry: string }
+export interface Guide {
+  url: string;
+  registry: string;
+}
 export type ProbeResult = 'ready' | 'unavailable' | 'denied' | 'cancelled';
 
 /** Unknown permission support requires an explicit click, rather than an unsolicited prompt. */
@@ -12,7 +15,9 @@ export async function localNetworkPermission(): Promise<PermissionStatus | undef
   for (const name of names) {
     try {
       return await navigator.permissions.query({ name: name as PermissionName });
-    } catch { /* Chromium permission names vary by version. */ }
+    } catch {
+      /* Chromium permission names vary by version. */
+    }
   }
   return undefined;
 }
@@ -27,26 +32,51 @@ export function mayAutoProbe(permission: PermissionStatus | undefined, userAgent
 export function supportsPublicProbe(registry: string): boolean {
   try {
     const init: RequestInit & { targetAddressSpace: 'public' } = { targetAddressSpace: 'public' };
-    return (new Request(registry, init) as Request & { targetAddressSpace?: string }).targetAddressSpace === 'public';
-  } catch { return false; }
+    return (
+      (new Request(registry, init) as Request & { targetAddressSpace?: string })
+        .targetAddressSpace === 'public'
+    );
+  } catch {
+    return false;
+  }
 }
 
 /** Uses the registry's standard npm ping endpoint; no account cookies or host process are needed. */
-export function probeGuide(guide: Guide, options: { permission?: PermissionStatus; manual: boolean; publicOnly?: boolean; signal: AbortSignal }): Promise<ProbeResult> {
+export function probeGuide(
+  guide: Guide,
+  options: {
+    permission?: PermissionStatus;
+    manual: boolean;
+    publicOnly?: boolean;
+    request?: typeof fetch;
+    signal: AbortSignal;
+  },
+): Promise<ProbeResult> {
   return new Promise(resolve => {
     const permission = options.publicOnly ? undefined : options.permission;
-    if (options.signal.aborted) { resolve('cancelled'); return; }
-    if (permission?.state === 'denied') { resolve('denied'); return; }
+    if (options.signal.aborted) {
+      resolve('cancelled');
+      return;
+    }
+    if (permission?.state === 'denied') {
+      resolve('denied');
+      return;
+    }
     const controller = new AbortController();
     const url = new URL('-/ping', guide.registry);
     url.searchParams.set('mearl_probe', crypto.randomUUID());
     let settled = false;
     let networkTimer: number | undefined;
     // A permission decision can take longer than the registry's network deadline.
-    const permissionPending = !options.publicOnly && options.manual && permission?.state !== 'granted';
-    const overallTimer = window.setTimeout(() => finish('unavailable'), permissionPending ? 120_000 : 5_000);
+    const permissionPending =
+      !options.publicOnly && options.manual && permission?.state !== 'granted';
+    const overallTimer = window.setTimeout(
+      () => finish('unavailable'),
+      permissionPending ? 120_000 : 5_000,
+    );
     function shortDeadline() {
-      if (!settled && !networkTimer) networkTimer = window.setTimeout(() => finish('unavailable'), 5_000);
+      if (!settled && !networkTimer)
+        networkTimer = window.setTimeout(() => finish('unavailable'), 5_000);
     }
     function finish(result: ProbeResult) {
       if (settled) return;
@@ -62,23 +92,84 @@ export function probeGuide(guide: Guide, options: { permission?: PermissionStatu
       if (permission?.state === 'denied') finish('denied');
       else if (permission?.state === 'granted') shortDeadline();
     }
-    function onAbort() { finish('cancelled'); }
+    function onAbort() {
+      finish('cancelled');
+    }
     options.signal.addEventListener('abort', onAbort, { once: true });
     permission?.addEventListener('change', onPermission);
     const request: RequestInit & { targetAddressSpace?: 'public' } = {
-      cache: 'no-store', credentials: 'omit', redirect: 'error', signal: controller.signal,
+      cache: 'no-store',
+      credentials: 'omit',
+      redirect: 'error',
+      signal: controller.signal,
       ...(options.publicOnly ? { targetAddressSpace: 'public' as const } : {}),
     };
-    fetch(url, request)
+    (options.request ?? fetch)(url, request)
       .then(async response => {
-        if (settled) { void response.body?.cancel().catch(() => {}); return; }
+        if (settled) {
+          void response.body?.cancel().catch(() => {});
+          return;
+        }
         shortDeadline();
-        if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) return finish('unavailable');
+        if (!response.ok || !response.headers.get('content-type')?.includes('application/json'))
+          return finish('unavailable');
         const data = await readJsonResponse(response, 4096);
-        finish(data && typeof data === 'object' && 'pong' in data && data.pong === true ? 'ready' : 'unavailable');
+        finish(
+          data && typeof data === 'object' && 'pong' in data && data.pong === true
+            ? 'ready'
+            : 'unavailable',
+        );
       })
       .catch(() => finish(permission?.state === 'denied' ? 'denied' : 'unavailable'));
   });
+}
+
+const networkFeatures = ['local-network', 'loopback-network', 'local-network-access'];
+interface NetworkPolicy {
+  features(): string[];
+  allowsFeature(name: string): boolean;
+}
+function networkPolicy(doc: Document | null): NetworkPolicy | undefined {
+  return (doc as (Document & { featurePolicy?: NetworkPolicy }) | null)?.featurePolicy;
+}
+function controlsLocalNetwork(policy: NetworkPolicy | undefined): policy is NetworkPolicy {
+  const features = policy?.features();
+  return Boolean(
+    features?.includes('local-network-access') ||
+    (features?.includes('local-network') && features.includes('loopback-network')),
+  );
+}
+
+export async function probeWithoutLocalNetwork(
+  guide: Guide,
+  signal: AbortSignal,
+): Promise<ProbeResult> {
+  if (controlsLocalNetwork(networkPolicy(document))) {
+    const frame = document.createElement('iframe');
+    frame.hidden = true;
+    frame.allow = networkFeatures.map(feature => feature + " 'none'").join('; ');
+    document.body.append(frame);
+    try {
+      const policy = networkPolicy(frame.contentDocument);
+      const realm = frame.contentWindow;
+      if (
+        realm &&
+        controlsLocalNetwork(policy) &&
+        policy
+          .features()
+          .filter(feature => networkFeatures.includes(feature))
+          .every(feature => !policy.allowsFeature(feature))
+      ) {
+        // Chromium can classify proxied HTTPS as unknown. The frame blocks local access without requiring a public IP classification.
+        return await probeGuide(guide, { manual: false, request: realm.fetch.bind(realm), signal });
+      }
+    } finally {
+      frame.remove();
+    }
+  }
+  return supportsPublicProbe(guide.registry)
+    ? probeGuide(guide, { manual: false, publicOnly: true, signal })
+    : 'unavailable';
 }
 
 export async function initGuide(): Promise<void> {
@@ -94,34 +185,52 @@ export async function initGuide(): Promise<void> {
   let active: AbortController | undefined;
   let disposed = false;
   const lifetime = new AbortController();
-  window.addEventListener('pagehide', () => { disposed = true; active?.abort(); lifetime.abort(); }, { once: true });
-  const run = async (manual: boolean, publicOnly = false) => {
+  window.addEventListener(
+    'pagehide',
+    () => {
+      disposed = true;
+      active?.abort();
+      lifetime.abort();
+    },
+    { once: true },
+  );
+  const run = async (manual: boolean, restricted = false) => {
     if (!guide || active) return;
     active = new AbortController();
     status.textContent = t.checking;
     detect.disabled = true;
     cancel.hidden = false;
     region.setAttribute('aria-busy', 'true');
-    const result = await probeGuide(guide, { permission, manual, publicOnly, signal: active.signal });
+    const result = restricted
+      ? await probeWithoutLocalNetwork(guide, active.signal)
+      : await probeGuide(guide, { permission, manual, signal: active.signal });
     active = undefined;
     detect.disabled = false;
     cancel.hidden = true;
     region.removeAttribute('aria-busy');
     if (disposed) return;
-    if (result === 'ready') { window.location.replace(guide.url); return; }
-    status.textContent = result === 'denied'
-      ? t.denied
-      : result === 'unavailable' && permission?.state === 'denied'
-      ? t.unreachable
-      : result === 'cancelled' ? t.cancelled
-      : t.unavailable;
+    if (result === 'ready') {
+      window.location.replace(guide.url);
+      return;
+    }
+    status.textContent =
+      result === 'denied'
+        ? t.denied
+        : result === 'unavailable' && permission?.state === 'denied'
+          ? t.unreachable
+          : result === 'cancelled'
+            ? t.cancelled
+            : t.unavailable;
     detect.textContent = t.retry;
   };
   const configure = async () => {
     detect.disabled = true;
     try {
-      const config = await loadInstallationConfig(new URL(region.dataset.configUrl ?? 'installation.json', window.location.href), window.location.origin,
-        AbortSignal.any([lifetime.signal, AbortSignal.timeout(5_000)]));
+      const config = await loadInstallationConfig(
+        new URL(region.dataset.configUrl ?? 'installation.json', window.location.href),
+        window.location.origin,
+        AbortSignal.any([lifetime.signal, AbortSignal.timeout(5_000)]),
+      );
       if (disposed) return;
       if (!config.guide) {
         guide = undefined;
@@ -139,20 +248,38 @@ export async function initGuide(): Promise<void> {
       status.textContent = t.ready;
       // A stalled Permissions API must not prevent the explicit detection button from working.
       let timer: number | undefined;
-      permission = await Promise.race([localNetworkPermission(), new Promise<undefined>(resolve => { timer = window.setTimeout(resolve, 1_000); })]);
+      permission = await Promise.race([
+        localNetworkPermission(),
+        new Promise<undefined>(resolve => {
+          timer = window.setTimeout(resolve, 1_000);
+        }),
+      ]);
       window.clearTimeout(timer);
       if (!disposed) {
         if (mayAutoProbe(permission, navigator.userAgent)) await run(false);
-        else if (supportsPublicProbe(guide.registry)) await run(false, true);
+        else if (
+          controlsLocalNetwork(networkPolicy(document)) ||
+          supportsPublicProbe(guide.registry)
+        )
+          await run(false, true);
       }
     } catch {
       if (disposed) return;
       region.hidden = false;
       link.hidden = true;
       status.textContent = t.configError;
-    } finally { detect.disabled = false; }
+    } finally {
+      detect.disabled = false;
+    }
   };
   cancel.addEventListener('click', () => active?.abort(), { signal: lifetime.signal });
-  detect.addEventListener('click', () => { if (guide) void run(true, permission?.state === 'denied' && supportsPublicProbe(guide.registry)); else void configure(); }, { signal: lifetime.signal });
+  detect.addEventListener(
+    'click',
+    () => {
+      if (guide) void run(true, permission?.state === 'denied');
+      else void configure();
+    },
+    { signal: lifetime.signal },
+  );
   await configure();
 }
