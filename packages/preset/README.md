@@ -12,6 +12,8 @@
 
 主入口在浏览器和 Node 中共享 preset 清单校验与继承解析，没有文件系统、网络、凭据或浏览器权限副作用；清单加载由调用方提供。可选子入口 `@mearl/preset/bundles` 提供资源校验、受限下载和显式调用的浏览器本地存储，见 [能力包说明](../../docs/browser-bundles.md)。
 
+`@mearl/preset/pageRuntime` 为独立的页面注入脚本提供页面运行时宿主及注入源码生成函数。
+
 ```ts
 import { resolvePreset, mergePresetDefaults } from '@mearl/preset';
 

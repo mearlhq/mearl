@@ -19,6 +19,10 @@
       "types": "./dist/installation.d.ts",
       "import": "./dist/installation.js"
     },
+    "./pageRuntime": {
+      "types": "./dist/pageRuntime.d.ts",
+      "import": "./dist/pageRuntime.js"
+    },
     "./installation-site.json": "./installation-site.json",
     "./networkRoutes": {
       "types": "./dist/networkRoutes.d.ts",

@@ -12,6 +12,8 @@ Browser and Node share one inheritance resolution and resource download; see [co
 
 The main entry shares preset validation and inheritance resolution across browsers and Node, without filesystem, network, credential, or browser permission side effects. Callers supply manifest loading. Optional `@mearl/preset/bundles` provides resource validation, bounded downloads, and explicitly invoked browser-local storage; see [browser bundles](../../docs/browser-bundles.en.md).
 
+`@mearl/preset/pageRuntime` provides the page runtime host and source generation functions for standalone page injection scripts.
+
 ```ts
 import { resolvePreset, mergePresetDefaults } from '@mearl/preset';
 

@@ -241,9 +241,6 @@ importers:
       prismjs:
         specifier: 1.30.0
         version: 1.30.0
-      semver:
-        specifier: 7.8.5
-        version: 7.8.5
       uqr:
         specifier: 0.1.2
         version: 0.1.2
@@ -296,9 +293,6 @@ importers:
       '@types/react-dom':
         specifier: 19.2.3
         version: 19.2.3(@types/react@19.2.10)
-      '@types/semver':
-        specifier: 7.8.0
-        version: 7.8.0
       '@types/webextension-polyfill':
         specifier: 0.12.4
         version: 0.12.4

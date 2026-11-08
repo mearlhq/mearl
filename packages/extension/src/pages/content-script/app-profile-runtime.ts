@@ -3,7 +3,7 @@ import {
   installRootWebViewDocumentTransport,
 } from '@mearl/browser-core/appProfileRuntime';
 import { APP_PROFILE_RUNTIME_INSTALLER } from '../../shared/appProfileRuntimeAsset';
-import { installPageRuntimeHost } from '@mearl/preset/bundles';
+import { installPageRuntimeHost } from '@mearl/preset/pageRuntime';
 
 const host = installPageRuntimeHost();
 
