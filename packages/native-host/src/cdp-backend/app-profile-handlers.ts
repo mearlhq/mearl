@@ -2,7 +2,10 @@ import { sendCdpPageCommand, getCdpPageDialogs } from './page-dialogs.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { processIdentity } from '@mearl/daemon-core';
 import { NodePageRuntimeStore, nativeCapabilityDirectory } from '../page-runtime-store.js';
-import { buildPageRuntimeRegistrationSource, buildPageRuntimeCallSource, type PageRuntimeBinding } from '@mearl/preset/bundles';
+import {
+  buildPageRuntimeRegistrationSource,
+  buildPageRuntimeCallSource,
+} from '@mearl/preset/bundles';
 import { nativeCapabilities } from '../native-capability-services.js';
 import { findCapabilityAppProfile, resolveInstalledAppProfile } from '../app-profile-catalog.js';
 /** CDP App environment and JSBridge injection. */
@@ -151,9 +154,20 @@ function serializeForSource(value: unknown): string {
 
 function buildDocumentSource(config: InjectedAppProfileConfig, session: PageSession): string {
   const runtime = config.pageRuntime;
-  const source = runtime ? new NodePageRuntimeStore(nativeCapabilityDirectory()).resolve(runtime, nativeCapabilities.get('app.pageRuntime'), session.runtimeOwner) : undefined;
-  const registration = runtime && source ? buildPageRuntimeRegistrationSource(runtime, source, '__mearlInstallPageRuntime__') : '';
-  const call = runtime ? buildPageRuntimeCallSource('config') : buildAppProfileRuntimeCallSource('config');
+  const source = runtime
+    ? new NodePageRuntimeStore(nativeCapabilityDirectory()).resolve(
+        runtime,
+        nativeCapabilities.get('app.pageRuntime'),
+        session.runtimeOwner,
+      )
+    : undefined;
+  const registration =
+    runtime && source
+      ? buildPageRuntimeRegistrationSource(runtime, source, '__mearlInstallPageRuntime__')
+      : '';
+  const call = runtime
+    ? buildPageRuntimeCallSource('config')
+    : buildAppProfileRuntimeCallSource('config');
   return `;(() => {const config=${serializeForSource(config)};(${installAppProfileMessageRelay.toString()})(${JSON.stringify(APP_PROFILE_BINDING)});(${installAppProfileDocumentEnvironment.toString()})(config,${JSON.stringify({ globals: 'runtime', restoreHintName: APP_PROFILE_RESTORE_HINT })});${registration};(${installAppProfileWhenDocumentReady.toString()})(() => {${call};},config.rootContainer?.enabled===true&&window===window.top);})();`;
 }
 
@@ -351,30 +365,88 @@ function listenForBridgeRequests(
     void (async () => {
       if (request.type === 'settings') {
         try {
-          const top = client === session.client && typeof contextId === 'number' ? await client.sendCommand('Runtime.evaluate', { expression: 'globalThis === globalThis.top', contextId, returnByValue: true }) : null;
-          if (top?.result?.value !== true || appProfileStates.get(session) !== state || !state.baseConfig.binding || request.payload?.profile !== state.baseConfig.profile) throw new Error('App settings require the active top document');
+          const top =
+            client === session.client && typeof contextId === 'number'
+              ? await client.sendCommand('Runtime.evaluate', {
+                  expression: 'globalThis === globalThis.top',
+                  contextId,
+                  returnByValue: true,
+                })
+              : null;
+          if (
+            top?.result?.value !== true ||
+            appProfileStates.get(session) !== state ||
+            !state.baseConfig.binding ||
+            request.payload?.profile !== state.baseConfig.profile
+          )
+            throw new Error('App settings require the active top document');
           let bridgeConfig;
           let options;
           let responses;
           let reload = false;
           if (typeof request.payload?.settingId === 'string') {
-            const updated = updateAppProfileSetting(state.baseConfig, request.payload.settingId, request.payload.value);
-            options = updated.options; responses = updated.responses; reload = updated.reload;
+            const updated = updateAppProfileSetting(
+              state.baseConfig,
+              request.payload.settingId,
+              request.payload.value,
+            );
+            options = updated.options;
+            responses = updated.responses;
+            reload = updated.reload;
           } else {
             const value = request.payload?.responses;
-            if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(method => !Object.hasOwn(state.baseConfig.binding!.definition.actions.responses ?? {}, method))) throw new Error('Undeclared App response');
-            bridgeConfig = { methods: Object.fromEntries(Object.entries(value).map(([method, response]) => [method, { response, ...(state.baseConfig.actions.silent?.includes(method) && { silent: true }) }])) };
-            validateAppBridgeConfig(bridgeConfig); responses = value;
+            if (
+              !value ||
+              typeof value !== 'object' ||
+              Array.isArray(value) ||
+              Object.keys(value).some(
+                method =>
+                  !Object.hasOwn(
+                    state.baseConfig.binding!.definition.actions.responses ?? {},
+                    method,
+                  ),
+              )
+            )
+              throw new Error('Undeclared App response');
+            bridgeConfig = {
+              methods: Object.fromEntries(
+                Object.entries(value).map(([method, response]) => [
+                  method,
+                  {
+                    response,
+                    ...(state.baseConfig.actions.silent?.includes(method) && { silent: true }),
+                  },
+                ]),
+              ),
+            };
+            validateAppBridgeConfig(bridgeConfig);
+            responses = value;
           }
-          await cdpSetAppProfile(session, { ...options, ...(bridgeConfig && { bridgeConfig }), tabId: session.tabId, enabled: true, profile: state.baseConfig.profile, reload });
-          await reply({ type: 'APP_BRIDGE_SETTINGS_RESPONSE', result: { success: true, responses, reload } });
-        } catch (error) { await reply({ type: 'APP_BRIDGE_SETTINGS_RESPONSE', result: { success: false, error: String(error) } }); }
+          await cdpSetAppProfile(session, {
+            ...options,
+            ...(bridgeConfig && { bridgeConfig }),
+            tabId: session.tabId,
+            enabled: true,
+            profile: state.baseConfig.profile,
+            reload,
+          });
+          await reply({
+            type: 'APP_BRIDGE_SETTINGS_RESPONSE',
+            result: { success: true, responses, reload },
+          });
+        } catch (error) {
+          await reply({
+            type: 'APP_BRIDGE_SETTINGS_RESPONSE',
+            result: { success: false, error: String(error) },
+          });
+        }
         return;
       }
       if (request.type === 'authCode') {
         if (
           !state.config.binding?.definition.authorization ||
-          state.config.actions.behaviors?.[state.config.binding.definition.authorization.method] !== 'authCode'
+          state.config.actions.behaviors?.[state.config.binding.definition.authorization.method] !==
+            'authCode'
         )
           return;
         if (pendingAuth.has(authKey)) return;
@@ -382,15 +454,19 @@ function listenForBridgeRequests(
         let browserId = '';
         try {
           let progressQueue: Promise<void> = Promise.resolve();
-          const pairing = await startAppAuthorization(state.config.binding!.definition.authorization!.hook, request.payload, phase => {
-            progressQueue = progressQueue
-              .then(async () => {
-                if (!cancelledAuth.has(authKey)) {
-                  await reply({ type: 'APP_BRIDGE_AUTH_CODE_PROGRESS', phase });
-                }
-              })
-              .catch(() => {});
-          });
+          const pairing = await startAppAuthorization(
+            state.config.binding!.definition.authorization!.hook,
+            request.payload,
+            phase => {
+              progressQueue = progressQueue
+                .then(async () => {
+                  if (!cancelledAuth.has(authKey)) {
+                    await reply({ type: 'APP_BRIDGE_AUTH_CODE_PROGRESS', phase });
+                  }
+                })
+                .catch(() => {});
+            },
+          );
           await progressQueue;
           browserId = pairing.browserId;
           if (cancelledAuth.has(authKey)) return;
@@ -484,34 +560,38 @@ function listenForBridgeRequests(
       let streamCapture: CdpProtocolStreamCapture | undefined;
       try {
         if (request.type === 'protocolStream') {
-          await cdpSendProtocolStreamRequest(session, protocolPayload as unknown as Record<string, unknown>, {
-            onRequestPrepared: metadata => {
-              streamCapture = recordCdpProtocolStreamStart(session.buffers, {
-                namespace: metadata.metadata?.namespace,
-                environment: metadata.metadata?.environment,
-                api: String(protocolPayload.api ?? ''),
-                url: metadata.url,
-                method: metadata.method,
-                requestHeaders: metadata.requestHeaders,
-                requestData: protocolPayload.data ?? null,
-              });
+          await cdpSendProtocolStreamRequest(
+            session,
+            protocolPayload as unknown as Record<string, unknown>,
+            {
+              onRequestPrepared: metadata => {
+                streamCapture = recordCdpProtocolStreamStart(session.buffers, {
+                  namespace: metadata.metadata?.namespace,
+                  environment: metadata.metadata?.environment,
+                  api: String(protocolPayload.api ?? ''),
+                  url: metadata.url,
+                  method: metadata.method,
+                  requestHeaders: metadata.requestHeaders,
+                  requestData: protocolPayload.data ?? null,
+                });
+              },
+              onResponse: metadata => {
+                if (streamCapture) {
+                  recordCdpProtocolStreamResponse(session.buffers, streamCapture, metadata);
+                }
+              },
+              onReceive: async data => {
+                if (streamCapture) {
+                  recordCdpProtocolStreamChunk(session.buffers, streamCapture, data);
+                }
+                await reply({
+                  type: 'APP_BRIDGE_PROTOCOL_STREAM_EVENT',
+                  eventType: 'onReceive',
+                  data,
+                });
+              },
             },
-            onResponse: metadata => {
-              if (streamCapture) {
-                recordCdpProtocolStreamResponse(session.buffers, streamCapture, metadata);
-              }
-            },
-            onReceive: async data => {
-              if (streamCapture) {
-                recordCdpProtocolStreamChunk(session.buffers, streamCapture, data);
-              }
-              await reply({
-                type: 'APP_BRIDGE_PROTOCOL_STREAM_EVENT',
-                eventType: 'onReceive',
-                data,
-              });
-            },
-          });
+          );
           if (streamCapture) recordCdpProtocolStreamEnd(session.buffers, streamCapture);
           await reply({
             type: 'APP_BRIDGE_PROTOCOL_STREAM_EVENT',
@@ -572,7 +652,8 @@ async function installChildTarget(
       const source = buildDocumentSource(childEnvironment.profile, session);
 
       if (childEnvironment.emulation) {
-        await sendCommands(session,
+        await sendCommands(
+          session,
           child,
           appProfileEmulationCommands(childEnvironment.emulation, state.config.userAgent),
           signal,
@@ -632,14 +713,15 @@ async function disposeState(session: PageSession, state: CdpAppProfileState): Pr
     // The target may already be closing; the daemon-owned handlers are still disposed locally.
   }
   await sendCdpPageCommand(session, session.client, 'Runtime.evaluate', {
-      expression: `delete globalThis[${JSON.stringify(APP_PROFILE_RESTORE_HINT)}]`,
-    })
-    .catch(() => {});
+    expression: `delete globalThis[${JSON.stringify(APP_PROFILE_RESTORE_HINT)}]`,
+  }).catch(() => {});
   const deviceEmulation = session.emulation?.config;
   if (deviceEmulation) {
     const commands = buildEnableEmulationCommands(deviceEmulation);
     await sendCommands(session, session.client, commands);
-    await Promise.allSettled(state.childClients.map(client => sendCommands(session, client, commands)));
+    await Promise.allSettled(
+      state.childClients.map(client => sendCommands(session, client, commands)),
+    );
   } else {
     await Promise.allSettled(
       [session.client, ...state.childClients].map(client =>
@@ -664,12 +746,15 @@ async function rollbackAppProfileInstall(
     }),
   ]);
   if (deviceEmulation) {
-    await sendCommands(session, session.client, buildEnableEmulationCommands(deviceEmulation)).catch(
-      () => {},
-    );
+    await sendCommands(
+      session,
+      session.client,
+      buildEnableEmulationCommands(deviceEmulation),
+    ).catch(() => {});
   } else {
-    await sendCdpPageCommand(session, session.client, 'Emulation.setUserAgentOverride', { userAgent: '' })
-      .catch(() => {});
+    await sendCdpPageCommand(session, session.client, 'Emulation.setUserAgentOverride', {
+      userAgent: '',
+    }).catch(() => {});
   }
 }
 
@@ -681,7 +766,11 @@ export function resolveCdpAppProfile(
 ): ResolvedCdpAppProfile {
   definition ??= findCapabilityAppProfile(profile)?.definition;
   const candidate = definition ?? current?.binding?.definition;
-  if (candidate && !candidate.pageRuntime && (candidate.bridges.length > 0 || Object.keys(candidate.globals).length > 0)) {
+  if (
+    candidate &&
+    !candidate.pageRuntime &&
+    (candidate.bridges.length > 0 || Object.keys(candidate.globals).length > 0)
+  ) {
     const runtime = nativeCapabilities.get('app.defaultPageRuntime')?.();
     if (!runtime) throw new Error('This App profile requires an installed page runtime capability');
     definition = validateAppProfileDefinition({ ...candidate, pageRuntime: runtime });
@@ -689,12 +778,18 @@ export function resolveCdpAppProfile(
   const resolved = resolveAppProfileUpdate(profile, { current, definition, options });
   const restoreOptions: CdpAppProfileRestoreOptions = {
     os: resolved.injected.platform === 'Android' ? 'android' : 'ios',
-    appVersion: resolved.injected.binding?.options.appVersion ?? resolved.injected.globals.__APP_VERSION__ ?? '',
+    appVersion:
+      resolved.injected.binding?.options.appVersion ??
+      resolved.injected.globals.__APP_VERSION__ ??
+      '',
     language: resolved.injected.language,
     ...(resolved.injected.binding?.options.lockDefinition !== undefined && {
       lockDefinition: resolved.injected.binding.options.lockDefinition,
     }),
-    deviceModel: resolved.injected.binding?.options.deviceModel ?? resolved.injected.globals.__DEVICE_MODEL__ ?? '',
+    deviceModel:
+      resolved.injected.binding?.options.deviceModel ??
+      resolved.injected.globals.__DEVICE_MODEL__ ??
+      '',
     ...(resolved.injected.deviceAppearance?.preset
       ? { devicePreset: resolved.injected.deviceAppearance.preset }
       : {}),
@@ -873,10 +968,15 @@ async function replaceRestoreState(
   restoreState: Omit<CdpAppProfileRestoreState, 'activeDocument'>,
   writeCurrent = true,
 ): Promise<void> {
-  const result = await sendCdpPageCommand(session, session.client, 'Page.addScriptToEvaluateOnNewDocument', {
-    source: buildRestoreStateSource(restoreState, true),
-    worldName: APP_PROFILE_RESTORE_WORLD,
-  });
+  const result = await sendCdpPageCommand(
+    session,
+    session.client,
+    'Page.addScriptToEvaluateOnNewDocument',
+    {
+      source: buildRestoreStateSource(restoreState, true),
+      worldName: APP_PROFILE_RESTORE_WORLD,
+    },
+  );
   if (typeof result.identifier !== 'string' || !result.identifier) {
     throw new Error('Chrome did not return an app profile restore script identifier');
   }
@@ -914,9 +1014,14 @@ async function replaceAppProfileDocumentSource(
   state: CdpAppProfileState,
   config: InjectedAppProfileConfig,
 ): Promise<void> {
-  const result = await sendCdpPageCommand(session, session.client, 'Page.addScriptToEvaluateOnNewDocument', {
-    source: buildDocumentSource(config, session),
-  });
+  const result = await sendCdpPageCommand(
+    session,
+    session.client,
+    'Page.addScriptToEvaluateOnNewDocument',
+    {
+      source: buildDocumentSource(config, session),
+    },
+  );
   if (typeof result.identifier !== 'string' || !result.identifier) {
     throw new Error('Chrome did not return an App profile bootstrap script identifier');
   }
@@ -949,8 +1054,7 @@ export async function restoreCdpAppProfile(session: PageSession): Promise<boolea
     silent: true,
   });
   const pageState = pageProbe.result?.value as
-    | { profile?: unknown; restoreHint?: unknown }
-    | undefined;
+    { profile?: unknown; restoreHint?: unknown } | undefined;
   if (typeof pageState?.profile !== 'string' && pageState?.restoreHint !== true) return false;
 
   const contextId = await getRestoreExecutionContext(session);
@@ -1022,12 +1126,15 @@ export async function restoreCdpAppProfile(session: PageSession): Promise<boolea
     session.emulation = previousEmulation;
     if (restoredEmulation) {
       if (previousEmulation?.config) {
-        await sendCommands(session,
+        await sendCommands(
+          session,
           session.client,
           buildEnableEmulationCommands(previousEmulation.config),
         ).catch(() => {});
       } else {
-        await sendCommands(session, session.client, buildDisableEmulationCommands()).catch(() => {});
+        await sendCommands(session, session.client, buildDisableEmulationCommands()).catch(
+          () => {},
+        );
       }
     }
     throw new Error(
@@ -1038,16 +1145,28 @@ export async function restoreCdpAppProfile(session: PageSession): Promise<boolea
   return true;
 }
 
-export async function applyResolvedCdpAppProfile(session: PageSession, resolved: ResolvedCdpAppProfile): Promise<void> {
+export async function applyResolvedCdpAppProfile(
+  session: PageSession,
+  resolved: ResolvedCdpAppProfile,
+): Promise<void> {
   const previousRuntime = appProfileStates.get(session)?.config.pageRuntime;
-  const transitionOwner = previousRuntime && session.runtimeOwner ? {
-    browser: createHash('sha256').update(randomUUID()).digest('hex'), target: session.targetId,
-    pid: process.pid, processIdentity: processIdentity(process.pid),
-  } : undefined;
+  const transitionOwner =
+    previousRuntime && session.runtimeOwner
+      ? {
+          browser: createHash('sha256').update(randomUUID()).digest('hex'),
+          target: session.targetId,
+          pid: process.pid,
+          processIdentity: processIdentity(process.pid),
+        }
+      : undefined;
   const store = new NodePageRuntimeStore();
-  if (previousRuntime && transitionOwner) store.resolve(previousRuntime, undefined, transitionOwner);
-  try { await applyResolvedCdpAppProfileImpl(session, resolved); }
-  finally { if (transitionOwner) store.release(transitionOwner); }
+  if (previousRuntime && transitionOwner)
+    store.resolve(previousRuntime, undefined, transitionOwner);
+  try {
+    await applyResolvedCdpAppProfileImpl(session, resolved);
+  } finally {
+    if (transitionOwner) store.release(transitionOwner);
+  }
 }
 
 async function applyResolvedCdpAppProfileImpl(
@@ -1065,7 +1184,8 @@ async function applyResolvedCdpAppProfileImpl(
   let state: CdpAppProfileState | undefined;
   try {
     if (deviceEmulation) {
-      await sendCommands(session,
+      await sendCommands(
+        session,
         session.client,
         appProfileEmulationCommands(deviceEmulation, resolved.profile.ua),
       );
@@ -1077,15 +1197,23 @@ async function applyResolvedCdpAppProfileImpl(
     }
     await session.client.sendCommand('Runtime.enable');
     await session.client.sendCommand('Runtime.addBinding', { name: APP_PROFILE_BINDING });
-    const script = await sendCdpPageCommand(session, session.client, 'Page.addScriptToEvaluateOnNewDocument', {
-      source,
-    });
+    const script = await sendCdpPageCommand(
+      session,
+      session.client,
+      'Page.addScriptToEvaluateOnNewDocument',
+      {
+        source,
+      },
+    );
     if (typeof script.identifier !== 'string' || !script.identifier) {
       throw new Error('Chrome did not return an app profile bootstrap script identifier');
     }
     documentScriptIdentifiers.push(script.identifier);
 
-    const restoreScript = await sendCdpPageCommand(session, session.client, 'Page.addScriptToEvaluateOnNewDocument',
+    const restoreScript = await sendCdpPageCommand(
+      session,
+      session.client,
+      'Page.addScriptToEvaluateOnNewDocument',
       {
         source: buildRestoreStateSource(restoreState, true),
         worldName: APP_PROFILE_RESTORE_WORLD,
@@ -1131,7 +1259,14 @@ async function applyResolvedCdpAppProfileImpl(
           installedState.mainFrameUrl = params.frame.url;
           installedState.definitionRefreshPending = false;
           if (session.runtimeOwner) {
-            try { new NodePageRuntimeStore().retain(session.runtimeOwner, installedState.config.pageRuntime); } catch (error) { console.warn('[cdp] Could not reclaim page runtime code', error); }
+            try {
+              new NodePageRuntimeStore().retain(
+                session.runtimeOwner,
+                installedState.config.pageRuntime,
+              );
+            } catch (error) {
+              console.warn('[cdp] Could not reclaim page runtime code', error);
+            }
           }
         }
       }),
@@ -1184,7 +1319,10 @@ async function applyResolvedCdpAppProfileImpl(
           if (intercepted) {
             if (params.request.url === installedState.mainFrameUrl)
               await sendCdpPageCommand(session, session.client, 'Page.reload', {});
-            else await sendCdpPageCommand(session, session.client, 'Page.navigate', { url: params.request.url });
+            else
+              await sendCdpPageCommand(session, session.client, 'Page.navigate', {
+                url: params.request.url,
+              });
           }
         }
         return intercepted;
@@ -1310,7 +1448,8 @@ export async function updateCdpAppProfileDeviceEmulation(
   await Promise.allSettled(
     state.childClients.map(client =>
       emulation
-        ? sendCommands(session,
+        ? sendCommands(
+            session,
             client,
             appProfileEmulationCommands(
               childAppProfileEnvironment(state.config, emulation).emulation!,

@@ -3,7 +3,6 @@ import { missingPresetPermissions } from '../../shared/presetPermissions';
 import { invalidateBrowserTracking } from './browserTracking';
 import {
   appProfileRevision,
-  APP_PROFILE_NAMES,
   DomainPermissionError,
   validateAppProfileDefinition,
   type AppProfileCatalogEntry,
@@ -18,11 +17,8 @@ import {
   presetRequiresBrowser,
   prepareBrowserBundleSnapshot,
   verifyPreparedBrowserPreset,
-  readBundleJson,
-  readBundleText,
   selectBrowserRequestUi,
   selectBrowserView,
-  selectBrowserControl,
   selectExtensionContributions,
   type SelectedBrowserControl,
   type BundleLoader,
@@ -34,14 +30,19 @@ import {
 import { isAgentDomainAuthorized } from '../../shared/proxyPermissions';
 import { withCookieInjection } from './utils/dnr';
 import { validateBrowserCapabilities } from './browserCapabilities';
-import { browserCapabilityCatalog, profileEntries, presetSettings, browserPresetStatus, BROWSER_BUNDLE_API_VERSION, type BrowserBundleSelection } from './browserCapabilityCatalog';
-import { mergePresetDefaults, resolveCapabilityConfig, type ResolvedPreset } from '@mearl/preset';
+import {
+  browserCapabilityCatalog,
+  profileEntries,
+  presetSettings,
+  browserPresetStatus,
+  BROWSER_BUNDLE_API_VERSION,
+  type BrowserBundleSelection,
+} from './browserCapabilityCatalog';
+import { mergePresetDefaults, resolveCapabilityConfig } from '@mearl/preset';
 import { BROWSER_REQUEST_UI_CHANGED } from '../../shared/browserRequestUi';
 import { validateRequestUiSetting } from '../../shared/browserRequestUiValidation';
 import { validateBrowserViewPreferences } from '../../shared/browserViewPreferences';
-import { resolveBrowserPresetSettings, type BrowserPresetSettings } from '../../shared/browserPresetSettings';
-import type { JsonObject } from '@mearl/preset';
-
+import type { BrowserPresetSettings } from '../../shared/browserPresetSettings';
 
 function validateBrowserUiContributions(bundles: PreparedBundle[], apiVersion: string) {
   selectExtensionContributions(bundles);
@@ -55,9 +56,20 @@ function validateBrowserUiContributions(bundles: PreparedBundle[], apiVersion: s
 }
 
 const presetListeners = new Set<() => void>();
-export function onBrowserPresetChange(listener: () => void) { presetListeners.add(listener); return () => { presetListeners.delete(listener); }; }
+export function onBrowserPresetChange(listener: () => void) {
+  presetListeners.add(listener);
+  return () => {
+    presetListeners.delete(listener);
+  };
+}
 function notifyRequestUiChanged() {
-  for (const listener of presetListeners) { try { listener(); } catch { /* A listener cannot interrupt preset activation. */ } }
+  for (const listener of presetListeners) {
+    try {
+      listener();
+    } catch {
+      /* A listener cannot interrupt preset activation. */
+    }
+  }
   invalidateBrowserTracking();
   invalidateRequestInspection();
   try {
@@ -69,15 +81,32 @@ function notifyRequestUiChanged() {
 
 export { BROWSER_BUNDLE_API_VERSION } from './browserCapabilityCatalog';
 
-export function createBrowserCapabilityRegistry(store: BrowserBundleStore, load: BundleLoader, profileLoad = load) {
-  async function installBundle(bundle: PreparedBundle, previous: BrowserBundleSelection, expectedRevision: string | null) {
+export function createBrowserCapabilityRegistry(
+  store: BrowserBundleStore,
+  load: BundleLoader,
+  profileLoad = load,
+) {
+  async function installBundle(
+    bundle: PreparedBundle,
+    previous: BrowserBundleSelection,
+    expectedRevision: string | null,
+  ) {
     const profiles = profileEntries(bundle);
-    const candidates = [...previous.bundles.filter(entry => entry.manifest.id !== bundle.manifest.id), bundle];
+    const candidates = [
+      ...previous.bundles.filter(entry => entry.manifest.id !== bundle.manifest.id),
+      bundle,
+    ];
     validateBrowserUiContributions(candidates, BROWSER_BUNDLE_API_VERSION);
     await validateBrowserCapabilities(candidates, [bundle.manifest.id]);
     await store.install(bundle, expectedRevision, previous.revisions);
     notifyRequestUiChanged();
-    return { id: bundle.manifest.id, source: bundle.source, version: bundle.manifest.version, revision: bundle.revision, profiles };
+    return {
+      id: bundle.manifest.id,
+      source: bundle.source,
+      version: bundle.manifest.version,
+      revision: bundle.revision,
+      profiles,
+    };
   }
 
   async function applyPrepared(
@@ -115,7 +144,13 @@ export function createBrowserCapabilityRegistry(store: BrowserBundleStore, load:
     ];
     validateBrowserUiContributions(candidates, BROWSER_BUNDLE_API_VERSION);
     presetSettings(prepared.preset, association?.installation?.overrides ?? {}, candidates);
-    await validateBrowserCapabilities(candidates, [...replacing], resolveCapabilityConfig(mergePresetDefaults(prepared.preset.defaults, association?.installation?.overrides ?? {})));
+    await validateBrowserCapabilities(
+      candidates,
+      [...replacing],
+      resolveCapabilityConfig(
+        mergePresetDefaults(prepared.preset.defaults, association?.installation?.overrides ?? {}),
+      ),
+    );
     if (validateOnly) return browserPresetStatus(prepared.preset, prepared.snapshot.revision);
     await confirm?.();
     await store.activatePreset(
@@ -148,7 +183,12 @@ export function createBrowserCapabilityRegistry(store: BrowserBundleStore, load:
           current.bundles,
           'extension',
           BROWSER_BUNDLE_API_VERSION,
-          resolveCapabilityConfig(mergePresetDefaults(current.activation!.preset.defaults, current.installation?.overrides ?? {})),
+          resolveCapabilityConfig(
+            mergePresetDefaults(
+              current.activation!.preset.defaults,
+              current.installation?.overrides ?? {},
+            ),
+          ),
         );
         validateBrowserUiContributions(current.bundles, BROWSER_BUNDLE_API_VERSION);
         const profiles = current.bundles
@@ -184,7 +224,9 @@ export function createBrowserCapabilityRegistry(store: BrowserBundleStore, load:
     let permissionPending: string[] = [];
     try {
       const missing = await missingPresetPermissions(requiredOrigins);
-      permissionPending = [...new Set([...missing.missingOrigins, ...missing.missingAuthorization])];
+      permissionPending = [
+        ...new Set([...missing.missingOrigins, ...missing.missingAuthorization]),
+      ];
     } catch (failure) {
       browserReady = false;
       error = failure instanceof Error ? failure.message : 'Invalid preset permissions';
@@ -197,7 +239,10 @@ export function createBrowserCapabilityRegistry(store: BrowserBundleStore, load:
       presetId: current.activation?.preset.id,
       presetVersion: current.activation?.preset.version,
       presetSource: current.activation?.snapshot.source,
-      pending: current.activation ? browserPresetStatus(current.activation.preset, current.activation.snapshot.revision).pending : [],
+      pending: current.activation
+        ? browserPresetStatus(current.activation.preset, current.activation.snapshot.revision)
+            .pending
+        : [],
       installationRevision: current.installation?.revision ?? null,
       browserRevision: current.activeRevision,
       ready,
@@ -208,8 +253,14 @@ export function createBrowserCapabilityRegistry(store: BrowserBundleStore, load:
   }
   return {
     captureSelection: () => store.list(),
-    async settings(selection?: BrowserBundleSelection): Promise<BrowserPresetSettings & { cacheScope: string; browserControl?: SelectedBrowserControl; appProfiles: AppProfileCatalogEntry[] }> {
-      const current = selection ?? await store.list();
+    async settings(selection?: BrowserBundleSelection): Promise<
+      BrowserPresetSettings & {
+        cacheScope: string;
+        browserControl?: SelectedBrowserControl;
+        appProfiles: AppProfileCatalogEntry[];
+      }
+    > {
+      const current = selection ?? (await store.list());
       if (
         current.activationError ||
         current.installationError ||
@@ -222,7 +273,15 @@ export function createBrowserCapabilityRegistry(store: BrowserBundleStore, load:
           'The selected browser settings graph is unavailable',
         );
       const catalog = browserCapabilityCatalog(current);
-      return { ...catalog.settings(), appProfiles: catalog.profiles().profiles, cacheScope: JSON.stringify([current.activeRevision, current.installationToken, current.revisions]) };
+      return {
+        ...catalog.settings(),
+        appProfiles: catalog.profiles().profiles,
+        cacheScope: JSON.stringify([
+          current.activeRevision,
+          current.installationToken,
+          current.revisions,
+        ]),
+      };
     },
     async view(slot: BrowserViewSlot = 'requestImport') {
       const current = await store.list();
@@ -249,11 +308,15 @@ export function createBrowserCapabilityRegistry(store: BrowserBundleStore, load:
     installationStatus,
     async captureInstallationSelection(expectedInstallationRevision?: string) {
       const current = await store.list();
-      if (expectedInstallationRevision !== undefined && (
-        current.installation?.revision !== expectedInstallationRevision ||
-        current.installation.browserRevision !== current.activeRevision ||
-        !current.installationToken || current.installationError || current.activationError
-      )) throw new BundleError('BUNDLE_CONFLICT', 'INSTALLATION_SELECTION_CHANGED');
+      if (
+        expectedInstallationRevision !== undefined &&
+        (current.installation?.revision !== expectedInstallationRevision ||
+          current.installation.browserRevision !== current.activeRevision ||
+          !current.installationToken ||
+          current.installationError ||
+          current.activationError)
+      )
+        throw new BundleError('BUNDLE_CONFLICT', 'INSTALLATION_SELECTION_CHANGED');
       return {
         activeRevision: current.activeRevision,
         revisions: current.revisions,
@@ -263,7 +326,16 @@ export function createBrowserCapabilityRegistry(store: BrowserBundleStore, load:
     async validatePreparedPreset(input: PreparedBrowserPreset) {
       const prepared = await verifyPreparedBrowserPreset(input, BROWSER_BUNDLE_API_VERSION);
       const current = await store.list();
-      await applyPrepared(prepared, current, { installation: current.installation, expectedInstallationToken: current.installationToken }, undefined, true);
+      await applyPrepared(
+        prepared,
+        current,
+        {
+          installation: current.installation,
+          expectedInstallationToken: current.installationToken,
+        },
+        undefined,
+        true,
+      );
     },
     async applyPreparedPreset(input: {
       prepared: Pick<PreparedBrowserPreset, 'snapshot' | 'bundles'>;
@@ -297,21 +369,67 @@ export function createBrowserCapabilityRegistry(store: BrowserBundleStore, load:
     pinPageRuntimes: (patch: Record<string, string | null>) => store.pinPageRuntimes(patch),
     synchronizePageRuntimePins: (pins: Record<string, string>) =>
       store.synchronizePageRuntimePins(pins),
-    async applyPreset(input: { source: string; expectedRevision: string | null; expectedId?: string; keepIndependentBrowser?: boolean; skipUnchanged?: boolean; validatePrepared?: (prepared: PreparedBrowserPreset) => Promise<void>; expectedSelection?: { activeRevision: string | null; revisions: Record<string, string>; installationToken: string | null }; confirm?: () => Promise<void> }) {
+    async applyPreset(input: {
+      source: string;
+      expectedRevision: string | null;
+      expectedId?: string;
+      keepIndependentBrowser?: boolean;
+      skipUnchanged?: boolean;
+      validatePrepared?: (prepared: PreparedBrowserPreset) => Promise<void>;
+      expectedSelection?: {
+        activeRevision: string | null;
+        revisions: Record<string, string>;
+        installationToken: string | null;
+      };
+      confirm?: () => Promise<void>;
+    }) {
       const previous = await store.list();
-      if (previous.activeRevision !== input.expectedRevision || input.expectedSelection && (previous.activeRevision !== input.expectedSelection.activeRevision || previous.installationToken !== input.expectedSelection.installationToken || Object.keys(previous.revisions).length !== Object.keys(input.expectedSelection.revisions).length || Object.entries(previous.revisions).some(([id, revision]) => input.expectedSelection!.revisions[id] !== revision)))
+      if (
+        previous.activeRevision !== input.expectedRevision ||
+        (input.expectedSelection &&
+          (previous.activeRevision !== input.expectedSelection.activeRevision ||
+            previous.installationToken !== input.expectedSelection.installationToken ||
+            Object.keys(previous.revisions).length !==
+              Object.keys(input.expectedSelection.revisions).length ||
+            Object.entries(previous.revisions).some(
+              ([id, revision]) => input.expectedSelection!.revisions[id] !== revision,
+            )))
+      )
         throw new BundleError('BUNDLE_CONFLICT', 'The selected preset has changed');
       const prepared = await prepareBrowserPreset(input.source, {
         load,
         mearlApiVersion: BROWSER_BUNDLE_API_VERSION,
       });
-      if (input.expectedId !== undefined && prepared.preset.id !== input.expectedId) throw new BundleError('BUNDLE_INVALID', 'The preset identity differs from the selected catalog entry');
+      if (input.expectedId !== undefined && prepared.preset.id !== input.expectedId)
+        throw new BundleError(
+          'BUNDLE_INVALID',
+          'The preset identity differs from the selected catalog entry',
+        );
       await input.validatePrepared?.(prepared);
-      if (input.skipUnchanged && prepared.snapshot.revision === previous.activeRevision) { await input.confirm?.(); return { ...await installationStatus(), revision: previous.activeRevision }; }
-      if (input.keepIndependentBrowser && !presetRequiresBrowser(prepared.preset)) { await input.confirm?.(); return { ...browserPresetStatus(prepared.preset, prepared.snapshot.revision, false), browserRequired: false }; }
-      if (previous.installationError) throw new BundleError('BUNDLE_INTEGRITY', 'INSTALLATION_NATIVE_SYNC_REQUIRED');
-      if (previous.installation && prepared.snapshot.revision !== previous.activeRevision) throw new BundleError('BUNDLE_CONFLICT', 'INSTALLATION_NATIVE_SYNC_REQUIRED');
-      return applyPrepared(prepared, previous, { installation: previous.installation, expectedInstallationToken: previous.installationToken }, input.confirm);
+      if (input.skipUnchanged && prepared.snapshot.revision === previous.activeRevision) {
+        await input.confirm?.();
+        return { ...(await installationStatus()), revision: previous.activeRevision };
+      }
+      if (input.keepIndependentBrowser && !presetRequiresBrowser(prepared.preset)) {
+        await input.confirm?.();
+        return {
+          ...browserPresetStatus(prepared.preset, prepared.snapshot.revision, false),
+          browserRequired: false,
+        };
+      }
+      if (previous.installationError)
+        throw new BundleError('BUNDLE_INTEGRITY', 'INSTALLATION_NATIVE_SYNC_REQUIRED');
+      if (previous.installation && prepared.snapshot.revision !== previous.activeRevision)
+        throw new BundleError('BUNDLE_CONFLICT', 'INSTALLATION_NATIVE_SYNC_REQUIRED');
+      return applyPrepared(
+        prepared,
+        previous,
+        {
+          installation: previous.installation,
+          expectedInstallationToken: previous.installationToken,
+        },
+        input.confirm,
+      );
     },
     async install(input: {
       id: string;
@@ -331,16 +449,28 @@ export function createBrowserCapabilityRegistry(store: BrowserBundleStore, load:
     async installProfile(source: string) {
       const previous = await store.list();
       const bundle = await prepareBundle(await resolveProfileSource(source), {
-        load: profileLoad, mearlApiVersion: BROWSER_BUNDLE_API_VERSION, signal: AbortSignal.timeout(30000),
+        load: profileLoad,
+        mearlApiVersion: BROWSER_BUNDLE_API_VERSION,
+        signal: AbortSignal.timeout(30000),
       });
       const { contributions, id } = bundle.manifest;
-      if (!contributions?.appProfiles?.length || Object.keys(contributions).some(key => !['appProfiles', 'pageRuntimes'].includes(key))) {
+      if (
+        !contributions?.appProfiles?.length ||
+        Object.keys(contributions).some(key => !['appProfiles', 'pageRuntimes'].includes(key))
+      ) {
         throw new BundleError('BUNDLE_INVALID', 'Expected an App profile bundle');
       }
       const installed = previous.bundles.find(entry => entry.manifest.id === id);
-      const sourceKey = (url: string) => url.replace(/^(https:\/\/raw\.githubusercontent\.com\/[^/]+\/[^/]+)\/[a-f0-9]{40}\/bundle\.json$/, '$1/bundle.json');
+      const sourceKey = (url: string) =>
+        url.replace(
+          /^(https:\/\/raw\.githubusercontent\.com\/[^/]+\/[^/]+)\/[a-f0-9]{40}\/bundle\.json$/,
+          '$1/bundle.json',
+        );
       if (installed && sourceKey(installed.source) !== sourceKey(bundle.source)) {
-        throw new BundleError('BUNDLE_CONFLICT', 'An installed package already owns this ID at another source');
+        throw new BundleError(
+          'BUNDLE_CONFLICT',
+          'An installed package already owns this ID at another source',
+        );
       }
       return installBundle(bundle, previous, previous.revisions[id] ?? null);
     },
@@ -351,7 +481,10 @@ export function createBrowserCapabilityRegistry(store: BrowserBundleStore, load:
     async get(name: string): Promise<AppProfileCatalogEntry | undefined> {
       if (!name.includes('/')) {
         const selected = await store.profileBinding(name);
-        if (!selected) return browserCapabilityCatalog(await store.list()).profiles().profiles.find(profile => profile.id === name);
+        if (!selected)
+          return browserCapabilityCatalog(await store.list())
+            .profiles()
+            .profiles.find(profile => profile.id === name);
         const profile = profileEntries(selected.bundle).find(
           profile => profile.id === selected.target,
         );

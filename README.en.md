@@ -113,6 +113,8 @@ pnpm build
 
 Load `packages/extension/dist_chrome` as an unpacked extension. Use `pnpm dev:website` to develop the website.
 
+Installing dependencies sets up a Git pre-commit hook. At commit time, ESLint checks and fixes staged TypeScript files under `packages/**/src/`, and Prettier formats staged TypeScript and JSON files there. Git stops the commit if lint errors remain. Run `pnpm lint` from the repository root to lint manually. Running `pnpm format:check` checks all files in that scope and may report existing formatting differences in files outside the commit.
+
 See [AGENTS.md](AGENTS.md) for commit conventions, code style, and validation by change scope. The [release guide](docs/releases.en.md) covers automatic beta numbering, npm OIDC, and extension artifact distribution.
 
 | Directory | Responsibility |

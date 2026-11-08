@@ -112,6 +112,8 @@ pnpm build
 
 扩展输出位于 `packages/extension/dist_chrome`，可作为已解压扩展加载。开发官网使用 `pnpm dev:website`。
 
+安装依赖会设置 Git 提交钩子。提交时，ESLint 检查并修复暂存的 `packages/**/src/` 下的 TypeScript 文件，Prettier 格式化同目录下暂存的 TypeScript 和 JSON 文件。仍有 lint 错误时，Git 会中止提交。可在仓库根目录运行 `pnpm lint` 手动检查。运行 `pnpm format:check` 会检查该范围内的所有文件，也可能报告未暂存文件中的既有格式差异。
+
 提交约定、代码风格和按改动范围选择的检查见 [AGENTS.md](AGENTS.md)。[发布说明](docs/releases.md) 介绍 beta 自动编号、npm OIDC 与扩展制品分发。
 
 | 目录 | 职责 |

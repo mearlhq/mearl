@@ -1,7 +1,7 @@
 import { fetchWithBrowserRedirects } from './browserFollowFetch';
 import { browserCapabilityCatalog, type BrowserBundleSelection } from './browserCapabilityCatalog';
 export type { BrowserBundleSelection } from './browserCapabilityCatalog';
-import { mergePresetDefaults, resolveCapabilityConfig, type JsonObject } from '@mearl/preset';
+import type { JsonObject } from '@mearl/preset';
 import {
   BrowserBundleStore,
   BundleError,
@@ -109,10 +109,23 @@ function createBrowserHost(signal: AbortSignal): BrowserCapabilityHost {
           : await buildCookieHeader(url);
         if (cookie) injected.push(cookie);
       }
-      if (input.redirect !== undefined && !['manual', 'follow'].includes(input.redirect)) throw new Error('Invalid browser request redirect mode');
-      if (input.cache !== undefined && !['default', 'no-store'].includes(input.cache)) throw new Error('Invalid browser request cache mode');
+      if (input.redirect !== undefined && !['manual', 'follow'].includes(input.redirect))
+        throw new Error('Invalid browser request redirect mode');
+      if (input.cache !== undefined && !['default', 'no-store'].includes(input.cache))
+        throw new Error('Invalid browser request cache mode');
       const fetchResponse = async () => {
-        if (input.redirect === 'follow') return fetchWithBrowserRedirects({ url: url.href, method: input.method ?? 'GET', headers, ...(input.formBody ? { formBody: input.formBody } : { body: input.body }), credentials: input.credentials ?? (input.withCookies ? 'include' : 'omit'), ...(input.cache ? { cache: input.cache } : {}) }, signal);
+        if (input.redirect === 'follow')
+          return fetchWithBrowserRedirects(
+            {
+              url: url.href,
+              method: input.method ?? 'GET',
+              headers,
+              ...(input.formBody ? { formBody: input.formBody } : { body: input.body }),
+              credentials: input.credentials ?? (input.withCookies ? 'include' : 'omit'),
+              ...(input.cache ? { cache: input.cache } : {}),
+            },
+            signal,
+          );
         const response = await fetch(url.href, {
           method: input.method ?? 'GET',
           headers,
@@ -141,20 +154,34 @@ function createBrowserHost(signal: AbortSignal): BrowserCapabilityHost {
       const url = await authorizeBrowserCapabilityUrl(input?.url);
       if (typeof input.name !== 'string' || !input.name)
         throw new Error('Browser cookie lookup requires a name');
-      if (input.domain !== undefined && typeof input.domain !== 'boolean') throw new Error('Invalid browser cookie domain scope');
+      if (input.domain !== undefined && typeof input.domain !== 'boolean')
+        throw new Error('Invalid browser cookie domain scope');
       let partitionKey: chrome.cookies.CookiePartitionKey | undefined;
       if (input.partitionKey !== undefined) {
-        if (!input.partitionKey || typeof input.partitionKey !== 'object' || Object.keys(input.partitionKey).some(key => key !== 'topLevelSite')) throw new Error('Invalid browser cookie partition');
+        if (
+          !input.partitionKey ||
+          typeof input.partitionKey !== 'object' ||
+          Object.keys(input.partitionKey).some(key => key !== 'topLevelSite')
+        )
+          throw new Error('Invalid browser cookie partition');
         const site = await authorizeBrowserCapabilityUrl(input.partitionKey.topLevelSite);
-        if (site.pathname !== '/' || site.search || site.hash) throw new Error('Cookie partition requires an origin');
+        if (site.pathname !== '/' || site.search || site.hash)
+          throw new Error('Cookie partition requires an origin');
         partitionKey = { topLevelSite: site.origin };
       }
       if (input.withRelatedCookies) {
-        if (input.domain || partitionKey) throw new Error('Related cookie lookup cannot override its scope');
+        if (input.domain || partitionKey)
+          throw new Error('Related cookie lookup cannot override its scope');
         return (await collectCookies(url)).find(cookie => cookie.name === input.name)?.value;
       }
-      const lookup = chrome.cookies.getAll({ ...(input.domain ? { domain: url.hostname } : { url: url.href }), ...(partitionKey ? { partitionKey } : {}) });
-      const cookies = input.domain || partitionKey ? await lookup : await lookup.catch(() => [] as chrome.cookies.Cookie[]);
+      const lookup = chrome.cookies.getAll({
+        ...(input.domain ? { domain: url.hostname } : { url: url.href }),
+        ...(partitionKey ? { partitionKey } : {}),
+      });
+      const cookies =
+        input.domain || partitionKey
+          ? await lookup
+          : await lookup.catch(() => [] as chrome.cookies.Cookie[]);
       for (const cookie of cookies) {
         if (cookie.name !== input.name) continue;
         if (input.domain) {
@@ -176,8 +203,16 @@ export function initializeBrowserCapabilities(): void {
     const id = port.name.slice(BROWSER_CAPABILITY_OWNER_PORT.length);
     const owner = owners.get(id);
     const sender = port.sender;
-    if (!owner || owner.port || owner.controller.signal.aborted || sender?.id !== chrome.runtime.id || sender.url !== chrome.runtime.getURL('src/pages/offscreen/index.html') || sender.tab !== undefined) {
-      port.disconnect(); return;
+    if (
+      !owner ||
+      owner.port ||
+      owner.controller.signal.aborted ||
+      sender?.id !== chrome.runtime.id ||
+      sender.url !== chrome.runtime.getURL('src/pages/offscreen/index.html') ||
+      sender.tab !== undefined
+    ) {
+      port.disconnect();
+      return;
     }
     owner.port = port;
     port.onDisconnect.addListener(() => {
@@ -244,10 +279,15 @@ export async function runAcceptedBrowserCapability(
       const response = await new Promise<any>((resolve, reject) => {
         const aborted = () => reject(new Error('Browser capability aborted'));
         controller.signal.addEventListener('abort', aborted, { once: true });
-        void chrome.runtime.sendMessage({
-          target: BROWSER_CAPABILITY_OFFSCREEN_TARGET, id, html,
-          timeoutMs: validate ? 30000 : 120000,
-        }).then(resolve, reject).finally(() => controller.signal.removeEventListener('abort', aborted));
+        void chrome.runtime
+          .sendMessage({
+            target: BROWSER_CAPABILITY_OFFSCREEN_TARGET,
+            id,
+            html,
+            timeoutMs: validate ? 30000 : 120000,
+          })
+          .then(resolve, reject)
+          .finally(() => controller.signal.removeEventListener('abort', aborted));
       });
       if (response?.success !== true)
         throw new Error(response?.error || 'Browser capability returned no result');
@@ -290,7 +330,9 @@ export async function validateBrowserCapabilities(
   }
 }
 
-type BrowserCapabilityExpectation = { bundleId: string } & ({ revision: string; bundleRevision?: never } | { bundleRevision: string; revision?: never });
+type BrowserCapabilityExpectation = { bundleId: string } & (
+  { revision: string; bundleRevision?: never } | { bundleRevision: string; revision?: never }
+);
 
 export async function prepareBrowserCapabilities(
   hooks: string[],
@@ -307,7 +349,7 @@ export async function prepareBrowserCapabilities(
     }
   >
 > {
-  const current = selection ?? await store.list();
+  const current = selection ?? (await store.list());
   if (
     current.activationError ||
     current.installationError ||
@@ -320,9 +362,18 @@ export async function prepareBrowserCapabilities(
       'The selected browser capability graph is unavailable',
     );
   const prepared = await browserCapabilityCatalog(current).runtimes();
-  const revisions = Object.fromEntries(await Promise.all(Object.entries(prepared.snapshot.modules).map(async ([id, entry]) => [id, entry.config && Object.keys(entry.config).length
-    ? await bundleDigest(new TextEncoder().encode(JSON.stringify([current.revisions[id], entry.config])))
-    : current.revisions[id]])));
+  const revisions = Object.fromEntries(
+    await Promise.all(
+      Object.entries(prepared.snapshot.modules).map(async ([id, entry]) => [
+        id,
+        entry.config && Object.keys(entry.config).length
+          ? await bundleDigest(
+              new TextEncoder().encode(JSON.stringify([current.revisions[id], entry.config])),
+            )
+          : current.revisions[id],
+      ]),
+    ),
+  );
   return Object.fromEntries(
     hooks.flatMap(hook => {
       const binding = prepared.snapshot.bindings[hook];
@@ -357,7 +408,8 @@ export async function prepareBrowserCapabilities(
             bundleId: binding.module,
             revision: revisions[binding.module],
             invocation: accepted,
-            invoke: (input: unknown, signal?: AbortSignal) => runAcceptedBrowserCapability({ ...accepted, input }, false, signal),
+            invoke: (input: unknown, signal?: AbortSignal) =>
+              runAcceptedBrowserCapability({ ...accepted, input }, false, signal),
           },
         ],
       ];

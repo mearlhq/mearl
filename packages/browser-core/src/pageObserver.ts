@@ -160,7 +160,7 @@ export function shouldWaitForPotentialNavigation(
   return !hasEffect && (observation.mutationCount ?? 0) <= 1;
 }
 
-export function isPotentialNavigationRequest(resourceType: string, url = ''): boolean {
+export function isPotentialNavigationRequest(resourceType: string, _url = ''): boolean {
   const normalizedType = resourceType.toLowerCase();
   if (normalizedType === 'xhr' || normalizedType === 'fetch') return true;
   return false;

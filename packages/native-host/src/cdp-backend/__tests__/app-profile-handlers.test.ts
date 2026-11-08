@@ -4,17 +4,22 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const hooks = vi.hoisted(() => new Map<string, (...args: any[]) => any>());
-vi.mock('../../native-capability-services.js', () => ({ nativeCapabilities: { get: (name: string) => hooks.get(name), require: (name: string) => { const hook = hooks.get(name); if (!hook) throw new Error('Required capability is not installed'); return hook; } } }));
+vi.mock('../../native-capability-services.js', () => ({
+  nativeCapabilities: {
+    get: (name: string) => hooks.get(name),
+    require: (name: string) => {
+      const hook = hooks.get(name);
+      if (!hook) throw new Error('Required capability is not installed');
+      return hook;
+    },
+  },
+}));
 import { APP_PROFILES } from '../../../../app-profiles/src/__tests__/fixtures.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { resolveEmulationConfig } from '@mearl/browser-core';
 import {
   cdpSetAppProfile,
   isCdpAppProfileActive,
-  resolveCdpAppProfile,
-  restoreCdpAppProfile,
   refreshCdpAppProfileForNavigation,
-  updateCdpAppProfileDeviceEmulation,
 } from '../app-profile-handlers';
 import { createBuffers } from '../buffers.js';
 import { clearCdpFetchInterceptionState } from '../fetch-interceptor.js';
@@ -148,13 +153,37 @@ function createSession(restoreProbe?: unknown) {
   return { listeners, sendCommand, session };
 }
 
-
 let directory: string;
 let window: Window;
-beforeEach(() => { window = new Window({ url: 'https://example.test/', settings: { enableJavaScriptEvaluation: true } }); directory = mkdtempSync(join(tmpdir(), 'mearl-profile-runtime-')); vi.stubEnv('MEARL_CAPABILITY_DIR', directory); hooks.clear(); hooks.set('app.profileCatalog', () => ({ namespace: 'fixture', profiles: Object.values(APP_PROFILES).map(definition => ({ ...definition, name: 'fixture/' + definition.name })), bindings: Object.fromEntries(Object.keys(APP_PROFILES).map(name => [name, 'fixture/' + name])) })); });
-afterEach(() => { window.close(); rmSync(directory, { recursive: true, force: true }); delete (window as any).DemoBridge; delete (window as any).__mearlAppProfile__; });
+beforeEach(() => {
+  window = new Window({
+    url: 'https://example.test/',
+    settings: { enableJavaScriptEvaluation: true },
+  });
+  directory = mkdtempSync(join(tmpdir(), 'mearl-profile-runtime-'));
+  vi.stubEnv('MEARL_CAPABILITY_DIR', directory);
+  hooks.clear();
+  hooks.set('app.profileCatalog', () => ({
+    namespace: 'fixture',
+    profiles: Object.values(APP_PROFILES).map(definition => ({
+      ...definition,
+      name: 'fixture/' + definition.name,
+    })),
+    bindings: Object.fromEntries(Object.keys(APP_PROFILES).map(name => [name, 'fixture/' + name])),
+  }));
+});
+afterEach(() => {
+  window.close();
+  rmSync(directory, { recursive: true, force: true });
+  delete (window as any).DemoBridge;
+  delete (window as any).__mearlAppProfile__;
+});
 function bootstrap(sendCommand: ReturnType<typeof vi.fn>): string {
-  const call = sendCommand.mock.calls.find(([method, params]) => method === 'Page.addScriptToEvaluateOnNewDocument' && String(params?.source).includes('const config='));
+  const call = sendCommand.mock.calls.find(
+    ([method, params]) =>
+      method === 'Page.addScriptToEvaluateOnNewDocument' &&
+      String(params?.source).includes('const config='),
+  );
   if (!call) throw new Error('Missing document bootstrap');
   return String(call[1].source);
 }
@@ -172,14 +201,30 @@ describe('public CDP App profile preparation', () => {
     expect(isCdpAppProfileActive(session)).toBe(true);
   });
   it('binds an installed implementation to the original App ID and executes verified code in the page', async () => {
-    const source = 'module.exports.install = config => { window.DemoBridge = { profile: config.profile, version: config.binding.options.appVersion }; window.__mearlAppProfile__ = config.profile; };';
+    const source =
+      'module.exports.install = config => { window.DemoBridge = { profile: config.profile, version: config.binding.options.appVersion }; window.__mearlAppProfile__ = config.profile; };';
     const sha256 = createHash('sha256').update(source).digest('hex');
     const binding = { id: 'sample/main', sha256 };
-    const definition = { ...APP_PROFILES.reader, name: 'sample/app', label: 'Sample', pageRuntime: binding };
-    hooks.set('app.profileCatalog', () => ({ namespace: 'sample', profiles: [definition], bindings: { reader: 'sample/app' }, order: ['reader'] }));
-    hooks.set('app.pageRuntime', requested => requested.sha256 === sha256 ? source : undefined);
+    const definition = {
+      ...APP_PROFILES.reader,
+      name: 'sample/app',
+      label: 'Sample',
+      pageRuntime: binding,
+    };
+    hooks.set('app.profileCatalog', () => ({
+      namespace: 'sample',
+      profiles: [definition],
+      bindings: { reader: 'sample/app' },
+      order: ['reader'],
+    }));
+    hooks.set('app.pageRuntime', requested => (requested.sha256 === sha256 ? source : undefined));
     const { session, sendCommand } = createSession();
-    await cdpSetAppProfile(session, { enabled: true, profile: 'reader', appVersion: '9.8.7', reload: false });
+    await cdpSetAppProfile(session, {
+      enabled: true,
+      profile: 'reader',
+      appVersion: '9.8.7',
+      reload: false,
+    });
     window.eval(bootstrap(sendCommand));
     expect((window as any).DemoBridge).toEqual({ profile: 'reader', version: '9.8.7' });
     expect(window.navigator.userAgent).toContain('Sample/9.8.7');
@@ -188,9 +233,25 @@ describe('public CDP App profile preparation', () => {
     const { session, sendCommand } = createSession();
     await cdpSetAppProfile(session, { enabled: true, profile: 'shop', reload: false });
     sendCommand.mockClear();
-    hooks.set('app.profileCatalog', () => ({ namespace: 'sample', profiles: [{ ...APP_PROFILES.reader, name: 'sample/app', pageRuntime: { id: 'sample/missing', sha256: 'a'.repeat(64) } }], bindings: { reader: 'sample/app' } }));
-    await expect(cdpSetAppProfile(session, { enabled: true, profile: 'reader', reload: false })).rejects.toThrow('not installed');
-    expect(sendCommand.mock.calls.filter(([method]) => method === 'Page.removeScriptToEvaluateOnNewDocument')).toEqual([]);
+    hooks.set('app.profileCatalog', () => ({
+      namespace: 'sample',
+      profiles: [
+        {
+          ...APP_PROFILES.reader,
+          name: 'sample/app',
+          pageRuntime: { id: 'sample/missing', sha256: 'a'.repeat(64) },
+        },
+      ],
+      bindings: { reader: 'sample/app' },
+    }));
+    await expect(
+      cdpSetAppProfile(session, { enabled: true, profile: 'reader', reload: false }),
+    ).rejects.toThrow('not installed');
+    expect(
+      sendCommand.mock.calls.filter(
+        ([method]) => method === 'Page.removeScriptToEvaluateOnNewDocument',
+      ),
+    ).toEqual([]);
     expect(isCdpAppProfileActive(session)).toBe(true);
   });
 });
@@ -198,26 +259,52 @@ describe('public CDP App profile preparation', () => {
 it('retains the previous exact runtime through a navigation followed by failed activation and rollback', async () => {
   const original = 'module.exports.install = () => { window.DemoBridge = "original"; };';
   const updated = 'module.exports.install = () => { window.DemoBridge = "updated"; };';
-  const runtime = (source: string) => ({ id: 'sample/main', sha256: createHash('sha256').update(source).digest('hex') });
-  const catalog = (source: string) => () => ({ namespace: 'sample', profiles: [{ ...APP_PROFILES.reader, name: 'sample/app', pageRuntime: runtime(source) }], bindings: { reader: 'sample/app' } });
+  const runtime = (source: string) => ({
+    id: 'sample/main',
+    sha256: createHash('sha256').update(source).digest('hex'),
+  });
+  const catalog = (source: string) => () => ({
+    namespace: 'sample',
+    profiles: [{ ...APP_PROFILES.reader, name: 'sample/app', pageRuntime: runtime(source) }],
+    bindings: { reader: 'sample/app' },
+  });
   const { session, sendCommand, listeners } = createSession();
-  hooks.set('app.profileCatalog', catalog(original)); hooks.set('app.pageRuntime', () => original);
+  hooks.set('app.profileCatalog', catalog(original));
+  hooks.set('app.pageRuntime', () => original);
   await cdpSetAppProfile(session, { enabled: true, profile: 'reader', reload: false });
-  hooks.set('app.profileCatalog', catalog(updated)); hooks.set('app.pageRuntime', requested => requested.sha256 === runtime(updated).sha256 ? updated : undefined);
+  hooks.set('app.profileCatalog', catalog(updated));
+  hooks.set('app.pageRuntime', requested =>
+    requested.sha256 === runtime(updated).sha256 ? updated : undefined,
+  );
   const normalSend = sendCommand.getMockImplementation()!;
   let fail = true;
   sendCommand.mockImplementation(async (method, params) => {
     if (method === 'Page.getFrameTree' && fail && listeners.has('Page.frameNavigated')) {
       fail = false;
-      listeners.get('Page.frameNavigated')?.({ frame: { id: 'main', url: 'https://example.test/next' } });
+      listeners.get('Page.frameNavigated')?.({
+        frame: { id: 'main', url: 'https://example.test/next' },
+      });
       throw new Error('activation fixture failure');
     }
     return normalSend(method, params);
   });
-  await expect(cdpSetAppProfile(session, { enabled: true, profile: 'reader', refreshDefinition: true, reload: false })).rejects.toThrow('activation fixture failure');
+  await expect(
+    cdpSetAppProfile(session, {
+      enabled: true,
+      profile: 'reader',
+      refreshDefinition: true,
+      reload: false,
+    }),
+  ).rejects.toThrow('activation fixture failure');
   expect(isCdpAppProfileActive(session)).toBe(true);
-  expect(existsSync(join(directory, 'page-runtimes', runtime(original).sha256 + '.cjs'))).toBe(true);
-  const sources = sendCommand.mock.calls.filter(([method, params]) => method === 'Page.addScriptToEvaluateOnNewDocument' && String(params?.source).includes('const config='));
+  expect(existsSync(join(directory, 'page-runtimes', runtime(original).sha256 + '.cjs'))).toBe(
+    true,
+  );
+  const sources = sendCommand.mock.calls.filter(
+    ([method, params]) =>
+      method === 'Page.addScriptToEvaluateOnNewDocument' &&
+      String(params?.source).includes('const config='),
+  );
   window.eval(String(sources.at(-1)![1].source));
   expect((window as any).DemoBridge).toBe('original');
 });
@@ -225,22 +312,48 @@ it('retains the previous exact runtime through a navigation followed by failed a
 it('keeps the full environment on navigation after its provider is removed', async () => {
   const source = 'module.exports.install = () => { window.DemoBridge = "retained"; };';
   const runtime = { id: 'sample/main', sha256: createHash('sha256').update(source).digest('hex') };
-  hooks.set('app.profileCatalog', () => ({ namespace: 'sample', profiles: [{ ...APP_PROFILES.reader, name: 'sample/app', pageRuntime: runtime }], bindings: { reader: 'sample/app' } }));
+  hooks.set('app.profileCatalog', () => ({
+    namespace: 'sample',
+    profiles: [{ ...APP_PROFILES.reader, name: 'sample/app', pageRuntime: runtime }],
+    bindings: { reader: 'sample/app' },
+  }));
   hooks.set('app.pageRuntime', () => source);
   const { session, sendCommand } = createSession();
   await cdpSetAppProfile(session, { enabled: true, profile: 'reader', reload: false });
-  hooks.clear(); sendCommand.mockClear();
+  hooks.clear();
+  sendCommand.mockClear();
   await expect(refreshCdpAppProfileForNavigation(session)).resolves.toBeUndefined();
-  expect(sendCommand.mock.calls.filter(([method]) => method === 'Page.addScriptToEvaluateOnNewDocument')).toEqual([]);
+  expect(
+    sendCommand.mock.calls.filter(([method]) => method === 'Page.addScriptToEvaluateOnNewDocument'),
+  ).toEqual([]);
   expect(isCdpAppProfileActive(session)).toBe(true);
 });
-
 
 it('rejects settings from a child execution context before mutating the top profile', async () => {
   const { session, sendCommand, listeners } = createSession();
   await cdpSetAppProfile(session, { enabled: true, profile: 'wallet', reload: false });
   sendCommand.mockClear();
-  listeners.get('Runtime.bindingCalled')!({ name: '__mearlCdpAppProfileRelay', executionContextId: 101, payload: JSON.stringify({ type: 'settings', requestId: 1, payload: { profile: 'wallet', settingId: 'language', value: 'en-US' } }) });
-  await vi.waitFor(() => expect(sendCommand.mock.calls.some(([method, params]) => method === 'Runtime.evaluate' && String(params?.expression).includes('APP_BRIDGE_SETTINGS_RESPONSE'))).toBe(true));
-  expect(sendCommand.mock.calls.some(([method]) => method === 'Page.reload' || method === 'Page.addScriptToEvaluateOnNewDocument')).toBe(false);
+  listeners.get('Runtime.bindingCalled')!({
+    name: '__mearlCdpAppProfileRelay',
+    executionContextId: 101,
+    payload: JSON.stringify({
+      type: 'settings',
+      requestId: 1,
+      payload: { profile: 'wallet', settingId: 'language', value: 'en-US' },
+    }),
+  });
+  await vi.waitFor(() =>
+    expect(
+      sendCommand.mock.calls.some(
+        ([method, params]) =>
+          method === 'Runtime.evaluate' &&
+          String(params?.expression).includes('APP_BRIDGE_SETTINGS_RESPONSE'),
+      ),
+    ).toBe(true),
+  );
+  expect(
+    sendCommand.mock.calls.some(
+      ([method]) => method === 'Page.reload' || method === 'Page.addScriptToEvaluateOnNewDocument',
+    ),
+  ).toBe(false);
 });

@@ -165,14 +165,19 @@ type CollectorTarget = chrome.debugger.Debuggee & { sessionId?: string };
 
 function setWebViewNetwork(tabId: number, sessionId: string, enabled: boolean): Promise<unknown> {
   const target: CollectorTarget = { tabId, sessionId };
-  return chrome.debugger.sendCommand(
-    target,
-    enabled ? 'Network.enable' : 'Network.disable',
-    enabled ? networkBufferOptions : undefined,
-  ).catch(() => {});
+  return chrome.debugger
+    .sendCommand(
+      target,
+      enabled ? 'Network.enable' : 'Network.disable',
+      enabled ? networkBufferOptions : undefined,
+    )
+    .catch(() => {});
 }
 
-export async function registerRequestCollectionWebView(tabId: number, sessionId: string): Promise<void> {
+export async function registerRequestCollectionWebView(
+  tabId: number,
+  sessionId: string,
+): Promise<void> {
   const sessions = businessWebViewSessions.get(tabId) ?? new Set<string>();
   sessions.add(sessionId);
   businessWebViewSessions.set(tabId, sessions);
@@ -219,7 +224,8 @@ function invalidateCollection(tabId: number): void {
   collectingTabs.delete(tabId);
   networkQueues.delete(tabId);
   pendingCaptureSequences.delete(tabId);
-  collectionErrors.delete(tabId);  pendingRequests.delete(tabId);
+  collectionErrors.delete(tabId);
+  pendingRequests.delete(tabId);
   backgroundProtocolStreams.delete(tabId);
   collectorLeases.delete(tabId);
   collectionConsumers.delete(tabId);
@@ -240,31 +246,51 @@ const collectionErrors = new Map<number, Error>();
 function committedCaptureState(tabId: number): DiagnosticsCaptureState {
   const state = getCaptureState(tabId);
   let sequence = state.currentSequence;
-  for (const pending of pendingCaptureSequences.get(tabId) ?? []) sequence = Math.min(sequence, pending - 1);
+  for (const pending of pendingCaptureSequences.get(tabId) ?? [])
+    sequence = Math.min(sequence, pending - 1);
   return { ...state, currentSequence: sequence };
 }
-export async function flushRequestCollection(tabId: number, options: { allowDecodeFailure?: boolean } = {}): Promise<void> {
+export async function flushRequestCollection(
+  tabId: number,
+  options: { allowDecodeFailure?: boolean } = {},
+): Promise<void> {
   const state = captureStates.get(tabId);
   await networkQueues.get(tabId)?.catch(() => {});
-  if (captureStates.get(tabId) !== state) throw new Error('Diagnostics capture changed while waiting for decoding');
+  if (captureStates.get(tabId) !== state)
+    throw new Error('Diagnostics capture changed while waiting for decoding');
   const error = collectionErrors.get(tabId);
   if (error && !options.allowDecodeFailure) throw error;
 }
-function enqueueNetworkEvent(tabId: number, state: DiagnosticsCaptureState, task: () => void | Promise<void>, release?: () => void) {
+function enqueueNetworkEvent(
+  tabId: number,
+  state: DiagnosticsCaptureState,
+  task: () => void | Promise<void>,
+  release?: () => void,
+) {
   const previous = networkQueues.get(tabId) ?? Promise.resolve();
-  const next = previous.then(async () => {
-    if (collectingTabs.has(tabId) && captureStates.get(tabId) === state) await task();
-  }).catch(error => {
-    if (captureStates.get(tabId) === state) {
-      const failure = error instanceof Error ? error : new Error(String(error));
-      if (failure.name === 'TrackingRequestError') collectionErrors.delete(tabId);
-      else collectionErrors.set(tabId, failure);
-      addLogToBuffer(tabId, { level: 'error', message: `Tracking decoding failed: ${failure.message}`, timestampMs: Date.now(), source: 'tracking', origin: 'browser', args: [] });
-    }
-  }).finally(() => {
-    release?.();
-    if (networkQueues.get(tabId) === next) networkQueues.delete(tabId);
-  });
+  const next = previous
+    .then(async () => {
+      if (collectingTabs.has(tabId) && captureStates.get(tabId) === state) await task();
+    })
+    .catch(error => {
+      if (captureStates.get(tabId) === state) {
+        const failure = error instanceof Error ? error : new Error(String(error));
+        if (failure.name === 'TrackingRequestError') collectionErrors.delete(tabId);
+        else collectionErrors.set(tabId, failure);
+        addLogToBuffer(tabId, {
+          level: 'error',
+          message: `Tracking decoding failed: ${failure.message}`,
+          timestampMs: Date.now(),
+          source: 'tracking',
+          origin: 'browser',
+          args: [],
+        });
+      }
+    })
+    .finally(() => {
+      release?.();
+      if (networkQueues.get(tabId) === next) networkQueues.delete(tabId);
+    });
   networkQueues.set(tabId, next);
 }
 
@@ -273,7 +299,9 @@ function handleDebuggerEvent(source: CollectorTarget, method: string, params: an
   if (!tabId || !collectingTabs.has(tabId)) return;
   if (source.sessionId && !businessWebViewSessions.get(tabId)?.has(source.sessionId)) return;
   const state = getCaptureState(tabId);
-  const requestKey = source.sessionId ? `${source.sessionId}:${params?.requestId}` : params?.requestId;
+  const requestKey = source.sessionId
+    ? `${source.sessionId}:${params?.requestId}`
+    : params?.requestId;
   if (method === 'Network.requestWillBeSent') {
     if (!params.request?.url?.startsWith('http')) return;
     const captureSequence = nextCaptureSequence(state);
@@ -282,41 +310,90 @@ function handleDebuggerEvent(source: CollectorTarget, method: string, params: an
     const sequences = pendingCaptureSequences.get(tabId)!;
     sequences.add(captureSequence);
     const decode = captureBrowserTrackingDecoder();
-    const input = { url: params.request.url, body: params.request.postData, options: { sequence, now: Date.now() }, locale: getCurrentLanguage() };
-    const decoded = Promise.all([decode(input), inspectBrowserRequest({ url: input.url, body: input.body })]);
+    const input = {
+      url: params.request.url,
+      body: params.request.postData,
+      options: { sequence, now: Date.now() },
+      locale: getCurrentLanguage(),
+    };
+    const decoded = Promise.all([
+      decode(input),
+      inspectBrowserRequest({ url: input.url, body: input.body }),
+    ]);
     // The ordered commit attaches the rejection handler after preceding network events.
     void decoded.catch(() => {});
-    enqueueNetworkEvent(tabId, state, async () => {
-      try {
-      let [result, metadata] = await decoded;
-      if (!collectingTabs.has(tabId) || captureStates.get(tabId) !== state) return;
-      if (result.tracking && !result.events.length && params.request.hasPostData && !params.request.postData) {
-        const body = await chrome.debugger.sendCommand(source, 'Network.getRequestPostData', { requestId: params.requestId }).catch(() => undefined) as { postData?: string } | undefined;
-        if (!collectingTabs.has(tabId) || captureStates.get(tabId) !== state) return;
-        if (body?.postData) result = await decode({ ...input, body: body.postData });
-      }
-      if (!collectingTabs.has(tabId) || captureStates.get(tabId) !== state) return;
-      collectionErrors.delete(tabId);
-      if (!source.sessionId || businessWebViewSessions.get(tabId)?.has(source.sessionId)) {
-        handleRequestWillBeSent(tabId, requestKey, params, result, captureSequence, metadata ?? undefined);
-      }
-      } catch (error) {
-        if (captureStates.get(tabId) === state) {
-          state.droppedEventsThroughSequence = Math.max(state.droppedEventsThroughSequence, captureSequence);
-          if (!(error instanceof Error) || error.name !== 'TrackingRequestError') state.droppedRequestsThroughSequence = Math.max(state.droppedRequestsThroughSequence, captureSequence);
+    enqueueNetworkEvent(
+      tabId,
+      state,
+      async () => {
+        try {
+          const [initialResult, metadata] = await decoded;
+          let result = initialResult;
+          if (!collectingTabs.has(tabId) || captureStates.get(tabId) !== state) return;
+          if (
+            result.tracking &&
+            !result.events.length &&
+            params.request.hasPostData &&
+            !params.request.postData
+          ) {
+            const body = (await chrome.debugger
+              .sendCommand(source, 'Network.getRequestPostData', { requestId: params.requestId })
+              .catch(() => undefined)) as { postData?: string } | undefined;
+            if (!collectingTabs.has(tabId) || captureStates.get(tabId) !== state) return;
+            if (body?.postData) result = await decode({ ...input, body: body.postData });
+          }
+          if (!collectingTabs.has(tabId) || captureStates.get(tabId) !== state) return;
+          collectionErrors.delete(tabId);
+          if (!source.sessionId || businessWebViewSessions.get(tabId)?.has(source.sessionId)) {
+            handleRequestWillBeSent(
+              tabId,
+              requestKey,
+              params,
+              result,
+              captureSequence,
+              metadata ?? undefined,
+            );
+          }
+        } catch (error) {
+          if (captureStates.get(tabId) === state) {
+            state.droppedEventsThroughSequence = Math.max(
+              state.droppedEventsThroughSequence,
+              captureSequence,
+            );
+            if (!(error instanceof Error) || error.name !== 'TrackingRequestError')
+              state.droppedRequestsThroughSequence = Math.max(
+                state.droppedRequestsThroughSequence,
+                captureSequence,
+              );
+          }
+          throw error;
         }
-        throw error;
-      }
-    }, () => sequences.delete(captureSequence));
+      },
+      () => sequences.delete(captureSequence),
+    );
     return;
   }
   switch (method) {
-    case 'Network.responseReceived': enqueueNetworkEvent(tabId, state, () => handleResponseReceived(tabId, requestKey, params)); break;
-    case 'Network.loadingFinished': enqueueNetworkEvent(tabId, state, () => { void handleLoadingFinished(tabId, source, requestKey, params); }); break;
-    case 'Network.loadingFailed': enqueueNetworkEvent(tabId, state, () => handleLoadingFailed(tabId, requestKey, params)); break;
-    case 'Runtime.consoleAPICalled': handleConsoleApiCalled(tabId, params); break;
-    case 'Runtime.exceptionThrown': handleExceptionThrown(tabId, params); break;
-    case 'Log.entryAdded': handleLogEntryAdded(tabId, params); break;
+    case 'Network.responseReceived':
+      enqueueNetworkEvent(tabId, state, () => handleResponseReceived(tabId, requestKey, params));
+      break;
+    case 'Network.loadingFinished':
+      enqueueNetworkEvent(tabId, state, () => {
+        void handleLoadingFinished(tabId, source, requestKey, params);
+      });
+      break;
+    case 'Network.loadingFailed':
+      enqueueNetworkEvent(tabId, state, () => handleLoadingFailed(tabId, requestKey, params));
+      break;
+    case 'Runtime.consoleAPICalled':
+      handleConsoleApiCalled(tabId, params);
+      break;
+    case 'Runtime.exceptionThrown':
+      handleExceptionThrown(tabId, params);
+      break;
+    case 'Log.entryAdded':
+      handleLogEntryAdded(tabId, params);
+      break;
   }
 }
 
@@ -401,10 +478,21 @@ function handleLogEntryAdded(tabId: number, params: any): void {
   });
 }
 
-function handleRequestWillBeSent(tabId: number, requestKey: string, params: any, decoded: TrackingRequestResult, captureSequence: number, metadata?: RequestMetadata): void {
+function handleRequestWillBeSent(
+  tabId: number,
+  requestKey: string,
+  params: any,
+  decoded: TrackingRequestResult,
+  captureSequence: number,
+  metadata?: RequestMetadata,
+): void {
   const { request, type, timestamp: monotonicTime, wallTime } = params;
   if (decoded.tracking) {
-    if (decoded.events.length) addEventsToBuffer(tabId, decoded.events.map(event => ({ ...event, captureSequence })));
+    if (decoded.events.length)
+      addEventsToBuffer(
+        tabId,
+        decoded.events.map(event => ({ ...event, captureSequence })),
+      );
     return;
   }
 
@@ -505,7 +593,10 @@ function handleResponseReceived(tabId: number, requestKey: string, params: any):
       entry.request.url,
       entry.request.responseHeaders,
     );
-    entry.request.apiName = generateNonProtocolApiName(entry.request.url, entry.request.resourceType);
+    entry.request.apiName = generateNonProtocolApiName(
+      entry.request.url,
+      entry.request.resourceType,
+    );
   }
   entry.request.isSSE = getHeaderValue(entry.request.responseHeaders, 'content-type').includes(
     'text/event-stream',
@@ -513,7 +604,12 @@ function handleResponseReceived(tabId: number, requestKey: string, params: any):
   refreshBufferedRequest(tabId, entry.request);
 }
 
-async function handleLoadingFinished(tabId: number, target: CollectorTarget, requestKey: string, params: any): Promise<void> {
+async function handleLoadingFinished(
+  tabId: number,
+  target: CollectorTarget,
+  requestKey: string,
+  params: any,
+): Promise<void> {
   const captureState = captureStates.get(tabId);
   const { requestId, timestamp: endTimestamp } = params;
   const pending = pendingRequests.get(tabId);
@@ -689,7 +785,10 @@ export interface BackgroundCapturedRequest {
 }
 
 /** 把扩展后台代发的普通 Protocol 请求接入共用请求缓冲区。 */
-export function recordBackgroundCapturedRequest(tabId: number, data: BackgroundCapturedRequest): boolean {
+export function recordBackgroundCapturedRequest(
+  tabId: number,
+  data: BackgroundCapturedRequest,
+): boolean {
   const captureState = captureStates.get(tabId);
   const captureSequence =
     collectingTabs.has(tabId) && captureState ? nextCaptureSequence(captureState) : undefined;
@@ -849,15 +948,18 @@ export async function startRequestCollection(
         onInvalidated: () => invalidateCollection(tabId),
       });
       collectorLeases.set(tabId, lease);
-      await Promise.all([...(businessWebViewSessions.get(tabId) ?? [])].map(sessionId =>
-        setWebViewNetwork(tabId, sessionId, true),
-      ));
+      await Promise.all(
+        [...(businessWebViewSessions.get(tabId) ?? [])].map(sessionId =>
+          setWebViewNetwork(tabId, sessionId, true),
+        ),
+      );
     } catch (error) {
       collectionConsumers.delete(tabId);
       collectingTabs.delete(tabId);
-  networkQueues.delete(tabId);
-  pendingCaptureSequences.delete(tabId);
-  collectionErrors.delete(tabId);      captureStates.delete(tabId);
+      networkQueues.delete(tabId);
+      pendingCaptureSequences.delete(tabId);
+      collectionErrors.delete(tabId);
+      captureStates.delete(tabId);
       requestBuffers.delete(tabId);
       requestBufferAccounting.delete(tabId);
       logBuffers.delete(tabId);
@@ -894,13 +996,16 @@ export async function stopRequestCollection(
   collectingTabs.delete(tabId);
   networkQueues.delete(tabId);
   pendingCaptureSequences.delete(tabId);
-  collectionErrors.delete(tabId);  pendingRequests.delete(tabId);
+  collectionErrors.delete(tabId);
+  pendingRequests.delete(tabId);
   backgroundProtocolStreams.delete(tabId);
   const lease = collectorLeases.get(tabId);
   collectorLeases.delete(tabId);
-  await Promise.all([...(businessWebViewSessions.get(tabId) ?? [])].map(sessionId =>
-    setWebViewNetwork(tabId, sessionId, false),
-  ));
+  await Promise.all(
+    [...(businessWebViewSessions.get(tabId) ?? [])].map(sessionId =>
+      setWebViewNetwork(tabId, sessionId, false),
+    ),
+  );
   await lease?.release();
 }
 
@@ -916,10 +1021,16 @@ export function getCollectorSnapshot(tabId: number): {
   requests: CapturedRequest[];
   events: RumEvent[];
 } {
-  const sequence = captureStates.has(tabId) ? committedCaptureState(tabId).currentSequence : Infinity;
+  const sequence = captureStates.has(tabId)
+    ? committedCaptureState(tabId).currentSequence
+    : Infinity;
   return {
-    requests: (requestBuffers.get(tabId) ?? []).filter(value => value.captureSequence === undefined || value.captureSequence <= sequence),
-    events: (eventBuffers.get(tabId) ?? []).filter(value => value.captureSequence === undefined || value.captureSequence <= sequence),
+    requests: (requestBuffers.get(tabId) ?? []).filter(
+      value => value.captureSequence === undefined || value.captureSequence <= sequence,
+    ),
+    events: (eventBuffers.get(tabId) ?? []).filter(
+      value => value.captureSequence === undefined || value.captureSequence <= sequence,
+    ),
   };
 }
 
@@ -948,9 +1059,13 @@ export function getCollectedRequests(
   const pattern = filter ? compileTextPattern(filter) : undefined;
   const state = committedCaptureState(tabId);
   const captured = queryCapturedEntries(
-    buffer.filter((request): request is CapturedRequest & { captureSequence: number } =>
-      Number.isSafeInteger(request.captureSequence) && request.captureSequence! <= state.currentSequence,
-    ).sort((left, right) => left.captureSequence - right.captureSequence),
+    buffer
+      .filter(
+        (request): request is CapturedRequest & { captureSequence: number } =>
+          Number.isSafeInteger(request.captureSequence) &&
+          request.captureSequence! <= state.currentSequence,
+      )
+      .sort((left, right) => left.captureSequence - right.captureSequence),
     state,
     { after, since, limit: count },
     request =>
@@ -966,7 +1081,9 @@ export function getCollectedRequests(
   return {
     requests: captured.entries,
     totalMatched: captured.totalMatched,
-    totalInBuffer: buffer.filter(value => value.captureSequence! <= state.currentSequence && isBusinessRequest(value)).length,
+    totalInBuffer: buffer.filter(
+      value => value.captureSequence! <= state.currentSequence && isBusinessRequest(value),
+    ).length,
     nextCursor: captured.nextCursor,
     hasMore: captured.hasMore,
     gap: captured.gap,
@@ -987,7 +1104,9 @@ export function getCollectedLogs(
   const state = committedCaptureState(tabId);
   const pattern = options.filter ? compileTextPattern(options.filter) : undefined;
   const result = queryCapturedEntries(
-    buffer.filter(value => value.captureSequence <= state.currentSequence).sort((left, right) => left.captureSequence - right.captureSequence),
+    buffer
+      .filter(value => value.captureSequence <= state.currentSequence)
+      .sort((left, right) => left.captureSequence - right.captureSequence),
     state,
     { after: options.after, since: options.since, limit: options.limit ?? 100 },
     log =>
@@ -998,7 +1117,10 @@ export function getCollectedLogs(
     state.droppedLogsThroughSequence,
     'logs',
   );
-  return { ...result, totalInBuffer: buffer.filter(value => value.captureSequence <= state.currentSequence).length };
+  return {
+    ...result,
+    totalInBuffer: buffer.filter(value => value.captureSequence <= state.currentSequence).length,
+  };
 }
 
 export function getCaptureCheckpoint(tabId: number): {
@@ -1023,7 +1145,12 @@ export function getCollectedEvents(
 ): CapturedTrackingEventQueryResult {
   const buffer = eventBuffers.get(tabId) || [];
   const state = committedCaptureState(tabId);
-  return queryCapturedTrackingEvents(buffer.filter(value => value.captureSequence! <= state.currentSequence), state, options, state.droppedEventsThroughSequence);
+  return queryCapturedTrackingEvents(
+    buffer.filter(value => value.captureSequence! <= state.currentSequence),
+    state,
+    options,
+    state.droppedEventsThroughSequence,
+  );
 }
 
 /**
@@ -1048,7 +1175,8 @@ export function cleanupCollector(tabId: number): void {
   collectingTabs.delete(tabId);
   networkQueues.delete(tabId);
   pendingCaptureSequences.delete(tabId);
-  collectionErrors.delete(tabId);  requestBuffers.delete(tabId);
+  collectionErrors.delete(tabId);
+  requestBuffers.delete(tabId);
   requestBufferAccounting.delete(tabId);
   logBuffers.delete(tabId);
   captureStates.delete(tabId);
