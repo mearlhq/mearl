@@ -88,7 +88,16 @@ jobs:
           node scripts/ci-release.mjs prepare --channel "$RELEASE_CHANNEL" --version "$RELEASE_VERSION" --workspace "$RUNNER_TEMP/mearl-release"
       - run: pnpm install --frozen-lockfile --ignore-scripts
         working-directory: ${{ runner.temp }}/mearl-release
-      - run: pnpm build
+      - name: Build release packages and extension
+        env:
+          VITE_MEARL_ANALYTICS_ID: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.channel == 'stable' && vars.VITE_MEARL_ANALYTICS_ID || '' }}
+          VITE_MEARL_ANALYTICS_SECRET: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.channel == 'stable' && secrets.VITE_MEARL_ANALYTICS_SECRET || '' }}
+        run: |
+          if [[ -n "$VITE_MEARL_ANALYTICS_ID" && -z "$VITE_MEARL_ANALYTICS_SECRET" || -z "$VITE_MEARL_ANALYTICS_ID" && -n "$VITE_MEARL_ANALYTICS_SECRET" ]]; then
+            printf '%s\n' 'Configure both extension Analytics settings or leave both unset.' >&2
+            exit 1
+          fi
+          pnpm build
         working-directory: ${{ runner.temp }}/mearl-release
       - run: npx --yes --package=node@20.18.0 -- node scripts/verify-node-runtime.mjs
         working-directory: ${{ runner.temp }}/mearl-release
