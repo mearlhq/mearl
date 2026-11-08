@@ -391,7 +391,8 @@ describe('SandboxToolPage', () => {
       />,
     );
 
-    const frame = (await screen.findByTitle('工作区笔记')) as HTMLIFrameElement;
+    await act(async () => {});
+    const frame = screen.getByTitle('工作区笔记') as HTMLIFrameElement;
     const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
     act(() => {
       window.dispatchEvent(
@@ -904,7 +905,9 @@ describe('SandboxToolPage', () => {
         page={page}
       />,
     );
-    const frame = (await screen.findByTitle('工作区笔记')) as HTMLIFrameElement;
+    // The sandbox sends its ready message after the HTML and its listener are committed.
+    await act(async () => {});
+    const frame = screen.getByTitle('工作区笔记') as HTMLIFrameElement;
     const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
     act(() => {
       window.dispatchEvent(
