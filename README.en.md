@@ -21,21 +21,6 @@ The extension provides a DevTools panel, popup, side panel, and toolbox. The CLI
 
 Mearl 3.0 runtime packages require **Node.js ≥ 20.18.0**. Use **Chrome ≥ 120** or a Chromium browser supporting the required extension APIs. See [extension compatibility](packages/extension/README.en.md#browser-compatibility) for individual features.
 
-### Install locally
-
-```bash
-npx @mearl/setup
-```
-
-The installer sets up the `mearl` CLI, Native Host, and main Mearl Skill. Install the extension version that matches the local runtime.
-
-- Download and extract `mearl-chrome-v*.zip`. Open `chrome://extensions/`, enable **Developer mode**, and choose **Load unpacked** to select the extracted folder. [GitHub Releases](https://github.com/mearlhq/mearl/releases)
-- Add Mearl to Chrome when the store offers the matching version. [Chrome Web Store](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm)
-
-Enable **Agent service** in Mearl, then run `mearl check --local` to verify the connection. [Setup documentation](packages/setup/README.en.md)
-
-Run `mearl guide` for the current CLI's core workflow and `mearl guide --list` for additional topics. Use `mearl <action> --help` for arguments. Guides ship locally with the client and do not connect to a browser or trigger updates. The Skill distributes a compact entry point; the CLI provides the guide content. MCP-only clients should follow tool descriptions and schemas directly.
-
 ### Use with an agent
 
 Copy this prompt into your agent.
@@ -50,6 +35,21 @@ Verify the browser connection and report the result.
 ```
 
 If your client requires MCP, run `npx @mearl/setup --mcp` after setting up the local environment. [MCP documentation](packages/mcp-server/README.en.md)
+
+### Install locally
+
+```bash
+npx @mearl/setup
+```
+
+The installer sets up the `mearl` CLI, Native Host, and main Mearl Skill. Install the extension version that matches the local runtime.
+
+- Download and extract `mearl-chrome-v*.zip`. Open `chrome://extensions/`, enable **Developer mode**, and choose **Load unpacked** to select the extracted folder. [GitHub Releases](https://github.com/mearlhq/mearl/releases)
+- Add Mearl to Chrome when the store offers the matching version. [Chrome Web Store](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm)
+
+Enable **Agent service** in Mearl, then run `mearl check --local` to verify the connection. [Setup documentation](packages/setup/README.en.md)
+
+Run `mearl guide` for the current CLI's core workflow and `mearl guide --list` for additional topics. Use `mearl <action> --help` for arguments. Guides ship locally with the client and do not connect to a browser or trigger updates. The Skill distributes a compact entry point; the CLI provides the guide content. MCP-only clients should follow tool descriptions and schemas directly.
 
 ### Run your first browser task
 
