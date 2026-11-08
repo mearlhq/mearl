@@ -36,6 +36,21 @@ Enable **Agent service** in Mearl, then run `mearl check --local` to verify the 
 
 Run `mearl guide` for the current CLI's core workflow and `mearl guide --list` for additional topics. Use `mearl <action> --help` for arguments. Guides ship locally with the client and do not connect to a browser or trigger updates. The Skill distributes a compact entry point; the CLI provides the guide content. MCP-only clients should follow tool descriptions and schemas directly.
 
+### Use with an agent
+
+Copy this prompt into your agent.
+
+```text
+Run this command to install the Mearl Skill.
+npx --yes skills add mearlhq/mearl --skill mearl --global
+
+Read the Skill and follow its instructions to set up my local environment.
+Tell me what to do if a step requires my input in Chrome.
+Verify the browser connection and report the result.
+```
+
+If your client requires MCP, run `npx @mearl/setup --mcp` after setting up the local environment. [MCP documentation](packages/mcp-server/README.en.md)
+
 ### Run your first browser task
 
 Paste this prompt into an agent with the Mearl Skill or MCP tools.
@@ -56,16 +71,6 @@ JS
 ```
 
 When multiple browsers are connected, use a returned `browserId` with `--browser <browserId>`. Continue using the returned `tabId` for subsequent actions. Check `mearl <action> --help` for arguments.
-
-### Use with an agent
-
-The main [Mearl Skill](skills/mearl/SKILL.md) provides browser operation guidance. After setting up the local environment, install the MCP server if your client requires it.
-
-```bash
-npx @mearl/setup --mcp
-```
-
-See the [MCP documentation](packages/mcp-server/README.en.md) for client configuration and the tool catalog.
 
 ### Use in code
 

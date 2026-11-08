@@ -36,6 +36,20 @@ npx @mearl/setup
 
 首次使用运行 `mearl guide` 读取当前 CLI 的核心工作流，`mearl guide --list` 查看按需专题；参数继续以 `mearl <action> --help` 为准。指南随客户端本地分发，不连接浏览器或触发更新。Skill 只分发精简入口，正文由 CLI 提供。仅使用 MCP 时直接按工具说明与 schema 操作。
 
+### 在 Agent 中使用
+
+把下面这段复制给你的 Agent。
+
+```text
+请运行以下命令安装 Mearl Skill。
+npx --yes skills add mearlhq/mearl --skill mearl --global
+
+读取 Skill 并按它的指引配置本机环境。需要我在 Chrome 里操作时，请告诉我具体步骤。
+完成后验证浏览器连接，并告诉我结果。
+```
+
+如果你的客户端需要 MCP，配置好本机环境后再运行 `npx @mearl/setup --mcp`。[MCP 文档](packages/mcp-server/README.md)
+
 ### 执行第一个浏览器任务
 
 把这段提示词复制到已接入 Mearl Skill 或 MCP 工具的 Agent 对话中。
@@ -56,16 +70,6 @@ JS
 ```
 
 连接多个浏览器时，使用清单返回的 `browserId`，为命令添加 `--browser <browserId>`。后续动作继续使用返回的 `tabId`；命令参数可通过 `mearl <action> --help` 查看。
-
-### 在 Agent 中使用
-
-主 [Mearl Skill](skills/mearl/SKILL.md) 提供浏览器操作指引。配置好本机环境后，可按客户端需要安装 MCP 服务。
-
-```bash
-npx @mearl/setup --mcp
-```
-
-客户端配置与工具目录见 [MCP 文档](packages/mcp-server/README.md)。
 
 ### 在代码中使用
 
