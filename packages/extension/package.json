@@ -13,14 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest run --coverage",
     "i18n:check": "node scripts/clean-i18n.js",
-    "i18n:clean": "node scripts/clean-i18n.js --remove",
-    "lint": "eslint src",
-    "lint:fix": "eslint src --fix",
-    "lint:strict": "eslint src --max-warnings 0",
-    "format": "prettier --write \"src/**/*.{ts,tsx,json}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,json}\""
+    "i18n:clean": "node scripts/clean-i18n.js --remove"
   },
   "dependencies": {
     "clsx": "2.1.1",

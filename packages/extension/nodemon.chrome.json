@@ -4,11 +4,9 @@
   },
   "watch": [
     "src",
-    "utils",
     "vite.config.base.ts",
     "vite.config.chrome.ts",
-    "manifest.ts",
-    "manifest.dev.json"
+    "manifest.ts"
   ],
   "ext": "tsx,css,html,ts,json",
   "ignore": [

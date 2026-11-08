@@ -19,9 +19,7 @@
     "check:core-browser": "node scripts/check-core-browser.mjs",
     "dev:website": "pnpm --filter @mearl/preset build && pnpm --filter @mearl/website dev",
     "build:website": "pnpm --filter @mearl/website... build",
-    "bump": "node scripts/bump-version.mjs",
-    "publish:beta": "node scripts/publish.mjs --channel beta",
-    "publish": "node scripts/publish.mjs"
+    "bump": "node scripts/bump-version.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.9.1",

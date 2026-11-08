@@ -143,7 +143,7 @@ export async function verifyRelease(directory, output, channel, env = process.en
   }
   const expected = (await manifests(directory)).filter(({ value }) => !value.private).map(({ value }) => value.name).sort();
   if (JSON.stringify(packed.map(value => value.name).sort()) !== JSON.stringify(expected)) throw new Error('Release package set differs from source');
-  const args = publishArgs(packed, { channel, env }).slice(2);
+  const args = publishArgs(packed, { channel, env });
   return { release, args };
 }
 

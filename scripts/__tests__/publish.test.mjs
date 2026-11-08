@@ -5,8 +5,8 @@ const manifests = [{ version: '3.0.0-beta.1', repository: { url: 'git+https://gi
 const ci = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'mearlhq/mearl', GITHUB_REF_TYPE: 'branch', GITHUB_REF_NAME: 'codex/open-source-ready' };
 
 describe('beta publishing', () => {
-  it('keeps pnpm git checks and the beta tag for local and trusted CI publishing', () => {
-    expect(publishArgs(manifests)).toEqual(['-r', 'publish', '--access', 'public', '--tag', 'beta', '--registry=https://registry.npmjs.org', '--publish-branch=main']);
+  it('keeps pnpm git checks and the beta tag for trusted publishing', () => {
+    expect(publishArgs(manifests)).toEqual(['--access', 'public', '--tag', 'beta', '--registry=https://registry.npmjs.org', '--publish-branch=main']);
     expect(publishArgs(manifests, { env: ci }).at(-1)).toBe('--publish-branch=codex/open-source-ready');
   });
   it.each([{ GITHUB_REPOSITORY: 'someone/mearl' }, { GITHUB_REF_TYPE: 'tag' }, { GITHUB_REF_NAME: 'feature/unreviewed' }])('rejects another CI identity: %j', patch => {
