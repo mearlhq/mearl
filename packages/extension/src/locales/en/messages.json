@@ -1,13 +1,19 @@
 {
   "appBridgeWebPageEnvironment": { "message": "Web page environment" },
-  "appBridgeWebPageEnvironmentReload": { "message": "Switching environments reloads the current web page." },
+  "appBridgeWebPageEnvironmentReload": {
+    "message": "Switching environments reloads the current web page."
+  },
   "appProfileInstallTitle": { "message": "Add App emulation" },
   "appProfileInstallAction": { "message": "Add App emulation" },
   "appProfileInstallOfficial": { "message": "Official App emulation" },
   "appProfileInstallWeChat": { "message": "WeChat emulation" },
-  "appProfileInstallDescription": { "message": "Install App emulation from a GitHub repository or an HTTPS bundle URL. Only install code from a source you trust." },
+  "appProfileInstallDescription": {
+    "message": "Install App emulation from a GitHub repository or an HTTPS bundle URL. Only install code from a source you trust."
+  },
   "appProfileInstallSource": { "message": "App emulation source" },
-  "appProfileInstallPermissionDenied": { "message": "Permission to read the emulation source was denied." },
+  "appProfileInstallPermissionDenied": {
+    "message": "Permission to read the emulation source was denied."
+  },
   "appProfileInstallFailed": { "message": "Could not install App emulation." },
   "appProfileInstallPending": { "message": "Installing…" },
   "appProfileInstallSubmit": { "message": "Install" },
@@ -29,7 +35,7 @@
     "message": "Mearl"
   },
   "extDescription": {
-    "message": "Agent-driven browser toolkit: automation, verification, observability"
+    "message": "Automate pages with an agent, debug requests, and emulate mobile environments in your own browser."
   },
   "openAgentSidePanelFromPage": {
     "message": "Open Mearl side panel"

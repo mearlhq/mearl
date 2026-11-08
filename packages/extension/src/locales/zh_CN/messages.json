@@ -5,7 +5,9 @@
   "appProfileInstallAction": { "message": "添加端模拟" },
   "appProfileInstallOfficial": { "message": "官方端模拟" },
   "appProfileInstallWeChat": { "message": "微信端模拟" },
-  "appProfileInstallDescription": { "message": "从 GitHub 仓库或 HTTPS 能力包地址安装端模拟。请确认你信任此来源。" },
+  "appProfileInstallDescription": {
+    "message": "从 GitHub 仓库或 HTTPS 能力包地址安装端模拟。请确认你信任此来源。"
+  },
   "appProfileInstallSource": { "message": "端模拟来源" },
   "appProfileInstallPermissionDenied": { "message": "未授权读取端模拟来源。" },
   "appProfileInstallFailed": { "message": "无法安装端模拟。" },
@@ -29,7 +31,7 @@
     "message": "Mearl"
   },
   "extDescription": {
-    "message": "Agent 驱动的浏览器工具：自动化验证、调试观测、一键 Mock"
+    "message": "在你自己的浏览器里，用 Agent 自动化操作、调试请求和模拟移动端环境。"
   },
   "openAgentSidePanelFromPage": {
     "message": "打开 Mearl 侧边栏"
