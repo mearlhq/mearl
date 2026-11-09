@@ -1,16 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { initInstallationBridge } from '../installation-bridge';
-const catalog = {
-  schemaVersion: 1,
-  guide: {
-    url: 'https://guide.example.test/installed.html',
-  },
-  presets: {
-    one: { label: 'First', source: 'https://assets.example.test/one.json', origins: [] },
-    two: { label: 'Second', source: 'https://assets.example.test/two.json', origins: [] },
-  },
-};
+const catalogUrl = 'https://guide.example.test/public-installation.json';
 let send: ReturnType<typeof vi.fn>;
 let originalParent: PropertyDescriptor | undefined;
 const parent = { postMessage: vi.fn() };
@@ -31,23 +22,12 @@ const flush = async () => {
 };
 const button = () => document.querySelector<HTMLButtonElement>('[data-bridge-install]')!;
 beforeEach(() => {
+  const fragment = new URLSearchParams({ catalog: catalogUrl });
+  window.history.replaceState({}, '', `/bridge.html#${fragment}`);
   document.body.innerHTML =
     '<main data-installation-bridge><p data-bridge-label></p><p data-bridge-status></p><button data-bridge-install></button></main>';
   parent.postMessage.mockClear();
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe() {}
-      disconnect() {}
-    },
-  );
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(
-      async () =>
-        new Response(JSON.stringify(catalog), { headers: { 'content-type': 'application/json' } }),
-    ),
-  );
+  vi.stubGlobal('fetch', vi.fn());
   send = vi.fn((_id, _input, callback) => callback({ success: true, data: { connected: true } }));
   vi.stubGlobal('chrome', { runtime: { sendMessage: send } });
 });
@@ -59,48 +39,75 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
-it('does not load the catalog when opened as a top-level page', async () => {
-  await initInstallationBridge();
+it('does not load the catalog when opened as a top-level page', () => {
+  initInstallationBridge();
   expect(fetch).not.toHaveBeenCalled();
   expect(button().disabled).toBe(true);
   expect(send).not.toHaveBeenCalled();
 });
 it('does not open a view from a synthetic click in the guide', async () => {
   embed();
-  await initInstallationBridge();
+  initInstallationBridge();
   select('one');
   await flush();
   button().click();
   await flush();
   expect(send.mock.calls.map(([, input]) => input.operation)).toEqual(['status']);
 });
+
+it('passes a same-origin catalog to the extension without reading it in the bridge', async () => {
+  embed();
+  initInstallationBridge();
+  select('custom');
+  await flush();
+  expect(fetch).not.toHaveBeenCalled();
+  expect(send.mock.calls[0][1]).toMatchObject({
+    operation: 'status',
+    presetId: 'custom',
+    catalogUrl,
+  });
+  expect(parent.postMessage).toHaveBeenLastCalledWith(
+    expect.objectContaining({ type: 'mearl-installation-status', presetId: 'custom' }),
+    'https://guide.example.test',
+  );
+  const click = new MouseEvent('click');
+  Object.defineProperty(click, 'isTrusted', { value: true });
+  button().dispatchEvent(click);
+  await flush();
+  expect(send.mock.calls.at(-1)![1]).toMatchObject({
+    operation: 'open',
+    presetId: 'custom',
+    catalogUrl,
+  });
+});
 it('handles a parent selection only once after BFCache restoration', async () => {
   embed();
-  await initInstallationBridge();
+  initInstallationBridge();
   window.dispatchEvent(new Event('pagehide'));
-  await initInstallationBridge();
+  initInstallationBridge();
   send.mockClear();
   select('two');
   await flush();
   expect(send.mock.calls).toHaveLength(1);
   expect(send.mock.calls[0][1].presetId).toBe('two');
 });
-it('leaves no stale enabled button if the catalog is unavailable after restoration', async () => {
+it('does not use a preset directory when the catalog is missing after restoration', async () => {
   embed();
-  await initInstallationBridge();
+  initInstallationBridge();
   select('one');
   await flush();
   expect(button().disabled).toBe(false);
   window.dispatchEvent(new Event('pagehide'));
-  vi.mocked(fetch).mockRejectedValue(new Error('Offline'));
-  await initInstallationBridge();
+  window.history.replaceState({}, '', '/bridge.html');
+  initInstallationBridge();
   expect(button().disabled).toBe(true);
-  expect(document.body.textContent).toContain('安装目录暂不可用');
+  expect(document.body.textContent).toContain('请从安装引导选择所需能力');
+  expect(fetch).not.toHaveBeenCalled();
 });
 
 it('replays the latest parent selection after a live open, including switching back', async () => {
   embed();
-  await initInstallationBridge();
+  initInstallationBridge();
   select('one');
   await flush();
   expect(document.querySelector<HTMLElement>('[data-bridge-label]')!.hidden).toBe(true);
@@ -135,18 +142,18 @@ it('replays the latest parent selection after a live open, including switching b
   expect(send.mock.calls).toHaveLength(count);
 });
 
-it.each([true, false, undefined])(
-  'only opens installation after a click when browserReady is %s',
-  async browserReady => {
+it.each([true, false])(
+  'only opens installation after a click when the status request succeeds: %s',
+  async connected => {
     embed();
     send.mockImplementation((_id, input, callback) =>
       callback(
-        input.operation === 'status' && browserReady !== undefined
-          ? { success: true, data: { connected: true, browserReady } }
+        input.operation === 'status' && connected
+          ? { success: true }
           : { success: false, error: 'INSTALLATION_SOURCE_DENIED' },
       ),
     );
-    await initInstallationBridge();
+    initInstallationBridge();
     select('one');
     await flush();
     select('two');
@@ -154,7 +161,7 @@ it.each([true, false, undefined])(
     expect(send.mock.calls.map(([, input]) => input.operation)).toEqual(['status', 'status']);
     expect(button().disabled).toBe(false);
     const status = document.querySelector('[data-bridge-status]')!;
-    if (browserReady === undefined) expect(status.textContent).toBe('');
+    if (!connected) expect(status.textContent).toBe('');
     else expect(status.textContent).not.toContain('不可用');
 
     const click = new MouseEvent('click');

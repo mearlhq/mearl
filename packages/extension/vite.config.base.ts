@@ -10,11 +10,6 @@ import manifest from './manifest';
 import pkg from './package.json';
 
 const isDev = process.env.__DEV__ === 'true';
-const installationConfigUrl = process.env.MEARL_INSTALLATION_CONFIG_URL ?? '';
-if (installationConfigUrl) {
-  const url = new URL(installationConfigUrl);
-  if (url.protocol !== 'https:' || url.username || url.password || url.hash || url.search) throw new Error('Expected an HTTPS installation catalog URL');
-}
 // set this flag to true, if you want localization support
 const localize = true;
 
@@ -39,7 +34,6 @@ export const baseBuildOptions: BuildOptions = {
 export default defineConfig({
   define: {
     __MEARL_BUILD_CHANNEL__: JSON.stringify(isDev ? 'development' : 'production'),
-    __MEARL_INSTALLATION_CONFIG_URL__: JSON.stringify(installationConfigUrl),
   },
   resolve: {
     tsconfigPaths: true,

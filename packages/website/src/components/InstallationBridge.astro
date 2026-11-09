@@ -14,4 +14,8 @@ import { installationBridgeCopy as t } from '../lib/installation-bridge-copy';
   .bridge-status { color: var(--muted); }
   .bridge-controls .button { min-height: 32px; padding: 6px 12px; font-size: 13px; }
   .installation-bridge [hidden] { display: none; }
+  @media (max-width: 150px) {
+    .bridge-label, .bridge-status { display: none; }
+    .bridge-controls .button { width: 100%; min-height: 38px; white-space: nowrap; }
+  }
 </style>

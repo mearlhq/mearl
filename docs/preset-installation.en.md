@@ -89,9 +89,7 @@ Setup prepares environment packages and the local host, then invokes the same `p
 
 Deployment `installation.json` may declare `presets` alongside `guide`. Entries contain only display names, HTTPS manifest URLs, and required Chrome site scopes. Scopes allow explicit HTTP, HTTPS, `*` schemes, and subdomain wildcards, but no all-site grants. Manifest origins count toward the 64-scope limit. Catalogs are limited to 32 presets and 64 KiB, without scripts, CLI arguments, or commands.
 
-Public `bridge.html` is a direct child frame of the configured guide. For manual installation, guides can select registered preset IDs and themes, and the public frame provides the installation button. The extension verifies the actual frame, active document, and guide path, and reads the catalog itself from the fixed public address.
-
-The guide checks the selected preset's status when it opens. Clicking Enable or Update opens the extension's installation page, where the user grants any required permissions.
+A guide embeds public `bridge.html` as a direct child iframe and sets `#catalog=<encoded same-origin HTTPS catalog URL>` on the iframe URL. After receiving `mearl-installation-ready`, the parent sends `mearl-installation-select` with `schemaVersion: 1`, `presetId`, and an optional theme. The bridge reports `mearl-installation-status` to the catalog origin with `schemaVersion`, `presetId`, and the display text in `text`. A narrow iframe displays the button and lets the guide render the status outside the frame. After the user clicks Enable, the extension gets the actual top-level page from the browser and follows the same-origin catalog confirmation flow below.
 
 The extension opens its own installation page. Existing permissions permit direct preparation; otherwise a foreground button requests Chrome site permissions and records previous Agent domain grants. Chrome retains catalog scheme scopes; Agent uses host domain contracts. Downloads also check HTTPS, catalog scheme/host scope, and current Chrome permissions; they reuse host Cookie injection, reject redirects, and share a 120-second deadline. Resources, graph, digests, Apps, UI, and runtime configuration validate before replacement; catalog and grants are rechecked before commit.
 
@@ -165,19 +163,13 @@ Deployers maintain trusted preset catalogs. The core defaults to an empty catalo
 The default installation site, extension ID, and local default catalog URL share `@mearl/preset/installation-site.json`. setup and Native updates support local `MEARL_INSTALLATION_CONFIG_URL`, which web pages cannot override and which does not change browser trust roots. Automatic updates require HTTPS; explicit CLI migration permits loopback HTTP for local validation. Deployed `installation.json` is readable: include only public addresses and policy, never credentials.
 
 
-## Direct installation from a website
+## Website installation from a same-origin catalog
 
-Websites query extension versions through injected content scripts, then request status/open for known preset IDs. Version probes return only version data, without Native Host, catalog reads, or installation. Buttons open the extension-owned installation view and normal authorization/install flow.
-
-Independent deployments may build extensions with `MEARL_INSTALLATION_CONFIG_URL` pointing to a trusted HTTPS catalog. Builds prepare content scripts and host permissions for its site. Catalog `guide.url` specifies the exact initiating website path. Hosts validate their own content scripts, top frames, current document identities, and catalog source. Pages, URL hashes, and message arguments cannot change trust configuration.
-
-Injected HTTPS pages can also propose a same-origin `catalogUrl` for one installation. Candidates reject credentials, queries, and fragments. Pages can only query status/open a view, never confirm sources, submit commands, or grant permissions. Status returns only confirmation-required flags, without reading catalogs or connecting local services.
+The installation bridge and HTTPS pages with an injected content script share the same catalog confirmation flow. Both require a same-origin `catalogUrl`. Candidate URLs cannot contain credentials, queries, or fragments. Pages can query status or open an installation view. Status reports whether source confirmation is required without reading the catalog or connecting to local services.
 
 After a user click, the extension-owned view shows the actual requesting page and catalog URL. Only **Continue, read configuration** checks Chrome permissions and reads the catalog. `guide.url` must match the requesting page, whose document must remain valid. The selected capability name, full source, and site scopes display afterward. Even existing grants require another **Confirm and install this configuration** click. The coordinator rechecks the same catalog snapshot, selection identity, and permissions before commit.
 
-Source confirmation and authorization persist in sessions bound to extension install pages, expire after 15 minutes, and are deleted on cancellation. Source changes, revocation, forged pages, or expiry prevent continuation. One installation does not create long-term trust or authorize automatic updates. Without a candidate URL or configured direct-install catalog, return `INSTALLATION_SITE_NOT_CONFIGURED`.
-
-Without this variable, the extension uses the connection entry points on the default installation site. Reload or update the extension after changing its build configuration.
+Source confirmation and authorization persist in sessions bound to extension install pages, expire after 15 minutes, and are deleted on cancellation. Source changes, revocation, forged pages, or expiry prevent continuation. One installation does not create long-term trust or authorize automatic updates.
 
 ### Environment management entry
 

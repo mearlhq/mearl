@@ -63,6 +63,7 @@ const input = (operation = 'open', presetId = 'team') => ({
   action: INSTALLATION_ACTION,
   operation,
   presetId,
+  catalogUrl: 'https://guide.example.test/catalog.json',
 });
 const make = (
   install = vi.fn(async () => {
@@ -100,6 +101,35 @@ const internal = (operation: string, session: string, authorize?: boolean) => ({
   session,
   ...(authorize ? { authorize } : {}),
 });
+
+async function openManaged(
+  service: ReturnType<typeof createInstallationService>,
+  presetId = 'team',
+  existing?: chrome.runtime.MessageSender,
+) {
+  const url = chrome.runtime.getURL(INSTALLATION_VIEW_PATH);
+  const tab = existing?.tab ?? (await chrome.tabs.create({ url }));
+  const sender =
+    existing ??
+    ({
+      id: chrome.runtime.id,
+      url,
+      tab,
+      frameId: 0,
+    } as chrome.runtime.MessageSender);
+  const previous = status;
+  status = { ...status, presetId, presetSource: config.presets![presetId].source };
+  try {
+    const result = (await service.internal(
+      { action: INSTALLATION_ACTION, operation: 'restart' },
+      sender,
+    )) as { session: string };
+    tabs.get(tab.id!)!.url = `${url}?session=${result.session}`;
+    return result;
+  } finally {
+    status = previous;
+  }
+}
 
 it('leaves the guide idle after status checks and rejects legacy automatic open requests', async () => {
   const { service, install } = make();
@@ -140,7 +170,13 @@ beforeEach(() => {
     INSTALLATION_SITE.origin,
   );
   topUrl = config.guide!.url;
-  frame = { url: INSTALLATION_BRIDGE_URL, parentFrameId: 0, documentId: 'bridge-document' };
+  frame = {
+    url: INSTALLATION_BRIDGE_URL,
+    parentFrameId: 0,
+    documentId: 'bridge-document',
+    parentDocumentId: 'top-document',
+    documentLifecycle: 'active',
+  };
   status = { browserReady: false, settingsPending: [], pending: [] };
   selection = { activeRevision: null, installationToken: null, revisions: {} };
   Object.assign(chrome, {
@@ -173,7 +209,14 @@ beforeEach(() => {
     },
     webNavigation: {
       getFrame: vi.fn(async ({ frameId }: { frameId: number }) =>
-        frameId === 0 ? { url: topUrl, parentFrameId: -1, documentId: 'top-document' } : frame,
+        frameId === 0
+          ? {
+              url: topUrl,
+              parentFrameId: -1,
+              documentId: 'top-document',
+              documentLifecycle: 'active',
+            }
+          : frame,
       ),
     },
     tabs: {
@@ -203,85 +246,30 @@ beforeEach(() => {
 });
 
 describe('website installation authority', () => {
-  const directSender = () => ({
-    ...owner(),
-    id: chrome.runtime.id,
-    url: config.guide!.url,
-    origin: new URL(config.guide!.url).origin,
-    frameId: 0,
-    documentId: 'top-document',
-  });
-  const directInput = (operation = 'status', presetId = 'team') => ({
-    action: 'mearlWebsiteInstallation',
-    operation,
-    presetId,
-  });
-  it('connects the configured guide directly without the public bridge or Native Host', async () => {
-    const { service, install } = make();
-    await expect(service.website(directInput(), directSender())).resolves.toMatchObject({
-      connected: true,
-      version: '3.0.0',
-      browserReady: false,
-    });
-    const opened = (await service.website(directInput('open'), directSender())) as {
-      session: string;
-    };
-    expect(records[`mearl-installation:${opened.session}`].owner).toEqual({
-      tabId: 1,
+  it('requires an explicit catalog for both website transports', async () => {
+    const { service } = make();
+    const { catalogUrl: _catalogUrl, ...request } = input('open');
+    const direct = {
+      ...owner(),
+      id: chrome.runtime.id,
+      url: config.guide!.url,
+      origin: new URL(config.guide!.url).origin,
       frameId: 0,
       documentId: 'top-document',
-    });
-    expect(install).not.toHaveBeenCalled();
-  });
-  it.each([
-    { id: 'other-extension' },
-    { origin: 'https://attacker.example' },
-    { frameId: 1 },
-    { url: 'https://guide.example.test/other.html' },
-    { documentId: 'stale-document' },
-    { documentLifecycle: 'prerender' },
-  ])('rejects an untrusted direct website %j', async patch => {
-    const { service } = make();
+    };
     await expect(
-      service.website(directInput('open'), {
-        ...directSender(),
-        ...patch,
-      } as chrome.runtime.MessageSender),
-    ).rejects.toThrow();
-    expect(chrome.tabs.create).not.toHaveBeenCalled();
-  });
-  it('does not accept install sources from the page or fetch a public catalog when direct installation is unconfigured', async () => {
-    const { service } = make();
-    await expect(
-      service.website(
-        { ...directInput(), source: 'https://attacker.example/preset.json' },
-        directSender(),
-      ),
+      service.website({ ...request, action: 'mearlWebsiteInstallation' }, direct),
     ).rejects.toThrow('INVALID_INSTALLATION_REQUEST');
-    await expect(service.website(directInput('open', 'unknown'), directSender())).rejects.toThrow(
-      'PRESET_UNAVAILABLE',
+    await expect(service.external(request, owner())).rejects.toThrow(
+      'INVALID_INSTALLATION_REQUEST',
     );
-    const fetch = vi.spyOn(globalThis, 'fetch');
-    await expect(
-      createInstallationService().website(directInput(), directSender()),
-    ).rejects.toThrow('SITE_NOT_CONFIGURED');
-    expect(fetch).not.toHaveBeenCalled();
-    fetch.mockRestore();
-  });
-  it('opens only a configured preset and saves its owner before the view navigates', async () => {
-    const { service, install } = make();
-    const opened = (await service.external(input(), owner())) as { session: string };
-    const saved = records[`mearl-installation:${opened.session}`];
-    expect(saved.preset.source).toBe(config.presets!.team.source);
-    expect(saved.owner).toEqual({ tabId: 1, frameId: 2, documentId: 'bridge-document' });
-    expect(saved.viewTabId).toBe(91);
-    expect(install).not.toHaveBeenCalled();
+    await expect(service.external({ ...input(), operation: ['status'] }, owner())).rejects.toThrow(
+      'INVALID_INSTALLATION_REQUEST',
+    );
     await expect(
       service.external({ ...input(), source: 'https://attacker.example/' }, owner()),
     ).rejects.toThrow('INVALID_INSTALLATION_REQUEST');
-    await expect(service.external(input('open', 'unknown'), owner())).rejects.toThrow(
-      'PRESET_UNAVAILABLE',
-    );
+    expect(chrome.tabs.create).not.toHaveBeenCalled();
   });
   it.each([
     { origin: 'https://attacker.example.test' },
@@ -296,13 +284,18 @@ describe('website installation authority', () => {
     ).rejects.toThrow();
     expect(chrome.tabs.create).not.toHaveBeenCalled();
   });
-  it('requires a direct frame under the configured guide path', async () => {
+  it('requires a direct frame under a page on the catalog origin', async () => {
     const { service } = make();
     frame.parentFrameId = 7;
     await expect(service.external(input(), owner())).rejects.toThrow('SOURCE_DENIED');
     frame.parentFrameId = 0;
-    topUrl = 'https://guide.example.test/untrusted.html';
-    await expect(service.external(input(), owner())).rejects.toThrow('PARENT_DENIED');
+    topUrl = 'https://other.example.test/untrusted.html';
+    await expect(service.external(input(), owner())).rejects.toThrow('SOURCE_DENIED');
+  });
+  it('rejects a request from a bridge attached to a replaced top-level document', async () => {
+    const { service } = make();
+    frame.parentDocumentId = 'previous-top-document';
+    await expect(service.external(input(), owner())).rejects.toThrow('INSTALLATION_PARENT_DENIED');
   });
   it.each(['bridge.html', 'connect.html', 'en/connect.html'])(
     'rejects top-level installation requests from %s',
@@ -322,6 +315,8 @@ describe('website installation authority', () => {
   );
   it('reports ready only for the catalog source and identity', async () => {
     const { service } = make();
+    const { session } = await openManaged(service);
+    const inspect = () => service.internal(internal('inspect', session), uiSender(session));
     status = {
       ...status,
       browserReady: true,
@@ -329,23 +324,23 @@ describe('website installation authority', () => {
       presetSource: 'https://other.example.test/team.json',
       pending: [{ id: 'node' }],
     };
-    expect(await service.external(input('status'), owner())).toMatchObject({
+    expect(await inspect()).toMatchObject({
       browserReady: false,
       localComponentCount: 0,
     });
     status.presetSource = config.presets!.team.source;
-    expect(await service.external(input('status'), owner())).toMatchObject({
+    expect(await inspect()).toMatchObject({
       browserReady: true,
       localComponentCount: 1,
     });
     status.settingsPending = ['simulation'];
-    expect(await service.external(input('status'), owner())).toMatchObject({ browserReady: false });
+    expect(await inspect()).toMatchObject({ browserReady: false });
     status.settingsPending = [];
     grants = false;
-    expect(await service.external(input('status'), owner())).toMatchObject({ browserReady: false });
+    expect(await inspect()).toMatchObject({ browserReady: false });
     grants = true;
     agent.allowed = [];
-    expect(await service.external(input('status'), owner())).toMatchObject({ browserReady: false });
+    expect(await inspect()).toMatchObject({ browserReady: false });
   });
   it('reuses its own view when Chrome omits the tab URL', async () => {
     const { service } = make();
@@ -440,6 +435,32 @@ describe('website source confirmation', () => {
     return { service, fetcher, install, native };
   };
   afterEach(() => vi.unstubAllGlobals());
+  it('routes a catalog from the embedded bridge into the same source-confirmation session', async () => {
+    const f = setup();
+    const input = (operation: string, url = catalogUrl) => ({
+      action: INSTALLATION_ACTION,
+      operation,
+      presetId: 'team',
+      catalogUrl: url,
+    });
+    await expect(
+      f.service.external(input('open', 'https://other.example/catalog.json'), owner()),
+    ).rejects.toThrow('INSTALLATION_SOURCE_DENIED');
+    await expect(f.service.external(input('status'), owner())).resolves.toMatchObject({
+      requiresSourceConfirmation: true,
+    });
+    expect(chrome.tabs.create).not.toHaveBeenCalled();
+    const opened = (await f.service.external(input('open'), owner())) as { session: string };
+    expect(await f.service.website(website(), sender())).toEqual(opened);
+    expect(
+      await f.service.internal(internal('inspect', opened.session), uiSender(opened.session)),
+    ).toMatchObject({
+      needsSourceConfirmation: true,
+      sourceRequest: { catalogUrl, requestingPage: config.guide!.url },
+    });
+    expect(f.fetcher).not.toHaveBeenCalled();
+    expect(f.native.capture).not.toHaveBeenCalled();
+  });
   it('only discovers the confirmation requirement and opens an extension view before any catalog or local-service access', async () => {
     const f = setup();
     expect(await f.service.website(website('status'), sender())).toMatchObject({
@@ -602,7 +623,7 @@ describe('extension installation session', () => {
       native,
       now: () => now,
     });
-    const { session } = (await service.external(input(), owner())) as { session: string };
+    const { session } = await openManaged(service);
     const sender = uiSender(session);
     now += 16 * 60_000;
     await expect(service.internal(internal('inspect', session), sender)).rejects.toThrow(
@@ -629,7 +650,7 @@ describe('extension installation session', () => {
   });
   it('cannot recover arbitrary or untrusted presets or recover from a child frame', async () => {
     const { service, install } = make();
-    const { session } = (await service.external(input(), owner())) as { session: string };
+    const { session } = await openManaged(service);
     const sender = uiSender(session);
     await expect(service.internal(internal('restart', session), sender)).rejects.toThrow(
       'PRESET_UNAVAILABLE',
@@ -658,7 +679,7 @@ describe('extension installation session', () => {
       install,
       now: () => now,
     });
-    const { session } = (await service.external(input(), owner())) as { session: string };
+    const { session } = await openManaged(service);
     configuration.mockRejectedValue(new Error('Failed to fetch'));
     grants = false;
     await expect(
@@ -671,7 +692,7 @@ describe('extension installation session', () => {
   });
   it('accepts Chrome storage key ordering without weakening catalog identity checks', async () => {
     const { service } = make();
-    const { session } = (await service.external(input(), owner())) as { session: string };
+    const { session } = await openManaged(service);
     const record = records[`mearl-installation:${session}`];
     record.preset = {
       label: record.preset.label,
@@ -688,7 +709,7 @@ describe('extension installation session', () => {
   });
   it('allows only its allocated top-level extension view', async () => {
     const { service, install } = make();
-    const { session } = (await service.external(input(), owner())) as { session: string };
+    const { session } = await openManaged(service);
     const sender = uiSender(session);
     for (const patch of [
       { url: 'https://guide.example.test/' },
@@ -711,7 +732,7 @@ describe('extension installation session', () => {
   });
   it('requires browser grants and explicit Agent authorization before changing stored domains', async () => {
     const { service, install } = make();
-    const { session } = (await service.external(input(), owner())) as { session: string };
+    const { session } = await openManaged(service);
     const sender = uiSender(session);
     agent.allowed = [];
     expect(await service.internal(internal('inspect', session), sender)).toMatchObject({
@@ -734,7 +755,7 @@ describe('extension installation session', () => {
   });
   it('does not restore authorization revoked after an automatic request was accepted', async () => {
     const { service, install } = make();
-    const { session } = (await service.external(input(), owner())) as { session: string };
+    const { session } = await openManaged(service);
     agent.allowed = [];
     vi.mocked(getAgentAllowedOrigins).mockResolvedValueOnce(config.presets!.team.origins);
     await expect(service.internal(internal('install', session), uiSender(session))).rejects.toThrow(
@@ -760,7 +781,7 @@ describe('extension installation session', () => {
         }),
     );
     const { service } = make(install);
-    const { session } = (await service.external(input(), owner())) as { session: string };
+    const { session } = await openManaged(service);
     const sender = uiSender(session);
     const first = service.internal(internal('install', session), sender);
     const second = service.internal(internal('install', session), sender);
@@ -780,7 +801,7 @@ describe('extension installation session', () => {
   });
   it('pins the selection before work and never re-applies a completed session', async () => {
     const { service, install } = make();
-    const { session } = (await service.external(input(), owner())) as { session: string };
+    const { session } = await openManaged(service);
     const sender = uiSender(session);
     selection.installationToken = 'a'.repeat(64);
     await expect(service.internal(internal('inspect', session), sender)).rejects.toThrow(
@@ -790,7 +811,7 @@ describe('extension installation session', () => {
       'SELECTION_CHANGED',
     );
     expect(install).not.toHaveBeenCalled();
-    await service.external(input(), owner());
+    await openManaged(service, 'team', sender);
     await service.internal(internal('install', session), sender);
     selection.activeRevision = 'b'.repeat(64);
     status.presetId = 'other';
@@ -812,8 +833,8 @@ describe('extension installation session', () => {
     };
     agent.allowed = [];
     const { service } = make();
-    const one = (await service.external(input(), owner())) as { session: string };
-    const two = (await service.external(input('open', 'second'), owner())) as { session: string };
+    const one = await openManaged(service);
+    const two = await openManaged(service, 'second');
     await Promise.all([
       service.internal(internal('install', one.session, true), uiSender(one.session)),
       service.internal(internal('install', two.session, true), uiSender(two.session)),
@@ -826,7 +847,7 @@ describe('extension installation session', () => {
   });
   it('expires sessions and rejects catalog changes before installation', async () => {
     const { service, install } = make();
-    const { session } = (await service.external(input(), owner())) as { session: string };
+    const { session } = await openManaged(service);
     const sender = uiSender(session);
     config.presets!.team.source = 'https://guide.example.test/changed.json';
     await expect(service.internal(internal('install', session), sender)).rejects.toThrow(
@@ -870,7 +891,7 @@ describe('catalog resource and commit authority', () => {
         captureInstallationSelection: async () => structuredClone(selection),
       } as any,
     });
-    const { session } = (await service.external(input(), owner())) as { session: string };
+    const { session } = await openManaged(service);
     const request = service.internal(internal('install', session), uiSender(session));
     return { request, committed };
   };
@@ -966,7 +987,7 @@ describe('attached native installation', () => {
           pending: [{ runtime: 'node', id: 'helper', reason }],
         }),
       );
-      const opened = (await f.service.external(input(), owner())) as { session: string };
+      const opened = await openManaged(f.service);
       const ui = uiSender(opened.session);
       await f.service.internal(internal('install', opened.session), ui);
       await f.service.internal(
@@ -998,7 +1019,7 @@ describe('attached native installation', () => {
         pending: [{ runtime: 'node', id: 'helper', reason: 'SKILL_SOURCE_CONFLICT' }],
       }),
     );
-    const opened = (await f.service.external(input(), owner())) as { session: string };
+    const opened = await openManaged(f.service);
     const ui = uiSender(opened.session);
     await f.service.internal(internal('install', opened.session), ui);
     await expect(
@@ -1056,7 +1077,7 @@ describe('attached native installation', () => {
         pending,
       }),
     );
-    const opened = (await f.service.external(input(), owner())) as { session: string };
+    const opened = await openManaged(f.service);
     await expect(
       f.service.internal(internal('install', opened.session), uiSender(opened.session)),
     ).resolves.toMatchObject({
@@ -1108,7 +1129,7 @@ describe('attached native installation', () => {
       return { id: 'team', revision: receipt };
     });
     const { service } = f;
-    const opened = (await service.external(input(), owner())) as { session: string };
+    const opened = await openManaged(service);
     expect(
       await service.internal(internal('install', opened.session), uiSender(opened.session)),
     ).toMatchObject({ ready: true, localStatus: 'ready' });
@@ -1158,7 +1179,7 @@ describe('attached native installation', () => {
         return { id: 'team', revision: receipt };
       });
       const { service } = f;
-      const opened = (await service.external(input(), owner())) as { session: string };
+      const opened = await openManaged(service);
       await expect(
         service.internal(internal('install', opened.session), uiSender(opened.session)),
       ).rejects.toThrow('Browser activation rejected');
@@ -1199,7 +1220,7 @@ describe('attached native installation', () => {
         return { id: 'team', revision: receipt, ready: true, browserSyncRequired: false };
       },
     );
-    const opened = (await f.service.external(input(), owner())) as { session: string };
+    const opened = await openManaged(f.service);
     expect(
       await f.service.internal(internal('install', opened.session), uiSender(opened.session)),
     ).toMatchObject({
@@ -1238,7 +1259,7 @@ describe('attached native installation', () => {
           ? { ready: false, changed: true }
           : { id: 'team', revision: receipt, ready: false, browserSyncRequired: true },
     );
-    const opened = (await f.service.external(input(), owner())) as { session: string };
+    const opened = await openManaged(f.service);
     expect(
       await f.service.internal(internal('install', opened.session), uiSender(opened.session)),
     ).toMatchObject({ localStatus: 'pending' });

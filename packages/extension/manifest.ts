@@ -5,9 +5,8 @@ import { EARLY_CONTENT_SCRIPT_FILES } from './src/shared/appProfileRuntimeAsset'
 import { chatVisualizationCdn } from './src/shared/chatVisualizationCdn';
 import { DEVICE_PREVIEW_PANEL_PAGE } from './src/shared/devicePreviewPanel';
 
-const directCatalog = process.env.MEARL_INSTALLATION_CONFIG_URL;
-const websiteOrigins = [...new Set([new URL(installationSite.url).origin, ...(directCatalog ? [new URL(directCatalog).origin] : [])])];
-const contentScriptMatches = [...ALLOWED_ORIGINS_LIST, ...websiteOrigins.map(origin => `${origin}/*`)];
+const installationOrigin = `${new URL(installationSite.url).origin}/*`;
+const contentScriptMatches = [...ALLOWED_ORIGINS_LIST, installationOrigin];
 
 interface ContentScriptDefinition {
   matches: string[];
@@ -120,7 +119,7 @@ const manifest: ManifestV3Export = {
     'tabGroups',
     'offscreen',
   ],
-  host_permissions: [...ALLOWED_ORIGINS_LIST, 'https://www.google-analytics.com/*', 'https://skills.sh/*', 'https://api.github.com/*', ...websiteOrigins.map(origin => `${origin}/*`)],
+  host_permissions: [...ALLOWED_ORIGINS_LIST, 'https://www.google-analytics.com/*', 'https://skills.sh/*', 'https://api.github.com/*', installationOrigin],
   optional_host_permissions: ['<all_urls>'],
 };
 
