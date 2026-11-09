@@ -3,7 +3,8 @@ import { ArrowRight, ArrowUpRight, Braces, Globe, PackageOpen, ScanSearch, Smart
 import BaseLayout from '../layouts/BaseLayout.astro';
 import CodeBlock from './CodeBlock.astro';
 import GitHubIcon from './GitHubIcon.astro';
-import { clientDemoPath, repositoryUrl, setupCommand, siteBase, sitePath, type Guide, type Locale } from '../lib/site';
+import { repositoryUrl, setupCommand, siteBase, sitePath, type Guide, type Locale } from '../lib/site';
+import { screenshots } from '../lib/screenshots';
 import { siteCopy } from '../lib/site-copy';
 import '../styles/home.css';
 
@@ -38,12 +39,12 @@ const capabilityLinks: Array<Array<{ page: Guide; label: string; anchor?: string
 ];
 const comparison = [
   {
-    src: 'https://img.alicdn.com/imgextra/i1/O1CN01nnWgmesZVnH1dDJk_!!6000000000994-49-tps-804-1520.webp',
-    label: t.comparisonBrowser, caption: t.comparisonBrowserCaption, width: 804, height: 1520,
+    ...screenshots.appBrowser,
+    label: t.comparisonBrowser, caption: screenshots.appBrowser[locale],
   },
   {
-    src: 'https://img.alicdn.com/imgextra/i2/O1CN01ZhW5i9Q0OsH1JhWW_!!6000000005725-49-tps-649-1227.webp',
-    label: t.comparisonApp, caption: t.comparisonAppCaption, width: 649, height: 1227,
+    ...screenshots.appWebView,
+    label: t.comparisonApp, caption: screenshots.appWebView[locale],
   },
 ] as const;
 ---
@@ -132,13 +133,12 @@ const comparison = [
         <h2 id="comparison-title">{t.comparisonTitle}</h2>
         <p>{t.comparisonLead}</p>
         <div class="product-comparison-links">
-          <a href={clientDemoPath(locale)}>{t.openDemo}<ArrowUpRight size={15} aria-hidden="true" /></a>
           <a href={sitePath(locale, 'emulation') + '#app'}>{t.mobileGuide}<ArrowRight size={15} aria-hidden="true" /></a>
         </div>
       </div>
       <div class="product-comparison-stage">
         <div class="product-comparison-grid">
-          {comparison.map(({ src, label, caption, width, height }) => (
+          {comparison.map(({ url: src, label, caption, width, height }) => (
             <figure class="product-comparison-view">
               <h3>{label}</h3>
               <a href={src} aria-label={caption}>

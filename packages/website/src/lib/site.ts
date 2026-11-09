@@ -38,10 +38,6 @@ JS`;
 
 export const siteBase = import.meta.env.BASE_URL.replace(/\/?$/, '/');
 
-export function clientDemoPath(locale: Locale) {
-  return `${siteBase}demos/client-h5.html?lang=${locale}`;
-}
-
 export function sitePath(locale: Locale, page: Page = 'home') {
   if (page === 'home') return siteBase + (locale === 'en' ? 'en.html' : '');
   return siteBase + localePrefix(locale) + `${page}.html`;

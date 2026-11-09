@@ -1,4 +1,4 @@
-import { clientDemoPath, type Guide, type Locale, type Page } from './site';
+import type { Guide, Locale, Page } from './site';
 import type { Screenshot } from './screenshots';
 
 type Topic = Exclude<Guide, 'installation' | 'quick-start'>;
@@ -152,26 +152,8 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
   'browser-automation': {
     en: {
       title: 'Automate a page',
-      lead: 'Call tools a site provides through WebMCP, or use a page snapshot to find controls and verify the result of an interaction.',
+      lead: 'Use a page snapshot to find controls and verify the result of an interaction, or call tools a site provides through WebMCP.',
       sections: [
-        {
-          id: 'webmcp',
-          title: 'Discover and call WebMCP tools',
-          text: 'WebMCP lets a site expose actions such as looking up an order. Mearl discovers tools registered by the main document in the selected Chrome tab. The extension connection and direct CDP both support discovery and calling, subject to the browser’s WebMCP capabilities.',
-          steps: [
-            'Check the webmcp array returned by tab_open, page_navigate, or page_snapshot. Discovery runs in the background. If the directory is missing or truncated, request it explicitly with includeWebMcp set to "full".',
-            'Use the returned ref and the tool’s input schema with page_call_tool. The SDK exposes pageCallTool and MCP exposes browser_page_call_tool. Refresh the directory after navigation or if the ref expires.',
-            'WebMCP is experimental in Chrome and must be enabled for the site or browser. If a browser can only list tools, Mearl reports discovery-only. If no callable tool is available, use the snapshot workflow below.',
-          ],
-          command: webMcp,
-          links: [
-            {
-              label: 'Chrome WebMCP setup',
-              url: 'https://developer.chrome.com/docs/ai/webmcp#get-started',
-            },
-            { label: 'MCP tools', path: 'packages/mcp-server/README.md' },
-          ],
-        },
         {
           id: 'snapshot',
           title: 'Start with a snapshot',
@@ -206,30 +188,30 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
             { label: 'MCP tools', path: 'packages/mcp-server/README.md' },
           ],
         },
-      ],
-    },
-    'zh-CN': {
-      title: '自动化操作网页',
-      lead: '可以直接调用站点提供的 WebMCP 工具，也可以用页面快照找到控件，操作后核对结果。',
-      sections: [
         {
           id: 'webmcp',
-          title: '发现和调用 WebMCP 工具',
-          text: 'WebMCP 让站点可以提供查订单等操作。Mearl 会发现所选 Chrome 标签页的主文档注册的工具。扩展连接和直连 CDP 都支持发现与调用，实际可用范围取决于浏览器提供的 WebMCP 能力。',
+          title: 'Discover and call WebMCP tools',
+          text: 'WebMCP lets a site expose actions such as looking up an order. Mearl discovers tools registered by the main document in the selected Chrome tab. The extension connection and direct CDP both support discovery and calling, subject to the browser’s WebMCP capabilities.',
           steps: [
-            '查看 tab_open、page_navigate 或 page_snapshot 返回的 webmcp 数组。发现过程在后台运行。目录缺失或被截断时，把 includeWebMcp 设为 "full" 显式补查。',
-            '用返回的 ref 和工具的输入 Schema 调用 page_call_tool。SDK 入口是 pageCallTool，MCP 入口是 browser_page_call_tool。页面跳转或引用失效后重新获取目录。',
-            'WebMCP 在 Chrome 中仍是实验功能，需要站点或浏览器启用。浏览器只能列出工具时，Mearl 返回 discovery-only 状态。没有可调用工具时，可继续使用下面的快照工作流。',
+            'Check the webmcp array returned by tab_open, page_navigate, or page_snapshot. Discovery runs in the background. If the directory is missing or truncated, request it explicitly with includeWebMcp set to "full".',
+            'Use the returned ref and the tool’s input schema with page_call_tool. The SDK exposes pageCallTool and MCP exposes browser_page_call_tool. Refresh the directory after navigation or if the ref expires.',
+            'WebMCP is experimental in Chrome and must be enabled for the site or browser. If a browser can only list tools, Mearl reports discovery-only. If no callable tool is available, use the snapshot workflow above.',
           ],
           command: webMcp,
           links: [
             {
-              label: '在 Chrome 中启用 WebMCP',
+              label: 'Chrome WebMCP setup',
               url: 'https://developer.chrome.com/docs/ai/webmcp#get-started',
             },
-            { label: 'MCP 工具', path: 'packages/mcp-server/README.md' },
+            { label: 'MCP tools', path: 'packages/mcp-server/README.md' },
           ],
         },
+      ],
+    },
+    'zh-CN': {
+      title: '自动化操作网页',
+      lead: '用页面快照找到控件，操作后核对结果；也可以直接调用站点提供的 WebMCP 工具。',
+      sections: [
         {
           id: 'snapshot',
           title: '先读取页面快照',
@@ -261,6 +243,24 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
           links: [
             { label: '把流程封装成 Skill', page: 'skill-plugins' },
             { label: 'CLI 和 SDK 参考', path: 'packages/client/README.md' },
+            { label: 'MCP 工具', path: 'packages/mcp-server/README.md' },
+          ],
+        },
+        {
+          id: 'webmcp',
+          title: '发现和调用 WebMCP 工具',
+          text: 'WebMCP 让站点可以提供查订单等操作。Mearl 会发现所选 Chrome 标签页的主文档注册的工具。扩展连接和直连 CDP 都支持发现与调用，实际可用范围取决于浏览器提供的 WebMCP 能力。',
+          steps: [
+            '查看 tab_open、page_navigate 或 page_snapshot 返回的 webmcp 数组。发现过程在后台运行。目录缺失或被截断时，把 includeWebMcp 设为 "full" 显式补查。',
+            '用返回的 ref 和工具的输入 Schema 调用 page_call_tool。SDK 入口是 pageCallTool，MCP 入口是 browser_page_call_tool。页面跳转或引用失效后重新获取目录。',
+            'WebMCP 在 Chrome 中仍是实验功能，需要站点或浏览器启用。浏览器只能列出工具时，Mearl 返回 discovery-only 状态。没有可调用工具时，可继续使用前面的快照工作流。',
+          ],
+          command: webMcp,
+          links: [
+            {
+              label: '在 Chrome 中启用 WebMCP',
+              url: 'https://developer.chrome.com/docs/ai/webmcp#get-started',
+            },
             { label: 'MCP 工具', path: 'packages/mcp-server/README.md' },
           ],
         },
@@ -460,12 +460,12 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
           text: 'Capability packages provide App emulation configurations. Query the target browser’s profile catalog to find supported IDs and options for user agent, JSBridge behavior, and WebView setup. Bridge responses simulate page-visible behavior. Native sign-in or payments depend on separately available capabilities.',
           command: findProfiles,
           steps: [
-            'Open the H5 sample page. In a regular browser it displays the activity details.',
-            'Install and select WeChat web page emulation. Choose Check the WeChat bridge and confirm that JSBridge is ready.',
+            'Open the page you want to test in a regular browser and capture its layout and available actions.',
+            'Install the WeChat profile and select WeChat web page emulation. Reload the page and check the behavior that depends on the User-Agent or JSBridge.',
             'With the device shell enabled, use the bottom gesture bar to switch to WeChat mini-program web page. An Agent can use set_app_profile with the ID returned by get_capabilities.',
           ],
+          screenshot: ['appBrowser', 'appWebView'],
           links: [
-            { label: 'Open the H5 sample', url: clientDemoPath('en') },
             { label: 'WeChat H5 emulation', url: 'https://github.com/mearlhq/wechat-profile' },
             { label: 'Capability packages', path: 'docs/capability-model.md' },
           ],
@@ -565,12 +565,12 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
           text: '端模拟配置由能力包提供。查询目标浏览器的端模拟列表，确认可用 ID、User-Agent、JSBridge 行为和容器设置。桥接回包模拟网页能感知的行为，真实原生登录或支付依赖另行可用的能力。',
           command: findProfiles,
           steps: [
-            '打开 H5 示例页面，确认普通浏览器只显示活动详情。',
-            '安装微信端模拟并选择「微信内网页」。点击「检查微信桥接」，确认显示「JSBridge 就绪」。',
+            '在普通浏览器中打开待验证的网页，记录布局和可用操作。',
+            '安装微信端模拟并选择「微信内网页」，刷新页面，检查依赖 User-Agent 或 JSBridge 的行为。',
             '开启设备外壳后，可从底部手势条切换到「微信小程序内网页」。Agent 可通过 get_capabilities 获取配置 ID，再用 set_app_profile 切换。',
           ],
+          screenshot: ['appBrowser', 'appWebView'],
           links: [
-            { label: '打开 H5 示例', url: clientDemoPath('zh-CN') },
             {
               label: '微信端模拟',
               url: 'https://github.com/mearlhq/wechat-profile/blob/main/README.zh-CN.md',

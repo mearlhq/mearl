@@ -1,6 +1,36 @@
 {
   "tools": [
     {
+      "id": "plugin:overlay",
+      "plugin": "overlay",
+      "repository": "mearlhq/mearl",
+      "skill": "design-overlay",
+      "title": "设计稿对比",
+      "description": "叠加 SVG、PNG、JPG，调整位置与裁切并查看像素差异",
+      "icon": "layers",
+      "locales": {
+        "en": {
+          "title": "Design Overlay",
+          "description": "Overlay SVG, PNG or JPG designs and compare pixel differences"
+        }
+      }
+    },
+    {
+      "id": "plugin:translate",
+      "plugin": "translate",
+      "repository": "mearlhq/mearl",
+      "skill": "immersive-translate",
+      "title": "沉浸式翻译",
+      "description": "使用 Codex 或浏览器内置模型翻译网页",
+      "icon": "languages",
+      "locales": {
+        "en": {
+          "title": "Immersive translation",
+          "description": "Read webpages with Codex or browser built-in translation"
+        }
+      }
+    },
+    {
       "id": "plugin:convert",
       "plugin": "convert",
       "repository": "mearlhq/mearl",
