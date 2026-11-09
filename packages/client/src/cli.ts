@@ -59,6 +59,7 @@ const CATEGORIES: { title: string; names: string[] }[] = [
       'page_upload',
       'page_download',
       'page_eval',
+      'page_call_tool',
     ],
   },
   { title: '组合调用', names: ['run_actions'] },
@@ -79,7 +80,11 @@ const CATEGORIES: { title: string; names: string[] }[] = [
 ];
 
 const BUILTIN_COMMANDS: readonly SuggestableCommand[] = [
-  { name: 'guide', description: '按需读取与当前 CLI 配套的本地指南', examples: ['guide', 'guide environment'] },
+  {
+    name: 'guide',
+    description: '按需读取与当前 CLI 配套的本地指南',
+    examples: ['guide', 'guide environment'],
+  },
   {
     name: 'run',
     description: '执行预注入 mearl SDK 的 Node.js 脚本',
@@ -471,7 +476,6 @@ function parsePayload(payloadRaw?: string, payloadFile?: string): Record<string,
   return {};
 }
 
-
 function normalizeScreenshotOutput(
   action: string,
   payload: Record<string, any>,
@@ -640,7 +644,13 @@ async function runPluginCli(args: string[], commandName: string): Promise<number
       console.log(plugin.version ?? 'unknown');
       return 0;
     }
-    if (parsed.help || (!plugin.defaultCommand && !parsed.pluginArgs?.length && !parsed.hasPayload && !Object.keys(parsed.pluginInput ?? {}).length)) {
+    if (
+      parsed.help ||
+      (!plugin.defaultCommand &&
+        !parsed.pluginArgs?.length &&
+        !parsed.hasPayload &&
+        !Object.keys(parsed.pluginInput ?? {}).length)
+    ) {
       console.error(plugin.help(`${commandName} ${parsed.action}`, parsed.pluginArgs?.[0]));
       return 0;
     }
@@ -745,9 +755,9 @@ export async function runMearlCli(args: string[], options: MearlCliOptions = {})
     const command = COMMAND_MAP.get(args[0]!);
     if (command) {
       console.error(formatCommandHelp(commandName, command));
-      if (command.name === 'set_app_profile' || command.name === 'tab_open') console.error(formatCapabilityHelp(await readHelpCapabilities(args), true));
-    }
-    else if (args[0] === 'check') printCheckHelp(commandName);
+      if (command.name === 'set_app_profile' || command.name === 'tab_open')
+        console.error(formatCapabilityHelp(await readHelpCapabilities(args), true));
+    } else if (args[0] === 'check') printCheckHelp(commandName);
     else if (ADVANCED_BUILTIN_COMMANDS.has(args[0]!)) {
       printAdvancedCommandHelp(commandName, args[0]!);
     } else if (args[0]?.startsWith('-')) {

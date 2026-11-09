@@ -26,6 +26,8 @@ interface TopicCopy {
 const chooseBrowser = 'mearl browser_list';
 const newSession = `mearl tab_open --browser '<browserId>' --session new --payload '{"url":"https://example.com","reuse":"prefer"}'`;
 const snapshot = `mearl page_snapshot --payload '{"tabId":12345,"mode":"interactive"}'`;
+const webMcp = `mearl page_snapshot --payload '{"tabId":12345,"includeWebMcp":"full"}'
+mearl page_call_tool --payload '{"tabId":12345,"toolRef":"<ref>","arguments":{"orderId":"123"}}'`;
 const diagnostics = `mearl tab_checkpoint --payload '{"tabId":12345}'
 mearl get_requests --payload '{"tabId":12345,"after":"<cursor>","includeBody":false}'
 mearl get_logs --payload '{"tabId":12345,"after":"<cursor>","level":"error"}'`;
@@ -150,8 +152,26 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
   'browser-automation': {
     en: {
       title: 'Automate a page',
-      lead: 'Use a page snapshot to find a control, interact with it, and check the result before taking the next action.',
+      lead: 'Call tools a site provides through WebMCP, or use a page snapshot to find controls and verify the result of an interaction.',
       sections: [
+        {
+          id: 'webmcp',
+          title: 'Discover and call WebMCP tools',
+          text: 'WebMCP lets a site expose actions such as looking up an order. Mearl discovers tools registered by the main document in the selected Chrome tab. The extension connection and direct CDP both support discovery and calling, subject to the browser’s WebMCP capabilities.',
+          steps: [
+            'Check the webmcp array returned by tab_open, page_navigate, or page_snapshot. Discovery runs in the background. If the directory is missing or truncated, request it explicitly with includeWebMcp set to "full".',
+            'Use the returned ref and the tool’s input schema with page_call_tool. The SDK exposes pageCallTool and MCP exposes browser_page_call_tool. Refresh the directory after navigation or if the ref expires.',
+            'WebMCP is experimental in Chrome and must be enabled for the site or browser. If a browser can only list tools, Mearl reports discovery-only. If no callable tool is available, use the snapshot workflow below.',
+          ],
+          command: webMcp,
+          links: [
+            {
+              label: 'Chrome WebMCP setup',
+              url: 'https://developer.chrome.com/docs/ai/webmcp#get-started',
+            },
+            { label: 'MCP tools', path: 'packages/mcp-server/README.md' },
+          ],
+        },
         {
           id: 'snapshot',
           title: 'Start with a snapshot',
@@ -190,8 +210,26 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
     },
     'zh-CN': {
       title: '自动化操作网页',
-      lead: '先用页面快照找到控件，再点击或输入。每次操作后，先核对结果，再决定下一步。',
+      lead: '可以直接调用站点提供的 WebMCP 工具，也可以用页面快照找到控件，操作后核对结果。',
       sections: [
+        {
+          id: 'webmcp',
+          title: '发现和调用 WebMCP 工具',
+          text: 'WebMCP 让站点可以提供查订单等操作。Mearl 会发现所选 Chrome 标签页的主文档注册的工具。扩展连接和直连 CDP 都支持发现与调用，实际可用范围取决于浏览器提供的 WebMCP 能力。',
+          steps: [
+            '查看 tab_open、page_navigate 或 page_snapshot 返回的 webmcp 数组。发现过程在后台运行。目录缺失或被截断时，把 includeWebMcp 设为 "full" 显式补查。',
+            '用返回的 ref 和工具的输入 Schema 调用 page_call_tool。SDK 入口是 pageCallTool，MCP 入口是 browser_page_call_tool。页面跳转或引用失效后重新获取目录。',
+            'WebMCP 在 Chrome 中仍是实验功能，需要站点或浏览器启用。浏览器只能列出工具时，Mearl 返回 discovery-only 状态。没有可调用工具时，可继续使用下面的快照工作流。',
+          ],
+          command: webMcp,
+          links: [
+            {
+              label: '在 Chrome 中启用 WebMCP',
+              url: 'https://developer.chrome.com/docs/ai/webmcp#get-started',
+            },
+            { label: 'MCP 工具', path: 'packages/mcp-server/README.md' },
+          ],
+        },
         {
           id: 'snapshot',
           title: '先读取页面快照',

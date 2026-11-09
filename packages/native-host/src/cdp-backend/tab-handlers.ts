@@ -24,6 +24,7 @@ import {
   waitForCdpAppProfileLoad,
 } from './app-profile-handlers.js';
 import { applyCdpDeviceShell, waitForCdpDeviceShellLoad } from './device-shell.js';
+import { watchCdpWebMcp } from './webmcp-handlers.js';
 
 interface CdpPageTarget extends TabMatchCandidate {
   targetId: string;
@@ -162,6 +163,8 @@ export async function cdpTabOpen(
         : undefined;
       const tabId = await session.ensureTargetRegistered(existing.targetId);
       const pageSession = await session.getPageSession(tabId);
+      const webmcp = watchCdpWebMcp(pageSession);
+      void webmcp.refreshCatalog();
       if (activation) {
         const visibilityState = await readCdpVisibilityState(pageSession);
         if (visibilityState) activation.visibilityState = visibilityState;
@@ -175,6 +178,7 @@ export async function cdpTabOpen(
         opened: false,
         reused: true,
         capture,
+        ...webmcp.fields(existing.url ?? url),
         ...(activation ? { activation } : {}),
       };
     }
@@ -195,6 +199,7 @@ export async function cdpTabOpen(
 
   // registerTarget 已创建并附加 page session
   const pageSession = await session.getPageSession(tabId);
+  const webmcp = watchCdpWebMcp(pageSession);
 
   // 导航前注册受控标识，首屏文档即带 Mearl favicon
   await ensureControlledIndicator(pageSession, controlSource);
@@ -232,6 +237,7 @@ export async function cdpTabOpen(
     .then(result => result.targetInfo)
     .catch(() => null);
   const openedUrl = targetInfo?.url ?? url;
+  void webmcp.refreshCatalog();
   if (activation) {
     const visibilityState = await readCdpVisibilityState(pageSession);
     if (visibilityState) activation.visibilityState = visibilityState;
@@ -244,6 +250,7 @@ export async function cdpTabOpen(
     opened: true,
     reused: false,
     capture,
+    ...webmcp.fields(openedUrl),
     ...(activation ? { activation } : {}),
     ...(!isImplicitlySelectablePageUrl(openedUrl) && {
       note: 'This URL is excluded from implicit CDP target selection. Pass this tabId to subsequent page actions.',

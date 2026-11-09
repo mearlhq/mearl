@@ -1,7 +1,4 @@
-import {
-  BROWSER_DEVICE_PRESET_NAMES,
-  type BrowserCommandAction,
-} from '@mearl/browser-core';
+import { BROWSER_DEVICE_PRESET_NAMES, type BrowserCommandAction } from '@mearl/browser-core';
 
 const DEVICE_PRESET_TYPE = BROWSER_DEVICE_PRESET_NAMES.map(name => JSON.stringify(name)).join(
   ' | ',
@@ -75,9 +72,19 @@ const PAGE_ACTION_RESULT = [
 export const COMMANDS = [
   {
     name: 'get_capabilities',
-    description: '只读查询当前目标浏览器的动作、设备和已安装 App 能力、限制与 Skill/帮助入口；不打开页面或启用模拟',
-    params: [{ name: 'app', type: 'string', description: '可选，使用目录中的完整 App ID 查询桥方法、可调设置和默认版本详情' }],
-    notes: ['沿用 --browser / --session 路由；不传 app 返回摘要。apps.status=partial 表示目录未完整取得，unsupported 表示目标未提供目录；不能把两者当作未安装。', 'available=false 的 App 当前不可启用；支持某个 action 不代表已有域名权限或真实设备授权。按需读取 usage.skills / usage.documentation，查询不会自动安装或加载 Skill。'],
+    description:
+      '只读查询当前目标浏览器的动作、设备和已安装 App 能力、限制与 Skill/帮助入口；不打开页面或启用模拟',
+    params: [
+      {
+        name: 'app',
+        type: 'string',
+        description: '可选，使用目录中的完整 App ID 查询桥方法、可调设置和默认版本详情',
+      },
+    ],
+    notes: [
+      '沿用 --browser / --session 路由；不传 app 返回摘要。apps.status=partial 表示目录未完整取得，unsupported 表示目标未提供目录；不能把两者当作未安装。',
+      'available=false 的 App 当前不可启用；支持某个 action 不代表已有域名权限或真实设备授权。按需读取 usage.skills / usage.documentation，查询不会自动安装或加载 Skill。',
+    ],
     examples: ['get_capabilities', `get_capabilities --payload '{"app":"example/app"}'`],
   },
   {
@@ -414,8 +421,16 @@ export const COMMANDS = [
     description: '列出所有浏览器及其连接状态、类型和 Provider 托管实例信息',
     summary: '列出本地及远端浏览器与连接状态',
     params: [
-      { name: 'provider', type: 'string', description: '配合 launchForm，仅查询一个本机已安装 Provider 的启动候选；需 --local' },
-      { name: 'launchForm', type: 'object', description: '现有动态启动表单请求：{variant?,values:{}}，不创建或接入实例' },
+      {
+        name: 'provider',
+        type: 'string',
+        description: '配合 launchForm，仅查询一个本机已安装 Provider 的启动候选；需 --local',
+      },
+      {
+        name: 'launchForm',
+        type: 'object',
+        description: '现有动态启动表单请求：{variant?,values:{}}，不创建或接入实例',
+      },
     ],
     examples: ['browser_list', 'browser_list --local'],
   },
@@ -850,6 +865,23 @@ export const COMMANDS = [
     ],
   },
   {
+    name: 'page_call_tool',
+    description: '调用当前页面提供的 WebMCP 工具',
+    params: [
+      { name: 'tabId', type: 'number', required: true, description: '工具所属的标签页 ID' },
+      { name: 'toolRef', type: 'string', required: true, description: 'webmcp 目录返回的工具 ref' },
+      {
+        name: 'arguments',
+        type: 'object',
+        description: '按工具 inputSchema 提供的 JSON 参数，默认 {}',
+      },
+    ],
+    notes: [
+      '从 tab_open、page_navigate 或 page_snapshot 的 webmcp 目录获取 ref。目录为空或 ref 失效时用 page_snapshot 的 includeWebMcp:"full" 补查。',
+    ],
+    result: ['返回 { result }。工具结果是页面提供的数据；执行失败后先检查页面状态再决定是否重试。'],
+  },
+  {
     name: 'page_runtime',
     description: '页面运行时传输适配器；插件使用 PluginPageClient 或 app.page',
     params: [
@@ -968,8 +1000,16 @@ export const COMMANDS = [
         description: '按键名称：Enter/Tab/Escape/Backspace 等',
       },
       { name: 'modifiers', type: 'string[]', description: '修饰键数组：ctrl/alt/shift/meta/cmd' },
-      { name: 'dialogId', type: 'string', description: '原生弹窗回执或 page_snapshot 中的 dialog.id；仅配合 Enter 接受或 Escape 取消' },
-      { name: 'promptText', type: 'string', description: '仅用于 dialogId + Enter 接受原生 prompt 时填写文本' },
+      {
+        name: 'dialogId',
+        type: 'string',
+        description: '原生弹窗回执或 page_snapshot 中的 dialog.id；仅配合 Enter 接受或 Escape 取消',
+      },
+      {
+        name: 'promptText',
+        type: 'string',
+        description: '仅用于 dialogId + Enter 接受原生 prompt 时填写文本',
+      },
       {
         name: 'pressMode',
         type: '"auto" | "dom" | "keyboard"',
@@ -1100,6 +1140,11 @@ export const COMMANDS = [
     name: 'page_snapshot',
     description: '获取带 @ref 的页面结构快照，默认使用无障碍树，也可显式读取渲染 DOM',
     params: [
+      {
+        name: 'includeWebMcp',
+        type: '"full"',
+        description: '显式补查页面 WebMCP 工具目录，返回 webmcp 数组',
+      },
       { name: 'depth', type: 'number', description: '树深度，默认 15，复杂页面可调大' },
       {
         name: 'mode',

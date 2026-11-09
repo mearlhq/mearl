@@ -20,6 +20,10 @@ import './timezone-handlers.js';
 import './cookie-handlers.js';
 import './snapshot-handlers.js';
 import './composite-handlers.js';
+import { registerActions } from './action-registry.js';
+import { callCdpWebMcp } from './webmcp-handlers.js';
+
+registerActions([{ name: 'page_call_tool', session: 'page', handler: callCdpWebMcp }]);
 
 // Re-export the registry dispatcher for use by handleViaCdp
 export { dispatchCdpAction, getRegisteredActionNames } from './action-registry.js';

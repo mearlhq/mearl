@@ -17,6 +17,7 @@ import { listActiveDebuggerTabIds } from '../debuggerSessionManager';
 import { notifyPanelOverrideChanged } from '../overrideNotifier';
 import { listControlledTabIds, releaseControlledTab } from './controlledTabs';
 import { disposePageRefs } from './pageRefs';
+import { disposeExtensionWebMcp, listWebMcpTabIds } from './webMcpHandlers';
 import { listCollectingMarkerTabIds, removeCollectingTab } from './tabHandlers';
 import { clearAppProfileForTab, listAppProfileTabIds } from '../utils/appProfileRules';
 import { clearDeviceShellForTab, listDeviceShellTabIds } from '../deviceShellRules';
@@ -64,6 +65,7 @@ export async function handleBrowserRelease(scope?: {
           ...listCollectingMarkerTabIds(),
           ...listDebuggerControlTabIds(),
           ...listActiveDebuggerTabIds(),
+          ...listWebMcpTabIds(),
           ...(await listAppProfileTabIds()),
           ...(await listDeviceShellTabIds()),
           ...(await listActiveQuickDeviceSimulationTabIds()),
@@ -85,6 +87,7 @@ export async function handleBrowserRelease(scope?: {
 
   for (const tabId of tabIds) {
     await runSerializedQuickSimulationUpdate(tabId, async () => {
+      disposeExtensionWebMcp(tabId);
       await runStep(tabId, 'activity', () => setBackgroundPageActivity(tabId, false));
       if (scope?.preserveEnvironment) {
         disposePageRefs(tabId);

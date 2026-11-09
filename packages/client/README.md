@@ -458,7 +458,7 @@ Node 插件在运行 CLI、SDK 或 MCP Server 的宿主上执行，不随浏览�
 | 网络请求      | `send_request` `request_permission`                                                                       |
 | 标签页        | `tab_open` `tab_list` `tab_close`                                                                                                    |
 | 页面感知      | `page_snapshot` `page_inspect` `page_screenshot` `page_frames`                                                                       |
-| 页面操作      | `page_click` `page_drag` `page_type` `page_hover` `page_scroll` `page_press` `page_wait` `page_navigate` `page_upload` `page_eval`    |
+| 页面操作      | `page_click` `page_drag` `page_type` `page_hover` `page_scroll` `page_press` `page_wait` `page_navigate` `page_upload` `page_eval` `page_call_tool` |
 | 页面运行时    | `page_runtime`（内部文档适配，插件使用 `app.page`） |
 | 组合调用      | `run_actions`                                                                                                                        |
 | 环境与 Cookie | `set_device_emulation` `set_app_profile` `set_timezone` `get_cookie` `set_cookie`                                                     |

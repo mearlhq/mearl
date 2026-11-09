@@ -20,6 +20,11 @@ import { synchronizeBrowserPreset } from './browserPresetSync';
 import { installProfileFromSetup } from './profileInstallation';
 import { capturePageDownload } from './agentHandlers/downloadHandlers';
 import { executePageUserScript } from './pageUserScripts';
+import {
+  callExtensionWebMcp,
+  refreshExtensionWebMcp,
+  watchExtensionWebMcp,
+} from './agentHandlers/webMcpHandlers';
 /**
  * Agent Bridge - 通过 Native Messaging 与 Agent Server 通信
  *
@@ -874,8 +879,12 @@ export class AgentBridge {
         return handleGetRules();
       case 'page_screenshot':
         return handlePageScreenshot(data, () => this.getActiveTabId());
-      case 'tab_open':
-        return handleTabOpen(data, controlSource, ctx.signal);
+      case 'tab_open': {
+        const result = await handleTabOpen(data, controlSource, ctx.signal);
+        const observation = watchExtensionWebMcp(result.tabId);
+        void refreshExtensionWebMcp(result.tabId, observation);
+        return { ...result, ...observation.fields(result.url) };
+      }
       case 'tab_close':
         return handleTabClose(data);
       case 'tab_list':
@@ -908,6 +917,8 @@ export class AgentBridge {
           throw new Error('Invalid page executionWorld');
         }
         return handlePageEval(data, () => this.getActiveTabId());
+      case 'page_call_tool':
+        return callExtensionWebMcp(data);
       case 'page_inspect':
         if (data?.selector === '$0') {
           const selected = await getDevtoolsSelectedElement(
@@ -947,10 +958,21 @@ export class AgentBridge {
         return handlePagePress(data, () => this.getActiveTabId());
       case 'page_wait':
         return handlePageWait(data, () => this.getActiveTabId());
-      case 'page_navigate':
-        return handlePageNavigate(data, () => this.getActiveTabId());
-      case 'page_snapshot':
-        return handlePageSnapshot(data, () => this.getActiveTabId());
+      case 'page_navigate': {
+        const observation = watchExtensionWebMcp(data.tabId);
+        observation.reset();
+        const result = await handlePageNavigate(data, () => this.getActiveTabId());
+        void refreshExtensionWebMcp(result.tabId, observation);
+        return { ...result, ...observation.fields(result.url) };
+      }
+      case 'page_snapshot': {
+        const observation = watchExtensionWebMcp(data.tabId);
+        const refresh = refreshExtensionWebMcp(data.tabId, observation);
+        const result = await handlePageSnapshot(data, () => this.getActiveTabId());
+        const full = data.includeWebMcp === 'full';
+        if (full) await refresh;
+        return { ...result, ...observation.fields(result.url, full) };
+      }
       case 'page_upload':
         return handlePageUpload(data, () => this.getActiveTabId());
       case 'page_frames':

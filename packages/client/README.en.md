@@ -458,7 +458,7 @@ Node plugins execute on the CLI/SDK/MCP Server host, never forwarded with browse
 | Network requests | `send_request` `request_permission` |
 | Tabs | `tab_open` `tab_list` `tab_close` |
 | Page observation | `page_snapshot` `page_inspect` `page_screenshot` `page_frames` |
-| Page actions | `page_click` `page_drag` `page_type` `page_hover` `page_scroll` `page_press` `page_wait` `page_navigate` `page_upload` `page_eval` |
+| Page actions | `page_click` `page_drag` `page_type` `page_hover` `page_scroll` `page_press` `page_wait` `page_navigate` `page_upload` `page_eval` `page_call_tool` |
 | Page runtimes | `page_runtime` (internal document adapter; plugins use `app.page`) |
 | Composition | `run_actions` |
 | Environment and Cookies | `set_device_emulation` `set_app_profile` `set_timezone` `get_cookie` `set_cookie` |

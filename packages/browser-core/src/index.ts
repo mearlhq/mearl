@@ -56,6 +56,7 @@ export * from './backendNodeRefs.js';
 export * from './pageEffectRefs.js';
 export * from './pageWait.js';
 export * from './pageNavigation.js';
+export * from './pageWebMcp.js';
 export * from './tabMatching.js';
 export * from './agentChat.js';
 export * from './agentSkills.js';
@@ -96,6 +97,5 @@ export * from './extensionVersion.js';
 export { MEARL_NATIVE_HOST_NAMES, type NativeHostIntegrationMode } from './nativeHostNames.js';
 
 export * from './dataStructure.js';
-
 
 export * from './requestMetadata.js';

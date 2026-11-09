@@ -16,6 +16,8 @@ MCP 工具与 CLI、SDK 共用浏览器动作、插件入口和控制会话。
 
 页面动作传 `observe: false` 可关闭内置观察仅执行裸动作；不需要在每次动作后固定追加 wait、snapshot 或 screenshot。
 
+打开、导航或快照时，已发现的主文档 WebMCP 工具会随 `webmcp` 数组返回。用工具的 `ref` 和输入 Schema 调用 `browser_page_call_tool`（CLI 为 `page_call_tool`，SDK 为 `pageCallTool`）。默认发现不阻塞页面动作，未发现工具时省略字段。传 `browser_page_snapshot({ tabId, includeWebMcp: "full" })` 可补查，空目录返回 `webmcp: []`。扩展和直连 CDP 都可发现工具。浏览器能按注册实例执行时才会提供可调用的 `ref`，较旧的浏览器返回 `webmcpStatus: "discovery-only"`。页面导航或引用失效后重新获取目录。
+
 浏览器工具与 CLI、SDK 使用同一返回结构。快照中的 `@eN` 可直接操作，内部节点映射只保存在运行时。
 常规响应的 `session` 包含会话 ID、浏览器、传输、状态和代次；标签页清单通过 `browser_tab_list`
 查询，`browser_control` 的交接结果还包含会话页面的 `tabs`。`browser_run_actions` 的步骤使用各 action 的返回结构。

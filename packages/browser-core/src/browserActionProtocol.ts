@@ -1,4 +1,5 @@
 import type { BrowserCapabilityCatalog } from './browserCapabilities.js';
+import type { PageCallToolParams } from './pageWebMcp.js';
 
 export interface GetCapabilitiesParams {
   /** Include method and setting details for this installed App ID. */
@@ -107,8 +108,7 @@ export type SendRequestFile = SendRequestFileMetadata &
   );
 
 export type SendRequestBinaryBody = { contentType?: string } & (
-  | { filePath: string; base64?: never }
-  | { filePath?: never; base64: string }
+  { filePath: string; base64?: never } | { filePath?: never; base64: string }
 );
 
 export interface SendRequestParams {
@@ -126,7 +126,10 @@ export interface SendRequestParams {
   timeout?: number;
 }
 
-export interface NetworkControlSelection { id: string; value: string }
+export interface NetworkControlSelection {
+  id: string;
+  value: string;
+}
 
 export type BrowserStatus = 'connected' | 'pairing' | 'running_disconnected' | 'stopped';
 
@@ -148,17 +151,10 @@ export interface BrowserSource {
 
 export type BrowserJsonPrimitive = string | number | boolean | null;
 export type BrowserJsonValue =
-  | BrowserJsonPrimitive
-  | BrowserJsonValue[]
-  | { [key: string]: BrowserJsonValue };
+  BrowserJsonPrimitive | BrowserJsonValue[] | { [key: string]: BrowserJsonValue };
 
 export type BrowserProviderOperation =
-  | 'start'
-  | 'close'
-  | 'detach'
-  | 'deleteData'
-  | 'access'
-  | 'syncCookies';
+  'start' | 'close' | 'detach' | 'deleteData' | 'access' | 'syncCookies';
 
 export interface BrowserProviderIdentity {
   id: string;
@@ -645,8 +641,7 @@ export interface PageDiagnosticsOptions {
         | 'source'
       >;
   events?:
-    | boolean
-    | Pick<GetEventsParams, 'source' | 'event_type' | 'filter' | 'limit' | 'includeRaw'>;
+    boolean | Pick<GetEventsParams, 'source' | 'event_type' | 'filter' | 'limit' | 'includeRaw'>;
 }
 
 export type PageDiagnosticsSetting = PageDiagnosticsOptions | boolean;
@@ -760,6 +755,7 @@ export interface PageSnapshotQuery {
 
 export interface PageSnapshotParams {
   tabId: number;
+  includeWebMcp?: 'full';
   depth?: number;
   maxChars?: number;
   maxNodes?: number;
@@ -771,11 +767,7 @@ export interface PageSnapshotParams {
 }
 
 export type PageInspectFilter =
-  | 'all'
-  | 'overflowing'
-  | 'horizontal-overflow'
-  | 'vertical-overflow'
-  | 'scrollable';
+  'all' | 'overflowing' | 'horizontal-overflow' | 'vertical-overflow' | 'scrollable';
 
 export interface PageInspectParams {
   tabId: number;
@@ -901,7 +893,10 @@ export interface RequestPermissionParams {
   domain: string;
 }
 
-export type RunActionName = Exclude<ExtensionBrowserAction, 'run_actions' | 'browser_release' | 'get_capabilities'>;
+export type RunActionName = Exclude<
+  ExtensionBrowserAction,
+  'run_actions' | 'browser_release' | 'get_capabilities'
+>;
 
 export interface ActionStep {
   action: RunActionName;
@@ -944,6 +939,7 @@ export interface BrowserActionMap {
   page_scroll: { request: PageScrollParams; response: unknown };
   page_hover: { request: PageHoverParams; response: unknown };
   page_eval: { request: PageEvalParams; response: unknown };
+  page_call_tool: { request: PageCallToolParams; response: { result: unknown } };
   page_runtime: { request: Record<string, unknown>; response: unknown };
   page_inspect: { request: PageInspectParams; response: unknown };
   page_snapshot: { request: PageSnapshotParams; response: unknown };
@@ -989,6 +985,7 @@ export const TAB_ID_REQUIRED_ACTIONS = [
   'page_scroll',
   'page_hover',
   'page_eval',
+  'page_call_tool',
   'page_inspect',
   'page_snapshot',
   'page_press',
@@ -1012,8 +1009,12 @@ export function actionRequiresTabId(action: unknown): action is TabIdRequiredAct
 }
 
 export function validateRequiredActionTabId(action: string, data: unknown): void {
-  if (action === 'get_capabilities' && data && typeof data === 'object' &&
-      ['tabId', 'tabIds', 'openerTabId'].some(key => Object.hasOwn(data, key))) {
+  if (
+    action === 'get_capabilities' &&
+    data &&
+    typeof data === 'object' &&
+    ['tabId', 'tabIds', 'openerTabId'].some(key => Object.hasOwn(data, key))
+  ) {
     throw new Error('get_capabilities does not accept page targets');
   }
   const cookieAction = action === 'get_cookie' || action === 'set_cookie';
@@ -1082,6 +1083,7 @@ export const BROWSER_ACTIONS = {
   page_scroll: true,
   page_hover: true,
   page_eval: true,
+  page_call_tool: true,
   page_runtime: true,
   page_inspect: true,
   page_snapshot: true,
@@ -1128,6 +1130,7 @@ export const BROWSER_COMMAND_ACTIONS = {
   page_scroll: true,
   page_hover: true,
   page_eval: true,
+  page_call_tool: true,
   page_runtime: true,
   page_inspect: true,
   page_snapshot: true,
@@ -1169,6 +1172,7 @@ export const EXTENSION_BROWSER_ACTIONS = {
   page_scroll: true,
   page_hover: true,
   page_eval: true,
+  page_call_tool: true,
   page_runtime: true,
   page_inspect: true,
   page_snapshot: true,

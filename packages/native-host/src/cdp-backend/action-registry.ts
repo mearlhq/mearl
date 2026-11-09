@@ -17,6 +17,7 @@ import {
 import type { CdpSession, PageSession } from './cdp-session.js';
 import { ensureControlledIndicator } from './controlled-indicator.js';
 import { getCdpPageDialogs, pressCdpPageDialog, snapshotCdpPageDialog } from './page-dialogs.js';
+import { watchCdpWebMcp } from './webmcp-handlers.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -89,12 +90,26 @@ export async function dispatchCdpAction(
     const dialog = snapshotCdpPageDialog(pageSession, data);
     if (dialog) return dialog;
   }
-  if (action === 'page_press' && data?.dialogId !== undefined) return pressCdpPageDialog(pageSession, data);
-  if (action === 'page_press' && data?.promptText !== undefined) throw new Error('page_press: promptText requires dialogId.');
+  if (action === 'page_press' && data?.dialogId !== undefined)
+    return pressCdpPageDialog(pageSession, data);
+  if (action === 'page_press' && data?.promptText !== undefined)
+    throw new Error('page_press: promptText requires dialogId.');
   // 任何页面级动作都视为对页面的操控，同步受控标识（favicon 替换）
   const dialogs = getCdpPageDialogs(pageSession);
   return dialogs.execute(async () => {
     await dialogs.command(() => ensureControlledIndicator(pageSession, controlSource));
+    if (action === 'page_snapshot' || action === 'page_navigate') {
+      const observation = watchCdpWebMcp(pageSession);
+      const snapshot = action === 'page_snapshot';
+      const full = snapshot && data.includeWebMcp === 'full';
+      if (!snapshot) observation.reset();
+      const refresh = snapshot ? observation.refreshCatalog(full) : undefined;
+      const result = await entry.handler(pageSession, data, controlSource);
+      if (full) await refresh;
+      if (snapshot) return { ...result, ...observation.fields(result.url, full) };
+      void observation.refreshCatalog();
+      return { ...result, ...observation.navigationFields(result.url) };
+    }
     return entry.handler(pageSession, data, controlSource);
   });
 }

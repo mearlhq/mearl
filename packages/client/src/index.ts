@@ -223,8 +223,13 @@ export function sendRequest(
   return invoke('send_request', params, options);
 }
 
-export function browserList(options?: UnifiedInvokeOptions): Promise<Protocol.BrowserActionResponse<'browser_list'>>;
-export function browserList(params: Protocol.BrowserListParams, options?: UnifiedInvokeOptions): Promise<Protocol.BrowserActionResponse<'browser_list'>>;
+export function browserList(
+  options?: UnifiedInvokeOptions,
+): Promise<Protocol.BrowserActionResponse<'browser_list'>>;
+export function browserList(
+  params: Protocol.BrowserListParams,
+  options?: UnifiedInvokeOptions,
+): Promise<Protocol.BrowserActionResponse<'browser_list'>>;
 export function browserList(
   paramsOrOptions: Protocol.BrowserListParams | UnifiedInvokeOptions = {},
   options?: UnifiedInvokeOptions,
@@ -367,6 +372,13 @@ export function pageEval(
   return invoke('page_eval', params, options);
 }
 
+export function pageCallTool(
+  params: Protocol.BrowserActionRequest<'page_call_tool'>,
+  options?: UnifiedInvokeOptions,
+): Promise<Protocol.BrowserActionResponse<'page_call_tool'>> {
+  return invoke('page_call_tool', params, options);
+}
+
 export function pageInspect(
   params: Protocol.PageInspectParams,
   options?: UnifiedInvokeOptions,
@@ -482,8 +494,11 @@ export { PluginStateClient } from './plugins/clients/pluginState.js';
 export { PluginModelClient } from './plugins/clients/pluginModels.js';
 export type * from '@mearl/browser-core';
 
-
-
 export { getStructure as structure, type StructureOptions } from '@mearl/browser-core';
 
-export type { GetCapabilitiesParams, BrowserCapabilityCatalog, AppCapability, AppProfileUsage } from '@mearl/browser-core';
+export type {
+  GetCapabilitiesParams,
+  BrowserCapabilityCatalog,
+  AppCapability,
+  AppProfileUsage,
+} from '@mearl/browser-core';

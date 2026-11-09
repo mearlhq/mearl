@@ -1,8 +1,12 @@
 import { setBackgroundPageActivity } from '../backgroundPageActivity';
 import { prepareTabForAgent } from './tabPreparation';
+import { refreshExtensionWebMcp, watchExtensionWebMcp } from './webMcpHandlers';
 export { prepareTabForAgent, prepareTabForCapture } from './tabPreparation';
 import { resolveAvailableAppProfile } from '../appProfileCatalog';
-import { assertDeviceShellSupported, assertAppProfilePageRuntimeSupported } from '../../../shared/chromiumVersion';
+import {
+  assertDeviceShellSupported,
+  assertAppProfilePageRuntimeSupported,
+} from '../../../shared/chromiumVersion';
 /**
  * Agent handlers: tab_open, tab_close, tab_list, tab_group
  */
@@ -699,6 +703,7 @@ export async function handleTabOpen(
       if (openerTabId !== undefined) {
         await bindAgentChatTabFromSource(openerTabId, existing.id);
       }
+      void refreshExtensionWebMcp(existing.id);
       await prepareTabForAgent(existing.id, controlSource);
       await flushRequestCollection(existing.id);
       const capture = getCaptureCheckpoint(existing.id);
@@ -787,6 +792,7 @@ export async function handleTabOpen(
     ...(openerTab && openerTab.windowId === targetWindowId ? { openerTabId: openerTab.id } : {}),
   });
   const tabId = tab.id!;
+  watchExtensionWebMcp(tabId);
   let activation: TabActivationResult | undefined;
 
   try {
@@ -822,11 +828,20 @@ export async function handleTabOpen(
     }
     if (emulationConfig) {
       if (emulation?.deviceShell === true) {
-        const shell = await getPreferredDeviceChromeConfig(emulationConfig, splitScreen, emulation.scale);
+        const shell = await getPreferredDeviceChromeConfig(
+          emulationConfig,
+          splitScreen,
+          emulation.scale,
+        );
         const options = splitScreen ? { splitScreen: true } : undefined;
         await applyDeviceShellForTab(tabId, shell, emulationConfig, options);
         await enableEmulationForTab(tabId, emulationConfig);
-        await prepareDeviceShellWebViewEnvironmentForTab(tabId, emulationConfig, resolvedProfile?.injected, options);
+        await prepareDeviceShellWebViewEnvironmentForTab(
+          tabId,
+          emulationConfig,
+          resolvedProfile?.injected,
+          options,
+        );
       } else {
         await enableEmulationForTab(tabId, emulationConfig);
       }
