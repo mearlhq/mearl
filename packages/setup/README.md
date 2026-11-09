@@ -43,7 +43,7 @@ npx @mearl/setup profile install mearlhq/wechat-profile
 一个命令安装 skill 并注册它的 CLI、SDK 和 MCP 能力：
 
 ```bash
-npx @mearl/setup plugin install https://github.com/mearlhq/mearl --skill browser-tab-manager --yes
+npx @mearl/setup plugin install https://github.com/mearlhq/mearl --github --skill browser-tab-manager --yes
 mearl tabs summary
 ```
 

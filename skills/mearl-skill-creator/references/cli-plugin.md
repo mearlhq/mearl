@@ -69,7 +69,7 @@ Skill 需要连同源码安装时，在生成的 `SKILL.md` 顶层声明 `instal
 ```yaml
 install:
   description: 安装并注册示例 Skill 和 CLI 命令
-  command: npx @mearl/setup plugin install group/project --skill example
+  command: npx @mearl/setup plugin install owner/repo --github --skill example
 ```
 
 `command` 中 `plugin install` 后的参数交给当前 preset 指定的 Skills 管理器（默认为 skills），安装固定为全局共享模式。setup 从安装成功输出中取得路径，注册其 `scripts/main.mjs` 或 `scripts/main.py`；不需要额外的 npm 包或安装脚本。自动注册默认使用安装目录名，需要短名称时在入口中声明 `name`；自定义入口文件继续用显式路径注册。

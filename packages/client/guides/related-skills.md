@@ -19,7 +19,7 @@
 有脚本入口的 Skill 可安装并自动注册插件：
 
 ```bash
-{{setup}} plugin install https://github.com/mearlhq/mearl --skill <skill-name> --yes
+{{setup}} plugin install https://github.com/mearlhq/mearl --github --skill <skill-name> --yes
 ```
 
 已可用的专用 Skill 按其说明执行。用户明确要求使用表中某项专用能力、且执行任务需要该插件时，可在缺失时按需安装并继续。普通网页操作使用通用流程。
@@ -29,7 +29,7 @@
 任务要运行小程序工程或已编译的微信产物时，先用 `mearl --help` 检查已注册插件中是否有 `wxa`。缺失时，从已包含此 Skill 且当前可访问的官方来源补装：
 
 ```bash
-{{setup}} plugin install https://github.com/mearlhq/wechat-profile --skill wechat-miniprogram --yes
+{{setup}} plugin install https://github.com/mearlhq/wechat-profile --github --skill wechat-miniprogram --yes
 ```
 
 官方来源暂不可用且本机已有包含此 Skill 的源码时，可直接注册：

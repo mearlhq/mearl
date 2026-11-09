@@ -27,7 +27,7 @@ npx skills add https://github.com/mearlhq/mearl --skill format-converter --globa
 setup 将标准 Skills 安装和插件注册合并为一次操作：
 
 ```bash
-npx @mearl/setup plugin install https://github.com/mearlhq/mearl --skill format-converter --yes
+npx @mearl/setup plugin install https://github.com/mearlhq/mearl --github --skill format-converter --yes
 ```
 
 标准 Skills 安装与 Mearl 插件注册是两个动作，不能假设前者会执行 frontmatter 中的 install 元数据。setup 的 plugin install 会解析 Skills 本次安装结果，再注册其中的插件；也可用 `setup plugin "$SKILL_DIR"` 注册本地入口。整套 preset 可通过 `npx @mearl/setup preset apply <source>` 安装，Skills 管理工具由 preset 配置并可继承覆盖。
@@ -52,7 +52,7 @@ npx skills add mearlhq/mearl --skill mearl --global
 Mearl 插件型 Skill 使用合并安装入口，一次完成依赖准备和注册：
 
 ```bash
-npx @mearl/setup plugin install mearlhq/mearl --skill browser-tab-manager --yes
+npx @mearl/setup plugin install mearlhq/mearl --github --skill browser-tab-manager --yes
 ```
 
 依赖新宿主或扩展能力的 Skill，应在对应 Mearl 版本发布后再对外推广。见[发布说明](../docs/releases.md)。

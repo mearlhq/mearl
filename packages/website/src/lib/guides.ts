@@ -34,15 +34,16 @@ mearl get_logs --payload '{"tabId":12345,"after":"<cursor>","level":"error"}'`;
 const signedRequest = `mearl send_request --browser '<browserId>' --payload '{"url":"https://api.example.com/me"}'`;
 const emulate = `mearl set_device_emulation --payload '{"tabId":12345,"enabled":true,"preset":"iphone-17-pro"}'`;
 const findProfiles = 'mearl set_app_profile --help';
-const wechatMiniProgram = `npx @mearl/setup plugin install mearlhq/wechat-profile --skill wechat-miniprogram
+const wechatMiniProgram = `npx @mearl/setup plugin install mearlhq/wechat-profile --github --skill wechat-miniprogram
 mearl wxa run ./dist`;
 const chineseBqb = 'https://github.com/F-loat/ChineseBQB-weapp';
 const egoSetup = `npx skills add mearlhq/mearl --skill mearl-ego --global
 ego-browser skill`;
-const pluginSetup = `npx @mearl/setup plugin install mearlhq/mearl --skill notes-memory
+const pluginSetup = `npx @mearl/setup plugin install mearlhq/mearl --github --skill notes-memory
 mearl notes --help
 mearl notes list`;
-const adapterSetup = 'npx @mearl/setup plugin install mearlhq/mearl --skill mearl-bbrowser';
+const adapterSetup =
+  'npx @mearl/setup plugin install mearlhq/mearl --github --skill mearl-bbrowser';
 const adapterCommands = `mearl bbrowser site search bilibili
 mearl bbrowser site info bilibili/popular
 mearl bbrowser site bilibili/popular 10`;
@@ -766,7 +767,7 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
           id: 'design-review',
           title: 'Compare a design with a live page',
           text: 'Install the design-overlay Skill plugin. On the page you want to review, open Design Overlay from the Mearl Toolbox. Import a design, align it with the page, then compare pixels in the current viewport.',
-          command: 'npx @mearl/setup plugin install mearlhq/mearl --skill design-overlay',
+          command: 'npx @mearl/setup plugin install mearlhq/mearl --github --skill design-overlay',
           links: [
             {
               label: 'Design Overlay reference',
@@ -841,7 +842,7 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
           id: 'design-review',
           title: '用设计稿核对真实页面',
           text: '安装 design-overlay Skill 插件。在要验收的网页上，从 Mearl 工具箱打开「设计稿对比」。导入设计稿、对齐页面，再比较当前视口中的像素差异。',
-          command: 'npx @mearl/setup plugin install mearlhq/mearl --skill design-overlay',
+          command: 'npx @mearl/setup plugin install mearlhq/mearl --github --skill design-overlay',
           links: [
             { label: '设计稿对比使用说明', path: 'skills/design-overlay/SKILL.md', shared: true },
           ],
