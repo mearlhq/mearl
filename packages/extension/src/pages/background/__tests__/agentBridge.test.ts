@@ -12,6 +12,10 @@ const analyticsMocks = vi.hoisted(() => ({
 const actionTargetMocks = vi.hoisted(() => ({
   prepareTabForAgent: vi.fn().mockResolvedValue(undefined),
   resumeFrozenPage: vi.fn().mockResolvedValue(undefined),
+  capturePageDownload: vi.fn(),
+}));
+vi.mock('../agentHandlers/downloadHandlers', () => ({
+  capturePageDownload: actionTargetMocks.capturePageDownload,
 }));
 const permissionMocks = vi.hoisted(() => ({
   isAgentDomainAuthorized: vi.fn(),
@@ -512,6 +516,28 @@ describe('AgentBridge native handshake', () => {
     );
   });
 
+  it('resumes a download trigger after arming capture and before observing the click', async () => {
+    bridge = new AgentBridge(new Map());
+    const internals = bridge as any;
+    vi.spyOn(internals, 'assertAgentActionAuthorized').mockResolvedValue(undefined);
+    actionTargetMocks.capturePageDownload.mockImplementation((_data, trigger) => trigger());
+    const observed = vi
+      .spyOn(internals, 'handleObservedPageAction')
+      .mockResolvedValue({ clicked: true });
+    const data = { tabId: 1, trigger: { selector: '#download' } };
+
+    await expect(
+      internals.dispatchSingleAction('__capture_download', data, {}, 'local'),
+    ).resolves.toEqual({ clicked: true });
+
+    const [resumeOrder] = actionTargetMocks.resumeFrozenPage.mock.invocationCallOrder;
+    expect(actionTargetMocks.resumeFrozenPage).toHaveBeenCalledExactlyOnceWith(1);
+    expect(actionTargetMocks.capturePageDownload.mock.invocationCallOrder[0]).toBeLessThan(
+      resumeOrder!,
+    );
+    expect(resumeOrder).toBeLessThan(observed.mock.invocationCallOrder[0]!);
+  });
+
   it('reports an invalid step tab as a batch failure before dispatching it', async () => {
     bridge = new AgentBridge(new Map());
     const internals = bridge as any;
@@ -634,17 +660,15 @@ describe('AgentBridge native handshake', () => {
   it('authorizes both debugger URL fallback and the first navigation origin', async () => {
     bridge = new AgentBridge(new Map());
     vi.mocked(chrome.tabs.get).mockResolvedValue({ id: 7 } as chrome.tabs.Tab);
-    chrome.debugger.getTargets = vi
-      .fn()
-      .mockResolvedValue([
-        {
-          id: 'physical',
-          type: 'page',
-          tabId: 7,
-          url: 'https://current.example/',
-          attached: false,
-        },
-      ]);
+    chrome.debugger.getTargets = vi.fn().mockResolvedValue([
+      {
+        id: 'physical',
+        type: 'page',
+        tabId: 7,
+        url: 'https://current.example/',
+        attached: false,
+      },
+    ]);
     permissionMocks.isAgentDomainAuthorized.mockImplementation(
       async domain => domain !== 'next.example',
     );

@@ -994,11 +994,13 @@ export class AgentBridge {
       case '__capture_download':
         return capturePageDownload(data, async () => {
           await this.assertAgentActionAuthorized('page_click', data);
-          return this.handleObservedPageAction(
-            'page_click',
-            { ...data.trigger, tabId: data.tabId },
-            ctx,
-            controlSource,
+          return withAgentPageAction('page_click', data.tabId, () =>
+            this.handleObservedPageAction(
+              'page_click',
+              { ...data.trigger, tabId: data.tabId },
+              ctx,
+              controlSource,
+            ),
           );
         });
       case 'browser_release':
