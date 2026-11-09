@@ -11,7 +11,7 @@
  * 插件本就只能控制 host 白名单内的页面，注入范围与可控范围一致。注入只作用
  * 于当前文档，导航后不主动补打：agent 的每个动作都会经 markTabControlled 重新
  * 注入，只要 agent 还在操作这个页面，标识就会自然恢复；页内幂等由注入脚本
- * 自身的 guard 保证。
+ * 自身的 guard 保证。登记和释放不等待图标脚本，因为冻结的文档可能一直不响应。
  */
 
 import { createControlledFaviconDataUrl, type ControlSource } from '@mearl/browser-core';
@@ -84,6 +84,16 @@ export async function getControlledWindowId(): Promise<number | undefined> {
 }
 
 // ─── favicon 指示器 ──────────────────────────────────────────────────────────
+
+function injectFavicon<Args extends unknown[]>(
+  injection: chrome.scripting.ScriptInjection<Args, void>,
+): void {
+  try {
+    void chrome.scripting.executeScript(injection).catch(() => {});
+  } catch {
+    // The extension context can disappear before the browser accepts the injection.
+  }
+}
 
 /**
  * 在页面里替换 favicon（在目标页的 isolated world 执行）。只处理顶层 frame；
@@ -188,22 +198,6 @@ function restoreFavicon(): void {
   delete marked.__mearlControlledFavicon__;
 }
 
-/**
- * 向当前文档注入 favicon 替换脚本。host 权限不足（白名单外页面、about:blank
- * 等）时静默跳过——标识是 best-effort，不影响登记表的功能职责。
- */
-async function applyFaviconIndicator(tabId: number, controlSource: ControlSource): Promise<void> {
-  const iconHref = createControlledFaviconDataUrl(controlSource);
-  await chrome.scripting
-    .executeScript({
-      target: { tabId },
-      func: overrideFavicon,
-      args: [iconHref],
-      injectImmediately: true,
-    })
-    .catch(() => {});
-}
-
 // ─── 对外入口 ────────────────────────────────────────────────────────────────
 
 /**
@@ -225,7 +219,12 @@ export async function markTabControlled(
       registry[String(tabId)] = Date.now();
       return true;
     });
-    await applyFaviconIndicator(tabId, controlSource);
+    injectFavicon({
+      target: { tabId },
+      func: overrideFavicon,
+      args: [createControlledFaviconDataUrl(controlSource)],
+      injectImmediately: true,
+    });
   } catch (error) {
     console.warn('[AgentBridge] Failed to mark tab as controlled:', error);
   }
@@ -234,13 +233,11 @@ export async function markTabControlled(
 /** browser_release 使用：撤销登记和当前文档的视觉标识，但保留标签页。 */
 export async function releaseControlledTab(tabId: number): Promise<void> {
   await unregisterControlledTab(tabId);
-  await chrome.scripting
-    .executeScript({
-      target: { tabId },
-      func: restoreFavicon,
-      injectImmediately: true,
-    })
-    .catch(() => {});
+  injectFavicon({
+    target: { tabId },
+    func: restoreFavicon,
+    injectImmediately: true,
+  });
 }
 
 /** 标签页关闭时的清理：撤销登记（页面内的注入随文档销毁，无需额外处理） */

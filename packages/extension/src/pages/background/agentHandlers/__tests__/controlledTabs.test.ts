@@ -113,6 +113,32 @@ describe('controlled tab registry & favicon indicator', () => {
     expect(await listControlledTabIds()).toEqual([9]);
   });
 
+  it('registers and releases a tab without waiting for favicon scripts', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(chrome.scripting.executeScript).mockImplementation(() => new Promise(() => {}));
+      let marked = false;
+      void markTabControlled(9).then(() => {
+        marked = true;
+      });
+      await vi.waitFor(() => expect(chrome.scripting.executeScript).toHaveBeenCalledTimes(1));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(marked).toBe(true);
+      expect(await listControlledTabIds()).toEqual([9]);
+
+      let released = false;
+      void releaseControlledTab(9).then(() => {
+        released = true;
+      });
+      await vi.waitFor(() => expect(chrome.scripting.executeScript).toHaveBeenCalledTimes(2));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(released).toBe(true);
+      expect(await listControlledTabIds()).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('unregisters the tab on cleanup', async () => {
     await markTabControlled(5);
     cleanupControlledTab(5);
