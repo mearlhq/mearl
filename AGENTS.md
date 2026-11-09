@@ -192,6 +192,7 @@ pnpm exec vitest run --project skills
 
 - The `beta` and `patch` channels use automatic version selection and an exported build tree as described in `docs/releases.md`.
 - For an explicitly requested release through the `stable` channel, run `pnpm bump <version>`, review all workspace versions, Skill frontmatter and MCP metadata, and prepare both `changelogs/v<version>.md` and `changelogs/v<version>.en.md` before committing.
+- After publishing a stable or patch version, verify that its GitHub Release has user-facing change notes and a comparison link. Update the Release and commit the matching Chinese and English entries under `changelogs/` if the workflow generated only a commit list.
 - Release notes describe concrete user-visible changes and compatibility requirements, grouped consistently with existing release notes. Verify website rendering when its changelog presentation changes.
 - Commit stable version files and notes together using `chore: v<version>`, matching root `package.json`.
 
