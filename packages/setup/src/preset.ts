@@ -291,7 +291,7 @@ export class PresetInstaller {
             };
           const error =
             Array.isArray(result?.permissionPending) && result.permissionPending.length
-              ? 'PRESET_DOMAIN_PERMISSION_REQUIRED: Open extension settings and authorize preset domains'
+              ? 'PRESET_DOMAIN_PERMISSION_REQUIRED: Authorize preset domains in the Mearl permission window or under Extension Settings → Domain Permissions'
               : typeof result?.error === 'string'
                 ? result.error
                 : undefined;

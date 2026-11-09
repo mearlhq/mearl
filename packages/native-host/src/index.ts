@@ -1568,6 +1568,8 @@ async function dispatchHostRequest(request: any, managed = false): Promise<HostA
       data: await requestPresetBrowser({
         operation: 'sync',
         installationRevision: data.installationRevision,
+        showPermissions:
+          !managed && controlSource === 'local' && request.controlSessionId === undefined,
       }),
     };
   }

@@ -1052,18 +1052,36 @@ it('reports missing preset authorization without disabling installed browser cap
     },
   } as any;
   chrome.permissions = { ...chrome.permissions, contains: vi.fn(async () => true) } as any;
-  expect(
-    await synchronizeBrowserPreset(
-      { operation: 'sync', installationRevision: 'a'.repeat(64) },
-      transport,
-      f.registry,
-    ),
-  ).toMatchObject({
+  const input = { operation: 'sync', installationRevision: 'a'.repeat(64) } as const;
+  const path = `src/pages/permission-request/index.html?presetRevision=${input.installationRevision}`;
+  const url = `chrome-extension://${extensionId}/${path}`;
+  const getContexts = vi.fn().mockResolvedValue([]);
+  const create = vi.fn();
+  const update = vi.fn().mockResolvedValue({ id: 42 });
+  vi.stubGlobal('chrome', {
+    ...chrome,
+    runtime: {
+      ...chrome.runtime,
+      getURL: (path: string) => `chrome-extension://${extensionId}/${path}`,
+      getContexts,
+    },
+    windows: { create, update, getLastFocused: vi.fn().mockResolvedValue({}) },
+  });
+  expect(await synchronizeBrowserPreset(input, transport, f.registry)).toMatchObject({
     browserReady: true,
     ready: false,
     settingsReady: false,
     permissionPending: ['https://accounts.example.test/*'],
   });
+  expect(create).not.toHaveBeenCalled();
+  await synchronizeBrowserPreset({ ...input, showPermissions: true }, transport, f.registry);
+  expect(create).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ url, type: 'popup', focused: true }),
+  );
+  getContexts.mockResolvedValue([{ frameId: 0, windowId: 42 }]);
+  await synchronizeBrowserPreset({ ...input, showPermissions: true }, transport, f.registry);
+  expect(create).toHaveBeenCalledOnce();
+  expect(update).toHaveBeenCalledExactlyOnceWith(42, { focused: true });
   stored.proxyCookieAllowedOrigins = ['*://accounts.example.test/*'];
   expect(await f.registry.installationStatus()).toMatchObject({
     ready: true,

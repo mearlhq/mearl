@@ -165,7 +165,7 @@ export interface HostToExtensionActionMap {
   __profile_install: { request: { source: string }; response: unknown };
   __preset_browser: {
     request:
-      | { operation: 'sync'; installationRevision: string }
+      | { operation: 'sync'; installationRevision: string; showPermissions?: boolean }
       | { operation: 'status' }
       | { operation: 'uninstall'; browserRevision: string; installationToken: string | null };
     response: {

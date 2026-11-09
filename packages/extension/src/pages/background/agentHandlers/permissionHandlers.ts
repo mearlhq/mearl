@@ -9,9 +9,11 @@ import {
   POPUP_PERMISSION_REQUEST,
   POPUP_PERMISSION_CANCEL,
   POPUP_PERMISSION_ALLOW,
+  PERMISSION_REQUEST_PAGE,
   PERMISSION_REQUEST_TIMEOUT_MS,
   type DomainPermissionDecision,
 } from '../../../shared/permissionRequest';
+import { openPermissionRequestWindow } from '../permissionRequestWindow';
 
 async function requestInPopup(
   domain: string,
@@ -114,41 +116,11 @@ export async function handleRequestPermission(
     return decision.granted ? { granted: true, domain, origin } : { granted: false, domain };
   }
   const popupUrl =
-    chrome.runtime.getURL('src/pages/permission-request/index.html') +
+    chrome.runtime.getURL(PERMISSION_REQUEST_PAGE) +
     `?domain=${encodeURIComponent(domain.trim())}&requestId=${encodeURIComponent(requestId)}`;
 
-  // Calculate center position based on the last focused window's screen
-  const popupWidth = 380;
   // Window dimensions include the title bar and Chrome's debugger notification.
-  const popupHeight = 300;
-  let left: number | undefined;
-  let top: number | undefined;
-  try {
-    const lastWin = await chrome.windows.getLastFocused({ windowTypes: ['normal'] });
-    if (
-      lastWin.left != null &&
-      lastWin.top != null &&
-      lastWin.width != null &&
-      lastWin.height != null
-    ) {
-      left = Math.round(lastWin.left + (lastWin.width - popupWidth) / 2);
-      top = Math.round(lastWin.top + (lastWin.height - popupHeight) / 2);
-    }
-  } catch {
-    // fallback: let Chrome decide position
-  }
-
-  // Open the confirmation popup window
-  const win = await chrome.windows.create({
-    url: popupUrl,
-    type: 'popup',
-    width: popupWidth,
-    height: popupHeight,
-    left,
-    top,
-    focused: true,
-    state: 'normal',
-  });
+  const win = await openPermissionRequestWindow(popupUrl, 380, 300);
 
   if (!win?.id) {
     throw new Error('Failed to open permission request window');

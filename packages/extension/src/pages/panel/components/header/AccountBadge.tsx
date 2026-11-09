@@ -20,7 +20,10 @@ import {
 import { useDelayedHover } from '../../../../shared/hooks/useDelayedHover';
 import { QRCodePopup } from '../QRCodePopup';
 import { LoginModal } from '../LoginModal';
-import { getBrowserUiSettingsCacheScope, useBrowserUiSettings } from '../../utils/browserUiSettings';
+import {
+  getBrowserUiSettingsCacheScope,
+  useBrowserUiSettings,
+} from '../../utils/browserUiSettings';
 import { setBrowserUiLoginOpen, useBrowserUiLogin } from '../../utils/browserUiLogin';
 
 interface AccountBadgeProps {
@@ -44,8 +47,7 @@ export const AccountBadge: FC<AccountBadgeProps> = ({
   iconSize = 14,
   className,
 }) => {
-  const { accounts, loading, error, requestAccounts, retryAccounts } =
-    useAccounts();
+  const { accounts, loading, error, requestAccounts, retryAccounts } = useAccounts();
 
   const login = useBrowserUiLogin('accounts');
   const settings = useBrowserUiSettings();
@@ -54,7 +56,7 @@ export const AccountBadge: FC<AccountBadgeProps> = ({
   const loginTitle = t('accountLogin', loginUrl ? new URL(loginUrl).hostname : 'Accounts');
   const [ssoStatus, setSsoStatus] = useState<'idle' | 'loading'>('idle');
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const [identityWatch, setIdentityWatch] = useState<Array<{name: string; domain: string}>>([]);
+  const [identityWatch, setIdentityWatch] = useState<Array<{ name: string; domain: string }>>([]);
   const [accountIdentity, setAccountIdentity] = useState('');
   const [cachedLoginId, setCachedLoginId] = useState(() => readAccountLabelCache(cacheScope));
   const [showCount, setShowCount] = useState<boolean>(false);
@@ -84,14 +86,23 @@ export const AccountBadge: FC<AccountBadgeProps> = ({
       if (read !== identityRead.current) return '';
       verifiedIdentityRead.current = read;
       const nextUserId = identity.value;
-      setIdentityWatch(previous => JSON.stringify(previous) === JSON.stringify(identity.watch) ? previous : identity.watch);
+      setIdentityWatch(previous =>
+        JSON.stringify(previous) === JSON.stringify(identity.watch) ? previous : identity.watch,
+      );
       setAccountIdentity(nextUserId);
-      const label = nextUserId ? identity.loginId ?? accounts.find(account => String(account.principalId ?? '') === nextUserId)?.loginId ?? '' : '';
+      const label = nextUserId
+        ? (identity.loginId ??
+          accounts.find(account => String(account.principalId ?? '') === nextUserId)?.loginId ??
+          '')
+        : '';
       setCachedLoginId(label);
       writeAccountLabelCache(cacheScope, label);
       return nextUserId;
     } catch (error) {
-      if (read === identityRead.current && isAccountLoginError(error instanceof Error ? error.message : String(error))) {
+      if (
+        read === identityRead.current &&
+        isAccountLoginError(error instanceof Error ? error.message : String(error))
+      ) {
         verifiedIdentityRead.current = read;
         setAccountIdentity('');
         setCachedLoginId('');
@@ -102,8 +113,11 @@ export const AccountBadge: FC<AccountBadgeProps> = ({
   };
 
   const openLoginModal = async () => {
-    try { await setBrowserUiLoginOpen('accounts', true); }
-    catch (error) { showToast(error instanceof Error ? error.message : String(error), 'error'); }
+    try {
+      await setBrowserUiLoginOpen('accounts', true);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), 'error');
+    }
   };
 
   const closeLoginModal = () => {
@@ -119,20 +133,30 @@ export const AccountBadge: FC<AccountBadgeProps> = ({
     setIdentityWatch([]);
     void refreshAccountIdentity();
     const read = identityRead.current;
-    if (!initialLabel) void fetchAccountIdentity({ cachedOnly: true }).then(identity => {
-      if (read === identityRead.current && read !== verifiedIdentityRead.current) {
-        setCachedLoginId(identity.loginId ?? '');
-        writeAccountLabelCache(cacheScope, identity.loginId ?? '');
-      }
-    }).catch(() => {});
-    return () => { identityRead.current++; };
+    if (!initialLabel)
+      void fetchAccountIdentity({ cachedOnly: true })
+        .then(identity => {
+          if (read === identityRead.current && read !== verifiedIdentityRead.current) {
+            setCachedLoginId(identity.loginId ?? '');
+            writeAccountLabelCache(cacheScope, identity.loginId ?? '');
+          }
+        })
+        .catch(() => {});
+    return () => {
+      identityRead.current++;
+    };
   }, [settings]);
   useEffect(() => {
     const cookieChanges = chrome.cookies?.onChanged;
     if (!cookieChanges) return;
     const handleCookieChange = (changeInfo: chrome.cookies.CookieChangeInfo) => {
       if (
-        identityWatch.some(scope => changeInfo.cookie.name === scope.name && (changeInfo.cookie.domain.replace(/^\./, '') === scope.domain || changeInfo.cookie.domain.endsWith('.' + scope.domain)))
+        identityWatch.some(
+          scope =>
+            changeInfo.cookie.name === scope.name &&
+            (changeInfo.cookie.domain.replace(/^\./, '') === scope.domain ||
+              changeInfo.cookie.domain.endsWith('.' + scope.domain)),
+        )
       ) {
         void refreshAccountIdentity();
       }
@@ -148,7 +172,9 @@ export const AccountBadge: FC<AccountBadgeProps> = ({
     };
   }, []);
 
-  useEffect(() => { if (dropdownOpen) void requestAccounts(); }, [dropdownOpen, requestAccounts, settings]);
+  useEffect(() => {
+    if (dropdownOpen) void requestAccounts();
+  }, [dropdownOpen, requestAccounts, settings]);
 
   const handleMouseEnter = () => {
     void requestAccounts();
@@ -159,9 +185,15 @@ export const AccountBadge: FC<AccountBadgeProps> = ({
     }
   };
 
-  const performSsoLogin = async (principalId: string | number, site: string, provider?: BrowserAccountItem['provider']) => {
+  const performSsoLogin = async (
+    principalId: string | number,
+    site: string,
+    provider?: BrowserAccountItem['provider'],
+  ) => {
     setSsoStatus('loading');
-    const { result } = await withAccountAutoLogin(() => fetchAccountSso(principalId, site, provider));
+    const { result } = await withAccountAutoLogin(() =>
+      fetchAccountSso(principalId, site, provider),
+    );
     if (!result.success || !result.data) {
       setSsoStatus('idle');
       if (isAccountLoginError(result.error)) {
@@ -223,9 +255,7 @@ export const AccountBadge: FC<AccountBadgeProps> = ({
     if (!query || quickBorrowStatus === 'loading') return;
     setQuickBorrowStatus('loading');
     try {
-      const { result: searchResult } = await withAccountAutoLogin(() =>
-        borrowAccount(query),
-      );
+      const { result: searchResult } = await withAccountAutoLogin(() => borrowAccount(query));
       if (!searchResult.success || !searchResult.data) {
         const msg = searchResult.error ?? '';
         if (isAccountLoginError(msg)) {
@@ -239,7 +269,8 @@ export const AccountBadge: FC<AccountBadgeProps> = ({
         return;
       }
       const account = searchResult.data;
-      if (account.principalId && account.site) await performSsoLogin(account.principalId, account.site, account.provider);
+      if (account.principalId && account.site)
+        await performSsoLogin(account.principalId, account.site, account.provider);
       await retryAccounts();
     } finally {
       setQuickBorrowStatus('idle');
@@ -294,12 +325,16 @@ export const AccountBadge: FC<AccountBadgeProps> = ({
   const noDataText = loading ? t('requestCasesLoading') : t('requestCasesNoData');
   const countLabel = `${count} ${t('requests')}`;
   const currentAccount = useMemo(
-    () => accountIdentity ? accounts.find(account => String(account.principalId ?? '') === accountIdentity) : undefined,
+    () =>
+      accountIdentity
+        ? accounts.find(account => String(account.principalId ?? '') === accountIdentity)
+        : undefined,
     [accounts, accountIdentity],
   );
   const currentLoginId = currentAccount?.loginId ?? cachedLoginId;
   useEffect(() => {
-    if (identityRead.current === verifiedIdentityRead.current) writeAccountLabelCache(cacheScope, currentLoginId);
+    if (identityRead.current === verifiedIdentityRead.current)
+      writeAccountLabelCache(cacheScope, currentLoginId);
   }, [cacheScope, currentLoginId, accountIdentity, settings]);
 
   const badgeLabel = canToggleCount
@@ -310,12 +345,14 @@ export const AccountBadge: FC<AccountBadgeProps> = ({
 
   return (
     <>
-      {login.definition && <LoginModal
-        isOpen={login.open}
-        onClose={closeLoginModal}
-        url={login.definition.url}
-        title={loginTitle}
-      />}
+      {login.definition && (
+        <LoginModal
+          isOpen={login.open}
+          onClose={closeLoginModal}
+          url={login.definition.url}
+          title={loginTitle}
+        />
+      )}
       <div
         className="relative shrink-0"
         onMouseEnter={handleMouseEnter}
@@ -421,10 +458,11 @@ export const AccountBadge: FC<AccountBadgeProps> = ({
                         <>
                           <div>{t('accountsLoadFailed', error)}</div>
                           <button
-                            className="mt-1 text-blue-500 hover:underline cursor-pointer"
+                            className="mt-1 text-blue-500 hover:underline cursor-pointer disabled:opacity-50"
+                            disabled={loading}
                             onClick={e => {
                               e.stopPropagation();
-                              retryAccounts();
+                              void retryAccounts({ requestPermission: true });
                             }}
                           >
                             {t('retry')}

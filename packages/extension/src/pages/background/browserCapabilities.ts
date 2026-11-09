@@ -15,6 +15,10 @@ import {
 } from '@mearl/preset/bundles';
 import { isAgentDomainAuthorized } from '../../shared/proxyPermissions';
 import {
+  browserDomainPermissionError,
+  browserHostPermissionError,
+} from '../../shared/browserCapabilityPermissions';
+import {
   BROWSER_CAPABILITY_HOST_TARGET,
   BROWSER_CAPABILITY_OFFSCREEN_TARGET,
   BROWSER_CAPABILITY_OWNER_PORT,
@@ -33,11 +37,11 @@ export async function authorizeBrowserCapabilityUrl(input: unknown): Promise<URL
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password)
     throw new Error('Browser capability request requires an HTTP(S) URL without credentials');
   if (!(await isAgentDomainAuthorized(url.hostname)))
-    throw Object.assign(new Error(`Browser domain permission required: ${url.hostname}`), {
+    throw Object.assign(new Error(browserDomainPermissionError(url)), {
       code: 'BROWSER_PERMISSION_REQUIRED',
     });
   if (!(await chrome.permissions.contains({ origins: [`${url.origin}/*`] })))
-    throw Object.assign(new Error(`Browser host permission required: ${url.origin}`), {
+    throw Object.assign(new Error(browserHostPermissionError(url)), {
       code: 'BROWSER_PERMISSION_REQUIRED',
     });
   return url;

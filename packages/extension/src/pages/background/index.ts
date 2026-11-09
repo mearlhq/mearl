@@ -11,10 +11,21 @@ import { handleBrowserTracking } from './browserTracking';
 import { initializeBrowserPureCapabilities } from './browserPureCapabilities';
 import { handleBrowserUiService, initializeBrowserUiOperations } from './browserUiService';
 import { handleExtensionServiceRequest } from './extensionServiceHandler';
-import { getAppProfileVariants, selectAppProfileVariant, setAppProfileSetting, setAppProfileRuntimeResponses } from './appProfileSettings';
-import { refreshAppProfileForNavigation, removeUnavailableBasicAppProfiles } from './appProfileLifecycle';
+import {
+  getAppProfileVariants,
+  selectAppProfileVariant,
+  setAppProfileSetting,
+  setAppProfileRuntimeResponses,
+} from './appProfileSettings';
+import {
+  refreshAppProfileForNavigation,
+  removeUnavailableBasicAppProfiles,
+} from './appProfileLifecycle';
 import { getAppProfileCatalog } from './appProfileCatalog';
-import { initializeQuickSimulationContextMenu, updateQuickSimulationContextMenu } from './quickSimulationContextMenu';
+import {
+  initializeQuickSimulationContextMenu,
+  updateQuickSimulationContextMenu,
+} from './quickSimulationContextMenu';
 import { handleQuickDeviceToolbar } from './quickDeviceToolbar';
 import { BROWSER_BUNDLE_ACTION, handleBrowserBundleRequest } from './browserBundleService';
 // Background Service Worker for Mearl
@@ -31,7 +42,14 @@ import {
   SERVICE_DEFAULTS_CACHE_KEY,
 } from '../../shared/externalServices';
 import { openInstallPage } from './installPage';
-import { clearAccountAutoLoginTab, getAccountIdentity, initializeAccountTracking, accountAutoLoginAvailability, startAccountAutoLogin, redirectAccountLoginTab } from './accountAutoLogin';
+import {
+  clearAccountAutoLoginTab,
+  getAccountIdentity,
+  initializeAccountTracking,
+  accountAutoLoginAvailability,
+  startAccountAutoLogin,
+  redirectAccountLoginTab,
+} from './accountAutoLogin';
 import { fetchApiSchema } from './api/requestMetadata';
 import { handleBrowserView } from './browserViewService';
 import { handleBrowserController, initializeBrowserControllers } from './browserControllers';
@@ -100,7 +118,11 @@ import {
   setSettingsContextTabId,
 } from './envSwitchRules';
 
-import { BROWSER_CONTROL_GET_ACTION, BROWSER_CONTROL_SET_ACTION, BROWSER_CONTROL_CLEAR_ACTION } from '../../shared/browserControl';
+import {
+  BROWSER_CONTROL_GET_ACTION,
+  BROWSER_CONTROL_SET_ACTION,
+  BROWSER_CONTROL_CLEAR_ACTION,
+} from '../../shared/browserControl';
 import { handleBrowserControl } from './browserControlService';
 
 import {
@@ -138,7 +160,10 @@ import {
 } from './tabPageOverrides';
 
 import { notifyContentScriptUnreachable, resendProtocolRequest, sendTabMessageSafe } from './utils';
-import { handleSendProtocolRequest, handleSendProtocolStreamRequest } from './agentHandlers/httpHandlers';
+import {
+  handleSendProtocolRequest,
+  handleSendProtocolStreamRequest,
+} from './agentHandlers/httpHandlers';
 import {
   cleanupClosedTabAppProfile,
   getAppProfileForTab,
@@ -277,7 +302,12 @@ const assertAgentServiceEnabled = () => {
 function ensureNativeBridge(reset = false): AgentBridge {
   if (!agentBridge) {
     try {
-      agentBridge = new AgentBridge(devtoolsPorts, devtoolsPagePorts, () => agentServiceEnabled, (data, transport) => installationService.native(data, transport));
+      agentBridge = new AgentBridge(
+        devtoolsPorts,
+        devtoolsPagePorts,
+        () => agentServiceEnabled,
+        (data, transport) => installationService.native(data, transport),
+      );
       console.log('[Background] Agent Bridge instance created');
     } catch (error) {
       console.warn('[Background] Agent Bridge creation failed:', error);
@@ -342,13 +372,16 @@ installAgentChatTabBindingObservers(async removed => {
 initializeAccountTracking();
 initializeBrowserRequestLogins();
 initializeBrowserControllers();
-const installationService = createInstallationService({ native: createNativeInstallationClient(() => ensureNativeBridge(false)) });
+const installationService = createInstallationService({
+  native: createNativeInstallationClient(() => ensureNativeBridge(false)),
+});
 initializePresetAutoUpdate(() => installationService.autoUpdate());
 chrome.runtime.onMessageExternal.addListener((message, sender, reply) => {
   if (message?.action !== INSTALLATION_ACTION) return;
   void installationService.external(message, sender).then(
     data => reply({ success: true, data }),
-    error => reply({ success: false, error: error instanceof Error ? error.message : String(error) }),
+    error =>
+      reply({ success: false, error: error instanceof Error ? error.message : String(error) }),
   );
   return true;
 });
@@ -705,8 +738,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'quickDeviceSafeAreaChanged') {
     const tabId = sender.tab?.id;
     if (tabId === undefined || sender.id !== chrome.runtime.id || sender.frameId !== 0) return;
-    void runSerializedQuickSimulationUpdate(tabId, () => restorePhoneFrameSafeAreaForTab(tabId))
-      .then(() => sendResponse({ success: true }), () => sendResponse({ success: false }));
+    void runSerializedQuickSimulationUpdate(tabId, () =>
+      restorePhoneFrameSafeAreaForTab(tabId),
+    ).then(
+      () => sendResponse({ success: true }),
+      () => sendResponse({ success: false }),
+    );
     return true;
   }
   if (message.action === 'quickDeviceToolbar') {
@@ -723,30 +760,72 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   if (message.action === DEVICE_PREVIEW_PANEL_STATE_ACTION) {
     const tabId = sender.tab?.id;
-    if (tabId === undefined || sender.id !== chrome.runtime.id || sender.frameId !== 0 ||
-        (message.open !== undefined && typeof message.open !== 'boolean')) {
+    if (
+      tabId === undefined ||
+      sender.id !== chrome.runtime.id ||
+      sender.frameId !== 0 ||
+      (message.open !== undefined && typeof message.open !== 'boolean')
+    ) {
       sendResponse({ success: false });
       return;
     }
-    void getDeviceShellForTab(tabId).then(shell => {
-      const open = shell?.config.phoneFrame ? message.open : false;
-      const wide = shell?.config.phoneFrame && typeof message.wide === 'boolean' ? message.wide : undefined;
-      sendResponse({ success: true, token: getDevicePreviewPanelToken(tabId, open, wide, message.retryCapture === true) });
-    }).catch(() => sendResponse({ success: false }));
+    void getDeviceShellForTab(tabId)
+      .then(shell => {
+        const open = shell?.config.phoneFrame ? message.open : false;
+        const wide =
+          shell?.config.phoneFrame && typeof message.wide === 'boolean' ? message.wide : undefined;
+        sendResponse({
+          success: true,
+          token: getDevicePreviewPanelToken(tabId, open, wide, message.retryCapture === true),
+        });
+      })
+      .catch(() => sendResponse({ success: false }));
     return true;
   }
   if (message.target === BROWSER_DOCUMENT_PROBE) return;
-  if (message.action === BROWSER_REQUEST_UI_CHANGED || message.target === 'mearl-browser-pure-runtime' || message.target === 'mearl-browser-pure-idle') return;
-  if (message.action === 'requestInspection') { void handleRequestInspection(message.data, sender).then(sendResponse); return true; }
-  if (message.action === 'browserTracking') { void handleBrowserTracking(message.data, sender).then(sendResponse); return true; }
-  if (message.action === 'browserUiService' || message.action === 'browserView' || message.action === BROWSER_REQUEST_UI_ACTION) {
-    const handler = message.action === 'browserView'
-      ? typeof message.data?.operation === 'string' && message.data.operation.startsWith('controller') ? handleBrowserController : handleBrowserView
-      : message.action === 'browserUiService' ? handleBrowserUiService : handleBrowserRequestUi;
-    const needsOwner = message.action === 'browserView' || message.data?.operation === 'loginOpen' || message.data?.operation === 'loginClose';
-    const owner = needsOwner ? resolveBrowserDocumentSender(sender, message.documentToken) : Promise.resolve(sender);
-    void owner.then(from => handler(message.data, from)).then(sendResponse,
-      error => sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) }));
+  if (
+    message.action === BROWSER_REQUEST_UI_CHANGED ||
+    message.target === 'mearl-browser-pure-runtime' ||
+    message.target === 'mearl-browser-pure-idle'
+  )
+    return;
+  if (message.action === 'requestInspection') {
+    void handleRequestInspection(message.data, sender).then(sendResponse);
+    return true;
+  }
+  if (message.action === 'browserTracking') {
+    void handleBrowserTracking(message.data, sender).then(sendResponse);
+    return true;
+  }
+  if (
+    message.action === 'browserUiService' ||
+    message.action === 'browserView' ||
+    message.action === BROWSER_REQUEST_UI_ACTION
+  ) {
+    const handler =
+      message.action === 'browserView'
+        ? typeof message.data?.operation === 'string' &&
+          message.data.operation.startsWith('controller')
+          ? handleBrowserController
+          : handleBrowserView
+        : message.action === 'browserUiService'
+          ? handleBrowserUiService
+          : handleBrowserRequestUi;
+    const needsOwner =
+      message.action === 'browserView' ||
+      message.data?.operation === 'loginOpen' ||
+      message.data?.operation === 'loginClose';
+    const result = needsOwner
+      ? resolveBrowserDocumentSender(sender, message.documentToken).then(from =>
+          handler(message.data, from),
+        )
+      : handler(message.data, sender);
+    void result.then(sendResponse, error =>
+      sendResponse({
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
     return true;
   }
 
@@ -761,14 +840,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'mearlWebsiteInstallation') {
     void installationService.website(message, sender).then(
       data => sendResponse({ success: true, data }),
-      error => sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) }),
+      error =>
+        sendResponse({
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        }),
     );
     return true;
   }
   if (message.action === INSTALLATION_ACTION) {
     void installationService.internal(message, sender).then(
       data => sendResponse({ success: true, data }),
-      error => sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) }),
+      error =>
+        sendResponse({
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        }),
     );
     return true;
   }
@@ -801,19 +888,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const tabId = sender.tab?.id;
     const pageUrl = sender.url ?? sender.tab?.url ?? '';
     if (typeof tabId !== 'number' || (sender.frameId !== undefined && sender.frameId !== 0)) {
-      sendResponse({ success: false, available: false, reason: 'invalid-sender' }); return true;
+      sendResponse({ success: false, available: false, reason: 'invalid-sender' });
+      return true;
     }
-    const action = message.action === 'accountAutoLoginAvailable' ? accountAutoLoginAvailability(tabId, pageUrl) : startAccountAutoLogin(tabId, pageUrl);
+    const action =
+      message.action === 'accountAutoLoginAvailable'
+        ? accountAutoLoginAvailability(tabId, pageUrl)
+        : startAccountAutoLogin(tabId, pageUrl);
     void action.then(sendResponse).catch(() => sendResponse({ success: false, available: false }));
     return true;
   }
   if (message.action === 'accountIdentity' || message.action === 'accountRedirect') {
-    if (!isExtensionUiSender(sender, chrome.runtime.id)) { sendResponse({ success: false, error: 'Extension UI required' }); return; }
-    const action = message.action === 'accountIdentity' ? getAccountIdentity({ cachedOnly: message.cachedOnly === true }) : (async () => {
-      const id = typeof message.tabId === 'number' ? message.tabId : (await chrome.tabs.query({ active: true, currentWindow: true }))[0]?.id;
-      if (typeof id === 'number') await redirectAccountLoginTab(id);
-    })();
-    void action.then(data => sendResponse({ success: true, data })).catch(error => sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) })); return true;
+    if (!isExtensionUiSender(sender, chrome.runtime.id)) {
+      sendResponse({ success: false, error: 'Extension UI required' });
+      return;
+    }
+    const action =
+      message.action === 'accountIdentity'
+        ? getAccountIdentity({ cachedOnly: message.cachedOnly === true })
+        : (async () => {
+            const id =
+              typeof message.tabId === 'number'
+                ? message.tabId
+                : (await chrome.tabs.query({ active: true, currentWindow: true }))[0]?.id;
+            if (typeof id === 'number') await redirectAccountLoginTab(id);
+          })();
+    void action
+      .then(data => sendResponse({ success: true, data }))
+      .catch(error =>
+        sendResponse({
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    return true;
   }
 
   if (message.action === 'getDnrIndicatorRules') {
@@ -945,11 +1053,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
     }
     void Promise.all([getDeviceShellForTab(tabId), getAppProfileForTab(tabId)])
-      .then(([deviceShell, profile]) => sendResponse({
-        success: true,
-        config: deviceShell?.config ?? null,
-        profileSettings: Boolean(profile?.settingsGroup),
-      }))
+      .then(([deviceShell, profile]) =>
+        sendResponse({
+          success: true,
+          config: deviceShell?.config ?? null,
+          profileSettings: Boolean(profile?.settingsGroup),
+        }),
+      )
       .catch(() => sendResponse({ success: false, config: null }));
     return true;
   }
@@ -1082,10 +1192,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'appProfileCatalogGet') {
     void getAppProfileCatalog().then(
       result => {
-        updateQuickSimulationContextMenu(result.profiles.some(profile => profile.available !== false));
+        updateQuickSimulationContextMenu(
+          result.profiles.some(profile => profile.available !== false),
+        );
         sendResponse({ success: true, ...result });
       },
-      error => sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) }),
+      error =>
+        sendResponse({
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        }),
     );
     return true;
   }
@@ -1097,22 +1213,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
     }
     void (async () => {
-        await restoreQuickDeviceEmulationForTab(tabId);
-        const config = await getAppProfileForTab(tabId);
-        const profile = config?.profile;
-        const lastProfile = isQuickAppProfileName(profile)
-          ? profile
-          : await getRememberedQuickAppProfileForTab(tabId);
-        const appVersion = (config?.binding?.options.appVersion ?? config?.globals?.['__APP_VERSION__']) ?? null;
-        const device = getQuickActiveDeviceContext(tabId);
-        return {
-          success: true,
-          profile: isQuickAppProfileName(profile) ? profile : null,
-          ...(lastProfile ? { lastProfile } : {}),
-          appVersion,
-          os: config ? (config.platform === 'Android' ? 'android' : 'ios') : device?.os,
-        };
-      })()
+      await restoreQuickDeviceEmulationForTab(tabId);
+      const config = await getAppProfileForTab(tabId);
+      const profile = config?.profile;
+      const lastProfile = isQuickAppProfileName(profile)
+        ? profile
+        : await getRememberedQuickAppProfileForTab(tabId);
+      const appVersion =
+        config?.binding?.options.appVersion ?? config?.globals?.['__APP_VERSION__'] ?? null;
+      const device = getQuickActiveDeviceContext(tabId);
+      return {
+        success: true,
+        profile: isQuickAppProfileName(profile) ? profile : null,
+        ...(lastProfile ? { lastProfile } : {}),
+        appVersion,
+        os: config ? (config.platform === 'Android' ? 'android' : 'ios') : device?.os,
+      };
+    })()
       .then(sendResponse)
       .catch(error => {
         sendResponse({
@@ -1181,7 +1298,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               profile,
               appVersion,
               os: config.platform === 'Android' ? 'android' : 'ios',
-              deviceModel: (config.binding?.options.deviceModel ?? config.globals.__DEVICE_MODEL__),
+              deviceModel: config.binding?.options.deviceModel ?? config.globals.__DEVICE_MODEL__,
             },
             () => null,
             { current: config },
@@ -1334,20 +1451,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
     }
     void (async () => {
-      const operation = message.action === 'appBridgeAuthCodeStart' ? 'start' : message.action === 'appBridgeAuthCodeWait' ? 'wait' : 'close';
+      const operation =
+        message.action === 'appBridgeAuthCodeStart'
+          ? 'start'
+          : message.action === 'appBridgeAuthCodeWait'
+            ? 'wait'
+            : 'close';
       const owner = { tabId: senderTabId, frameId: sender.frameId, documentId: sender.documentId };
-      const progress = operation === 'close' ? undefined : (value: unknown) => {
-        const phase = (value as { phase?: unknown } | null)?.phase;
-        if (!['installing', 'connected', 'authorizing'].includes(String(phase))) return;
-        void sendTabMessageSafe(senderTabId, { action: 'appBridgeAuthCodeProgress', requestId: message.requestId, phase }, { frameId: sender.frameId, documentId: sender.documentId });
-      };
+      const progress =
+        operation === 'close'
+          ? undefined
+          : (value: unknown) => {
+              const phase = (value as { phase?: unknown } | null)?.phase;
+              if (!['installing', 'connected', 'authorizing'].includes(String(phase))) return;
+              void sendTabMessageSafe(
+                senderTabId,
+                { action: 'appBridgeAuthCodeProgress', requestId: message.requestId, phase },
+                { frameId: sender.frameId, documentId: sender.documentId },
+              );
+            };
       let result;
       if (operation === 'start') {
         const config = await getAppProfileForTab(senderTabId);
         const authorization = config?.binding?.definition.authorization;
-        if (!authorization || config!.actions.behaviors?.[authorization.method] !== 'authCode') throw new Error('Authorization is not enabled for this App profile');
+        if (!authorization || config!.actions.behaviors?.[authorization.method] !== 'authCode')
+          throw new Error('Authorization is not enabled for this App profile');
         result = await startAppAuthorization(owner, authorization.hook, message.params, progress);
-      } else result = await finishAppAuthorization(operation, owner, String(message.browserId ?? ''), message.params, progress);
+      } else
+        result = await finishAppAuthorization(
+          operation,
+          owner,
+          String(message.browserId ?? ''),
+          message.params,
+          progress,
+        );
       sendResponse({
         success: true,
         ...(result as Record<string, unknown>),
@@ -1414,7 +1551,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
     }
     void setAppProfileRuntimeResponses(tabId, message.profile, message.responses)
-      .then(sendResponse).catch(error => sendResponse({ success: false, error: String(error) }));
+      .then(sendResponse)
+      .catch(error => sendResponse({ success: false, error: String(error) }));
     return true;
   }
 
@@ -1437,7 +1575,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return handleSendProtocolRequest(
           payload,
           config.hostCapabilities,
-          prepared => { requestMetadata = prepared.metadata; },
+          prepared => {
+            requestMetadata = prepared.metadata;
+          },
           request => selectAppBridgeResponseOverride(senderTabId, api, request),
         );
       })
@@ -1559,7 +1699,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             void enqueueStreamEvent('onReceive', data);
             recordBackgroundProtocolStreamChunk(senderTabId, panelRequestId, data);
           },
-          metadata => recordStreamStart(metadata.requestHeaders, metadata.method, metadata.url, metadata.metadata),
+          metadata =>
+            recordStreamStart(
+              metadata.requestHeaders,
+              metadata.method,
+              metadata.url,
+              metadata.metadata,
+            ),
           recordStreamResponse,
           config.hostCapabilities,
         );
@@ -1570,7 +1716,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const reason = error instanceof Error ? error.message : String(error);
         recordStreamStart();
         await enqueueStreamEvent('onError', {
-            error: reason,
+          error: reason,
         });
         recordBackgroundProtocolStreamEnd(senderTabId, panelRequestId, { error: reason });
         sendResponse({ success: false, error: reason });
@@ -1579,18 +1725,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if ([BROWSER_CONTROL_GET_ACTION, BROWSER_CONTROL_SET_ACTION, BROWSER_CONTROL_CLEAR_ACTION].includes(message.action)) {
+  if (
+    [BROWSER_CONTROL_GET_ACTION, BROWSER_CONTROL_SET_ACTION, BROWSER_CONTROL_CLEAR_ACTION].includes(
+      message.action,
+    )
+  ) {
     void handleBrowserControl(message, sender).then(result => {
-      if (result.success && message.action !== BROWSER_CONTROL_GET_ACTION) scheduleDnrNotify(message.tabId);
+      if (result.success && message.action !== BROWSER_CONTROL_GET_ACTION)
+        scheduleDnrNotify(message.tabId);
       sendResponse(result);
     });
     return true;
   }
 
-
-
   // origin 与 tabId 均取自发送方，跨域 iframe 不能为其他 tab 建立规则。
-  if (message.action === 'networkControlReportOrigin' || message.action === 'envSwitchReportOrigin') {
+  if (
+    message.action === 'networkControlReportOrigin' ||
+    message.action === 'envSwitchReportOrigin'
+  ) {
     const tabId = sender.tab?.id;
     if (typeof tabId === 'number' && sender.url) {
       void addEnvSwitchCorsRule(tabId, sender.url).catch(() => {});
@@ -1666,7 +1818,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.action === 'saveDevRules') {
-    if (!isExtensionUiSender(sender, chrome.runtime.id)) { sendResponse({ success: false, error: 'Extension UI required' }); return; }
+    if (!isExtensionUiSender(sender, chrome.runtime.id)) {
+      sendResponse({ success: false, error: 'Extension UI required' });
+      return;
+    }
     void saveDevRules(message.forms, message.enabled).then(sendResponse);
     return true;
   }
@@ -1704,7 +1859,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.action === 'autoApplyDevRules') {
     const tabUrl: string = message.url || sender.tab?.url || '';
-    if (tabUrl) void autoApplyDevRules(tabUrl).catch(error => console.warn('[Background] autoApplyDevRules failed:', error));
+    if (tabUrl)
+      void autoApplyDevRules(tabUrl).catch(error =>
+        console.warn('[Background] autoApplyDevRules failed:', error),
+      );
     return;
   }
 
@@ -1911,9 +2069,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'getOverrides') {
     const overrides = getOverrides(tabId);
     if (typeof message.url === 'string') {
-      void inspectBrowserRequest({ url: message.url, body: message.requestBody }).then(metadata => {
-        sendResponse({ overrides, apiName: metadata?.apiName ?? null });
-      }).catch(error => sendResponse({ error: error instanceof Error ? error.message : String(error) }));
+      void inspectBrowserRequest({ url: message.url, body: message.requestBody })
+        .then(metadata => {
+          sendResponse({ overrides, apiName: metadata?.apiName ?? null });
+        })
+        .catch(error =>
+          sendResponse({ error: error instanceof Error ? error.message : String(error) }),
+        );
     } else sendResponse({ overrides });
     return true;
   }
@@ -1964,7 +2126,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const ping = { action: 'pingElementPickerRuntime' };
       const pickerFrames = previewRootFrameId
         ? await sendTabMessageToFrameIdsSafe<PickerPing>(
-            tabId, await getElementPickerPreviewFrameIds(tabId, previewRootFrameId), ping,
+            tabId,
+            await getElementPickerPreviewFrameIds(tabId, previewRootFrameId),
+            ping,
           )
         : await sendTabMessageToFramesSafe<PickerPing>(tabId, ping, { notifyOnUnreachable: true });
       if (elementPickerStartGenerations.get(tabId) !== generation) {
@@ -1979,7 +2143,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: false });
         return;
       }
-      const topFramePage = pickerFrames.find(result => result.frameId === (previewRootFrameId ?? 0))?.response.page;
+      const topFramePage = pickerFrames.find(result => result.frameId === (previewRootFrameId ?? 0))
+        ?.response.page;
       const tabPage = await chrome.tabs
         .get(tabId)
         .then(tab =>
@@ -2007,11 +2172,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       setActiveElementPickerSession(tabId, session);
       const appProfileActive = Boolean(await getAppProfileForTab(tabId));
-      const startupFrameIds = previewRootFrameId ? pickerFrameIds : selectElementPickerStartupFrames(
-        pickerFrameIds,
-        !!message.traceMode,
-        appProfileActive,
-      );
+      const startupFrameIds = previewRootFrameId
+        ? pickerFrameIds
+        : selectElementPickerStartupFrames(pickerFrameIds, !!message.traceMode, appProfileActive);
       const targetFrameIds = message.traceMode
         ? await ensureElementPickerMainRuntimeForFrames(tabId, startupFrameIds)
         : startupFrameIds;
@@ -2050,10 +2213,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: false });
         return;
       }
-      const initialActiveFrameId = startedFrameIds.includes(previewRootFrameId ?? -1) ? previewRootFrameId : selectInitialElementPickerFrame(
-        startedFrameIds,
-        appProfileActive,
-      );
+      const initialActiveFrameId = startedFrameIds.includes(previewRootFrameId ?? -1)
+        ? previewRootFrameId
+        : selectInitialElementPickerFrame(startedFrameIds, appProfileActive);
       const initialFrameToken = pickerFrames.find(result => result.frameId === initialActiveFrameId)
         ?.response.frameToken;
       if (initialFrameToken) {
@@ -2064,8 +2226,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       sendResponse({ success: true, frameIds: startedFrameIds });
     })().catch(error => {
-      if (elementPickerStartGenerations.get(tabId) === generation) clearActiveElementPickerSession(tabId);
-      sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) });
+      if (elementPickerStartGenerations.get(tabId) === generation)
+        clearActiveElementPickerSession(tabId);
+      sendResponse({
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
     });
     return true;
   }
@@ -2234,9 +2400,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch((error: Error) => sendResponse({ success: false, error: error.message }));
     return true;
   }
-
-
-
 });
 
 // ==================== Debugger 事件监听 ====================
@@ -2246,16 +2409,27 @@ chrome.debugger.onEvent.addListener((source, method, params: any) => {
   if (source.tabId !== undefined && method === 'Target.attachedToTarget') {
     void handleAppProfileChildTargetEvent(source.tabId, method, params);
   }
-  if (source.tabId !== undefined && method === 'Target.detachedFromTarget' && typeof params?.sessionId === 'string') {
+  if (
+    source.tabId !== undefined &&
+    method === 'Target.detachedFromTarget' &&
+    typeof params?.sessionId === 'string'
+  ) {
     forgetChildDeviceSession(source.tabId, params.sessionId);
     forgetRequestCollectionWebView(source.tabId, params.sessionId);
-    handleDebuggerSessionEvent(source.tabId, 'Runtime.executionContextsCleared', {}, params.sessionId);
+    handleDebuggerSessionEvent(
+      source.tabId,
+      'Runtime.executionContextsCleared',
+      {},
+      params.sessionId,
+    );
   }
   const eventSource = source as chrome.debugger.Debuggee & { sessionId?: string };
   if (source.tabId !== undefined) {
     handleDebuggerSessionEvent(source.tabId, method, params, eventSource.sessionId);
-    if (method === 'Page.frameNavigated' &&
-        (params?.frame?.name === '__mearl_root__' || params?.frame?.name === '__mearl_layer__')) {
+    if (
+      method === 'Page.frameNavigated' &&
+      (params?.frame?.name === '__mearl_root__' || params?.frame?.name === '__mearl_layer__')
+    ) {
       // Each DevTools session restores its saved CSS insets when Blink commits a new document.
       void restorePhoneFrameSafeAreaForTab(source.tabId).catch(() => {});
     }

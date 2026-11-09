@@ -1,6 +1,26 @@
 import { receiveBrowserPreset, type PresetTransferTransport } from '@mearl/preset/bundles';
 import type { HostToExtensionActionMap } from '@mearl/browser-core';
 import { BROWSER_BUNDLE_API_VERSION, browserCapabilityRegistry } from './browserCapabilityRegistry';
+import {
+  PERMISSION_REQUEST_PAGE,
+  PRESET_PERMISSION_REVISION_PARAM,
+} from '../../shared/permissionRequest';
+import { openPermissionRequestWindow } from './permissionRequestWindow';
+
+async function openPresetPermissions(revision: string) {
+  const url = chrome.runtime.getURL(
+    `${PERMISSION_REQUEST_PAGE}?${PRESET_PERMISSION_REVISION_PARAM}=${revision}`,
+  );
+  const contexts = await chrome.runtime.getContexts({ documentUrls: [url] }).catch(() => []);
+  const existing = contexts.find(context => context.frameId === 0 && context.windowId >= 0);
+  if (existing) {
+    const focused = await chrome.windows
+      .update(existing.windowId, { focused: true })
+      .catch(() => undefined);
+    if (focused) return;
+  }
+  await openPermissionRequestWindow(url, 440, 440);
+}
 
 export async function synchronizeBrowserPreset(
   input: HostToExtensionActionMap['__preset_browser']['request'],
@@ -40,7 +60,7 @@ export async function synchronizeBrowserPreset(
       mearlApiVersion: BROWSER_BUNDLE_API_VERSION,
     });
     try {
-      return await registry.applyPreparedPreset({
+      const status = await registry.applyPreparedPreset({
         prepared: received.prepared,
         installation: received.installation,
         expected: previous,
@@ -49,6 +69,16 @@ export async function synchronizeBrowserPreset(
           await accepted?.confirm();
         },
       });
+      if (
+        input.showPermissions === true &&
+        status.installationRevision === input.installationRevision &&
+        status.permissionPending.length
+      ) {
+        await openPresetPermissions(input.installationRevision).catch(error =>
+          console.warn('[Preset] Could not open domain permissions:', error),
+        );
+      }
+      return status;
     } finally {
       await received.release().catch(() => {});
     }

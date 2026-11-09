@@ -1,3 +1,5 @@
+export const PERMISSION_REQUEST_PAGE = 'src/pages/permission-request/index.html';
+export const PRESET_PERMISSION_REVISION_PARAM = 'presetRevision';
 export const POPUP_PERMISSION_REQUEST = 'popup_permission_request';
 export const POPUP_PERMISSION_CANCEL = 'popup_permission_cancel';
 export const POPUP_PERMISSION_ALLOW = 'popup_permission_allow';

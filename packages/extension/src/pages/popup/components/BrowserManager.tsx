@@ -1037,14 +1037,7 @@ interface AccountPickerProps {
   onRetry: () => Promise<void>;
 }
 
-function AccountPicker({
-  accounts,
-  loading,
-  error,
-  value,
-  onChange,
-  onRetry,
-}: AccountPickerProps) {
+function AccountPicker({ accounts, loading, error, value, onChange, onRetry }: AccountPickerProps) {
   const availableAccounts = accounts.filter(account => account.site);
   const optionClass = (selected: boolean) =>
     clsx(
@@ -1118,8 +1111,9 @@ function AccountPicker({
           <span className="truncate">{t('accountsLoadFailed', error)}</span>
           <button
             type="button"
+            disabled={loading}
             onClick={() => void onRetry()}
-            className="shrink-0 cursor-pointer text-blue-600 hover:underline dark:text-blue-400"
+            className="shrink-0 cursor-pointer text-blue-600 hover:underline dark:text-blue-400 disabled:opacity-50"
           >
             {t('requestCasesRetry')}
           </button>
@@ -1647,7 +1641,7 @@ function LaunchForm({
                     error={accountsError}
                     value={accountId}
                     onChange={setAccountId}
-                    onRetry={retryAccounts}
+                    onRetry={() => retryAccounts({ requestPermission: true })}
                   />
                 ) : undefined
               }
@@ -1764,7 +1758,11 @@ interface BrowserManagerProps {
   accountsEnabled?: boolean;
 }
 
-export function BrowserManager({ accountsEnabled = false, onBack, headerActions }: BrowserManagerProps) {
+export function BrowserManager({
+  accountsEnabled = false,
+  onBack,
+  headerActions,
+}: BrowserManagerProps) {
   const controlSessions = useControlSessions();
   const [browsers, setBrowsers] = useState<BrowserInfo[]>([]);
   const [providers, setProviders] = useState<BrowserProviderSummary[]>([]);
@@ -1946,11 +1944,13 @@ export function BrowserManager({ accountsEnabled = false, onBack, headerActions 
             </button>
           )}
           <div className="flex min-w-0 items-baseline gap-2">
-          <h2 className="shrink-0 text-xs font-medium text-text-primary">
-            {t('browserManagerTitle')}
-          </h2>
-          <p className="truncate text-3xs text-text-secondary">{t('browserManagerDescription')}</p>
-        </div>
+            <h2 className="shrink-0 text-xs font-medium text-text-primary">
+              {t('browserManagerTitle')}
+            </h2>
+            <p className="truncate text-3xs text-text-secondary">
+              {t('browserManagerDescription')}
+            </p>
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {headerActions}

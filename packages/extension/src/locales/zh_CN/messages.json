@@ -1055,6 +1055,9 @@
   "accountsLoadFailed": {
     "message": "加载账号失败：$1"
   },
+  "accountsPermissionRequired": {
+    "message": "需要访问 $1，点击重试申请权限"
+  },
   "accountSearchPlaceholder": {
     "message": "输入账号名称或 账号 ID"
   },
@@ -3303,6 +3306,18 @@
   },
   "presetPermissionsGrant": {
     "message": "授权 preset 域名"
+  },
+  "presetPermissionPromptDesc": {
+    "message": "有 $1 个站点待授权。你可以一次申请，并在 Chrome 弹窗中确认。"
+  },
+  "presetPermissionPromptSites": {
+    "message": "待授权站点（$1）"
+  },
+  "presetPermissionPromptChanged": {
+    "message": "当前 Preset 已变更。请重新运行安装以申请权限。"
+  },
+  "presetPermissionPromptReady": {
+    "message": "此 Preset 的域名权限已就绪。"
   },
   "requestCasesButton": {
     "message": "用例"

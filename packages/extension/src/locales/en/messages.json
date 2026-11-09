@@ -1062,6 +1062,9 @@
   "accountsLoadFailed": {
     "message": "Failed to load accounts: $1"
   },
+  "accountsPermissionRequired": {
+    "message": "Access to $1 is required. Select Retry to request permission."
+  },
   "accountSearchPlaceholder": {
     "message": "Enter account name or account ID"
   },
@@ -3307,6 +3310,18 @@
   },
   "presetPermissionsGrant": {
     "message": "Authorize preset domains"
+  },
+  "presetPermissionPromptDesc": {
+    "message": "$1 sites need access. Request access to all of them at once and confirm in Chrome."
+  },
+  "presetPermissionPromptSites": {
+    "message": "Sites that need access ($1)"
+  },
+  "presetPermissionPromptChanged": {
+    "message": "The active preset has changed. Run the installation again to request access."
+  },
+  "presetPermissionPromptReady": {
+    "message": "This preset already has all required domain permissions."
   },
   "requestCasesButton": {
     "message": "Cases"
