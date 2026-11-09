@@ -681,6 +681,29 @@ describe('parseSetupArgs', () => {
   });
 });
 
+it('keeps text-mode lifecycle output concise while explicit status still returns JSON', async () => {
+  const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const revision = 'a'.repeat(64);
+  const pending = { revision, ready: false, warnings: ['Browser synchronization pending'] };
+  const runPreset = vi.fn().mockResolvedValue(pending);
+  const runLifecycle = vi.fn(async (_options, dependencies) => {
+    dependencies.onPresetStatus({ revision, ready: false });
+    return true;
+  });
+  vi.stubEnv('MEARL_SETUP_STATUS_FORMAT', 'text');
+  try {
+    expect(await main(['--yes'], false, { runLifecycle, runPreset })).toBe(3);
+    expect(log).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith(pending.warnings[0]);
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('preset status'));
+    expect(await main(['preset', 'status'], false, { runPreset })).toBe(3);
+    expect(JSON.parse(log.mock.calls[0][0])).toEqual(pending);
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});
+
 it('reports actual preset readiness after the base Skill phase and rejects a replaced selection', async () => {
   vi.spyOn(console, 'log').mockImplementation(() => {});
   vi.spyOn(console, 'error').mockImplementation(() => {});

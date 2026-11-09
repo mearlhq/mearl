@@ -1,6 +1,8 @@
 const setupRelease = vi.hoisted(() => ({ SETUP_VERSION: '2.22.0' }));
 vi.mock('../setupVersion.js', () => setupRelease);
-beforeEach(() => { setupRelease.SETUP_VERSION = '2.22.0'; });
+beforeEach(() => {
+  setupRelease.SETUP_VERSION = '2.22.0';
+});
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -69,8 +71,15 @@ function dependencies(
   >
 > {
   return {
-    readManagement: vi.fn(async () => ({ setup: undefined, source: undefined, revision: undefined })),
-    claimLifecycle: vi.fn(() => ({ release: vi.fn(), lifecycle: { started: vi.fn(), finished: vi.fn() } })),
+    readManagement: vi.fn(async () => ({
+      setup: undefined,
+      source: undefined,
+      revision: undefined,
+    })),
+    claimLifecycle: vi.fn(() => ({
+      release: vi.fn(),
+      lifecycle: { started: vi.fn(), finished: vi.fn() },
+    })),
     cleanupNativeHost: vi.fn(() => true),
     cleanupRuntime: vi.fn(async () => {}),
     confirm: vi.fn(async () => true),
@@ -1272,23 +1281,44 @@ it('prepares the selected manager after runtime initialization and before any Sk
   deps.detectPackage = vi.fn(() => detectedPackage('local', 'pnpm'));
   const prepareSkills = vi.fn(async () => {});
   expect(await runMearlLifecycle({ operation: 'install' }, { ...deps, prepareSkills })).toBe(true);
-  expect(deps.runCommand.mock.invocationCallOrder[2]).toBeLessThan(prepareSkills.mock.invocationCallOrder[0]);
-  expect(prepareSkills.mock.invocationCallOrder[0]).toBeLessThan(deps.installManagedPlugins.mock.invocationCallOrder[0]);
-  expect(prepareSkills.mock.invocationCallOrder[0]).toBeLessThan(deps.runSkillOperation.mock.invocationCallOrder[0]);
+  expect(deps.runCommand.mock.invocationCallOrder[2]).toBeLessThan(
+    prepareSkills.mock.invocationCallOrder[0],
+  );
+  expect(prepareSkills.mock.invocationCallOrder[0]).toBeLessThan(
+    deps.installManagedPlugins.mock.invocationCallOrder[0],
+  );
+  expect(prepareSkills.mock.invocationCallOrder[0]).toBeLessThan(
+    deps.runSkillOperation.mock.invocationCallOrder[0],
+  );
 });
 
-it('saves the preset before package changes and activates it before the Skill batch', async () => {
+it('saves the preset before package changes and avoids reinstalling its managed plugins', async () => {
   const installation = detectedPackage('local');
   const deps = dependencies(new Map([['local', installation]]));
-  const status = { ready: false, revision: 'a'.repeat(64), pending: [{ reason: 'BROWSER_SYNC_REQUIRED' }] } as any;
+  const status = {
+    ready: false,
+    revision: 'a'.repeat(64),
+    pending: [{ reason: 'BROWSER_SYNC_REQUIRED' }],
+  } as any;
   const activate = vi.fn(async () => status);
   const onPresetStatus = vi.fn();
-  deps.preparePreset.mockImplementation(async () => { deps.readManagement.mockResolvedValue({ setup: undefined, source: undefined, revision: status.revision }); return { revision: status.revision, activate }; });
+  deps.preparePreset.mockImplementation(async () => {
+    deps.readManagement.mockResolvedValue({
+      setup: undefined,
+      source: undefined,
+      revision: status.revision,
+    });
+    return { revision: status.revision, activate };
+  });
   expect(await runMearlLifecycle({ operation: 'update' }, { ...deps, onPresetStatus })).toBe(true);
   expect(deps.preparePreset).toHaveBeenCalledWith(expect.objectContaining({ source: undefined }));
-  expect(deps.preparePreset.mock.invocationCallOrder[0]).toBeLessThan(deps.runCommand.mock.invocationCallOrder[0]);
-  expect(deps.runCommand.mock.invocationCallOrder[2]).toBeLessThan(activate.mock.invocationCallOrder[0]);
-  expect(activate.mock.invocationCallOrder[0]).toBeLessThan(deps.installManagedPlugins.mock.invocationCallOrder[0]);
+  expect(deps.preparePreset.mock.invocationCallOrder[0]).toBeLessThan(
+    deps.runCommand.mock.invocationCallOrder[0],
+  );
+  expect(deps.runCommand.mock.invocationCallOrder[2]).toBeLessThan(
+    activate.mock.invocationCallOrder[0],
+  );
+  expect(deps.installManagedPlugins).not.toHaveBeenCalled();
   expect(onPresetStatus).toHaveBeenCalledExactlyOnceWith(status);
 });
 
@@ -1298,7 +1328,14 @@ it('does not modify packages when preset preparation fails, or activate after pa
   expect(await runMearlLifecycle({ operation: 'update' }, deps)).toBe(false);
   expect(deps.runCommand).not.toHaveBeenCalled();
   const activate = vi.fn();
-  deps.preparePreset.mockImplementation(async () => { deps.readManagement.mockResolvedValue({ setup: undefined, source: undefined, revision: 'a'.repeat(64) }); return { revision: 'a'.repeat(64), activate }; });
+  deps.preparePreset.mockImplementation(async () => {
+    deps.readManagement.mockResolvedValue({
+      setup: undefined,
+      source: undefined,
+      revision: 'a'.repeat(64),
+    });
+    return { revision: 'a'.repeat(64), activate };
+  });
   deps.runCommand.mockResolvedValue({ code: 1, stdout: '', stderr: '' });
   expect(await runMearlLifecycle({ operation: 'update' }, deps)).toBe(false);
   expect(activate).not.toHaveBeenCalled();
@@ -1315,7 +1352,9 @@ it('does not prepare presets when maintaining an older release line or uninstall
 it('does not run the fallback Skill tool after package or manager preparation failure', async () => {
   const deps = dependencies(new Map());
   deps.detectPackage = vi.fn(() => detectedPackage('local', 'pnpm'));
-  const prepareSkills = vi.fn(async () => { throw new Error('Preset is unavailable'); });
+  const prepareSkills = vi.fn(async () => {
+    throw new Error('Preset is unavailable');
+  });
   expect(await runMearlLifecycle({ operation: 'install' }, { ...deps, prepareSkills })).toBe(false);
   expect(deps.runSkillOperation).not.toHaveBeenCalled();
   expect(deps.installManagedPlugins).not.toHaveBeenCalled();
@@ -1329,7 +1368,9 @@ it('installs exact beta runtime packages by default without selecting latest', a
   setupRelease.SETUP_VERSION = '3.0.0-beta.0';
   const deps = dependencies(new Map());
   deps.detectPackage = vi.fn(() => detectedPackage('local', 'pnpm'));
-  await expect(runMearlLifecycle({ operation: 'install', skipSkill: true }, deps)).resolves.toBe(true);
+  await expect(runMearlLifecycle({ operation: 'install', skipSkill: true }, deps)).resolves.toBe(
+    true,
+  );
   const commands = vi.mocked(deps.runCommand).mock.calls.map(([, args]) => args);
   expect(commands).toContainEqual(['add', '-g', '@mearl/client@3.0.0-beta.0']);
   expect(commands).toContainEqual(['add', '-g', '@mearl/native-host@3.0.0-beta.0']);
@@ -1342,11 +1383,25 @@ it('adopts a browser preset after initializing the runtime and before any Skill 
   deps.detectPackage = vi.fn(() => detectedPackage('local'));
   const status = { revision: 'a'.repeat(64), ready: false } as any;
   const activate = vi.fn(async () => status);
-  deps.prepareBrowserPreset.mockImplementation(async () => { deps.readManagement.mockResolvedValue({ setup: undefined, source: undefined, revision: status.revision }); return { revision: status.revision, activate }; });
+  deps.prepareBrowserPreset.mockImplementation(async () => {
+    deps.readManagement.mockResolvedValue({
+      setup: undefined,
+      source: undefined,
+      revision: status.revision,
+    });
+    return { revision: status.revision, activate };
+  });
   const onPresetStatus = vi.fn();
-  expect(await runMearlLifecycle({ operation: 'install', defaultPresetSource: 'https://default.example.test/preset.json' }, { ...deps, onPresetStatus })).toBe(true);
-  expect(deps.runCommand.mock.invocationCallOrder.at(-1)).toBeLessThan(deps.prepareBrowserPreset.mock.invocationCallOrder[0]);
-  expect(activate.mock.invocationCallOrder[0]).toBeLessThan(deps.installManagedPlugins.mock.invocationCallOrder[0]);
+  expect(
+    await runMearlLifecycle(
+      { operation: 'install', defaultPresetSource: 'https://default.example.test/preset.json' },
+      { ...deps, onPresetStatus },
+    ),
+  ).toBe(true);
+  expect(deps.runCommand.mock.invocationCallOrder.at(-1)).toBeLessThan(
+    deps.prepareBrowserPreset.mock.invocationCallOrder[0],
+  );
+  expect(deps.installManagedPlugins).not.toHaveBeenCalled();
   expect(onPresetStatus).toHaveBeenCalledWith(status);
   expect(deps.preparePreset).toHaveBeenCalledOnce();
 });
@@ -1356,10 +1411,26 @@ it('uses the distribution default only when no browser selection was adopted', a
   const deps = dependencies(new Map());
   deps.detectPackage = vi.fn(() => detectedPackage('local'));
   const activate = vi.fn(async () => ({ revision: 'a'.repeat(64), ready: true }) as any);
-  deps.preparePreset.mockResolvedValueOnce(undefined).mockImplementationOnce(async () => { deps.readManagement.mockResolvedValue({ setup: undefined, source: undefined, revision: 'a'.repeat(64) }); return { revision: 'a'.repeat(64), activate }; });
-  expect(await runMearlLifecycle({ operation: 'install', defaultPresetSource: 'https://default.example.test/preset.json' }, deps)).toBe(true);
-  expect(deps.preparePreset).toHaveBeenLastCalledWith(expect.objectContaining({ fallbackSource: 'https://default.example.test/preset.json' }));
-  expect(deps.prepareBrowserPreset.mock.invocationCallOrder[0]).toBeLessThan(deps.preparePreset.mock.invocationCallOrder[1]);
+  deps.preparePreset.mockResolvedValueOnce(undefined).mockImplementationOnce(async () => {
+    deps.readManagement.mockResolvedValue({
+      setup: undefined,
+      source: undefined,
+      revision: 'a'.repeat(64),
+    });
+    return { revision: 'a'.repeat(64), activate };
+  });
+  expect(
+    await runMearlLifecycle(
+      { operation: 'install', defaultPresetSource: 'https://default.example.test/preset.json' },
+      deps,
+    ),
+  ).toBe(true);
+  expect(deps.preparePreset).toHaveBeenLastCalledWith(
+    expect.objectContaining({ fallbackSource: 'https://default.example.test/preset.json' }),
+  );
+  expect(deps.prepareBrowserPreset.mock.invocationCallOrder[0]).toBeLessThan(
+    deps.preparePreset.mock.invocationCallOrder[1],
+  );
   expect(activate).toHaveBeenCalledOnce();
 });
 
@@ -1368,7 +1439,12 @@ it('stops before fallback defaults or Skills if browser preset discovery fails',
   const deps = dependencies(new Map());
   deps.detectPackage = vi.fn(() => detectedPackage('local'));
   deps.prepareBrowserPreset.mockRejectedValueOnce(new Error('different presets'));
-  expect(await runMearlLifecycle({ operation: 'install', defaultPresetSource: 'https://default.example.test/preset.json' }, deps)).toBe(false);
+  expect(
+    await runMearlLifecycle(
+      { operation: 'install', defaultPresetSource: 'https://default.example.test/preset.json' },
+      deps,
+    ),
+  ).toBe(false);
   expect(deps.preparePreset).toHaveBeenCalledOnce();
   expect(deps.installManagedPlugins).not.toHaveBeenCalled();
   expect(deps.runSkillOperation).not.toHaveBeenCalled();
@@ -1377,11 +1453,25 @@ it('stops before fallback defaults or Skills if browser preset discovery fails',
 it('does not adopt a browser preset during an unattended runtime update', async () => {
   setupRelease.SETUP_VERSION = '3.0.0-beta.5';
   const deps = dependencies(new Map([['local', detectedPackage('local')]]));
-  await runMearlLifecycle({ operation: 'update', defaultPresetSource: 'https://default.example.test/preset.json', env: { MEARL_AUTO_UPDATE_PROFILES: 'local' } }, deps);
+  await runMearlLifecycle(
+    {
+      operation: 'update',
+      defaultPresetSource: 'https://default.example.test/preset.json',
+      env: { MEARL_AUTO_UPDATE_PROFILES: 'local' },
+    },
+    deps,
+  );
   expect(deps.prepareBrowserPreset).not.toHaveBeenCalled();
   expect(deps.preparePreset).toHaveBeenCalledOnce();
   deps.preparePreset.mockClear();
-  await runMearlLifecycle({ operation: 'update', defaultPresetSource: 'https://default.example.test/preset.json', skipSkill: true }, deps);
+  await runMearlLifecycle(
+    {
+      operation: 'update',
+      defaultPresetSource: 'https://default.example.test/preset.json',
+      skipSkill: true,
+    },
+    deps,
+  );
   expect(deps.prepareBrowserPreset).not.toHaveBeenCalled();
   expect(deps.preparePreset).toHaveBeenCalledOnce();
 });
@@ -1389,10 +1479,16 @@ it('does not adopt a browser preset during an unattended runtime update', async 
 it('rejects an incompatible installed management policy before changing packages', async () => {
   setupRelease.SETUP_VERSION = '3.0.0-beta.8';
   const deps = dependencies(new Map([['local', detectedPackage('local')]]));
-  deps.readManagement.mockResolvedValue({ setup: { package: '@team/setup', version: 'beta', runtime: '>=4.0.0 <5' }, source: 'https://example.test/preset.json', revision: 'a'.repeat(64) });
+  deps.readManagement.mockResolvedValue({
+    setup: { package: '@team/setup', version: 'beta', runtime: '>=4.0.0 <5' },
+    source: 'https://example.test/preset.json',
+    revision: 'a'.repeat(64),
+  });
   expect(await runMearlLifecycle({ operation: 'update' }, deps)).toBe(false);
   expect(deps.runCommand).not.toHaveBeenCalled();
-  expect(deps.writeLine).toHaveBeenCalledWith(expect.stringContaining('npx @team/setup@beta update'));
+  expect(deps.writeLine).toHaveBeenCalledWith(
+    expect.stringContaining('npx @team/setup@beta update'),
+  );
   expect(deps.claimLifecycle.mock.results[0].value.release).toHaveBeenCalledOnce();
 });
 it('rechecks accepted management before a package command and preserves corrupt installations', async () => {
@@ -1401,7 +1497,10 @@ it('rechecks accepted management before a package command and preserves corrupt 
   expect(await runMearlLifecycle({ operation: 'uninstall', yes: true }, deps)).toBe(false);
   expect(deps.cleanupNativeHost).not.toHaveBeenCalled();
   expect(deps.runCommand).not.toHaveBeenCalled();
-  deps.readManagement.mockResolvedValueOnce({ setup: undefined, source: undefined, revision: undefined }).mockResolvedValueOnce({ setup: undefined, source: undefined, revision: undefined }).mockResolvedValue({ setup: undefined, source: undefined, revision: 'b'.repeat(64) });
+  deps.readManagement
+    .mockResolvedValueOnce({ setup: undefined, source: undefined, revision: undefined })
+    .mockResolvedValueOnce({ setup: undefined, source: undefined, revision: undefined })
+    .mockResolvedValue({ setup: undefined, source: undefined, revision: 'b'.repeat(64) });
   expect(await runMearlLifecycle({ operation: 'update' }, deps)).toBe(false);
   expect(deps.runCommand).not.toHaveBeenCalled();
 });
@@ -1410,23 +1509,45 @@ it('stops a second lifecycle operation while the first owns the shared lease', a
   const { claimPresetInstallation } = await import('../presetInstallationLease.js');
   const first = dependencies(new Map([['local', detectedPackage('local')]]));
   const second = dependencies(new Map([['local', detectedPackage('local')]]));
-  first.claimLifecycle = second.claimLifecycle = vi.fn(() => claimPresetInstallation(join(directory, 'lifecycle.json')));
+  first.claimLifecycle = second.claimLifecycle = vi.fn(() =>
+    claimPresetInstallation(join(directory, 'lifecycle.json')),
+  );
   let release!: () => void;
   let entered!: () => void;
-  const started = new Promise<void>(resolve => { entered = resolve; });
-  first.readManagement.mockImplementationOnce(async () => { entered(); await new Promise<void>(resolve => { release = resolve; }); return { setup: undefined, source: undefined, revision: undefined }; });
+  const started = new Promise<void>(resolve => {
+    entered = resolve;
+  });
+  first.readManagement.mockImplementationOnce(async () => {
+    entered();
+    await new Promise<void>(resolve => {
+      release = resolve;
+    });
+    return { setup: undefined, source: undefined, revision: undefined };
+  });
   const pending = runMearlLifecycle({ operation: 'update' }, first);
   try {
     await started;
     expect(await runMearlLifecycle({ operation: 'uninstall', yes: true }, second)).toBe(false);
     expect(second.runCommand).not.toHaveBeenCalled();
     expect(second.cleanupNativeHost).not.toHaveBeenCalled();
-  } finally { release(); await pending; rmSync(directory, { recursive: true, force: true }); }
+  } finally {
+    release();
+    await pending;
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 it('pins a managed stable installation to the verified installer version instead of latest', async () => {
   setupRelease.SETUP_VERSION = '3.0.1';
   const deps = dependencies(new Map([['local', detectedPackage('local')]]));
-  deps.readManagement.mockResolvedValue({ setup: { package: '@team/setup', version: 'latest', runtime: '>=3.0.0 <3.0.10' }, source: 'https://example.test/preset.json', revision: 'a'.repeat(64) });
+  deps.readManagement.mockResolvedValue({
+    setup: { package: '@team/setup', version: 'latest', runtime: '>=3.0.0 <3.0.10' },
+    source: 'https://example.test/preset.json',
+    revision: 'a'.repeat(64),
+  });
   expect(await runMearlLifecycle({ operation: 'update' }, deps)).toBe(true);
-  expect(deps.runCommand).toHaveBeenCalledWith(expect.any(String), ['install', '-g', '@mearl/client@3.0.1'], expect.any(Object));
+  expect(deps.runCommand).toHaveBeenCalledWith(
+    expect.any(String),
+    ['install', '-g', '@mearl/client@3.0.1'],
+    expect.any(Object),
+  );
 });

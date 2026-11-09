@@ -33,13 +33,14 @@ import {
   type CommandResult,
   type CommandRunner,
 } from '@mearl/daemon-core';
-import { readInstallationManagement, setupManagementCommand, setupRuntimeCompatible } from '@mearl/daemon-core/installation';
+import {
+  readInstallationManagement,
+  setupManagementCommand,
+  setupRuntimeCompatible,
+} from '@mearl/daemon-core/installation';
 import { claimPresetInstallation } from './presetInstallationLease.js';
 import { isMearlReleaseLine, mearlPackageSelector } from './version.js';
-import {
-  installManagedPlugins,
-  uninstallManagedPlugins,
-} from './managedPlugins.js';
+import { installManagedPlugins, uninstallManagedPlugins } from './managedPlugins.js';
 import { uninstallPlugin } from './plugin.js';
 import { uninstallProviderPackage } from './provider.js';
 import { packageRegistryEnvironment } from './npmRegistry.js';
@@ -261,7 +262,8 @@ async function runHook(
 
       const running = /\[CloudServer\]\s+Status:\s+running\b/.test(status.stdout);
       const pluginMode =
-        Boolean(cloudMode && cloudMode !== 'websocket') || /\[CloudServer\]\s+Mode:\s+(?!websocket\b)\S+/.test(status.stdout);
+        Boolean(cloudMode && cloudMode !== 'websocket') ||
+        /\[CloudServer\]\s+Mode:\s+(?!websocket\b)\S+/.test(status.stdout);
       if (operation === 'update' && !running && !pluginMode) {
         writeLine('Hook: cloud update skipped because cloud-server is not running.');
         return true;
@@ -319,28 +321,59 @@ export async function runMearlLifecycle(
   const writeLine = dependencies.writeLine ?? (line => console.error(line));
   let lease: ReturnType<typeof claimPresetInstallation> | undefined;
   try {
-    lease = (dependencies.claimLifecycle ?? (() => claimPresetInstallation(path.join(homedir(), '.agents', '.mearl-setup-lifecycle.json'))))();
-    const readManagement = () => (dependencies.readManagement ?? readInstallationManagement)({ directory: (options.env ?? process.env).MEARL_CAPABILITY_DIR });
+    lease = (
+      dependencies.claimLifecycle ??
+      (() =>
+        claimPresetInstallation(path.join(homedir(), '.agents', '.mearl-setup-lifecycle.json')))
+    )();
+    const readManagement = () =>
+      (dependencies.readManagement ?? readInstallationManagement)({
+        directory: (options.env ?? process.env).MEARL_CAPABILITY_DIR,
+      });
     let acceptedRevision = (await readManagement()).revision;
     let selector = mearlPackageSelector(SETUP_VERSION, options.targetLine);
     const assertManagement = async (expected = acceptedRevision) => {
       const { setup, revision } = await readManagement();
-      if (revision !== expected) throw new Error('PRESET_SELECTION_CHANGED: The selected preset changed during setup.');
-      if (setup && options.operation !== 'uninstall' && !setupRuntimeCompatible(setup, SETUP_VERSION, options.targetLine)) {
-        throw new Error(`SETUP_RUNTIME_CONFLICT: The selected preset requires ${setup.runtime}. Use ${setupManagementCommand(setup)} ${options.operation}.`);
+      if (revision !== expected)
+        throw new Error('PRESET_SELECTION_CHANGED: The selected preset changed during setup.');
+      if (
+        setup &&
+        options.operation !== 'uninstall' &&
+        !setupRuntimeCompatible(setup, SETUP_VERSION, options.targetLine)
+      ) {
+        throw new Error(
+          `SETUP_RUNTIME_CONFLICT: The selected preset requires ${setup.runtime}. Use ${setupManagementCommand(setup)} ${options.operation}.`,
+        );
       }
-      selector = setup?.runtime ? options.targetLine ?? SETUP_VERSION : mearlPackageSelector(SETUP_VERSION, options.targetLine);
+      selector = setup?.runtime
+        ? (options.targetLine ?? SETUP_VERSION)
+        : mearlPackageSelector(SETUP_VERSION, options.targetLine);
     };
     await assertManagement();
     const runner = dependencies.runCommand ?? runCommand;
-    return await withOwnedCommands(lease.lifecycle, () => executeLifecycle(options, {
-      ...dependencies,
-      runCommand: async (...args) => { await assertManagement(); return runner(...args); },
-    }, async revision => { await assertManagement(revision); acceptedRevision = revision; }, () => selector));
+    return await withOwnedCommands(lease.lifecycle, () =>
+      executeLifecycle(
+        options,
+        {
+          ...dependencies,
+          runCommand: async (...args) => {
+            await assertManagement();
+            return runner(...args);
+          },
+        },
+        async revision => {
+          await assertManagement(revision);
+          acceptedRevision = revision;
+        },
+        () => selector,
+      ),
+    );
   } catch (error) {
     writeLine(`Setup: ${error instanceof Error ? error.message : String(error)}`);
     return false;
-  } finally { lease?.release(); }
+  } finally {
+    lease?.release();
+  }
 }
 
 async function executeLifecycle(
@@ -488,13 +521,24 @@ async function executeLifecycle(
       : null;
   const detectedClient =
     detectedClientCandidate?.packageName === UNIFIED_CLIENT ? detectedClientCandidate : null;
-  const preparesPreset = options.operation !== 'uninstall' && !dependencies.prepareSkills && (!options.targetLine || Number(options.targetLine.split('.')[0]) >= 3);
-  const selectsInitialPreset = preparesPreset && !options.skipSkill && !env.MEARL_AUTO_UPDATE_CLIENT_ROOT && !env.MEARL_AUTO_UPDATE_PROFILES;
+  const preparesPreset =
+    options.operation !== 'uninstall' &&
+    !dependencies.prepareSkills &&
+    (!options.targetLine || Number(options.targetLine.split('.')[0]) >= 3);
+  const selectsInitialPreset =
+    preparesPreset &&
+    !options.skipSkill &&
+    !env.MEARL_AUTO_UPDATE_CLIENT_ROOT &&
+    !env.MEARL_AUTO_UPDATE_PROFILES;
   let stagedPreset: StagedPresetInstallation | undefined;
-  if (preparesPreset || (options.operation !== 'uninstall' && options.presetSource && !dependencies.prepareSkills)) {
+  if (
+    preparesPreset ||
+    (options.operation !== 'uninstall' && options.presetSource && !dependencies.prepareSkills)
+  ) {
     try {
       stagedPreset = await (dependencies.preparePreset ?? prepareSetupPreset)({
-        source: options.presetSource, env,
+        source: options.presetSource,
+        env,
       });
       if (stagedPreset) await acceptPreset(stagedPreset.revision);
     } catch (error) {
@@ -699,23 +743,50 @@ async function executeLifecycle(
     }
   }
 
-  if (packagesOk && selectsInitialPreset && !stagedPreset && !options.presetSource && lifecycleSelected.some(profile => profile === 'local' || profile === 'mcp')) {
-    try { stagedPreset = await (dependencies.prepareBrowserPreset ?? prepareBrowserSetupPreset)({ env, writeLine }); if (stagedPreset) await acceptPreset(stagedPreset.revision); }
-    catch (error) { writeLine(`Browser preset: ${error instanceof Error ? error.message : String(error)}`); packagesOk = false; }
+  if (
+    packagesOk &&
+    selectsInitialPreset &&
+    !stagedPreset &&
+    !options.presetSource &&
+    lifecycleSelected.some(profile => profile === 'local' || profile === 'mcp')
+  ) {
+    try {
+      stagedPreset = await (dependencies.prepareBrowserPreset ?? prepareBrowserSetupPreset)({
+        env,
+        writeLine,
+      });
+      if (stagedPreset) await acceptPreset(stagedPreset.revision);
+    } catch (error) {
+      writeLine(`Browser preset: ${error instanceof Error ? error.message : String(error)}`);
+      packagesOk = false;
+    }
   }
   if (packagesOk && selectsInitialPreset && !stagedPreset && options.defaultPresetSource) {
-    try { stagedPreset = await (dependencies.preparePreset ?? prepareSetupPreset)({ fallbackSource: options.defaultPresetSource, env }); if (stagedPreset) await acceptPreset(stagedPreset.revision); }
-    catch (error) { writeLine(`Default preset: ${error instanceof Error ? error.message : String(error)}`); packagesOk = false; }
+    try {
+      stagedPreset = await (dependencies.preparePreset ?? prepareSetupPreset)({
+        fallbackSource: options.defaultPresetSource,
+        env,
+      });
+      if (stagedPreset) await acceptPreset(stagedPreset.revision);
+    } catch (error) {
+      writeLine(`Default preset: ${error instanceof Error ? error.message : String(error)}`);
+      packagesOk = false;
+    }
   }
-  if (packagesOk && options.operation !== 'uninstall' && (stagedPreset || dependencies.prepareSkills)) {
+  if (
+    packagesOk &&
+    options.operation !== 'uninstall' &&
+    (stagedPreset || dependencies.prepareSkills)
+  ) {
     try {
       if (stagedPreset) {
         const status = await stagedPreset.activate();
         dependencies.onPresetStatus?.(status);
-      }
-      else await dependencies.prepareSkills!();
+      } else await dependencies.prepareSkills!();
+    } catch (error) {
+      writeLine(`Skill preparation: ${error instanceof Error ? error.message : String(error)}`);
+      packagesOk = false;
     }
-    catch (error) { writeLine(`Skill preparation: ${error instanceof Error ? error.message : String(error)}`); packagesOk = false; }
   }
   const selectedUsesSkill = lifecycleSelected.some(profile => MEARL_PROFILES[profile].usesSkill);
   const remainingSkillProfiles = (['local', 'cloud'] as const).filter(
@@ -729,13 +800,11 @@ async function executeLifecycle(
     selectedUsesClient &&
     options.skipSkill !== true &&
     ((options.operation === 'uninstall' && remainingSkillProfiles.length === 0) ||
-      (options.operation !== 'uninstall' && options.targetLine === undefined))
+      (options.operation !== 'uninstall' && options.targetLine === undefined && !stagedPreset))
   ) {
     try {
       if (options.operation === 'uninstall') {
-        const result = await (
-          dependencies.uninstallManagedPlugins ?? uninstallManagedPlugins
-        )({
+        const result = await (dependencies.uninstallManagedPlugins ?? uninstallManagedPlugins)({
           env,
           includeMearlSkill: true,
           runCommand: runner,
@@ -747,15 +816,13 @@ async function executeLifecycle(
           skillOk = false;
         }
       } else {
-        const result = await (dependencies.installManagedPlugins ?? installManagedPlugins)(
-          {
-            env,
-            includeMearlSkill: true,
-            mearlSkillOperation: options.operation,
-            runCommand: runner,
-            writeLine,
-          },
-        );
+        const result = await (dependencies.installManagedPlugins ?? installManagedPlugins)({
+          env,
+          includeMearlSkill: true,
+          mearlSkillOperation: options.operation,
+          runCommand: runner,
+          writeLine,
+        });
         if (result === 'installed') runStandaloneSkill = false;
         else if (result === 'failed') {
           runStandaloneSkill = false;

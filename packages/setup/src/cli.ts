@@ -415,7 +415,13 @@ async function runSetupLifecycle(
   if (actual.revision !== preset.revision)
     throw new Error('The selected preset changed while setup was running');
   const warnings = [...new Set([...(preset.warnings ?? []), ...(actual.warnings ?? [])])];
-  console.log(JSON.stringify({ ...actual, warnings }, null, 2));
+  if (process.env.MEARL_SETUP_STATUS_FORMAT === 'text') {
+    for (const warning of warnings) console.error(warning);
+    if (!actual.ready)
+      console.error('Preset setup is pending. Run the installer with "preset status" for details.');
+  } else {
+    console.log(JSON.stringify({ ...actual, warnings }, null, 2));
+  }
   return actual.ready ? 0 : 3;
 }
 

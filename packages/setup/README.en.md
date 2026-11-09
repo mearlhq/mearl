@@ -277,3 +277,5 @@ The default directory is the public site's `installation.json`; override with HT
 Explicit setup first reuses the local preset. Without one, after runtime initialization and before Skill installation, it adopts the connected browser's trusted preset. Explicit `--preset <source>` wins. Differing browser selections, untrusted sources, or failed state reads require an explicit choice. First connection waits about one minute; closed browsers receive only the base environment and retry guidance. Ordinary connections and background core updates do not install an initial local preset.
 
 Distributions can set local-process `MEARL_SETUP_DEFAULT_PRESET` to a default manifest source. It applies only when neither side has a selection. Plugin, Provider, removal, and other subcommands keep their behavior. Setup performs installation and verifies its status.
+
+Distributions can set `MEARL_SETUP_STATUS_FORMAT=text` to show warnings and pending-work guidance at the end of lifecycle commands. `preset status` still reports JSON, and exit codes still reflect actual readiness.
