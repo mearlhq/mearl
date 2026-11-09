@@ -38,7 +38,7 @@ MEARL_INSTALLATION_CONFIG="$(cat /path/to/installation.json)" pnpm build:website
 }
 ```
 
-引导 URL 必须使用与公网官网不同的 HTTPS origin。探测到可访问时，公网官网在导航栏下方显示横幅，用户可点击进入内网官网。「关闭」在当前标签页会话内隐藏横幅，「不再提示」会记住此浏览器中的选择。
+引导 URL 必须使用与公网官网不同的 HTTPS origin。探测到可访问时，公网官网在导航栏下方显示横幅，用户可点击进入自定义官网。「关闭」在当前标签页会话内隐藏横幅，「不再提示」会记住此浏览器中的选择。
 
 将 Pages 的部署来源设为 GitHub Actions。`Deploy installation website` 工作流在 `main` 收到涉及官网代码、构建依赖、站内参考文档或部署配置的推送时自动运行。其他推送跳过官网工作流。更新仓库密钥后也可以手动运行。
 

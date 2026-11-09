@@ -38,7 +38,7 @@ The catalog uses this format:
 }
 ```
 
-The guide URL must use an HTTPS origin distinct from the public website. When the guide is reachable, the public site shows a banner below its navigation with a link to the intranet site. Closing it hides the banner for the current tab session. “Don’t show again” remembers the choice in that browser.
+The guide URL must use an HTTPS origin distinct from the public website. When the guide is reachable, the public site shows a banner below its navigation with a link to the custom website. Closing it hides the banner for the current tab session. “Don’t show again” remembers the choice in that browser.
 
 Set the Pages deployment source to GitHub Actions. The `Deploy installation website` workflow runs automatically when a push to `main` changes the website code, build dependencies, reference documents rendered on the site, or deployment configuration. Other pushes skip the website workflow. You can also run it manually after updating the repository secret.
 

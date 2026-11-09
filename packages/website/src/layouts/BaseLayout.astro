@@ -1,7 +1,7 @@
 ---
 import { ArrowUpRight, Languages, Menu, Moon, Sun } from '@lucide/astro';
 import GitHubIcon from '../components/GitHubIcon.astro';
-import IntranetBanner from '../components/IntranetBanner.astro';
+import CustomWebsiteBanner from '../components/CustomWebsiteBanner.astro';
 import ThemeBootstrap from '../components/ThemeBootstrap.astro';
 import { docsNavigation, referenceLinks, releaseLine, repositoryUrl, siteBase, sitePath, type Locale, type Page } from '../lib/site';
 import { siteCopy } from '../lib/site-copy';
@@ -72,7 +72,7 @@ const home = sitePath(locale);
         </div>
       </div>
     </header>
-    <IntranetBanner {locale} />
+    <CustomWebsiteBanner {locale} />
     <main id="main"><slot /></main>
     <footer class="docs-footer">
       <div><strong>Mearl</strong><p>{t.footerLead}</p></div>

@@ -185,10 +185,10 @@ describe('silent welcome page discovery', () => {
 
   beforeEach(() => {
     document.body.innerHTML = `
-      <aside data-intranet-banner hidden>
-        <a data-intranet-link>Open</a>
-        <button data-intranet-close>Close</button>
-        <button data-intranet-never>Don't show again</button>
+      <aside data-custom-website-banner hidden>
+        <a data-custom-website-link>Open</a>
+        <button data-custom-website-close>Close</button>
+        <button data-custom-website-never>Don't show again</button>
       </aside>
       <main>Welcome</main>`;
     vi.stubGlobal('navigator', {
@@ -203,8 +203,11 @@ describe('silent welcome page discovery', () => {
     fetchMock.mockResolvedValue(headResponse());
     await initGuide();
     expect(replace).not.toHaveBeenCalled();
-    expect(document.querySelector('[data-intranet-banner]')).not.toHaveProperty('hidden', true);
-    expect(document.querySelector('[data-intranet-link]')).toHaveProperty('href', guide.url);
+    expect(document.querySelector('[data-custom-website-banner]')).not.toHaveProperty(
+      'hidden',
+      true,
+    );
+    expect(document.querySelector('[data-custom-website-link]')).toHaveProperty('href', guide.url);
   });
 
   it.each([
@@ -213,8 +216,8 @@ describe('silent welcome page discovery', () => {
   ] as const)('can dismiss using %s', async (button, scope) => {
     fetchMock.mockResolvedValue(headResponse());
     await initGuide();
-    document.querySelector<HTMLButtonElement>(`[data-intranet-${button}]`)!.click();
-    const banner = document.querySelector<HTMLElement>('[data-intranet-banner]')!;
+    document.querySelector<HTMLButtonElement>(`[data-custom-website-${button}]`)!.click();
+    const banner = document.querySelector<HTMLElement>('[data-custom-website-banner]')!;
     expect(banner.hidden).toBe(true);
     expect(window[scope].getItem('mearl-intranet-banner-dismissed')).toBe('1');
 
@@ -230,12 +233,12 @@ describe('silent welcome page discovery', () => {
     await initGuide();
     expect(replace).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledOnce();
-    expect(document.querySelector('[data-intranet-banner]')).toHaveProperty('hidden', true);
+    expect(document.querySelector('[data-custom-website-banner]')).toHaveProperty('hidden', true);
   });
 
   it('hides a previously visible banner when the guide becomes unreachable', async () => {
     fetchMock.mockResolvedValueOnce(headResponse()).mockRejectedValueOnce(new TypeError('Offline'));
-    const banner = document.querySelector('[data-intranet-banner]');
+    const banner = document.querySelector('[data-custom-website-banner]');
     await initGuide();
     expect(banner).toHaveProperty('hidden', false);
     await initGuide();

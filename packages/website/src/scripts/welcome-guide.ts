@@ -138,10 +138,10 @@ function isDismissed(scope: 'localStorage' | 'sessionStorage'): boolean {
 }
 
 export async function initGuide(): Promise<void> {
-  const banner = document.querySelector<HTMLElement>('[data-intranet-banner]');
-  const link = banner?.querySelector<HTMLAnchorElement>('[data-intranet-link]');
-  const close = banner?.querySelector<HTMLButtonElement>('[data-intranet-close]');
-  const never = banner?.querySelector<HTMLButtonElement>('[data-intranet-never]');
+  const banner = document.querySelector<HTMLElement>('[data-custom-website-banner]');
+  const link = banner?.querySelector<HTMLAnchorElement>('[data-custom-website-link]');
+  const close = banner?.querySelector<HTMLButtonElement>('[data-custom-website-close]');
+  const never = banner?.querySelector<HTMLButtonElement>('[data-custom-website-never]');
   if (!banner || !link || !close || !never) return;
   banner.hidden = true;
   if (banner.dataset.dismissed || isDismissed('localStorage') || isDismissed('sessionStorage'))

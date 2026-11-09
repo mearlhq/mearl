@@ -24,7 +24,7 @@
   background: color-mix(in srgb, var(--docs-canvas) 92%, transparent);
   border-bottom: 1px solid var(--docs-border);
 }
-.docs-header, .intranet-banner-content {
+.docs-header, .custom-website-banner-content {
   max-width: var(--docs-content);
   margin-inline: auto;
   padding-inline: var(--docs-gutter);
