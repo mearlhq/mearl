@@ -158,9 +158,15 @@ vi.mock('../../panel/components/JsonKeyboardHints', () => ({
   JsonKeyboardHints: () => null,
 }));
 vi.mock('../../sidepanel/SidepanelChat', () => ({
-  SidepanelChat: ({ windowId, headerAction }: { windowId: number | null; headerAction?: (flushDraft: () => void) => ReactNode }) => (
+  SidepanelChat: ({
+    windowId,
+    footerAction,
+  }: {
+    windowId: number | null;
+    footerAction?: (flushDraft: () => void) => ReactNode;
+  }) => (
     <div>
-      <header>{headerAction?.(() => {})}</header>
+      <footer>{footerAction?.(() => {})}</footer>
       <div data-window-id={windowId}>agent chat content</div>
     </div>
   ),
@@ -186,8 +192,22 @@ vi.mock('../../panel/components/header/QuickSettingsMenu', () => ({
 vi.mock('../../panel/hooks/useRemoteConfig', () => ({ useRemoteConfig: () => null }));
 vi.mock('../components/UrlQueryPresetButton', () => ({ UrlQueryPresetButton: () => null }));
 vi.mock('../components/BrowserManager', () => ({
-  BrowserManager: ({ onBack, headerActions }: { onBack?: () => void; headerActions?: ReactNode }) => (
-    <div>browser manager content{onBack && <button aria-label="toolboxBack" onClick={onBack}>back</button>}{headerActions}</div>
+  BrowserManager: ({
+    onBack,
+    headerActions,
+  }: {
+    onBack?: () => void;
+    headerActions?: ReactNode;
+  }) => (
+    <div>
+      browser manager content
+      {onBack && (
+        <button aria-label="toolboxBack" onClick={onBack}>
+          back
+        </button>
+      )}
+      {headerActions}
+    </div>
   ),
 }));
 vi.mock('../components/DeviceCaptureEntry', () => ({
@@ -238,7 +258,15 @@ vi.mock('../components/Toolbox', async importOriginal => ({
 }));
 vi.mock('../../options/components/RulesEditor', () => ({
   default: ({ onBack, headerActions }: { onBack?: () => void; headerActions?: ReactNode }) => (
-    <div>request rules content{onBack && <button aria-label="toolboxBack" onClick={onBack}>back</button>}{headerActions}</div>
+    <div>
+      request rules content
+      {onBack && (
+        <button aria-label="toolboxBack" onClick={onBack}>
+          back
+        </button>
+      )}
+      {headerActions}
+    </div>
   ),
 }));
 
@@ -301,26 +329,31 @@ describe('Popup Agent side panel shortcut', () => {
   it('opens the shared chat and shows the side-panel shortcut only there', async () => {
     render(<Popup bootstrapConfig={bootstrapConfig} />);
 
-    expect(screen.queryByRole('button', { name: 'openAgentSidePanelFromPage' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'openAgentSidePanelFromPage' }),
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'agentChatTitle' }));
-    expect(await screen.findByRole('button', { name: 'openAgentSidePanelFromPage' })).toHaveAttribute(
-      'title',
-      'openAgentSidePanelFromPage (Shortcut)',
-    );
+    const shortcut = await screen.findByRole('button', { name: 'openAgentSidePanelFromPage' });
+    expect(shortcut).toHaveTextContent('Shortcut agentChatSidePanelLabel');
+    expect(shortcut).toHaveAttribute('title', 'openAgentSidePanelFromPage (Shortcut)');
     const chat = await screen.findByText('agent chat content');
     await waitFor(() => expect(chat).toHaveAttribute('data-window-id', '17'));
     fireEvent.keyDown(document, { key: 'v', ctrlKey: true });
     expect(clipboardMocks.readClipboardContent).not.toHaveBeenCalled();
     expect(configMocks.getConfig).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'popupToolFormatter' }));
-    expect(screen.queryByRole('button', { name: 'openAgentSidePanelFromPage' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'openAgentSidePanelFromPage' }),
+    ).not.toBeInTheDocument();
   });
 
   it('keeps the side-panel shortcut absent when bootstrapped config disables Agent', () => {
     render(<Popup bootstrapConfig={{ ...bootstrapConfig, agentEnabled: false }} />);
 
     expect(screen.queryByRole('button', { name: 'agentChatTitle' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'openAgentSidePanelFromPage' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'openAgentSidePanelFromPage' }),
+    ).not.toBeInTheDocument();
     expect(configMocks.getConfig).not.toHaveBeenCalled();
   });
 
@@ -355,7 +388,11 @@ describe('Popup Agent side panel shortcut', () => {
 
   it('opens the side panel for the focused normal window before closing the popup', async () => {
     let finishOpening!: () => void;
-    openSidePanel.mockReturnValueOnce(new Promise<void>(resolve => { finishOpening = resolve; }));
+    openSidePanel.mockReturnValueOnce(
+      new Promise<void>(resolve => {
+        finishOpening = resolve;
+      }),
+    );
     render(<Popup />);
 
     fireEvent.click(await screen.findByRole('button', { name: 'agentChatTitle' }));
@@ -378,7 +415,9 @@ describe('Popup Agent side panel shortcut', () => {
     const button = await screen.findByRole('button', { name: 'openAgentSidePanelFromPage' });
     await waitFor(() => expect(button).toBeEnabled());
     fireEvent.click(button);
-    await waitFor(() => expect(toastMocks.showToast).toHaveBeenCalledWith('openAgentSidePanelFailed', 'error'));
+    await waitFor(() =>
+      expect(toastMocks.showToast).toHaveBeenCalledWith('openAgentSidePanelFailed', 'error'),
+    );
     expect(window.close).not.toHaveBeenCalled();
 
     fireEvent.click(button);
@@ -487,10 +526,7 @@ describe('Popup Agent side panel shortcut', () => {
       cacheToolboxNavigation(tools);
       window.localStorage.setItem('mearl.popup.activeView', view);
       window.localStorage.setItem('mearl.popup.toolbox.pinnedCount', '1');
-      window.localStorage.setItem(
-        'mearl.popup.toolbox.order',
-        JSON.stringify(['plugin:notebook']),
-      );
+      window.localStorage.setItem('mearl.popup.toolbox.order', JSON.stringify(['plugin:notebook']));
       window.localStorage.setItem(
         'mearl.popup.toolbox.activeTool',
         JSON.stringify({
@@ -574,9 +610,7 @@ describe('Popup Agent side panel shortcut', () => {
       ]),
     );
     toolboxMocks.list.mockResolvedValue({
-      tools: [
-        { id: 'plugin:notebook', plugin: 'notebook', title: 'Workspace Notes', order: 100 },
-      ],
+      tools: [{ id: 'plugin:notebook', plugin: 'notebook', title: 'Workspace Notes', order: 100 }],
     });
     window.localStorage.setItem(
       'mearl.popup.toolbox.activeTool',
@@ -691,9 +725,7 @@ describe('Popup Agent side panel shortcut', () => {
 
   it('restores the selected toolbox tool after switching to another view', async () => {
     toolboxMocks.list.mockResolvedValue({
-      tools: [
-        { id: 'plugin:notebook', plugin: 'notebook', title: 'Workspace Notes', order: 100 },
-      ],
+      tools: [{ id: 'plugin:notebook', plugin: 'notebook', title: 'Workspace Notes', order: 100 }],
     });
     render(<Popup bootstrapConfig={bootstrapConfig} />);
 
@@ -843,70 +875,101 @@ describe('Popup Agent side panel shortcut', () => {
     expect(await screen.findByText('browser manager content')).toBeInTheDocument();
   });
 
-  it.each(['rules', 'browsers'] as const)('provides tool navigation for an unpinned built-in: %s', async view => {
-    window.localStorage.setItem('mearl.popup.toolbox.pinnedCount', '1');
-    window.localStorage.setItem('mearl.popup.activeView', 'toolbox');
-    render(<Popup bootstrapConfig={bootstrapConfig} />);
-    fireEvent.click(await screen.findByRole('button', { name: `open hidden ${view}` }));
-    await screen.findByText(view === 'rules' ? 'request rules content' : 'browser manager content');
-    expect(screen.getByRole('button', { name: 'toolboxBack' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'toolboxSwitchTool' })).toBeInTheDocument();
-    const entry = screen.getByRole('button', { name: 'popupToolToolbox' });
-    expect(entry).toHaveAttribute('aria-pressed', 'true');
-    expect(entry).toHaveAttribute('title', view === 'rules' ? 'popupToolRules' : 'popupToolBrowsers');
-    fireEvent.click(screen.getByRole('button', { name: 'openInNewTab' }));
-    await waitFor(() => expect(chrome.tabs.create).toHaveBeenCalledWith({
-      url: `chrome-extension://extension-id/src/pages/popup/index.html?view=${view}&standalone=1`, active: true,
-    }));
-    fireEvent.click(screen.getByRole('button', { name: 'toolboxBack' }));
-    await screen.findByText('toolbox content');
-    expect(screen.queryByRole('button', { name: 'toolboxBack' })).toBeNull();
-    expect(entry.querySelector('svg')).toHaveClass('lucide-wrench');
-  });
+  it.each(['rules', 'browsers'] as const)(
+    'provides tool navigation for an unpinned built-in: %s',
+    async view => {
+      window.localStorage.setItem('mearl.popup.toolbox.pinnedCount', '1');
+      window.localStorage.setItem('mearl.popup.activeView', 'toolbox');
+      render(<Popup bootstrapConfig={bootstrapConfig} />);
+      fireEvent.click(await screen.findByRole('button', { name: `open hidden ${view}` }));
+      await screen.findByText(
+        view === 'rules' ? 'request rules content' : 'browser manager content',
+      );
+      expect(screen.getByRole('button', { name: 'toolboxBack' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'toolboxSwitchTool' })).toBeInTheDocument();
+      const entry = screen.getByRole('button', { name: 'popupToolToolbox' });
+      expect(entry).toHaveAttribute('aria-pressed', 'true');
+      expect(entry).toHaveAttribute(
+        'title',
+        view === 'rules' ? 'popupToolRules' : 'popupToolBrowsers',
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'openInNewTab' }));
+      await waitFor(() =>
+        expect(chrome.tabs.create).toHaveBeenCalledWith({
+          url: `chrome-extension://extension-id/src/pages/popup/index.html?view=${view}&standalone=1`,
+          active: true,
+        }),
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'toolboxBack' }));
+      await screen.findByText('toolbox content');
+      expect(screen.queryByRole('button', { name: 'toolboxBack' })).toBeNull();
+      expect(entry.querySelector('svg')).toHaveClass('lucide-wrench');
+    },
+  );
 
-  it.each(['rules', 'browsers'] as const)('remembers the unpinned %s tool across formatter navigation', async view => {
-    window.localStorage.setItem('mearl.popup.toolbox.pinnedCount', '1');
-    window.localStorage.setItem('mearl.popup.activeView', 'toolbox');
-    render(<Popup bootstrapConfig={bootstrapConfig} />);
-    fireEvent.click(await screen.findByRole('button', { name: `open hidden ${view}` }));
-    const content = view === 'rules' ? 'request rules content' : 'browser manager content';
-    await screen.findByText(content);
-    const entry = screen.getByRole('button', { name: 'popupToolToolbox' });
-    const title = view === 'rules' ? 'popupToolRules' : 'popupToolBrowsers';
-    fireEvent.click(screen.getByRole('button', { name: 'popupToolFormatter' }));
-    expect(entry).toHaveAttribute('title', title);
-    expect(entry).toHaveAttribute('aria-pressed', 'false');
-    fireEvent.click(entry);
-    expect(await screen.findByText(content)).toBeInTheDocument();
-    expect(entry).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.queryByText('toolbox content')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'toolboxBack' }));
-    await screen.findByText('toolbox content');
-    fireEvent.click(screen.getByRole('button', { name: 'popupToolFormatter' }));
-    fireEvent.click(entry);
-    expect(await screen.findByText('toolbox content')).toBeInTheDocument();
-    expect(entry.querySelector('svg')).toHaveClass('lucide-wrench');
-  });
+  it.each(['rules', 'browsers'] as const)(
+    'remembers the unpinned %s tool across formatter navigation',
+    async view => {
+      window.localStorage.setItem('mearl.popup.toolbox.pinnedCount', '1');
+      window.localStorage.setItem('mearl.popup.activeView', 'toolbox');
+      render(<Popup bootstrapConfig={bootstrapConfig} />);
+      fireEvent.click(await screen.findByRole('button', { name: `open hidden ${view}` }));
+      const content = view === 'rules' ? 'request rules content' : 'browser manager content';
+      await screen.findByText(content);
+      const entry = screen.getByRole('button', { name: 'popupToolToolbox' });
+      const title = view === 'rules' ? 'popupToolRules' : 'popupToolBrowsers';
+      fireEvent.click(screen.getByRole('button', { name: 'popupToolFormatter' }));
+      expect(entry).toHaveAttribute('title', title);
+      expect(entry).toHaveAttribute('aria-pressed', 'false');
+      fireEvent.click(entry);
+      expect(await screen.findByText(content)).toBeInTheDocument();
+      expect(entry).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.queryByText('toolbox content')).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'toolboxBack' }));
+      await screen.findByText('toolbox content');
+      fireEvent.click(screen.getByRole('button', { name: 'popupToolFormatter' }));
+      fireEvent.click(entry);
+      expect(await screen.findByText('toolbox content')).toBeInTheDocument();
+      expect(entry.querySelector('svg')).toHaveClass('lucide-wrench');
+    },
+  );
 
-  it.each(['rules', 'browsers'] as const)('remembers an initially open unpinned %s tool', async view => {
-    window.localStorage.setItem('mearl.popup.toolbox.pinnedCount', '1');
-    window.localStorage.setItem('mearl.popup.activeView', view);
-    render(<Popup bootstrapConfig={bootstrapConfig} />);
-    const content = view === 'rules' ? 'request rules content' : 'browser manager content';
-    await screen.findByText(content);
-    fireEvent.click(screen.getByRole('button', { name: 'popupToolFormatter' }));
-    fireEvent.click(screen.getByRole('button', { name: 'popupToolToolbox' }));
-    expect(await screen.findByText(content)).toBeInTheDocument();
-    expect(screen.queryByText('toolbox content')).toBeNull();
-  });
+  it.each(['rules', 'browsers'] as const)(
+    'remembers an initially open unpinned %s tool',
+    async view => {
+      window.localStorage.setItem('mearl.popup.toolbox.pinnedCount', '1');
+      window.localStorage.setItem('mearl.popup.activeView', view);
+      render(<Popup bootstrapConfig={bootstrapConfig} />);
+      const content = view === 'rules' ? 'request rules content' : 'browser manager content';
+      await screen.findByText(content);
+      fireEvent.click(screen.getByRole('button', { name: 'popupToolFormatter' }));
+      fireEvent.click(screen.getByRole('button', { name: 'popupToolToolbox' }));
+      expect(await screen.findByText(content)).toBeInTheDocument();
+      expect(screen.queryByText('toolbox content')).toBeNull();
+    },
+  );
 
   it('preserves the collapsed plugin when a pinned built-in is initially open', async () => {
     window.localStorage.setItem('mearl.popup.toolbox.pinnedCount', '4');
     window.localStorage.setItem('mearl.popup.activeView', 'browsers');
-    window.localStorage.setItem('mearl.popup.toolbox.activeTool', JSON.stringify({
-      kind: 'plugin', id: 'plugin:notebook', title: 'Workspace Notes', icon: 'git-branch',
-    }));
-    cacheToolboxNavigation([{ id: 'plugin:notebook', plugin: 'notebook', title: 'Workspace Notes', icon: 'git-branch', order: 100 }]);
+    window.localStorage.setItem(
+      'mearl.popup.toolbox.activeTool',
+      JSON.stringify({
+        kind: 'plugin',
+        id: 'plugin:notebook',
+        title: 'Workspace Notes',
+        icon: 'git-branch',
+      }),
+    );
+    cacheToolboxNavigation([
+      {
+        id: 'plugin:notebook',
+        plugin: 'notebook',
+        title: 'Workspace Notes',
+        icon: 'git-branch',
+        order: 100,
+      },
+    ]);
     toolboxMocks.list.mockReturnValue(new Promise(() => {}));
     render(<Popup bootstrapConfig={bootstrapConfig} />);
     await screen.findByText('browser manager content');
@@ -931,7 +994,9 @@ describe('Popup Agent side panel shortcut', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'toolboxBack' }));
     expect(screen.getByText('toolbox content')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'openAgentSidePanelFromPage' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'openAgentSidePanelFromPage' }),
+    ).not.toBeInTheDocument();
   });
 
   it('remembers an unpinned plugin selected from the built-in tool switcher', async () => {
@@ -942,12 +1007,19 @@ describe('Popup Agent side panel shortcut', () => {
     });
     render(<Popup bootstrapConfig={bootstrapConfig} />);
     fireEvent.click(await screen.findByRole('button', { name: 'load-tools' }));
-    await waitFor(() => expect(window.localStorage.getItem('mearl.popup.toolbox.navigation')).toContain('plugin:notebook'));
+    await waitFor(() =>
+      expect(window.localStorage.getItem('mearl.popup.toolbox.navigation')).toContain(
+        'plugin:notebook',
+      ),
+    );
     fireEvent.click(screen.getByRole('button', { name: 'open hidden browsers' }));
     await screen.findByText('browser manager content');
     fireEvent.keyDown(screen.getByRole('button', { name: 'toolboxSwitchTool' }), { key: 'Enter' });
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Workspace Notes' }));
-    expect(await screen.findByText('toolbox content')).toHaveAttribute('data-selected-tool', 'plugin:notebook');
+    expect(await screen.findByText('toolbox content')).toHaveAttribute(
+      'data-selected-tool',
+      'plugin:notebook',
+    );
     const entry = screen.getByRole('button', { name: 'popupToolToolbox' });
     expect(entry).toHaveAttribute('title', 'Workspace Notes');
     expect(entry.querySelector('svg')).toHaveClass('lucide-git-branch');

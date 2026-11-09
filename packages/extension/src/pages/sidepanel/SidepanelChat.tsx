@@ -49,6 +49,7 @@ import type {
   ElementPickerSelection,
 } from '../content-script/elementPicker';
 import { JsonTree } from '../panel/components/json-tree/JsonTree';
+import { KeyboardHint } from '../panel/components/KeyboardHint';
 import { SearchableSelect } from '../panel/components/SearchableSelect';
 import { ToastContainer } from '../panel/components/ToastContainer';
 import { NativeHostUpdateGuide } from '../panel/components/NativeHostUpdateGuide';
@@ -389,9 +390,9 @@ interface SidepanelChatProps {
   windowId: number | null;
   embedded?: boolean;
   compact?: boolean;
-  headerAction?: (flushDraft: () => void) => ReactNode;
+  footerAction?: (flushDraft: () => void) => ReactNode;
   pageElementActions?: boolean;
-  showOpenInApp?: boolean;
+  showAllHeaderActions?: boolean;
   toolboxToolId?: string;
   toolboxConversationKey?: string;
   toolboxContext?: string;
@@ -411,9 +412,9 @@ export function SidepanelChat({
   windowId,
   embedded = false,
   compact = false,
-  headerAction,
+  footerAction,
   pageElementActions = true,
-  showOpenInApp = true,
+  showAllHeaderActions = false,
   toolboxToolId,
   toolboxConversationKey,
   toolboxContext,
@@ -813,10 +814,13 @@ export function SidepanelChat({
     });
   }, [persistComposerDraft]);
 
-  useEffect(() => () => {
-    imageSelectionGenerationRef.current += 1;
-    flushComposerDraft();
-  }, [flushComposerDraft]);
+  useEffect(
+    () => () => {
+      imageSelectionGenerationRef.current += 1;
+      flushComposerDraft();
+    },
+    [flushComposerDraft],
+  );
 
   useEffect(() => {
     const handleTabUpdated = (updatedTabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
@@ -958,7 +962,6 @@ export function SidepanelChat({
     !resumingSession &&
     !refreshingSession;
   const canOpenCodexApp =
-    showOpenInApp &&
     providerId === 'codex' &&
     (Boolean(workspaceDirectory) || (hasConversationBinding && !ephemeral));
   const openCodexAppTitle =
@@ -1103,16 +1106,19 @@ export function SidepanelChat({
     (session?.status !== 'error' || qoderNeedsSignIn) &&
     (replyRequest !== null || !active);
   const failedUserMessage = qoderNeedsSignIn
-    ? conversationEvents.findLast(event => event.method === 'chat/userMessage')?.params as
-        { text?: unknown; imageCount?: number; hasAdditionalContext?: boolean } | undefined
+    ? (conversationEvents.findLast(event => event.method === 'chat/userMessage')?.params as
+        { text?: unknown; imageCount?: number; hasAdditionalContext?: boolean } | undefined)
     : undefined;
   const resendText =
     typeof failedUserMessage?.text === 'string' &&
-    !failedUserMessage.imageCount && !failedUserMessage.hasAdditionalContext &&
+    !failedUserMessage.imageCount &&
+    !failedUserMessage.hasAdditionalContext &&
     (session?.tabId ?? conversationTabId) === activeTabId
       ? failedUserMessage.text.trim()
       : '';
-  const hideLatestAuthMessage = qoderNeedsSignIn && lastChatMessage?.role === 'system' &&
+  const hideLatestAuthMessage =
+    qoderNeedsSignIn &&
+    lastChatMessage?.role === 'system' &&
     isQoderAuthenticationError(lastChatMessage.message);
   const visibleChatMessages = hideLatestAuthMessage ? chatMessages.slice(0, -1) : chatMessages;
   const canExportConversation = Boolean(
@@ -1317,15 +1323,13 @@ export function SidepanelChat({
     const generation = imageSelectionGenerationRef.current;
 
     void Promise.all(
-      acceptedFiles.map(
-        async (file, index): Promise<PastedImage> => ({
-          id: `pasted-image-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`,
-          data: await readImageData(file),
-          mimeType: file.type,
-          ...(file.name ? { name: file.name } : {}),
-          size: file.size,
-        }),
-      ),
+      acceptedFiles.map(async (file, index): Promise<PastedImage> => ({
+        id: `pasted-image-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`,
+        data: await readImageData(file),
+        mimeType: file.type,
+        ...(file.name ? { name: file.name } : {}),
+        size: file.size,
+      })),
     )
       .then(images => {
         if (imageSelectionGenerationRef.current !== generation) return;
@@ -1523,16 +1527,21 @@ export function SidepanelChat({
     return <div className={`${embedded ? 'h-full w-full' : 'h-screen w-screen'} bg-bg-primary`} />;
   }
 
+  const footerClassName = 'px-2.5 border-t border-border/50 bg-bg-secondary';
+  const secondaryHeaderActionDisplay = showAllHeaderActions ? 'grid' : 'hidden @[360px]:grid';
+
   return (
     <div
       className={`flex flex-col bg-bg-primary text-text-primary ${embedded ? 'h-full w-full' : 'h-screen w-screen'}`}
     >
-      {!initializing || headerAction ? (
+      {!initializing ? (
         <header
           className={`@container relative flex items-center justify-between gap-2 border-b border-border/50 bg-bg-secondary pr-[9px] pl-[10px] ${compact ? 'min-h-12 py-1' : embedded ? 'min-h-14 py-[7px]' : 'min-h-[54px] py-[7px]'}`}
         >
           <span className="sr-only">{t('agentChatTitle')}</span>
-          <div className={`flex min-w-0 flex-1 items-center gap-2 ${initializing ? 'invisible' : ''}`}>
+          <div
+            className={`flex min-w-0 flex-1 items-center gap-2 ${initializing ? 'invisible' : ''}`}
+          >
             {embedded && onClose ? (
               <button
                 type="button"
@@ -1622,7 +1631,11 @@ export function SidepanelChat({
             <div className="flex shrink-0 items-center gap-[3px]">
               <button
                 onClick={handleNewChat}
-                disabled={resumingSession || refreshingSession || (!session && selectedProvider?.acceptsNewSessions === false)}
+                disabled={
+                  resumingSession ||
+                  refreshingSession ||
+                  (!session && selectedProvider?.acceptsNewSessions === false)
+                }
                 className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-md text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
                 title={t('agentChatNew')}
                 aria-label={t('agentChatNew')}
@@ -1633,7 +1646,12 @@ export function SidepanelChat({
                 <ConversationPicker
                   provider={selectedProvider}
                   currentSessionId={session?.providerSessionId}
-                  disabled={active || resumingSession || refreshingSession || selectedProvider?.acceptsNewSessions === false}
+                  disabled={
+                    active ||
+                    resumingSession ||
+                    refreshingSession ||
+                    selectedProvider?.acceptsNewSessions === false
+                  }
                   listSessions={listSessions}
                   resumeSession={resumeSession}
                 />
@@ -1641,7 +1659,7 @@ export function SidepanelChat({
               <button
                 type="button"
                 onClick={() => setSkillsManagerOpen(true)}
-                className="hidden h-[30px] w-[30px] shrink-0 place-items-center rounded-md text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary cursor-pointer @[360px]:grid"
+                className={`${secondaryHeaderActionDisplay} h-[30px] w-[30px] shrink-0 place-items-center rounded-md text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary cursor-pointer`}
                 title={t('agentSkillsManage')}
                 aria-label={t('agentSkillsManage')}
               >
@@ -1651,66 +1669,67 @@ export function SidepanelChat({
                 <button
                   type="button"
                   onClick={openInApp}
-                  className="hidden h-[30px] w-[30px] shrink-0 place-items-center rounded-md text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary cursor-pointer @[360px]:grid"
+                  className={`${secondaryHeaderActionDisplay} h-[30px] w-[30px] shrink-0 place-items-center rounded-md text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary cursor-pointer`}
                   title={openCodexAppTitle}
                   aria-label={openCodexAppTitle}
                 >
                   <ExternalLink className="h-[15px] w-[15px] stroke-[1.4]" />
                 </button>
               ) : null}
-              <div ref={moreActionsRef} className="relative @[360px]:hidden">
-                <button
-                  type="button"
-                  onClick={() => setMoreActionsOpen(open => !open)}
-                  className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-md text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary cursor-pointer"
-                  title={t('agentChatMoreActions')}
-                  aria-label={t('agentChatMoreActions')}
-                  aria-controls="agent-chat-more-actions"
-                  aria-expanded={moreActionsOpen}
-                  aria-haspopup="menu"
-                >
-                  <Ellipsis className="h-[15px] w-[15px] stroke-[1.4]" />
-                </button>
-                {moreActionsOpen ? (
-                  <div
-                    id="agent-chat-more-actions"
-                    role="menu"
-                    className="absolute right-0 top-10 z-50 mt-1 w-48 overflow-hidden rounded-lg border border-border bg-bg-primary p-1 shadow-lg"
+              {!showAllHeaderActions ? (
+                <div ref={moreActionsRef} className="relative @[360px]:hidden">
+                  <button
+                    type="button"
+                    onClick={() => setMoreActionsOpen(open => !open)}
+                    className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-md text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary cursor-pointer"
+                    title={t('agentChatMoreActions')}
+                    aria-label={t('agentChatMoreActions')}
+                    aria-controls="agent-chat-more-actions"
+                    aria-expanded={moreActionsOpen}
+                    aria-haspopup="menu"
                   >
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        setSkillsManagerOpen(true);
-                        setMoreActionsOpen(false);
-                      }}
-                      className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-xs text-text-primary transition-colors hover:bg-bg-hover cursor-pointer"
+                    <Ellipsis className="h-[15px] w-[15px] stroke-[1.4]" />
+                  </button>
+                  {moreActionsOpen ? (
+                    <div
+                      id="agent-chat-more-actions"
+                      role="menu"
+                      className="absolute right-0 top-10 z-50 mt-1 w-48 overflow-hidden rounded-lg border border-border bg-bg-primary p-1 shadow-lg"
                     >
-                      <Blocks className="h-3.5 w-3.5 shrink-0 text-text-secondary" />
-                      <span className="truncate">{t('agentSkillsManage')}</span>
-                    </button>
-                    {canOpenCodexApp ? (
                       <button
                         type="button"
                         role="menuitem"
                         onClick={() => {
-                          openInApp();
+                          setSkillsManagerOpen(true);
                           setMoreActionsOpen(false);
                         }}
                         className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-xs text-text-primary transition-colors hover:bg-bg-hover cursor-pointer"
-                        title={openCodexAppTitle}
-                        aria-label={openCodexAppTitle}
                       >
-                        <ExternalLink className="h-3.5 w-3.5 shrink-0 text-text-secondary" />
-                        <span className="truncate">{openCodexAppTitle}</span>
+                        <Blocks className="h-3.5 w-3.5 shrink-0 text-text-secondary" />
+                        <span className="truncate">{t('agentSkillsManage')}</span>
                       </button>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
+                      {canOpenCodexApp ? (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            openInApp();
+                            setMoreActionsOpen(false);
+                          }}
+                          className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-xs text-text-primary transition-colors hover:bg-bg-hover cursor-pointer"
+                          title={openCodexAppTitle}
+                          aria-label={openCodexAppTitle}
+                        >
+                          <ExternalLink className="h-3.5 w-3.5 shrink-0 text-text-secondary" />
+                          <span className="truncate">{openCodexAppTitle}</span>
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           ) : null}
-          {headerAction?.(flushComposerDraft)}
         </header>
       ) : null}
 
@@ -1798,7 +1817,9 @@ export function SidepanelChat({
                 <ConversationMessage
                   key={`conversation-message-${index}`}
                   message={
-                    providerId === 'qoder' && message.role === 'system' && isQoderAuthenticationError(message.message)
+                    providerId === 'qoder' &&
+                    message.role === 'system' &&
+                    isQoderAuthenticationError(message.message)
                       ? { ...message, message: t('agentChatQoderSignInRequired') }
                       : message
                   }
@@ -1916,9 +1937,7 @@ export function SidepanelChat({
       ) : null}
 
       {!initializing && !nativeHostUpdate ? (
-        <footer
-          className={`${compact ? 'p-1.5' : 'p-2'} border-t border-border/50 bg-bg-secondary`}
-        >
+        <footer className={`${footerClassName} ${compact ? 'pt-1.5' : 'pt-2'}`}>
           {replyRequest ? (
             <div className="flex items-center justify-between gap-2 pb-1.5 text-3xs text-blue-600 dark:text-blue-400">
               <span className="truncate">{t('agentChatReplyingTo', replyRequest.method)}</span>
@@ -2039,8 +2058,16 @@ export function SidepanelChat({
               {canInterrupt ? t('agentChatStop') : t('agentChatSend')}
             </button>
           </div>
-          <div className="flex items-center justify-between gap-2 pt-1 text-3xs text-text-secondary">
-            <span className="min-w-0 truncate">{t('agentChatInputHint')}</span>
+          <div className="flex items-center justify-between gap-2 py-1.5 text-3xs text-text-secondary">
+            <div className="flex min-w-0 flex-wrap items-center gap-1 leading-3 text-text-secondary/80">
+              {footerAction?.(flushComposerDraft)}
+              <KeyboardHint surface="primary" className="min-w-0">
+                <span className="min-w-0 break-words">{t('agentChatSendShortcut')}</span>
+              </KeyboardHint>
+              <KeyboardHint surface="primary" className="min-w-0">
+                <span className="min-w-0 break-words">{t('agentChatNewlineShortcut')}</span>
+              </KeyboardHint>
+            </div>
             <div className="flex shrink-0 items-center gap-1">
               {pageElementActions ? (
                 <>
@@ -2155,6 +2182,10 @@ export function SidepanelChat({
               </div>
             </div>
           </div>
+        </footer>
+      ) : footerAction ? (
+        <footer className={`${footerClassName} flex items-center py-1.5 text-3xs leading-3`}>
+          {footerAction(flushComposerDraft)}
         </footer>
       ) : null}
       <SkillsManagerModal

@@ -9,7 +9,6 @@ import {
   Braces,
   LoaderCircle,
   Monitor,
-  PanelRightClose,
   Rotate3d,
   Wrench,
   createLucideIcon,
@@ -54,11 +53,15 @@ import {
   copyToClipboard,
   readClipboardContent,
 } from '../panel/utils/clipboard';
-import { setValueByPathInParsedData, serializeWithFormat, tryParseJsonString } from '../panel/utils/helpers';
+import {
+  setValueByPathInParsedData,
+  serializeWithFormat,
+  tryParseJsonString,
+} from '../panel/utils/helpers';
 import { generateQrCodeSvgMarkup } from '../panel/utils/qrCode';
 import { showToast } from '../panel/utils/toast';
 import { MEARL_DOC_URL } from '../../shared/constants';
-import { agentSidePanelShortcutLabel } from '../../shared/agentSidePanelState';
+import { AgentSidePanelShortcut } from '../sidepanel/components/AgentSidePanelShortcut';
 import { openExtensionTab } from '../../shared/extensionTab';
 import { setExtensionPageTitle } from '../../shared/pageTitle';
 import { clsx } from 'clsx';
@@ -173,7 +176,9 @@ function PopupViewFallback() {
 export const Popup: FC<PopupProps> = ({ isSidePanel = false, bootstrapConfig, bootstrapInput }) => {
   const remoteConfig = useRemoteConfig();
   const containerRef = useRef<HTMLDivElement>(null);
-  const [expandedPaths, setExpandedPaths] = useState<Record<string, boolean>>(bootstrapInput?.expandedPaths ?? {});
+  const [expandedPaths, setExpandedPaths] = useState<Record<string, boolean>>(
+    bootstrapInput?.expandedPaths ?? {},
+  );
   const [copied, setCopied] = useState<boolean>(false);
   const [qrCodeCopied, setQrCodeCopied] = useState<boolean>(false);
   const [config, configLoaded] = useExtensionConfig(bootstrapConfig);
@@ -232,7 +237,9 @@ export const Popup: FC<PopupProps> = ({ isSidePanel = false, bootstrapConfig, bo
     parsed: any;
     format?: import('../panel/utils/helpers').StringFormat;
     prefix?: string;
-  } | null>(() => bootstrapInput?.inputText ? tryParseJsonString(bootstrapInput.inputText) : null);
+  } | null>(() =>
+    bootstrapInput?.inputText ? tryParseJsonString(bootstrapInput.inputText) : null,
+  );
   const parsedData = topLevelParsed?.parsed ?? null;
   const inputFormat = topLevelParsed?.format;
   const inputPrefix = topLevelParsed?.prefix;
@@ -521,9 +528,9 @@ export const Popup: FC<PopupProps> = ({ isSidePanel = false, bootstrapConfig, bo
 
   const handleViewChange = (view: PopupView) => {
     view = normalizeCapabilityView(view, requestCasesEnabled);
-    const builtIn = navigationTools.slice(pinnedCount).find(tool =>
-      isToolboxBuiltInView(tool.view) && tool.view === view,
-    );
+    const builtIn = navigationTools
+      .slice(pinnedCount)
+      .find(tool => isToolboxBuiltInView(tool.view) && tool.view === view);
     if (builtIn) setToolboxEntryId(builtIn.id);
     else if (unpinnedBuiltIn && view !== 'toolbox') setToolboxEntryId(unpinnedBuiltIn.id);
     setActiveView(view);
@@ -542,7 +549,6 @@ export const Popup: FC<PopupProps> = ({ isSidePanel = false, bootstrapConfig, bo
   const showQrCode = qrCodeEnabled && parsedData && !isSidePanel && !jsonTreeInteraction;
   const urlForQRCode = showQrCode ? serialize(parsedData) : '';
   const navigateUrl = isUrlFormat && parsedData ? serialize(parsedData) : '';
-  const sidePanelShortcut = useMemo(() => agentSidePanelShortcutLabel(navigator.platform), []);
   const navigationTools = sortToolsByOrder(
     [
       {
@@ -581,26 +587,29 @@ export const Popup: FC<PopupProps> = ({ isSidePanel = false, bootstrapConfig, bo
         icon: tool.icon ?? 'blocks',
         label: localizeToolboxMetadata(tool).title,
       })),
-    ].filter(tool =>
-      (tool.view !== 'capture' || requestCasesEnabled) && (tool.view !== 'chat' || chatAvailable),
+    ].filter(
+      tool =>
+        (tool.view !== 'capture' || requestCasesEnabled) && (tool.view !== 'chat' || chatAvailable),
     ),
     toolOrder,
   );
   const pinnedTools = navigationTools.slice(0, pinnedCount);
-  const unpinnedBuiltIn = navigationTools.slice(pinnedCount).find(tool =>
-    isToolboxBuiltInView(tool.view) && tool.view === activeView,
-  );
+  const unpinnedBuiltIn = navigationTools
+    .slice(pinnedCount)
+    .find(tool => isToolboxBuiltInView(tool.view) && tool.view === activeView);
   const selectedToolboxIsPinned = pinnedTools.some(tool => tool.id === selectedToolboxId);
   const toolboxEntryIsPinned = pinnedTools.some(tool => tool.id === toolboxEntryId);
-  const selectedToolboxTool = unpinnedBuiltIn ?? (toolboxEntryIsPinned
-    ? undefined
-    : (navigationTools.find(tool => tool.id === toolboxEntryId) ??
-      (initialToolboxSelection?.kind === 'plugin' && initialToolboxSelection.id === toolboxEntryId
-        ? {
-            icon: initialToolboxSelection.icon ?? 'blocks',
-            label: initialToolboxSelection.title,
-          }
-        : undefined)));
+  const selectedToolboxTool =
+    unpinnedBuiltIn ??
+    (toolboxEntryIsPinned
+      ? undefined
+      : (navigationTools.find(tool => tool.id === toolboxEntryId) ??
+        (initialToolboxSelection?.kind === 'plugin' && initialToolboxSelection.id === toolboxEntryId
+          ? {
+              icon: initialToolboxSelection.icon ?? 'blocks',
+              label: initialToolboxSelection.title,
+            }
+          : undefined)));
   const navigationItems = [
     ...pinnedTools,
     {
@@ -621,9 +630,9 @@ export const Popup: FC<PopupProps> = ({ isSidePanel = false, bootstrapConfig, bo
 
   const openNavigationTool = (tool: (typeof navigationItems)[number]) => {
     if (tool.id === 'toolbox') {
-      const builtIn = navigationTools.slice(pinnedCount).find(item =>
-        item.id === toolboxEntryId && isToolboxBuiltInView(item.view),
-      );
+      const builtIn = navigationTools
+        .slice(pinnedCount)
+        .find(item => item.id === toolboxEntryId && isToolboxBuiltInView(item.view));
       if (builtIn && activeView !== builtIn.view) {
         handleViewChange(builtIn.view);
         return;
@@ -661,23 +670,32 @@ export const Popup: FC<PopupProps> = ({ isSidePanel = false, bootstrapConfig, bo
       <ToolSwitcher
         currentId={unpinnedBuiltIn.id}
         tools={navigationTools.slice(pinnedCount).map(tool => ({
-          id: tool.id, title: tool.label, icon: tool.icon,
+          id: tool.id,
+          title: tool.label,
+          icon: tool.icon,
           onClick: () => openNavigationTool(tool),
         }))}
       />
-      {unpinnedBuiltIn.view !== 'chat' && !isStandaloneRoute && !isStandalonePage && !isSidePanel && (
-        <button
-          type="button"
-          title={t('openInNewTab')}
-          aria-label={t('openInNewTab')}
-          className="cursor-pointer rounded p-1 text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary"
-          onClick={() => void openExtensionTab(chrome.runtime.getURL(
-            `src/pages/popup/index.html?view=${unpinnedBuiltIn.view}&standalone=1`,
-          )).then(() => window.close())}
-        >
-          <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
-        </button>
-      )}
+      {unpinnedBuiltIn.view !== 'chat' &&
+        !isStandaloneRoute &&
+        !isStandalonePage &&
+        !isSidePanel && (
+          <button
+            type="button"
+            title={t('openInNewTab')}
+            aria-label={t('openInNewTab')}
+            className="cursor-pointer rounded p-1 text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary"
+            onClick={() =>
+              void openExtensionTab(
+                chrome.runtime.getURL(
+                  `src/pages/popup/index.html?view=${unpinnedBuiltIn.view}&standalone=1`,
+                ),
+              ).then(() => window.close())
+            }
+          >
+            <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        )}
     </>
   ) : undefined;
 
@@ -749,11 +767,11 @@ export const Popup: FC<PopupProps> = ({ isSidePanel = false, bootstrapConfig, bo
               {navigationItems.map(tool => {
                 const isActive =
                   (tool.id === 'toolbox' && Boolean(unpinnedBuiltIn)) ||
-                  activeView === tool.view &&
-                  (tool.view !== 'toolbox' ||
-                    (tool.id === 'toolbox'
-                      ? !selectedToolboxIsPinned
-                      : selectedToolboxId === tool.id));
+                  (activeView === tool.view &&
+                    (tool.view !== 'toolbox' ||
+                      (tool.id === 'toolbox'
+                        ? !selectedToolboxIsPinned
+                        : selectedToolboxId === tool.id)));
                 return (
                   <button
                     key={tool.id}
@@ -816,7 +834,11 @@ export const Popup: FC<PopupProps> = ({ isSidePanel = false, bootstrapConfig, bo
       {activeView === 'browsers' && (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <Suspense fallback={<PopupViewFallback />}>
-            <BrowserManager accountsEnabled={accountsEnabled}  onBack={unpinnedBuiltIn ? returnToToolbox : undefined} headerActions={builtInHeaderActions} />
+            <BrowserManager
+              accountsEnabled={accountsEnabled}
+              onBack={unpinnedBuiltIn ? returnToToolbox : undefined}
+              headerActions={builtInHeaderActions}
+            />
           </Suspense>
         </div>
       )}
@@ -834,7 +856,9 @@ export const Popup: FC<PopupProps> = ({ isSidePanel = false, bootstrapConfig, bo
                 >
                   <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
-                <h2 className="truncate text-xs font-medium text-text-primary">{t('agentChatTitle')}</h2>
+                <h2 className="truncate text-xs font-medium text-text-primary">
+                  {t('agentChatTitle')}
+                </h2>
               </div>
               {builtInHeaderActions}
             </div>
@@ -846,21 +870,15 @@ export const Popup: FC<PopupProps> = ({ isSidePanel = false, bootstrapConfig, bo
                 embedded
                 compact
                 pageElementActions={false}
-                showOpenInApp={false}
-                headerAction={flushDraft => (
-                  <button
-                    type="button"
+                showAllHeaderActions
+                footerAction={flushDraft => (
+                  <AgentSidePanelShortcut
                     onClick={() => {
                       flushDraft();
                       void handleOpenAgentSidePanel();
                     }}
                     disabled={sidePanelWindowId === null}
-                    aria-label={t('openAgentSidePanelFromPage')}
-                    title={`${t('openAgentSidePanelFromPage')} (${sidePanelShortcut})`}
-                    className="grid h-[30px] w-[30px] shrink-0 cursor-pointer place-items-center rounded-md text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <PanelRightClose className="h-[15px] w-[15px] stroke-[1.4]" aria-hidden="true" />
-                  </button>
+                  />
                 )}
               />
             </Suspense>
@@ -894,7 +912,10 @@ export const Popup: FC<PopupProps> = ({ isSidePanel = false, bootstrapConfig, bo
       {activeView === 'rules' && (
         <div className="min-h-0 flex-1 overflow-hidden">
           <Suspense fallback={<PopupViewFallback />}>
-            <RulesEditor onBack={unpinnedBuiltIn ? returnToToolbox : undefined} headerActions={builtInHeaderActions} />
+            <RulesEditor
+              onBack={unpinnedBuiltIn ? returnToToolbox : undefined}
+              headerActions={builtInHeaderActions}
+            />
           </Suspense>
         </div>
       )}
@@ -1025,7 +1046,7 @@ export const Popup: FC<PopupProps> = ({ isSidePanel = false, bootstrapConfig, bo
 
       {/* 底部工具栏：快捷键提示 + URL query 快捷参数 */}
       {activeView === 'formatter' && (
-        <div className="px-3 py-1.5 border-t border-border bg-toolbar flex items-center gap-2">
+        <div className="px-2.5 py-1.5 border-t border-border bg-toolbar flex items-center gap-2">
           <div className="flex flex-1 min-w-0 items-center gap-1 overflow-hidden">
             <div className="flex-1 min-w-0 overflow-hidden">
               <JsonKeyboardHints
@@ -1051,7 +1072,7 @@ export const Popup: FC<PopupProps> = ({ isSidePanel = false, bootstrapConfig, bo
 
       {/* 错误提示：覆盖底部快捷键栏 */}
       {activeView === 'formatter' && parseError && (
-        <div className="absolute bottom-0 left-0 right-0 z-30 px-3 py-1.5 border-t border-border bg-red-50 dark:bg-red-950 text-xs text-red-600 dark:text-red-400">
+        <div className="absolute bottom-0 left-0 right-0 z-30 px-2.5 py-1.5 border-t border-border bg-red-50 dark:bg-red-950 text-xs text-red-600 dark:text-red-400">
           {parseError}
         </div>
       )}

@@ -3,6 +3,7 @@ import { Command, Keyboard } from 'lucide-react';
 import { clsx } from 'clsx';
 import { t } from '../utils/i18n';
 import { useLocalStorage } from '../hooks/useLocalStorage';
+import { KeyboardHint } from './KeyboardHint';
 
 type JsonKeyboardHintsMode = 'tree' | 'code';
 
@@ -31,8 +32,6 @@ export const JsonKeyboardHints: FC<JsonKeyboardHintsProps> = ({
 }) => {
   const [showShortcuts, setShowShortcuts] = useLocalStorage(storageKey, true);
 
-  const hintClassName =
-    'flex items-center px-1 py-0.5 bg-bg-secondary border border-border rounded';
   const clickableClassName =
     'cursor-pointer hover:bg-bg-hover hover:border-border-hover transition-colors';
   const commandClassName = compact ? 'w-2 h-2' : 'w-2.5 h-2.5';
@@ -40,12 +39,7 @@ export const JsonKeyboardHints: FC<JsonKeyboardHintsProps> = ({
   const treeHints = (
     <>
       {(showPasteHint || showUndoHint) && (
-        <div
-          className={clsx(
-            'flex items-center gap-2 px-1 py-0.5 bg-bg-secondary border border-border rounded',
-            (onPaste || onUndo) && clickableClassName,
-          )}
-        >
+        <KeyboardHint className={clsx('gap-2', (onPaste || onUndo) && clickableClassName)}>
           {showPasteHint && (
             <span
               className="flex items-center"
@@ -64,24 +58,24 @@ export const JsonKeyboardHints: FC<JsonKeyboardHintsProps> = ({
               <Command className={commandClassName} />+{t('hintUndo')}
             </span>
           )}
-        </div>
+        </KeyboardHint>
       )}
       {showEnterNavigateHint && (
-        <div
-          className={clsx(hintClassName, onEnterNavigate && clickableClassName)}
+        <KeyboardHint
+          className={onEnterNavigate ? clickableClassName : undefined}
           onClick={onEnterNavigate}
           role={onEnterNavigate ? 'button' : undefined}
         >
           {t('hintEnterNavigate')}
-        </div>
+        </KeyboardHint>
       )}
     </>
   );
 
   const codeHints = (
-    <div className="flex items-center px-1 py-0.5 bg-bg-secondary border border-border rounded">
+    <KeyboardHint>
       <Command className={commandClassName} />+{t('hintCodeSearch')}
-    </div>
+    </KeyboardHint>
   );
 
   return (

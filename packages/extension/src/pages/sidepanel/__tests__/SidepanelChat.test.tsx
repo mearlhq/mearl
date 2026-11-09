@@ -292,21 +292,22 @@ vi.mock('../../panel/components/json-tree/JsonTree', () => ({
 
 describe('SidepanelChat', () => {
   it('keeps an accepted conversation usable while its provider is being retired', async () => {
-  provider.acceptsNewSessions = false;
-  events = [];
-  sessionStatus = 'idle';
-  try {
-    render(<SidepanelChat windowId={1} />);
-    const composer = await screen.findByPlaceholderText('agentChatInputPlaceholder');
-    fireEvent.change(composer, { target: { value: 'continue accepted session' } });
-    const submit = screen.getByRole('button', { name: 'agentChatSend' });
-    expect(submit).not.toBeDisabled();
-    expect(screen.getByRole('button', { name: 'agentChatNew' })).not.toBeDisabled();
-    fireEvent.click(submit);
-    await waitFor(() => expect(send).toHaveBeenCalled());
-  } finally { delete provider.acceptsNewSessions; }
-});
-
+    provider.acceptsNewSessions = false;
+    events = [];
+    sessionStatus = 'idle';
+    try {
+      render(<SidepanelChat windowId={1} />);
+      const composer = await screen.findByPlaceholderText('agentChatInputPlaceholder');
+      fireEvent.change(composer, { target: { value: 'continue accepted session' } });
+      const submit = screen.getByRole('button', { name: 'agentChatSend' });
+      expect(submit).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: 'agentChatNew' })).not.toBeDisabled();
+      fireEvent.click(submit);
+      await waitFor(() => expect(send).toHaveBeenCalled());
+    } finally {
+      delete provider.acceptsNewSessions;
+    }
+  });
 
   afterEach(() => {
     vi.useRealTimers();
@@ -1304,12 +1305,14 @@ describe('SidepanelChat', () => {
     render(
       <SidepanelChat
         windowId={1}
-        headerAction={flushDraft => <button onClick={flushDraft}>Hand off chat</button>}
+        footerAction={flushDraft => <button onClick={flushDraft}>Hand off chat</button>}
       />,
     );
     const input = await screen.findByPlaceholderText('agentChatInputPlaceholder');
     fireEvent.change(input, { target: { value: 'keep this draft' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Hand off chat' }));
+    const handoff = screen.getByRole('button', { name: 'Hand off chat' });
+    expect(handoff.closest('footer')).toContainElement(input);
+    fireEvent.click(handoff);
 
     expect(sessionStorageState['agentChatSidepanelComposerDraftV1:11']).toMatchObject({
       input: 'keep this draft',
@@ -1322,8 +1325,7 @@ describe('SidepanelChat', () => {
     const storageSet = chrome.storage.session.set as unknown as Mock;
     storageSet.mockImplementation(async values => {
       const draft = values['agentChatSidepanelComposerDraftV1:11'] as
-        | { pastedImages?: unknown[] }
-        | undefined;
+        { pastedImages?: unknown[] } | undefined;
       if (draft?.pastedImages?.length) throw new Error('QUOTA_BYTES exceeded');
       Object.assign(sessionStorageState, values);
     });
@@ -1945,12 +1947,16 @@ describe('SidepanelChat', () => {
     expect(openInApp).toHaveBeenCalledOnce();
   });
 
-  it('hides both Codex App actions when the chat surface disables them', async () => {
-    render(<SidepanelChat windowId={1} showOpenInApp={false} />);
+  it('opens Codex App directly when header actions are shown without an overflow menu', async () => {
+    render(<SidepanelChat windowId={1} showAllHeaderActions />);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'More actions' }));
-    expect(screen.queryByRole('button', { name: 'Open in Codex App' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: 'Open in Codex App' })).not.toBeInTheDocument();
+    const openCodexApp = await screen.findByRole('button', { name: 'Open in Codex App' });
+    expect(screen.getByRole('button', { name: 'Manage Skills' })).toBeVisible();
+    expect(openCodexApp).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument();
+
+    fireEvent.click(openCodexApp);
+    expect(openInApp).toHaveBeenCalledOnce();
   });
 
   it('opens the selected folder in Codex App before a conversation exists', async () => {
@@ -2267,7 +2273,10 @@ describe('SidepanelChat', () => {
     render(<SidepanelChat windowId={1} />);
     fireEvent.click(await screen.findByRole('button', { name: 'agentChatQoderSignIn' }));
 
-    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ action: 'agent_chat_login_qoder', data: {} });
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+      action: 'agent_chat_login_qoder',
+      data: {},
+    });
     await waitFor(() => expect(chrome.tabs.create).toHaveBeenCalledWith({ url }));
     expect(await screen.findByText('agentChatQoderSignInPending')).toBeInTheDocument();
     const composer = screen.getByRole('textbox');

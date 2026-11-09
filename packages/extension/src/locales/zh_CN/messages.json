@@ -2232,7 +2232,7 @@
     "message": "\\1 \\2 引用捕获组"
   },
   "hintEnterNavigate": {
-    "message": "Enter: 跳转"
+    "message": "Enter 跳转"
   },
   "openInNewPage": {
     "message": "在新页面中打开"
@@ -2899,8 +2899,14 @@
   "agentChatSend": {
     "message": "发送"
   },
-  "agentChatInputHint": {
-    "message": "Enter 发送，Shift + Enter 换行"
+  "agentChatSidePanelLabel": {
+    "message": "侧边栏"
+  },
+  "agentChatSendShortcut": {
+    "message": "Enter 发送"
+  },
+  "agentChatNewlineShortcut": {
+    "message": "Shift + Enter 换行"
   },
   "agentChatEnableAutoApprove": {
     "message": "开启自动审批"
