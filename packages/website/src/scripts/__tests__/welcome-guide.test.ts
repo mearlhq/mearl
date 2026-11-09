@@ -236,13 +236,46 @@ describe('silent welcome page discovery', () => {
     expect(document.querySelector('[data-custom-website-banner]')).toHaveProperty('hidden', true);
   });
 
-  it('hides a previously visible banner when the guide becomes unreachable', async () => {
+  it('restores the cached banner before the catalog loads and clears it after a failed probe', async () => {
     fetchMock.mockResolvedValueOnce(headResponse()).mockRejectedValueOnce(new TypeError('Offline'));
-    const banner = document.querySelector('[data-custom-website-banner]');
     await initGuide();
-    expect(banner).toHaveProperty('hidden', false);
+
+    const banner = document.querySelector<HTMLElement>('[data-custom-website-banner]')!;
+    const link = banner.querySelector<HTMLAnchorElement>('[data-custom-website-link]')!;
+    banner.hidden = true;
+    link.removeAttribute('href');
+    let finish!: (config: Awaited<ReturnType<typeof installation.loadInstallationConfig>>) => void;
+    vi.mocked(installation.loadInstallationConfig).mockReturnValueOnce(
+      new Promise(resolve => {
+        finish = resolve;
+      }),
+    );
+    const refresh = initGuide();
+    expect(banner.hidden).toBe(false);
+    expect(link.href).toBe(guide.url);
+    expect(fetchMock).toHaveBeenCalledOnce();
+
+    finish({ schemaVersion: 1, guide });
+    await refresh;
+    expect(banner.hidden).toBe(true);
+    expect(link.hasAttribute('href')).toBe(false);
+
+    vi.mocked(installation.loadInstallationConfig).mockResolvedValueOnce({ schemaVersion: 1 });
+    const nextVisit = initGuide();
+    expect(banner.hidden).toBe(true);
+    await nextVisit;
+  });
+
+  it('keeps a dismissed cached banner hidden when revalidation completes', async () => {
+    fetchMock.mockResolvedValue(headResponse());
     await initGuide();
-    expect(banner).toHaveProperty('hidden', true);
+
+    const refresh = initGuide();
+    document.querySelector<HTMLButtonElement>('[data-custom-website-close]')!.click();
+    await refresh;
+
+    expect(document.querySelector('[data-custom-website-banner]')).toHaveProperty('hidden', true);
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 
   it('does not request access when a silent probe is unavailable', async () => {

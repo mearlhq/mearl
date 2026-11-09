@@ -1,5 +1,5 @@
 import type { InstallationGuide } from '@mearl/preset/installation';
-import { loadInstallationConfig } from '../lib/installation.mjs';
+import { loadInstallationConfig, parseInstallationConfig } from '../lib/installation.mjs';
 import { siteBase } from '../lib/site';
 
 /** Permission names vary across Chromium versions. */
@@ -128,6 +128,19 @@ export async function probeWithoutLocalNetwork(
 }
 
 const dismissedKey = 'mearl-intranet-banner-dismissed';
+const guideCacheKey = `mearl-team-guide:${siteBase}`;
+
+function cachedGuideUrl(): string | undefined {
+  try {
+    const url = sessionStorage.getItem(guideCacheKey);
+    if (url) {
+      return parseInstallationConfig({ schemaVersion: 1, guide: { url } }, location.origin).guide
+        ?.url;
+    }
+  } catch {
+    // Storage may be unavailable or contain an invalid URL.
+  }
+}
 
 function isDismissed(scope: 'localStorage' | 'sessionStorage'): boolean {
   try {
@@ -143,11 +156,40 @@ export async function initGuide(): Promise<void> {
   const close = banner?.querySelector<HTMLButtonElement>('[data-custom-website-close]');
   const never = banner?.querySelector<HTMLButtonElement>('[data-custom-website-never]');
   if (!banner || !link || !close || !never) return;
-  banner.hidden = true;
-  if (banner.dataset.dismissed || isDismissed('localStorage') || isDismissed('sessionStorage'))
+  if (banner.dataset.dismissed || isDismissed('localStorage') || isDismissed('sessionStorage')) {
+    banner.hidden = true;
     return;
+  }
   const lifetime = new AbortController();
   const { signal } = lifetime;
+  const render = (url?: string) => {
+    if (url) link.href = url;
+    else link.removeAttribute('href');
+    banner.hidden = !url;
+  };
+  const update = (url?: string) => {
+    if (signal.aborted) return;
+    render(url);
+    try {
+      if (url) sessionStorage.setItem(guideCacheKey, url);
+      else sessionStorage.removeItem(guideCacheKey);
+    } catch {
+      // The banner also works without storage.
+    }
+  };
+  const dismiss = (scope: 'localStorage' | 'sessionStorage') => {
+    lifetime.abort();
+    banner.hidden = true;
+    banner.dataset.dismissed = 'true';
+    try {
+      window[scope].setItem(dismissedKey, '1');
+    } catch {
+      /* The banner can still be dismissed on this page. */
+    }
+  };
+  close.onclick = () => dismiss('sessionStorage');
+  never.onclick = () => dismiss('localStorage');
+  render(cachedGuideUrl());
   window.addEventListener('pagehide', () => lifetime.abort(), { once: true, signal });
   try {
     const { guide } = await loadInstallationConfig(
@@ -155,7 +197,11 @@ export async function initGuide(): Promise<void> {
       window.location.origin,
       AbortSignal.any([signal, AbortSignal.timeout(5_000)]),
     );
-    if (!guide || signal.aborted) return;
+    if (signal.aborted) return;
+    if (!guide) {
+      update();
+      return;
+    }
     let timer: number | undefined;
     const permission = await Promise.race([
       localNetworkPermission(),
@@ -168,22 +214,9 @@ export async function initGuide(): Promise<void> {
     const reachable = mayAutoProbe(permission, navigator.userAgent)
       ? await probeGuide(guide, { signal })
       : await probeWithoutLocalNetwork(guide, signal);
-    if (!reachable || signal.aborted) return;
-    link.href = guide.url;
-    const dismiss = (scope: 'localStorage' | 'sessionStorage') => {
-      banner.hidden = true;
-      banner.dataset.dismissed = 'true';
-      try {
-        window[scope].setItem(dismissedKey, '1');
-      } catch {
-        /* The banner can still be dismissed on this page. */
-      }
-    };
-    close.onclick = () => dismiss('sessionStorage');
-    never.onclick = () => dismiss('localStorage');
-    banner.hidden = false;
+    update(reachable ? guide.url : undefined);
   } catch {
-    // Guide discovery is optional for the public site.
+    update();
   } finally {
     lifetime.abort();
   }
