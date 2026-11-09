@@ -47,7 +47,7 @@ The installer sets up the `mearl` CLI, Native Host, and main Mearl Skill. Instal
 - Download and extract `mearl-chrome-v*.zip`. Open `chrome://extensions/`, enable **Developer mode**, and choose **Load unpacked** to select the extracted folder. [GitHub Releases](https://github.com/mearlhq/mearl/releases)
 - Add Mearl to Chrome when the store offers the matching version. [Chrome Web Store](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm)
 
-Enable **Agent service** in Mearl, then run `mearl check --local` to verify the connection. [Setup documentation](packages/setup/README.en.md)
+Enable **Agent service** in Mearl, then run `mearl check` to verify the connection. [Setup documentation](packages/setup/README.en.md)
 
 Run `mearl guide` for the current CLI's core workflow and `mearl guide --list` for additional topics. Use `mearl <action> --help` for arguments. Guides ship locally with the client and do not connect to a browser or trigger updates. The Skill distributes a compact entry point; the CLI provides the guide content. MCP-only clients should follow tool descriptions and schemas directly.
 

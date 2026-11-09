@@ -90,7 +90,7 @@ const topics = guide?.sections.map(section => ({ id: section.id, label: section.
       <section class="docs-section" id="verify">
         <h2>{t.verifySetup}</h2>
         <p>{t.verifySetupLead}</p>
-        <CodeBlock {locale} id="check-command" command="mearl check --local" label="Shell" />
+        <CodeBlock {locale} id="check-command" command="mearl check" label="Shell" />
         <p class="docs-follow-up">{t.verifyResult}</p>
         <a class="docs-next" href={sitePath(locale, 'quick-start')}>{t.continueToQuick}<ArrowRight size={16} aria-hidden="true" /></a>
       </section>

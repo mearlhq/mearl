@@ -46,7 +46,7 @@ npx @mearl/setup
 - 下载并解压 `mearl-chrome-v*.zip`。打开 `chrome://extensions/`，开启「开发者模式」，点击「加载已解压的扩展程序」并选择解压目录。[GitHub Releases](https://github.com/mearlhq/mearl/releases)
 - 商店提供同版扩展时，可以直接添加到 Chrome。[Chrome 应用商店](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm)
 
-在 Mearl 中开启 **Agent 服务**，然后运行 `mearl check --local` 验证连接。[安装器文档](packages/setup/README.md)
+在 Mearl 中开启 **Agent 服务**，然后运行 `mearl check` 验证连接。[安装器文档](packages/setup/README.md)
 
 首次使用运行 `mearl guide` 读取当前 CLI 的核心工作流，`mearl guide --list` 查看按需专题；参数继续以 `mearl <action> --help` 为准。指南随客户端本地分发，不连接浏览器或触发更新。Skill 只分发精简入口，正文由 CLI 提供。仅使用 MCP 时直接按工具说明与 schema 操作。
 
