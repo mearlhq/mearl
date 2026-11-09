@@ -213,7 +213,7 @@ export function patchReleaseNotes(directory, version, isPublished) {
     'log', '--no-merges', '--format=- %s (%h)', ...(tag ? [`refs/tags/${tag}..HEAD`] : ['--max-count=20']),
   ], directory).toString().trim();
   const notes = [
-    '## 补丁发布 / Patch release',
+    '### 补丁发布 / Patch release',
     commits || '本次发布与上一正式版使用同一源码。 / This patch uses the same source as the previous stable release.',
   ];
   if (tag) notes.push(`[完整变更 / Full changelog](https://github.com/${repository}/compare/${tag}...v${version})`);

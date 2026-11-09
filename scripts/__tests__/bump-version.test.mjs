@@ -23,7 +23,7 @@ it('updates nested manifests, MCP metadata and Skill frontmatter while retaining
   expect(await readFile(join(root, 'skills/example/SKILL.md'), 'utf8')).toContain('version: "3.0.0-beta.0"\n---\nBody\nversion: keep-body');
   expect(JSON.parse(await readFile(join(root, 'skills/catalog.json'), 'utf8'))).toEqual(['example']);
   expect(await readFile(join(root, 'changelogs/v3.0.0-beta.0.md'), 'utf8')).toContain('# Mearl 3.0.0-beta.0');
-  expect(await readFile(join(root, 'changelogs/v3.0.0-beta.0.en.md'), 'utf8')).toContain('## 📌 Highlights');
+  expect(await readFile(join(root, 'changelogs/v3.0.0-beta.0.en.md'), 'utf8')).toContain('\n### Highlights\n');
 });
 it('rejects unsupported versions, invalid Skills and existing release notes before changing versions', async () => {
   const root = await fixture();

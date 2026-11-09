@@ -24,8 +24,8 @@ export async function bumpVersion(version, directory = root, { changelog = true 
   const notesUrl = `https://github.com/mearlhq/mearl/blob/${tag}/changelogs/${tag}`;
   const notesHeader = `# Mearl ${version}\n\n[简体中文](${notesUrl}.md) | [English](${notesUrl}.en.md)\n\n`;
   const releaseNotes = changelog ? [
-    [join(directory, 'changelogs', `${tag}.md`), notesHeader + '## 📌 版本重点\n\n待补充本次版本重点。\n\n### ♻️ 重构\n\n待补充具体变化及提交引用。\n'],
-    [join(directory, 'changelogs', `${tag}.en.md`), notesHeader + '## 📌 Highlights\n\nAdd the highlights for this release.\n\n### ♻️ Refactors\n\nDescribe the changes and link to their commits.\n'],
+    [join(directory, 'changelogs', `${tag}.md`), notesHeader + '### 版本重点\n\n待补充本次版本重点。\n\n### 变更\n\n待补充具体变化及提交引用。\n'],
+    [join(directory, 'changelogs', `${tag}.en.md`), notesHeader + '### Highlights\n\nAdd the highlights for this release.\n\n### Changes\n\nDescribe the changes and link to their commits.\n'],
   ] : [];
   for (const [changelogPath] of releaseNotes) {
     try {
