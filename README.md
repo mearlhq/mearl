@@ -2,61 +2,56 @@
 
 [简体中文](README.md) | [English](README.en.md)
 
-在自己的浏览器里，和 Agent 一起操作与调试网页。[产品官网和快速上手](https://mearlhq.github.io/mearl/)
+在你日常使用的浏览器里，和 Agent 一起操作与调试网页。
 
-Mearl 沿用浏览器的登录态，帮你验收功能、排查问题、核对设计稿或导出报表。验证过的常用任务可以沉淀成 Skill，复用网页操作或直接调用合适的接口。你可以在扩展里操作，也可以通过 CLI、TypeScript SDK 或 MCP 把任务交给 Agent。
+Mearl 复用浏览器已有的登录态，让 Agent 帮你验收功能、排查页面问题、导出报表。你也可以直接在 Chrome DevTools 面板里查看请求、设置 Mock、模拟设备环境。验证过的常用流程可以做成 Skill，供下次任务复用。
 
-## 可以做什么
-
-- **操作网页**：读取页面快照，点击、输入、滚动、上传、下载和截图，支持多标签页与控制会话。
-- **调试请求**：查看 HTTP 请求、响应和流式事件，重发请求，设置 Mock、重定向和请求头规则。
-- **观察页面**：读取控制台日志，检查元素尺寸、样式、遮挡与滚动容器，采集和查询埋点事件。
-- **模拟环境**：调整设备视口、触摸、User-Agent 和时区；通过已安装的端模拟配置还原 App WebView 环境。
-- **组合任务**：在 `mearl run` 中使用 JavaScript 编排浏览器动作与已注册的 Skill 命令。
-- **连接更多浏览器**：通过本机扩展、CDP、云端 Connector 或独立 Provider 控制目标浏览器。
-
-浏览器扩展提供 DevTools 面板、Popup、侧边栏和工具箱。CLI、SDK 和 MCP 共用同一套浏览器动作。控制会话让多步任务沿用指定的浏览器和标签页。[控制会话](packages/client/README.md#控制会话与文件)
+[产品官网](https://mearlhq.github.io/mearl/) · [Chrome 应用商店](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm) · [GitHub Releases](https://github.com/mearlhq/mearl/releases)
 
 ## 开始使用
 
-Mearl 3.0 的运行包要求 **Node.js ≥ 20.18.0**，浏览器使用 **Chrome ≥ 120** 或支持相应扩展 API 的 Chromium 浏览器。各项功能的版本要求见[扩展兼容性](packages/extension/README.md#浏览器兼容性)。
+### 1. 安装浏览器扩展
 
-### 在 Agent 中使用
+从 [Chrome 应用商店](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm)安装扩展，或从 [GitHub Releases](https://github.com/mearlhq/mearl/releases) 下载 `mearl-chrome-v*.zip`，解压后在 `chrome://extensions/` 开启「开发者模式」，选择「加载已解压的扩展程序」。
 
-把下面这段复制给你的 Agent。
+浏览器需要 **Chrome ≥ 120** 或支持相应扩展 API 的 Chromium 浏览器。[浏览器兼容性](packages/extension/README.md#浏览器兼容性)
+
+安装后即可使用 DevTools 调试面板。要让 Agent 操作浏览器，继续完成下面的配置。
+
+### 2. 连接 Agent
+
+本机组件需要 **Node.js ≥ 20.18.0**。你可以让 Agent 完成配置，也可以手动安装，选择一种方式即可。
+
+**交给 Agent 配置**：把下面这段复制给支持 Skill 的 Agent。
 
 ```text
-请运行以下命令安装 Mearl Skill。
+请运行以下命令安装 Mearl Skill：
 npx --yes skills add mearlhq/mearl --skill mearl --global
 
-读取 Skill 并按它的指引配置本机环境。需要我在 Chrome 里操作时，请告诉我具体步骤。
-完成后验证浏览器连接，并告诉我结果。
+读取 Skill 并按指引配置本机环境，检查扩展与本机组件版本是否一致。
+需要我在 Chrome 中操作时，告诉我具体步骤。
+运行 mearl check 验证连接并报告结果。
 ```
 
-如果你的客户端需要 MCP，配置好本机环境后再运行 `npx @mearl/setup --mcp`。[MCP 文档](packages/mcp-server/README.md)
-
-### 安装本机环境
+**手动配置**：在终端运行安装器，安装 CLI、Native Host 和 Mearl Skill。
 
 ```bash
 npx @mearl/setup
 ```
 
-安装器配置 `mearl` CLI、Native Host 和主 Mearl Skill。请安装与本机组件同版的扩展。
+使用与本机组件同版的扩展。在 Mearl 弹窗的「设置 → 服务集成」中开启 **Agent 服务**，运行 `mearl check` 验证连接。[安装器文档](packages/setup/README.md)
 
-- 下载并解压 `mearl-chrome-v*.zip`。打开 `chrome://extensions/`，开启「开发者模式」，点击「加载已解压的扩展程序」并选择解压目录。[GitHub Releases](https://github.com/mearlhq/mearl/releases)
-- 商店提供同版扩展时，可以直接添加到 Chrome。[Chrome 应用商店](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm)
+使用 MCP 客户端时，在本机环境就绪后运行 `npx @mearl/setup --mcp` 完成接入。[MCP 文档](packages/mcp-server/README.md)
 
-在 Mearl 中开启 **Agent 服务**，然后运行 `mearl check` 验证连接。[安装器文档](packages/setup/README.md)
+### 3. 执行第一个任务
 
-首次使用运行 `mearl guide` 读取当前 CLI 的核心工作流，`mearl guide --list` 查看按需专题；参数继续以 `mearl <action> --help` 为准。指南随客户端本地分发，不连接浏览器或触发更新。Skill 只分发精简入口，正文由 CLI 提供。仅使用 MCP 时直接按工具说明与 schema 操作。
-
-### 执行第一个浏览器任务
-
-把这段提示词复制到已接入 Mearl Skill 或 MCP 工具的 Agent 对话中。
+在已接入 Mearl 的 Agent 中试一句。
 
 > 用 Mearl 在我的浏览器里打开 https://example.com，告诉我页面标题，并截一张图。
 
-也可以在终端用 JavaScript 运行器打开标签页并打印快照。
+## CLI 与 SDK
+
+连接就绪后，也可以在终端打开页面并打印快照：
 
 ```bash
 mearl browser_list
@@ -69,11 +64,9 @@ console.log(await mearl.pageSnapshot({ tabId: tab.tabId, mode: 'viewport' }));
 JS
 ```
 
-连接多个浏览器时，使用清单返回的 `browserId`，为命令添加 `--browser <browserId>`。后续动作继续使用返回的 `tabId`；命令参数可通过 `mearl <action> --help` 查看。
+连接多个浏览器时，使用 `mearl browser_list` 返回的 `browserId`，通过 `mearl run --browser <browserId>` 选择目标。用 `mearl guide` 查看工作流，`mearl guide --list` 查看专题，`mearl <action> --help` 查看参数。
 
-### 在代码中使用
-
-本机环境和浏览器连接就绪后，项目可直接调用 TypeScript SDK：
+在项目中使用 TypeScript SDK：
 
 ```bash
 npm install @mearl/client
@@ -88,6 +81,17 @@ console.log(page.snapshot);
 ```
 
 更多动作、控制会话、脚本和插件示例见 [CLI / SDK 文档](packages/client/README.md)。
+
+## 可以做什么
+
+- **操作网页**，包括读取快照、点击、输入、滚动、上传、下载和截图。
+- **调试请求**，包括查看 HTTP 请求、响应和流式事件，重发请求，设置 Mock、重定向和请求头规则。
+- **检查页面**，读取控制台日志，检查元素尺寸、样式、遮挡和滚动容器，采集和查询埋点事件。
+- **模拟环境**，包括切换设备视口、触摸、User-Agent 和时区，以及通过端模拟配置还原 App WebView。
+- 用 `mearl run` **编排任务**，在 JavaScript 中组合浏览器动作和 Skill 命令。
+- 通过本机扩展、CDP、云端 Connector 或 Provider **连接浏览器**。
+
+扩展提供 DevTools 面板、弹窗、侧边栏和工具箱。CLI、SDK 和 MCP 共用浏览器动作，可通过控制会话把多步任务保持在指定浏览器和标签页。[控制会话](packages/client/README.md#控制会话与文件)
 
 ## 扩展 Mearl
 
@@ -112,9 +116,7 @@ pnpm build
 
 扩展输出位于 `packages/extension/dist_chrome`，可作为已解压扩展加载。开发官网使用 `pnpm dev:website`。
 
-安装依赖会设置 Git 提交钩子。提交时，ESLint 检查并修复暂存的 `packages/**/src/` 下的 TypeScript 文件，Prettier 格式化同目录下暂存的 TypeScript 和 JSON 文件。仍有 lint 错误时，Git 会中止提交。可在仓库根目录运行 `pnpm lint` 手动检查。运行 `pnpm format:check` 会检查该范围内的所有文件，也可能报告未暂存文件中的既有格式差异。
-
-提交约定、代码风格和按改动范围选择的检查见 [AGENTS.md](AGENTS.md)。[发布说明](docs/releases.md) 介绍 beta 自动编号、npm OIDC 与扩展制品分发。
+提交钩子会检查并格式化暂存的源码。可运行 `pnpm lint` 和 `pnpm format:check` 手动检查。[开发规范](AGENTS.md) · [发布流程](docs/releases.md)
 
 | 目录 | 职责 |
 | --- | --- |

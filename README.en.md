@@ -2,62 +2,56 @@
 
 [简体中文](README.md) | [English](README.en.md)
 
-Automate and debug with an agent in the browser you already use. [Product website and quick start](https://mearlhq.github.io/mearl/en.html).
+Automate and debug with an agent in the browser you use every day.
 
-Mearl reuses your browser's sign-in for tasks like checking a feature, diagnosing a web issue, comparing a design, or exporting a report. Verify recurring tasks once, then package them as Skills that use browser actions or call suitable endpoints directly. Work in the extension or use the CLI, TypeScript SDK, and MCP to give tasks to an agent.
+Mearl reuses your browser's existing sign-in so an agent can help you verify features, investigate page issues, and export reports. You can also inspect requests, configure mocks, and emulate device environments directly in its Chrome DevTools panel. Package verified workflows as Skills to reuse in future tasks.
 
-## What you can do
-
-- **Automate pages**: Read snapshots, click, type, scroll, upload, download, and take screenshots across tabs and control sessions.
-- **Debug requests**: Inspect HTTP requests, responses, and streaming events; replay requests; configure mocks, redirects, and header rules.
-- **Inspect pages**: Read console logs, inspect element dimensions, styles, occlusion, and scroll containers, and capture and query analytics events.
-- **Simulate environments**: Adjust the viewport, touch input, User-Agent, and time zone; configure App WebView environments through installed profiles.
-- **Compose tasks**: Orchestrate browser actions and registered Skill commands in JavaScript with `mearl run`.
-- **Connect more browsers**: Control browsers through the local extension, CDP, a cloud Connector, or an independent Provider.
-
-The extension provides a DevTools panel, popup, side panel, and toolbox. The CLI, SDK, and MCP share the browser action catalog. A control session keeps the steps of a task on the intended browser and tabs. [Control sessions](packages/client/README.en.md#control-sessions-and-files)
+[Product website](https://mearlhq.github.io/mearl/en.html) · [Chrome Web Store](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm) · [GitHub Releases](https://github.com/mearlhq/mearl/releases)
 
 ## Get started
 
-Mearl 3.0 runtime packages require **Node.js ≥ 20.18.0**. Use **Chrome ≥ 120** or a Chromium browser supporting the required extension APIs. See [extension compatibility](packages/extension/README.en.md#browser-compatibility) for individual features.
+### 1. Install the browser extension
 
-### Use with an agent
+Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm), or download `mearl-chrome-v*.zip` from [GitHub Releases](https://github.com/mearlhq/mearl/releases), extract it, enable **Developer mode** at `chrome://extensions/`, and choose **Load unpacked**.
 
-Copy this prompt into your agent.
+Use **Chrome ≥ 120** or a Chromium browser with the required extension APIs. [Browser compatibility](packages/extension/README.en.md#browser-compatibility)
+
+The DevTools panel is ready to use after installation. To let an agent control the browser, continue with the setup below.
+
+### 2. Connect your agent
+
+Local components require **Node.js ≥ 20.18.0**. Choose either agent-assisted or manual setup.
+
+**Let your agent configure Mearl**: copy this prompt into an agent that supports Skills.
 
 ```text
-Run this command to install the Mearl Skill.
+Run this command to install the Mearl Skill:
 npx --yes skills add mearlhq/mearl --skill mearl --global
 
-Read the Skill and follow its instructions to set up my local environment.
-Tell me what to do if a step requires my input in Chrome.
-Verify the browser connection and report the result.
+Read the Skill and follow its local setup instructions. Check that the extension and local components have matching versions.
+Tell me the steps if you need my input in Chrome.
+Run mearl check to verify the connection and report the result.
 ```
 
-If your client requires MCP, run `npx @mearl/setup --mcp` after setting up the local environment. [MCP documentation](packages/mcp-server/README.en.md)
-
-### Install locally
+**Configure manually**: run the installer in your terminal to install the CLI, Native Host, and Mearl Skill.
 
 ```bash
 npx @mearl/setup
 ```
 
-The installer sets up the `mearl` CLI, Native Host, and main Mearl Skill. Install the extension version that matches the local runtime.
+Use the same extension version as the local components. In the Mearl popup, enable **Agent Service** under **Settings → Services**, then run `mearl check` to verify the connection. [Setup documentation](packages/setup/README.en.md)
 
-- Download and extract `mearl-chrome-v*.zip`. Open `chrome://extensions/`, enable **Developer mode**, and choose **Load unpacked** to select the extracted folder. [GitHub Releases](https://github.com/mearlhq/mearl/releases)
-- Add Mearl to Chrome when the store offers the matching version. [Chrome Web Store](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm)
+For MCP clients, run `npx @mearl/setup --mcp` after local setup to configure the integration. [MCP documentation](packages/mcp-server/README.en.md)
 
-Enable **Agent service** in Mearl, then run `mearl check` to verify the connection. [Setup documentation](packages/setup/README.en.md)
+### 3. Run your first task
 
-Run `mearl guide` for the current CLI's core workflow and `mearl guide --list` for additional topics. Use `mearl <action> --help` for arguments. Guides ship locally with the client and do not connect to a browser or trigger updates. The Skill distributes a compact entry point; the CLI provides the guide content. MCP-only clients should follow tool descriptions and schemas directly.
-
-### Run your first browser task
-
-Paste this prompt into an agent with the Mearl Skill or MCP tools.
+Try this prompt in an agent connected to Mearl.
 
 > Use Mearl to open https://example.com in my browser, tell me the page title, and take a screenshot.
 
-To try the JavaScript runner from a terminal, open a tab and print its snapshot.
+## CLI and SDK
+
+Once connected, you can also open a page from your terminal and print its snapshot:
 
 ```bash
 mearl browser_list
@@ -70,11 +64,9 @@ console.log(await mearl.pageSnapshot({ tabId: tab.tabId, mode: 'viewport' }));
 JS
 ```
 
-When multiple browsers are connected, use a returned `browserId` with `--browser <browserId>`. Continue using the returned `tabId` for subsequent actions. Check `mearl <action> --help` for arguments.
+If multiple browsers are connected, use a `browserId` returned by `mearl browser_list` with `mearl run --browser <browserId>`. Run `mearl guide` for the workflow, `mearl guide --list` for topics, and `mearl <action> --help` for arguments.
 
-### Use in code
-
-Once the local environment and browser connection are ready, use the TypeScript SDK:
+To use the TypeScript SDK in your project:
 
 ```bash
 npm install @mearl/client
@@ -89,6 +81,17 @@ console.log(page.snapshot);
 ```
 
 See the [CLI / SDK documentation](packages/client/README.en.md) for actions, control sessions, scripts, and plugins.
+
+## What you can do
+
+- **Automate pages** by reading snapshots, clicking, typing, scrolling, uploading, downloading, and taking screenshots.
+- **Debug requests** by inspecting HTTP requests, responses, and streaming events, replaying requests, and configuring mocks, redirects, and header rules.
+- **Inspect pages** by reading console logs, checking element dimensions, styles, occlusion, and scroll containers, and capturing and querying analytics events.
+- **Emulate environments** by changing the viewport, touch input, User-Agent, and time zone, or using App profiles to emulate a WebView.
+- **Compose tasks** with `mearl run` by combining browser actions and Skill commands in JavaScript.
+- **Connect browsers** through the local extension, CDP, a cloud Connector, or a Provider.
+
+The extension provides a DevTools panel, popup, side panel, and toolbox. The CLI, SDK, and MCP share browser actions and can use control sessions to keep a task on the intended browser and tabs. [Control sessions](packages/client/README.en.md#control-sessions-and-files)
 
 ## Extend Mearl
 
@@ -113,9 +116,7 @@ pnpm build
 
 Load `packages/extension/dist_chrome` as an unpacked extension. Use `pnpm dev:website` to develop the website.
 
-Installing dependencies sets up a Git pre-commit hook. At commit time, ESLint checks and fixes staged TypeScript files under `packages/**/src/`, and Prettier formats staged TypeScript and JSON files there. Git stops the commit if lint errors remain. Run `pnpm lint` from the repository root to lint manually. Running `pnpm format:check` checks all files in that scope and may report existing formatting differences in files outside the commit.
-
-See [AGENTS.md](AGENTS.md) for commit conventions, code style, and validation by change scope. The [release guide](docs/releases.en.md) covers automatic beta numbering, npm OIDC, and extension artifact distribution.
+The pre-commit hook checks and formats staged source files. Run `pnpm lint` and `pnpm format:check` to check manually. [Development guidelines](AGENTS.md) · [Release guide](docs/releases.en.md)
 
 | Directory | Responsibility |
 | --- | --- |
