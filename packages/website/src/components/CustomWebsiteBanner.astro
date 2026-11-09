@@ -5,8 +5,8 @@ import type { Locale } from '../lib/site';
 interface Props { locale: Locale }
 const { locale } = Astro.props;
 const t = locale === 'en'
-  ? { message: 'The custom website is reachable.', visit: 'Open custom website', never: 'Don’t show again', close: 'Close custom website notice' }
-  : { message: '检测到可访问自定义官网。', visit: '前往自定义官网', never: '不再提示', close: '关闭自定义官网提示' };
+  ? { message: 'Team setup guide available', visit: 'View guide', never: 'Don’t show again', close: 'Dismiss team setup notice' }
+  : { message: '团队安装指引可用', visit: '查看指引', never: '不再提示', close: '关闭团队安装指引提示' };
 ---
 <aside class="custom-website-banner" data-custom-website-banner aria-label={t.message} hidden>
   <div class="custom-website-banner-content">
