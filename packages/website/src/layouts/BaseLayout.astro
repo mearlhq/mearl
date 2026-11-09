@@ -42,16 +42,10 @@ const home = sitePath(locale);
     <a class="skip-link" href="#main">{t.skip}</a>
     <header class="site-header">
       <div class="docs-header">
-        <a class="brand" href={home}><img src={`${siteBase}icons/icon.svg`} alt="" width="28" height="28" /><span>Mearl</span></a>
+        <a class="brand" href={home}><img src={`${siteBase}icons/icon.svg`} alt="" width="26" height="26" /><span>Mearl</span></a>
         <span class="docs-version">{releaseLine}</span>
         <button class="nav-toggle" type="button" aria-label={t.openNav} aria-expanded="false" aria-controls="site-navigation"><Menu size={18} aria-hidden="true" /></button>
         <nav class="nav-links" id="site-navigation" aria-label={t.nav}>
-          <div class="docs-desktop-nav">
-            <a href={home} aria-current={page === 'home' ? 'page' : undefined}>{t.overview}</a>
-            <a href={sitePath(locale, 'extension')} aria-current={page === 'extension' ? 'page' : undefined}>{t.chromeExtension}</a>
-            <a href={sitePath(locale, 'quick-start')} aria-current={page === 'quick-start' ? 'page' : undefined}>{t.documentation}</a>
-            <a href={sitePath(locale, 'installation')} aria-current={page === 'installation' ? 'page' : undefined}>{t.start}</a>
-          </div>
           <div class="docs-mobile-nav">
             {docsNavigation(locale).map(group => (
               <div>
@@ -76,7 +70,9 @@ const home = sitePath(locale);
     <main id="main"><slot /></main>
     <footer class="docs-footer">
       <div><strong>Mearl</strong><p>{t.footerLead}</p></div>
-      <nav aria-label={t.reference}>
+      <nav aria-label={t.nav}>
+        <a href={sitePath(locale, 'quick-start')}>{t.documentation}</a>
+        <a href={sitePath(locale, 'extension')}>{t.chromeExtension}</a>
         <a href={`${repositoryUrl}/releases`}>{t.releases} <ArrowUpRight size={13} aria-hidden="true" /></a>
         <a href={`${repositoryUrl}/issues`}>{t.issues} <ArrowUpRight size={13} aria-hidden="true" /></a>
       </nav>

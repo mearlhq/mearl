@@ -32,7 +32,7 @@ const topics = guide?.sections.map(section => ({ id: section.id, label: section.
 ---
 <DocsLayout title={`${title} · Mearl`} {description} {locale} {page} {topics}>
   <header class="docs-detail">
-    <p class="docs-eyebrow"><span></span>{install || quick ? t.start : t.docsNav}</p>
+    <p class="docs-eyebrow"><span></span>{install || quick ? t.gettingStarted : t.workflows}</p>
     <h1>{title}</h1>
     <p class="docs-lead">{description}</p>
     {install && <div class="docs-guide-links">
@@ -85,16 +85,12 @@ const topics = guide?.sections.map(section => ({ id: section.id, label: section.
         <p>{t.requirements}</p>
         <p>{t.installLead}</p>
         <CodeBlock {locale} id="install-command" command={setupCommand} label="Shell" />
-        <div class="docs-install-extension">
-          <p>{t.agentExtensionStep}</p>
-          <ExtensionInstallLinks {locale} />
-        </div>
         <div class="docs-guide-links"><a href={docPath(locale, 'packages/setup/README.md')}>{t.setupGuide}<ArrowRight size={14} aria-hidden="true" /></a></div>
       </section>
       <section class="docs-section" id="verify">
         <h2>{t.verifySetup}</h2>
         <p>{t.verifySetupLead}</p>
-        <CodeBlock {locale} id="check-command" command="mearl check" label="Shell" />
+        <CodeBlock {locale} id="check-command" command="mearl check --local" label="Shell" />
         <p class="docs-follow-up">{t.verifyResult}</p>
         <a class="docs-next" href={sitePath(locale, 'quick-start')}>{t.continueToQuick}<ArrowRight size={16} aria-hidden="true" /></a>
       </section>

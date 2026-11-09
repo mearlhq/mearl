@@ -1,6 +1,7 @@
 ---
 import { ArrowRight } from '@lucide/astro';
 import DocsLayout from '../layouts/DocsLayout.astro';
+import CodeBlock from './CodeBlock.astro';
 import ProductScreenshot from './ProductScreenshot.astro';
 import { docPath, sitePath, type Locale } from '../lib/site';
 import { siteCopy } from '../lib/site-copy';
@@ -31,7 +32,7 @@ const topics = entryPoints.map(({ id, title }) => ({ id, label: title }));
   <section class="docs-section" id="agent-chat">
     <h2>{copy.chatTitle}</h2>
     <p>{copy.chatText}</p>
-    <blockquote class="docs-example-prompt">{copy.prompt}</blockquote>
+    <CodeBlock {locale} id="extension-agent-prompt" command={copy.prompt} label={t.promptLabel} prompt />
     <ProductScreenshot screenshot="agentChart" {locale} />
     <div class="docs-guide-links">
       <a href={sitePath(locale, 'installation') + '#agent'}>{t.agentInstall}<ArrowRight size={14} aria-hidden="true" /></a>
@@ -118,14 +119,6 @@ const topics = entryPoints.map(({ id, title }) => ({ id, label: title }));
   .popup-example-split { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
   .popup-workflow :global(.docs-figure) { max-width: 600px; }
   .popup-example-split :global(.docs-figure) { margin: 0; }
-  .docs-example-prompt {
-    margin: 0;
-    padding: 12px 16px;
-    border: 1px solid var(--docs-border);
-    border-radius: 8px;
-    background: var(--docs-panel);
-    color: var(--docs-title);
-  }
   @media (max-width: 820px) {
     .popup-example-split { grid-template-columns: minmax(0, 1fr); }
   }

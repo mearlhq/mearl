@@ -10,7 +10,7 @@ const t = siteCopy[locale];
 const offlineZip = await latestExtensionDownload();
 ---
 <div class="docs-install-links">
-  {offlineZip && <a class="button button-primary" href={offlineZip.url}>{t.offlineInstall} <span class="docs-zip-version">{offlineZip.version}</span><Download size={14} aria-hidden="true" /></a>}
-  <a class:list={['button', offlineZip ? 'button-secondary' : 'button-primary']} href={chromeStoreUrl}>{t.storeInstall}<ArrowUpRight size={13} aria-hidden="true" /></a>
+  <a class="button button-primary" href={chromeStoreUrl}>{t.storeInstall}<ArrowUpRight size={13} aria-hidden="true" /></a>
+  {offlineZip && <a class="button button-secondary" href={offlineZip.url}>{t.offlineInstall} <span class="docs-zip-version">{offlineZip.version}</span><Download size={14} aria-hidden="true" /></a>}
 </div>
 {offlineZip && <p class="docs-install-note">{t.offlineLead} <code>chrome://extensions/</code>{locale === 'en' ? ', ' : ''}{t.offlineSteps}</p>}
