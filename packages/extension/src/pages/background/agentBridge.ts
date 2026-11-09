@@ -13,6 +13,7 @@ import { getExtensionVersion } from '../../shared/extensionVersion';
 import {
   setBackgroundPageActivity,
   releaseBackgroundPageActivities,
+  resumeFrozenPage,
 } from './backgroundPageActivity';
 import { handlePluginPageRuntime } from './pluginPageHost';
 import { synchronizeBrowserPreset } from './browserPresetSync';
@@ -95,6 +96,7 @@ import {
   actionRequiresTabId,
   validateRequiredActionTabId,
   describePageActionFailure,
+  isPageActAction,
   shouldObservePageAction,
   splitObservedActionPayload,
   actionRequiresDomainCheck,
@@ -188,6 +190,15 @@ function actionTargetsTab(action: string, data?: { reload?: unknown }): boolean 
     return action === 'set_cookie' && data?.reload === true;
   }
   return action !== 'tab_close' && actionRequiresTabId(action);
+}
+
+async function withAgentPageAction<T>(
+  action: string,
+  tabId: number,
+  execute: () => Promise<T>,
+): Promise<T> {
+  if (isPageActAction(action)) await resumeFrozenPage(tabId);
+  return withExtensionPageDialogs(tabId, execute, false);
 }
 
 // One successful handshake consumes the automatic update check for this
@@ -1112,7 +1123,7 @@ export class AgentBridge {
         ? shortcut.data
         : typeof targetTabId === 'number' &&
             (message.action.startsWith('page_') || message.action === 'run_actions')
-          ? await withExtensionPageDialogs(targetTabId, execute, false).catch(async error => {
+          ? await withAgentPageAction(message.action, targetTabId, execute).catch(async error => {
               // Page.enable may discover a modal that was already open before this request.
               if (message.action === 'page_snapshot') {
                 const pending = await extensionPageDialogShortcut(message.action, actionData);
@@ -1183,7 +1194,7 @@ export class AgentBridge {
         };
       };
       return typeof tabId === 'number' && action.startsWith('page_')
-        ? withExtensionPageDialogs(tabId, execute, false)
+        ? withAgentPageAction(action, tabId, execute)
         : execute();
     });
   }

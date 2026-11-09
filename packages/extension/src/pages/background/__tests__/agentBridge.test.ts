@@ -11,6 +11,7 @@ const analyticsMocks = vi.hoisted(() => ({
 }));
 const actionTargetMocks = vi.hoisted(() => ({
   prepareTabForAgent: vi.fn().mockResolvedValue(undefined),
+  resumeFrozenPage: vi.fn().mockResolvedValue(undefined),
 }));
 const permissionMocks = vi.hoisted(() => ({
   isAgentDomainAuthorized: vi.fn(),
@@ -50,6 +51,7 @@ vi.mock('../agentHandlers/releaseHandlers', () => ({
 vi.mock('../backgroundPageActivity', () => ({
   setBackgroundPageActivity: vi.fn().mockResolvedValue(undefined),
   releaseBackgroundPageActivities: vi.fn().mockResolvedValue(undefined),
+  resumeFrozenPage: actionTargetMocks.resumeFrozenPage,
 }));
 
 vi.mock('../../../shared/analytics', () => ({
@@ -340,11 +342,25 @@ describe('AgentBridge native handshake', () => {
     vi.spyOn(internals, 'canHandleAgentActions').mockReturnValue(false);
     enhancementMocks.handleBrowserEnhancement.mockResolvedValue({ released: true });
     for (const operation of ['probe', 'bind', 'invoke']) {
-      await internals.handleAgentMessage({ id: operation, action: '__browser_enhancement', data: { operation }, trustedInternal: true });
-      expect(reply).toHaveBeenCalledWith({ id: operation, success: false, error: 'Agent service is disabled' });
+      await internals.handleAgentMessage({
+        id: operation,
+        action: '__browser_enhancement',
+        data: { operation },
+        trustedInternal: true,
+      });
+      expect(reply).toHaveBeenCalledWith({
+        id: operation,
+        success: false,
+        error: 'Agent service is disabled',
+      });
     }
     expect(enhancementMocks.handleBrowserEnhancement).not.toHaveBeenCalled();
-    await internals.handleAgentMessage({ id: 'cleanup', action: '__browser_enhancement', data: { operation: 'release' }, trustedInternal: true });
+    await internals.handleAgentMessage({
+      id: 'cleanup',
+      action: '__browser_enhancement',
+      data: { operation: 'release' },
+      trustedInternal: true,
+    });
     expect(reply).toHaveBeenCalledWith({ id: 'cleanup', success: true, data: { released: true } });
   });
 
@@ -375,11 +391,17 @@ describe('AgentBridge native handshake', () => {
   it('routes capability discovery without domain authorization, capture or tab preparation', async () => {
     bridge = new AgentBridge(new Map());
     const internals = bridge as any;
-    capabilityMocks.handleGetCapabilities.mockResolvedValue({ apps: { status: 'available', entries: [] } });
+    capabilityMocks.handleGetCapabilities.mockResolvedValue({
+      apps: { status: 'available', entries: [] },
+    });
     permissionMocks.isAgentDomainAuthorized.mockResolvedValue(false);
     vi.spyOn(internals, 'canHandleAgentActions').mockReturnValue(true);
     const reply = vi.spyOn(internals, 'sendToAgent').mockImplementation(() => {});
-    await internals.handleAgentMessage({ id: 'capabilities', action: 'get_capabilities', data: {} });
+    await internals.handleAgentMessage({
+      id: 'capabilities',
+      action: 'get_capabilities',
+      data: {},
+    });
     expect(capabilityMocks.handleGetCapabilities).toHaveBeenCalledWith({});
     expect(permissionMocks.isAgentDomainAuthorized).not.toHaveBeenCalled();
     expect(actionTargetMocks.prepareTabForAgent).not.toHaveBeenCalled();
@@ -466,6 +488,28 @@ describe('AgentBridge native handshake', () => {
 
     expect(actionTargetMocks.prepareTabForAgent).toHaveBeenCalledOnce();
     expect(actionTargetMocks.prepareTabForAgent).toHaveBeenCalledWith(2, 'remote');
+  });
+
+  it.each([undefined, false])('resumes the tab before a click (observe: %s)', async observe => {
+    bridge = new AgentBridge(new Map());
+    const internals = bridge as any;
+    vi.spyOn(internals, 'canHandleAgentActions').mockReturnValue(true);
+    vi.spyOn(internals, 'sendToAgent').mockImplementation(() => {});
+    const observed = vi.spyOn(internals, 'handleObservedPageAction').mockResolvedValue({});
+    const direct = vi.spyOn(internals, 'dispatchSingleAction').mockResolvedValue({});
+
+    await internals.handleAgentMessage({
+      id: 'click',
+      action: 'page_click',
+      data: { tabId: 1, selector: '#open', observe },
+    });
+
+    const dispatch = observe === false ? direct : observed;
+    expect(dispatch).toHaveBeenCalledOnce();
+    expect(actionTargetMocks.resumeFrozenPage).toHaveBeenCalledExactlyOnceWith(1);
+    expect(actionTargetMocks.resumeFrozenPage.mock.invocationCallOrder[0]).toBeLessThan(
+      dispatch.mock.invocationCallOrder[0]!,
+    );
   });
 
   it('reports an invalid step tab as a batch failure before dispatching it', async () => {
@@ -590,9 +634,27 @@ describe('AgentBridge native handshake', () => {
   it('authorizes both debugger URL fallback and the first navigation origin', async () => {
     bridge = new AgentBridge(new Map());
     vi.mocked(chrome.tabs.get).mockResolvedValue({ id: 7 } as chrome.tabs.Tab);
-    chrome.debugger.getTargets = vi.fn().mockResolvedValue([{ id: 'physical', type: 'page', tabId: 7, url: 'https://current.example/', attached: false }]);
-    permissionMocks.isAgentDomainAuthorized.mockImplementation(async domain => domain !== 'next.example');
-    await expect((bridge as any).assertEnhancementActionAuthorized(7, 'set_app_profile', 'https://next.example')).rejects.toThrow('next.example');
+    chrome.debugger.getTargets = vi
+      .fn()
+      .mockResolvedValue([
+        {
+          id: 'physical',
+          type: 'page',
+          tabId: 7,
+          url: 'https://current.example/',
+          attached: false,
+        },
+      ]);
+    permissionMocks.isAgentDomainAuthorized.mockImplementation(
+      async domain => domain !== 'next.example',
+    );
+    await expect(
+      (bridge as any).assertEnhancementActionAuthorized(
+        7,
+        'set_app_profile',
+        'https://next.example',
+      ),
+    ).rejects.toThrow('next.example');
     expect(permissionMocks.isAgentDomainAuthorized).toHaveBeenCalledWith('current.example');
     expect(permissionMocks.isAgentDomainAuthorized).toHaveBeenCalledWith('next.example');
   });

@@ -22,7 +22,7 @@ vi.mock('../../debuggerSessionManager', () => ({
 }));
 vi.mock('../../deviceEmulationState', () => ({ getEmulationConfigForTab }));
 vi.mock('../../utils/containerFrameTarget', async importOriginal => ({
-  ...await importOriginal<typeof import('../../utils/containerFrameTarget')>(),
+  ...(await importOriginal<typeof import('../../utils/containerFrameTarget')>()),
   getContainerTopFrame,
   getFrameTarget,
   getFrameViewportTransform,
@@ -118,7 +118,12 @@ describe('page upload', () => {
 });
 
 describe('actions in the active preview WebView', () => {
-  const frame = { frameId: 'business', sessionId: 'child', phoneFrame: true, url: 'https://example.test/' };
+  const frame = {
+    frameId: 'business',
+    sessionId: 'child',
+    phoneFrame: true,
+    url: 'https://example.test/',
+  };
 
   it('routes custom waits and CSS uploads to the business frame', async () => {
     getContainerTopFrame.mockResolvedValue(frame);
@@ -131,25 +136,39 @@ describe('actions in the active preview WebView', () => {
     }) as any;
     const target = { tabId: 1, sessionId: 'child' };
 
-    await expect(handlePageWait({ tabId: 1, condition: 'document.readyState === "complete"' }, () => null))
-      .resolves.toMatchObject({ waited: true, mode: 'condition' });
-    await expect(handlePageUpload({ tabId: 1, selector: '#upload', filePaths: ['/tmp/photo.jpg'] }, () => null))
-      .resolves.toMatchObject({ uploaded: true });
+    await expect(
+      handlePageWait({ tabId: 1, condition: 'document.readyState === "complete"' }, () => null),
+    ).resolves.toMatchObject({ waited: true, mode: 'condition' });
+    await expect(
+      handlePageUpload(
+        { tabId: 1, selector: '#upload', filePaths: ['/tmp/photo.jpg'] },
+        () => null,
+      ),
+    ).resolves.toMatchObject({ uploaded: true });
     expect(chrome.debugger.sendCommand).toHaveBeenCalledWith(
-      target, 'Runtime.evaluate', expect.objectContaining({ contextId: 17, returnByValue: true }),
+      target,
+      'Runtime.evaluate',
+      expect.objectContaining({ contextId: 17, returnByValue: true }),
     );
-    expect(chrome.debugger.sendCommand).toHaveBeenCalledWith(
-      target, 'DOM.setFileInputFiles', { files: ['/tmp/photo.jpg'], objectId: 'upload-input' },
-    );
+    expect(chrome.debugger.sendCommand).toHaveBeenCalledWith(target, 'DOM.setFileInputFiles', {
+      files: ['/tmp/photo.jpg'],
+      objectId: 'upload-input',
+    });
   });
 
   it('rejects a reference from the covered WebView before touching its DOM', async () => {
     getContainerTopFrame.mockResolvedValue(frame);
-    vi.mocked(resolveRef).mockReturnValueOnce({ frameId: 'covered', backendNodeId: 3, role: 'textbox', name: 'Covered' });
+    vi.mocked(resolveRef).mockReturnValueOnce({
+      frameId: 'covered',
+      backendNodeId: 3,
+      role: 'textbox',
+      name: 'Covered',
+    });
     chrome.debugger.sendCommand = vi.fn() as any;
 
-    await expect(handlePageType({ tabId: 1, selector: '@e1', text: 'hello' }, () => null))
-      .rejects.toThrow('outside the active preview page');
+    await expect(
+      handlePageType({ tabId: 1, selector: '@e1', text: 'hello' }, () => null),
+    ).rejects.toThrow('outside the active preview page');
     expect(getFrameTarget).toHaveBeenCalledWith(1, 'covered', 'business');
     expect(chrome.debugger.sendCommand).not.toHaveBeenCalled();
   });
@@ -646,9 +665,16 @@ describe('page point clicking', () => {
     chrome.debugger.sendCommand = vi.fn(async () => ({
       result: { value: { error: 'Cannot select a disabled option' } },
     })) as any;
-    await expect(handlePageClick({
-      tabId: 1, point: { x: 20, y: 30 }, clickMode: 'dom',
-    }, () => null)).rejects.toMatchObject({ pageActionFailureStage: 'precondition' });
+    await expect(
+      handlePageClick(
+        {
+          tabId: 1,
+          point: { x: 20, y: 30 },
+          clickMode: 'dom',
+        },
+        () => null,
+      ),
+    ).rejects.toMatchObject({ pageActionFailureStage: 'precondition' });
   });
 
   it('uses the DOM fallback for point clicks on a hidden page', async () => {
@@ -994,28 +1020,43 @@ describe('page point clicking', () => {
   });
 
   it.each([
-    ['selector', 'auto'], ['ref', 'auto'], ['text', 'auto'],
-    ['selector', 'mouse'], ['ref', 'mouse'], ['text', 'mouse'],
+    ['selector', 'auto'],
+    ['ref', 'auto'],
+    ['text', 'auto'],
+    ['selector', 'mouse'],
+    ['ref', 'mouse'],
+    ['text', 'mouse'],
   ] as const)('dispatches native options via %s in %s mode', async (mode, clickMode) => {
     vi.mocked(resolveRef).mockReturnValue({ backendNodeId: 44, role: 'option', name: 'New' });
     const selectionState = { valueBefore: 'old', valueAfter: 'new', selectedAfter: true };
-    const coords = { x: 20, y: 30, tag: 'select', text: 'Old New', sourceTarget: { tag: 'option', text: 'New' } };
+    const coords = {
+      x: 20,
+      y: 30,
+      tag: 'select',
+      text: 'Old New',
+      sourceTarget: { tag: 'option', text: 'New' },
+    };
     const selection = { clicked: true, tag: 'option', text: 'New', cx: 20, cy: 30, selectionState };
     let calls = 0;
     chrome.debugger.sendCommand = vi.fn(async (_target, method, params: any) => {
       if (method === 'DOM.resolveNode') return { object: { objectId: 'option' } };
-      if (method === 'Accessibility.getFullAXTree') return { nodes: [
-        { role: { value: 'option' }, name: { value: 'New' }, backendDOMNodeId: 44 },
-      ] };
-      if (method === 'Runtime.callFunctionOn') return { result: { value: calls++ === 0 ? coords : selection } };
+      if (method === 'Accessibility.getFullAXTree')
+        return {
+          nodes: [{ role: { value: 'option' }, name: { value: 'New' }, backendDOMNodeId: 44 }],
+        };
+      if (method === 'Runtime.callFunctionOn')
+        return { result: { value: calls++ === 0 ? coords : selection } };
       if (method === 'Runtime.evaluate') {
-        if (params.expression === 'document.visibilityState') return { result: { value: 'visible' } };
+        if (params.expression === 'document.visibilityState')
+          return { result: { value: 'visible' } };
         return { result: { value: calls++ === 0 ? coords : selection } };
       }
       return {};
     }) as any;
-    const params = mode === 'text' ? { text: 'New', role: 'option' }
-      : { selector: mode === 'ref' ? '@e3' : '#target' };
+    const params =
+      mode === 'text'
+        ? { text: 'New', role: 'option' }
+        : { selector: mode === 'ref' ? '@e3' : '#target' };
     const result = await handlePageClick({ tabId: 1, ...params, clickMode }, () => null);
     if (clickMode === 'auto') {
       expect(result).toMatchObject({ tag: 'option', dispatchMode: 'dom', selectionState });
@@ -1023,8 +1064,11 @@ describe('page point clicking', () => {
       expect(result).toMatchObject({ dispatchMode: 'trusted-input', pointerType: 'mouse' });
       expect(result).not.toHaveProperty('selectionState');
     }
-    expect(vi.mocked(chrome.debugger.sendCommand).mock.calls.some(([, method]) => method.startsWith('Input.')))
-      .toBe(clickMode === 'mouse');
+    expect(
+      vi
+        .mocked(chrome.debugger.sendCommand)
+        .mock.calls.some(([, method]) => method.startsWith('Input.')),
+    ).toBe(clickMode === 'mouse');
   });
 
   it('uses the state-aware JS path for checkbox CSS selectors by default', async () => {
@@ -1237,6 +1281,42 @@ describe('page waiting', () => {
     expect(expressions.some(expression => expression.includes('state = "visible"'))).toBe(true);
     expect(expressions.some(expression => expression.includes('expected = "提交成功"'))).toBe(true);
   });
+
+  it.each([true, false])(
+    'resumes before evaluating a frozen page (initially frozen: %s)',
+    async initiallyFrozen => {
+      let frozen = initiallyFrozen;
+      let ready = false;
+      chrome.tabs.get = vi.fn(async () => ({ frozen })) as any;
+      chrome.debugger.sendCommand = vi.fn(async (_target, method) => {
+        if (method === 'Page.setWebLifecycleState') {
+          frozen = false;
+          ready = true;
+          return {};
+        }
+        if (frozen) throw new Error('The frozen page cannot evaluate the condition');
+        if (!ready) frozen = true;
+        return { result: { value: ready } };
+      }) as any;
+
+      await expect(
+        handlePageWait(
+          { tabId: 1, selector: '#confirmation', state: 'visible', timeout: 250, interval: 20 },
+          () => null,
+        ),
+      ).resolves.toMatchObject({ waited: true, value: true });
+      expect(chrome.debugger.sendCommand).toHaveBeenCalledWith(
+        { tabId: 1 },
+        'Page.setWebLifecycleState',
+        { state: 'active' },
+      );
+      expect(vi.mocked(chrome.debugger.sendCommand).mock.calls.map(([, method]) => method)).toEqual(
+        initiallyFrozen
+          ? ['Page.setWebLifecycleState', 'Runtime.evaluate']
+          : ['Runtime.evaluate', 'Page.setWebLifecycleState', 'Runtime.evaluate'],
+      );
+    },
+  );
 
   it('evaluates conditions in the main page context', async () => {
     chrome.debugger.sendCommand = vi.fn().mockResolvedValue({

@@ -8,6 +8,19 @@ interface PageActivity {
 const activities = new Map<number, PageActivity>();
 const queues = new Map<number, Promise<void>>();
 
+/** Resume page callbacks without switching the visible tab or emulating focus. */
+export async function resumeFrozenPage(tabId: number): Promise<void> {
+  const tab = await chrome.tabs?.get?.(tabId);
+  if (!tab || !('frozen' in tab) || tab.frozen !== true) return;
+
+  const lease = await acquireDebuggerLease(tabId, { consumer: 'agent-page-resume' });
+  try {
+    await chrome.debugger.sendCommand({ tabId }, 'Page.setWebLifecycleState', { state: 'active' });
+  } finally {
+    await lease.release();
+  }
+}
+
 /** Focus emulation keeps an explicitly activated page running without focusing its window. */
 export async function setBackgroundPageActivity(
   tabId: number,

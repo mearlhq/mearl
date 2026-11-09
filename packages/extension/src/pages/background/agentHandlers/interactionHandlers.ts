@@ -1,3 +1,4 @@
+import { resumeFrozenPage } from '../backgroundPageActivity';
 import { sendPageCommand, runPageScript } from '../pageDialogs';
 /**
  * Agent handlers: page_click, page_type, page_scroll, page_hover, page_eval
@@ -177,11 +178,20 @@ async function resolvePageRefFrame(
   entry: RefEntry,
 ): Promise<ContainerFrameTarget | undefined> {
   const active = await getContainerTopFrame(tabId);
-  const frame = entry.frameId === active?.frameId ? active : entry.frameId
-    ? await getFrameTarget(tabId, entry.frameId, active?.phoneFrame ? active.frameId : undefined)
-    : undefined;
+  const frame =
+    entry.frameId === active?.frameId
+      ? active
+      : entry.frameId
+        ? await getFrameTarget(
+            tabId,
+            entry.frameId,
+            active?.phoneFrame ? active.frameId : undefined,
+          )
+        : undefined;
   if (active?.phoneFrame && !frame) {
-    throw new PageActionPreconditionError(`Ref ${ref} is outside the active preview page. Run page_snapshot again.`);
+    throw new PageActionPreconditionError(
+      `Ref ${ref} is outside the active preview page. Run page_snapshot again.`,
+    );
   }
   return frame && active?.phoneFrame ? { ...frame, phoneFrame: true } : frame;
 }
@@ -332,10 +342,12 @@ export async function startExtensionPageObservation(
     }
   }
   try {
-    const [result] = await runPageScript(tabId, () => chrome.scripting.executeScript({
-      target: { tabId },
-      func: installPageObserverInPage,
-    }));
+    const [result] = await runPageScript(tabId, () =>
+      chrome.scripting.executeScript({
+        target: { tabId },
+        func: installPageObserverInPage,
+      }),
+    );
     const checkpoint = result?.result as PageObservationCheckpoint | undefined;
     assertPageObservationCheckpoint(checkpoint);
     return { ...checkpoint, world: 'scripting', startedAt };
@@ -386,37 +398,39 @@ export async function finishExtensionPageObservation(
   }
   let changeSet: PageChangeSet | undefined;
   if (checkpoint.world === 'scripting') {
-    const scriptPromise = runPageScript(tabId, () => chrome.scripting.executeScript({
-      target: { tabId },
-      func: async (
-        globalKey: string,
-        version: number,
-        focus: string | null,
-        actionQuietMs: number,
-        actionFirstChangeTimeoutMs: number,
-        actionTimeoutMs: number,
-      ) => {
-        const state = (globalThis as any)[globalKey];
-        if (!state || typeof state.waitSince !== 'function') {
-          throw new Error('Page observer is unavailable after the action');
-        }
-        return state.waitSince(
-          version,
-          focus ?? undefined,
-          actionQuietMs,
-          actionFirstChangeTimeoutMs,
-          actionTimeoutMs,
-        );
-      },
-      args: [
-        PAGE_OBSERVER_GLOBAL,
-        checkpoint.version,
-        checkpoint.focus ?? null,
-        quietMs,
-        firstChangeTimeoutMs,
-        effectiveTimeoutMs,
-      ],
-    }));
+    const scriptPromise = runPageScript(tabId, () =>
+      chrome.scripting.executeScript({
+        target: { tabId },
+        func: async (
+          globalKey: string,
+          version: number,
+          focus: string | null,
+          actionQuietMs: number,
+          actionFirstChangeTimeoutMs: number,
+          actionTimeoutMs: number,
+        ) => {
+          const state = (globalThis as any)[globalKey];
+          if (!state || typeof state.waitSince !== 'function') {
+            throw new Error('Page observer is unavailable after the action');
+          }
+          return state.waitSince(
+            version,
+            focus ?? undefined,
+            actionQuietMs,
+            actionFirstChangeTimeoutMs,
+            actionTimeoutMs,
+          );
+        },
+        args: [
+          PAGE_OBSERVER_GLOBAL,
+          checkpoint.version,
+          checkpoint.focus ?? null,
+          quietMs,
+          firstChangeTimeoutMs,
+          effectiveTimeoutMs,
+        ],
+      }),
+    );
     const [result] = await raceWithDeadline(scriptPromise, swDeadlineMs);
     changeSet = result?.result as PageChangeSet | undefined;
   } else {
@@ -443,7 +457,8 @@ export async function finishExtensionPageObservation(
       let contextId: number | undefined;
       if (checkpoint.containerFrameId) {
         contextId = await getFrameExecutionContextId(
-          frameDebuggee(tabId, { sessionId: checkpoint.containerSessionId }), checkpoint.containerFrameId,
+          frameDebuggee(tabId, { sessionId: checkpoint.containerSessionId }),
+          checkpoint.containerFrameId,
         );
       }
       const cdpPromise = evaluatePageObserverWithCdp<PageChangeSet>(
@@ -474,7 +489,9 @@ export async function disposeExtensionPageObservation(
   let sessionId: string | undefined;
   if (world === 'scripting') {
     await raceWithDeadline(
-      runPageScript(tabId, () => chrome.scripting.executeScript({ target: { tabId }, func: disposePageObserverInPage })),
+      runPageScript(tabId, () =>
+        chrome.scripting.executeScript({ target: { tabId }, func: disposePageObserverInPage }),
+      ),
       PAGE_OBSERVER_CLEANUP_DEADLINE_MS,
     ).catch(() => {});
     return;
@@ -498,9 +515,10 @@ export async function disposeExtensionPageObservation(
   try {
     let contextId: number | undefined;
     if (containerFrameId) {
-      contextId = await getFrameExecutionContextId(frameDebuggee(tabId, { sessionId }), containerFrameId).catch(
-        () => undefined,
-      );
+      contextId = await getFrameExecutionContextId(
+        frameDebuggee(tabId, { sessionId }),
+        containerFrameId,
+      ).catch(() => undefined);
     }
     await raceWithDeadline(
       evaluatePageObserverWithCdp<void>(
@@ -539,11 +557,13 @@ async function emitClickIndicator(
   mode: 'js' | 'cdp',
 ): Promise<void> {
   try {
-    await runPageScript(tabId, () => chrome.scripting.executeScript({
-      target: { tabId },
-      func: showClickIndicator,
-      args: [x, y, mode],
-    }));
+    await runPageScript(tabId, () =>
+      chrome.scripting.executeScript({
+        target: { tabId },
+        func: showClickIndicator,
+        args: [x, y, mode],
+      }),
+    );
   } catch {
     // Non-critical — skip silently if injection fails (e.g. chrome:// pages)
   }
@@ -672,11 +692,16 @@ async function projectFramePoint(
     y: transform.offset.y + point.y * transform.scale.y,
   };
   if (requirePreviewHit) {
-    const inside = point.x >= 0 && point.y >= 0 &&
-      point.x < transform.viewport.width && point.y < transform.viewport.height;
+    const inside =
+      point.x >= 0 &&
+      point.y >= 0 &&
+      point.x < transform.viewport.width &&
+      point.y < transform.viewport.height;
     const owner = transform.outerOwnerBackendNodeId;
-    const businessHit = inside && owner !== undefined &&
-      await hitsFrameOwner(tabId, owner, outerPoint.x, outerPoint.y);
+    const businessHit =
+      inside &&
+      owner !== undefined &&
+      (await hitsFrameOwner(tabId, owner, outerPoint.x, outerPoint.y));
     if (!businessHit) {
       throw new PageActionPreconditionError('Point is outside the visible device preview page.');
     }
@@ -708,8 +733,12 @@ async function enrichFrameDispatchTarget(
   }
 
   const transform = await getFrameViewportTransform(tabId, frame.frameId);
-  const outerPoint = await projectFramePoint(tabId, transform, framePoint,
-    frame.phoneFrame === true && dispatchTarget.dispatchMode === 'trusted-input');
+  const outerPoint = await projectFramePoint(
+    tabId,
+    transform,
+    framePoint,
+    frame.phoneFrame === true && dispatchTarget.dispatchMode === 'trusted-input',
+  );
   const hitTarget = normalizeHitTarget(
     await evaluateInClickFrame<PageClickHitTarget | null>(
       tabId,
@@ -930,12 +959,15 @@ async function clickByRef(
   }
 
   if (requestedFrame?.phoneFrame && !refEntry.frameId) {
-    throw new PageActionPreconditionError(`Ref ${ref} is outside the active preview page. Run page_snapshot again.`);
+    throw new PageActionPreconditionError(
+      `Ref ${ref} is outside the active preview page. Run page_snapshot again.`,
+    );
   }
 
-  const refFrame = refEntry.frameId && refEntry.frameId !== requestedFrame?.frameId
-    ? await resolveClickFrame(tabId, refEntry.frameId)
-    : requestedFrame;
+  const refFrame =
+    refEntry.frameId && refEntry.frameId !== requestedFrame?.frameId
+      ? await resolveClickFrame(tabId, refEntry.frameId)
+      : requestedFrame;
   if (requestedFrame && refEntry.frameId && requestedFrame.frameId !== refEntry.frameId) {
     throw new PageActionPreconditionError(
       `page_click: ref ${ref} belongs to frame ${refEntry.frameId}, not ${requestedFrame.frameId}.`,
@@ -1490,8 +1522,7 @@ async function resolveScopeBackendNodeId(
     }
     return backendNodeId;
   } finally {
-    await sendPageCommand(debugTarget, 'Runtime.releaseObject', { objectId })
-      .catch(() => {});
+    await sendPageCommand(debugTarget, 'Runtime.releaseObject', { objectId }).catch(() => {});
   }
 }
 
@@ -1610,13 +1641,20 @@ async function dispatchDragBetweenPoints(
   try {
     for (const point of path.points) {
       await waitForNextPoint();
-      await sendCdpInputCommand(debugTarget, 'Input.dispatchMouseEvent', {
-        type: 'mouseMoved',
-        x: point.x,
-        y: point.y,
-        button: 'left',
-        buttons: 1,
-      }, () => { lastPoint = point; });
+      await sendCdpInputCommand(
+        debugTarget,
+        'Input.dispatchMouseEvent',
+        {
+          type: 'mouseMoved',
+          x: point.x,
+          y: point.y,
+          button: 'left',
+          buttons: 1,
+        },
+        () => {
+          lastPoint = point;
+        },
+      );
     }
   } catch (error) {
     primaryError = error;
@@ -1839,7 +1877,9 @@ export async function handlePageDrag(
     const container = await getContainerTopFrame(tabId);
     const frame = container?.phoneFrame ? container : undefined;
     const contentTarget = frameDebuggee(tabId, frame);
-    const contextId = frame ? await getFrameExecutionContextId(contentTarget, frame.frameId) : undefined;
+    const contextId = frame
+      ? await getFrameExecutionContextId(contentTarget, frame.frameId)
+      : undefined;
     await scrollDragSourceIntoView(tabId, contentTarget, input.from, frame, contextId);
     const from = await resolveDragEndpoint(tabId, contentTarget, input.from, frame, contextId);
     const to = await resolveDragEndpoint(tabId, contentTarget, input.to, frame, contextId);
@@ -1882,7 +1922,9 @@ export async function handlePageDrag(
     }
 
     const transform = frame ? await getFrameViewportTransform(tabId, frame.frameId) : undefined;
-    const start = transform ? await projectFramePoint(tabId, transform, from.point, true) : from.point;
+    const start = transform
+      ? await projectFramePoint(tabId, transform, from.point, true)
+      : from.point;
     const end = transform ? await projectFramePoint(tabId, transform, to.point, true) : to.point;
     const { steps } = await dispatchDragBetweenPoints(
       debugTarget,
@@ -1987,8 +2029,11 @@ async function typeByRef(
 
     const value = result.result?.value;
     if (!value) {
-      throw new Error(result.exceptionDetails?.exception?.description ??
-        result.exceptionDetails?.text ?? 'page_type evaluation returned no result');
+      throw new Error(
+        result.exceptionDetails?.exception?.description ??
+          result.exceptionDetails?.text ??
+          'page_type evaluation returned no result',
+      );
     }
     if (value.error) throw new PageActionPreconditionError(value.error);
     return value;
@@ -2216,7 +2261,12 @@ async function hoverByRef(
 
     const { x, y, tag, text } = coordResult.result.value;
     const point = frame?.phoneFrame
-      ? await projectFramePoint(tabId, await getFrameViewportTransform(tabId, frame.frameId), { x, y }, true)
+      ? await projectFramePoint(
+          tabId,
+          await getFrameViewportTransform(tabId, frame.frameId),
+          { x, y },
+          true,
+        )
       : { x, y };
 
     // Dispatch mouseMoved event via CDP to trigger hover effects
@@ -2264,7 +2314,12 @@ async function hoverBySelector(
   const debuggerLease = await acquireDebuggerLease(tabId, { consumer: 'page-hover' });
   try {
     const point = container?.phoneFrame
-      ? await projectFramePoint(tabId, await getFrameViewportTransform(tabId, container.frameId), coord, true)
+      ? await projectFramePoint(
+          tabId,
+          await getFrameViewportTransform(tabId, container.frameId),
+          coord,
+          true,
+        )
       : { x: coord.x, y: coord.y };
     await sendPageCommand(debugTarget, 'Input.dispatchMouseEvent', {
       type: 'mouseMoved',
@@ -2305,11 +2360,14 @@ export async function handlePageEval(
     // When no frameId is given, auto-resolve to container top layer if present.
     let contextId: number | undefined;
     const container = await getContainerTopFrame(tabId);
-    const requestedFrame = frameId && container && frameId !== container.frameId
-      ? await getFrameTarget(tabId, frameId, container.phoneFrame ? container.frameId : undefined)
-      : container;
+    const requestedFrame =
+      frameId && container && frameId !== container.frameId
+        ? await getFrameTarget(tabId, frameId, container.phoneFrame ? container.frameId : undefined)
+        : container;
     if (container?.phoneFrame && frameId && !requestedFrame) {
-      throw new PageActionPreconditionError('page_eval: frameId is outside the active preview page.');
+      throw new PageActionPreconditionError(
+        'page_eval: frameId is outside the active preview page.',
+      );
     }
     const debugTarget = frameDebuggee(tabId, requestedFrame);
     const effectiveFrameId = frameId ?? container?.frameId;
@@ -2370,7 +2428,12 @@ async function getFrameExecutionContextId(
   refresh = false,
 ): Promise<number> {
   return debugTarget.sessionId
-    ? resolveDebuggerFrameExecutionContextId(debugTarget.tabId, frameId, refresh, debugTarget.sessionId)
+    ? resolveDebuggerFrameExecutionContextId(
+        debugTarget.tabId,
+        frameId,
+        refresh,
+        debugTarget.sessionId,
+      )
     : resolveDebuggerFrameExecutionContextId(debugTarget.tabId, frameId, refresh);
 }
 
@@ -2410,10 +2473,15 @@ export async function handlePagePress(
   try {
     const container = await getContainerTopFrame(tabId);
     if (container?.phoneFrame) {
-      const focused = await evaluateInClickFrame<boolean>(tabId,
+      const focused = await evaluateInClickFrame<boolean>(
+        tabId,
         'document.hasFocus() || (window.focus(), document.hasFocus())',
-        container);
-      if (!focused) throw new PageActionPreconditionError('Focus the device preview page before sending keyboard input.');
+        container,
+      );
+      if (!focused)
+        throw new PageActionPreconditionError(
+          'Focus the device preview page before sending keyboard input.',
+        );
     }
     const baseParams = {
       key: input.descriptor.key,
@@ -2464,6 +2532,7 @@ export async function handlePageWait(
 
   const expression = buildPageWaitExpression(options);
   while (Date.now() - startedAt < options.timeout) {
+    await resumeFrozenPage(tabId);
     const value = await evalInActivePage<unknown>(tabId, expression);
     const evaluationError = readPageWaitEvaluationError(value);
     if (evaluationError) throw new PageActionPreconditionError(evaluationError);
@@ -2479,11 +2548,12 @@ export async function handlePageWait(
     await new Promise(resolve => setTimeout(resolve, options.interval));
   }
 
-  const target = options.mode === 'selector'
-    ? `selector ${JSON.stringify(options.selector)} did not reach state ${JSON.stringify(options.state)}`
-    : options.mode === 'text'
-      ? `text ${JSON.stringify(options.text)} was not found`
-      : 'condition was not met';
+  const target =
+    options.mode === 'selector'
+      ? `selector ${JSON.stringify(options.selector)} did not reach state ${JSON.stringify(options.state)}`
+      : options.mode === 'text'
+        ? `text ${JSON.stringify(options.text)} was not found`
+        : 'condition was not met';
   throw new Error(`page_wait ${target} after ${options.timeout}ms.`);
 }
 
@@ -2512,7 +2582,9 @@ export async function handlePageUpload(
   const isRef = selector.startsWith('@e');
   const refEntry = isRef ? resolveRef(tabId, selector) : undefined;
   if (isRef && !refEntry) {
-    throw new PageActionPreconditionError(`Ref ${selector} not found. Run page_snapshot first to get fresh refs.`);
+    throw new PageActionPreconditionError(
+      `Ref ${selector} not found. Run page_snapshot first to get fresh refs.`,
+    );
   }
   const frame = refEntry
     ? await resolvePageRefFrame(tabId, selector, refEntry)
@@ -2532,10 +2604,15 @@ export async function handlePageUpload(
         expression: `document.querySelector(${JSON.stringify(selector)})`,
         contextId,
         returnByValue: false,
-      })) as { result?: { objectId?: string }; exceptionDetails?: { text?: string; exception?: { description?: string } } };
+      })) as {
+        result?: { objectId?: string };
+        exceptionDetails?: { text?: string; exception?: { description?: string } };
+      };
       if (evaluated.exceptionDetails) {
         throw new PageActionPreconditionError(
-          evaluated.exceptionDetails.exception?.description ?? evaluated.exceptionDetails.text ?? 'Invalid selector',
+          evaluated.exceptionDetails.exception?.description ??
+            evaluated.exceptionDetails.text ??
+            'Invalid selector',
         );
       }
       objectId = evaluated.result?.objectId;
@@ -2598,7 +2675,8 @@ export async function handlePageUpload(
     if (isRef) deleteRef(tabId, selector);
     throw error;
   } finally {
-    if (objectId) await sendPageCommand(debugTarget, 'Runtime.releaseObject', { objectId }).catch(() => {});
+    if (objectId)
+      await sendPageCommand(debugTarget, 'Runtime.releaseObject', { objectId }).catch(() => {});
     await debuggerLease.release();
   }
 }
