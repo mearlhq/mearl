@@ -4,7 +4,7 @@ import { BookOpen } from 'lucide-react';
 import { Modal, ModalHeader } from './modal/Modal';
 import { t } from '../utils/i18n';
 
-import { MEARL_DOC_URL } from '../../../shared/constants';
+import { INSTALLATION_SITE } from '../../../shared/installation';
 import { useBrowserUiSettings } from '../utils/browserUiSettings';
 
 interface SettingsModalProps {
@@ -72,7 +72,7 @@ export const SettingsModal: FC<SettingsModalProps> = ({ onClose, previewTabId })
         }
         actions={
           <a
-            href={settings.links?.manual ?? MEARL_DOC_URL}
+            href={settings.links?.manual ?? INSTALLATION_SITE.href}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1 text-xs text-text-secondary hover:text-blue-600 transition-colors"
@@ -84,14 +84,20 @@ export const SettingsModal: FC<SettingsModalProps> = ({ onClose, previewTabId })
         }
         onClose={onClose}
       />
-      <div className={previewTabId === undefined ? 'flex-1 overflow-hidden' : 'min-h-0 flex-1 overflow-y-auto'}>
+      <div
+        className={
+          previewTabId === undefined ? 'flex-1 overflow-hidden' : 'min-h-0 flex-1 overflow-y-auto'
+        }
+      >
         {previewTabId !== undefined ? (
           <Suspense fallback={loading}>
             <Options embeddedTabId={previewTabId} />
           </Suspense>
         ) : optionsUrl ? (
           <iframe src={optionsUrl} className="w-full h-full border-0" title={t('settings')} />
-        ) : loading}
+        ) : (
+          loading
+        )}
       </div>
     </Modal>
   );

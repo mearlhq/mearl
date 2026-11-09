@@ -1276,6 +1276,65 @@ describe('attached native installation', () => {
   });
 });
 
+describe('installed preset management', () => {
+  it('delegates removal of a linked preset and lets the browser retry a partial removal', async () => {
+    const browserRevision = 'a'.repeat(64);
+    const nativeRevision = 'b'.repeat(64);
+    const installationToken = 'c'.repeat(64);
+    const source = config.presets!.team.source;
+    const uninstallPreset = vi.fn();
+    const native = {
+      capture: vi.fn().mockResolvedValue({
+        protocol: 1,
+        selection: nativeRevision,
+        id: 'team',
+        source,
+        uninstallSupported: true,
+      }),
+      request: vi.fn().mockResolvedValue({ ready: false }),
+    };
+    const service = createInstallationService({
+      native,
+      registry: {
+        installationStatus: async () => ({
+          presetId: 'team',
+          presetVersion: '1.0.0',
+          presetSource: source,
+          browserRevision,
+          installationRevision: nativeRevision,
+          installationToken,
+        }),
+        uninstallPreset,
+      } as any,
+    });
+    expect(await service.installedPresets()).toMatchObject([
+      { id: 'team', nativeRevision, canUninstall: true },
+    ]);
+    await expect(service.uninstallPreset(browserRevision, undefined)).resolves.toMatchObject({
+      ready: false,
+      blocker: { reason: 'selection-changed' },
+    });
+    await expect(service.uninstallPreset(browserRevision, nativeRevision)).resolves.toMatchObject({
+      ready: false,
+    });
+    expect(native.request).toHaveBeenCalledWith(
+      { operation: 'uninstall', expectedRevision: nativeRevision },
+      160_000,
+    );
+    expect(uninstallPreset).not.toHaveBeenCalled();
+
+    native.capture.mockResolvedValue(undefined);
+    expect(await service.installedPresets()).toMatchObject([{ canUninstall: false }]);
+    await expect(service.uninstallPreset(browserRevision, undefined)).resolves.toMatchObject({
+      ready: false,
+      blocker: { reason: 'selection-changed' },
+    });
+    native.capture.mockResolvedValue({ protocol: 1, selection: null });
+    expect(await service.uninstallPreset(browserRevision, undefined)).toEqual({ ready: true });
+    expect(uninstallPreset).toHaveBeenCalledExactlyOnceWith(browserRevision, installationToken);
+  });
+});
+
 describe('trusted automatic preset updates', () => {
   beforeEach(() => {
     const local: Record<string, unknown> = {};

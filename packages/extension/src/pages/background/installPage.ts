@@ -3,7 +3,7 @@ import site from '@mearl/preset/installation-site.json';
 declare const __MEARL_WEBSITE_URL__: string;
 
 export const INSTALL_PAGE_URL = new URL('installed.html', site.url).href;
-const customPage =
+export const CUSTOM_INSTALL_PAGE_URL =
   typeof __MEARL_WEBSITE_URL__ !== 'undefined' && __MEARL_WEBSITE_URL__
     ? new URL('installed.html', __MEARL_WEBSITE_URL__).href
     : undefined;
@@ -13,8 +13,8 @@ export async function openInstallPage(
 ): Promise<void> {
   if (reason !== 'install') return;
   const reachable =
-    customPage &&
-    (await fetch(customPage, {
+    CUSTOM_INSTALL_PAGE_URL &&
+    (await fetch(CUSTOM_INSTALL_PAGE_URL, {
       method: 'HEAD',
       credentials: 'omit',
       cache: 'no-store',
@@ -25,7 +25,7 @@ export async function openInstallPage(
       () => false,
     ));
   try {
-    await chrome.tabs.create({ url: reachable ? customPage : INSTALL_PAGE_URL });
+    await chrome.tabs.create({ url: reachable ? CUSTOM_INSTALL_PAGE_URL : INSTALL_PAGE_URL });
   } catch {
     // Closing the browser must not interrupt extension installation.
   }

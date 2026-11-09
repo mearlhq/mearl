@@ -4,6 +4,7 @@ import { cleanupBrowserEnhancements } from './browserEnhancements';
 import { cleanupEnvironmentRevisions } from './environmentRevisions';
 import { resolveBrowserDocumentSender } from './browserDocuments';
 import { initializePresetAutoUpdate } from './presetAutoUpdate';
+import { PRESET_MANAGEMENT_ACTION } from '../../shared/presetAutoUpdate';
 import { createInstallationService } from './installationService';
 import { createNativeInstallationClient } from './nativeInstallationClient';
 import { INSTALLATION_ACTION } from '../../shared/installation';
@@ -375,7 +376,7 @@ initializeBrowserControllers();
 const installationService = createInstallationService({
   native: createNativeInstallationClient(() => ensureNativeBridge(false)),
 });
-initializePresetAutoUpdate(() => installationService.autoUpdate());
+const checkPresetUpdate = initializePresetAutoUpdate(() => installationService.autoUpdate());
 chrome.runtime.onMessageExternal.addListener((message, sender, reply) => {
   if (message?.action !== INSTALLATION_ACTION) return;
   void installationService.external(message, sender).then(
@@ -856,6 +857,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           success: false,
           error: error instanceof Error ? error.message : String(error),
         }),
+    );
+    return true;
+  }
+  if (message.action === PRESET_MANAGEMENT_ACTION) {
+    if (!isExtensionUiSender(sender, chrome.runtime.id)) return;
+    const manage = async () => {
+      switch (message.operation) {
+        case 'status':
+          return installationService.installedPresets();
+        case 'install-url':
+          return installationService.presetInstallUrl();
+        case 'update':
+          return checkPresetUpdate(true);
+        case 'uninstall':
+          return installationService.uninstallPreset(
+            message.browserRevision,
+            message.nativeRevision,
+          );
+        default:
+          throw new Error('INVALID_INSTALLATION_REQUEST');
+      }
+    };
+    void manage().then(
+      data => sendResponse({ success: true, data }),
+      error => sendResponse({ success: false, error: String(error) }),
     );
     return true;
   }

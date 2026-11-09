@@ -354,6 +354,7 @@ describe('preset installation and live selection', () => {
       let online = false;
       let removed = false;
       let uninstallSupported = false;
+      let statusUnavailable = true;
       const installationToken = 'a'.repeat(64);
       f.invoke.mockImplementation(async (action, data, options) => {
         if (action === 'preset_browser_status') {
@@ -366,6 +367,7 @@ describe('preset installation and live selection', () => {
               installationToken: null,
             };
           if (removed) return { browserRevision: null };
+          if (statusUnavailable) throw new Error('Browser disconnected');
           return {
             browserRevision: receipt.browserRevision,
             installationRevision: revision,
@@ -384,10 +386,20 @@ describe('preset installation and live selection', () => {
         }
         return original(action, data, options);
       });
-      await expect(f.installer.uninstall()).rejects.toThrow('Update the Native Host and extension');
+      await expect(f.installer.uninstall('c'.repeat(64))).rejects.toThrow('changed before removal');
+      await expect(f.installer.uninstall(revision)).rejects.toMatchObject({
+        blocker: { reason: 'browser-unavailable', browser: 'first' },
+      });
+      statusUnavailable = false;
+      await expect(f.installer.uninstall(revision)).rejects.toMatchObject({
+        blocker: { reason: 'browser-update-required', browser: 'first' },
+      });
       expect((await f.installer.store.current()).receipt?.revision).toBe(revision);
+      expect(f.invoke.mock.calls.some(([action]) => action === 'preset_browser_uninstall')).toBe(
+        false,
+      );
       uninstallSupported = true;
-      expect(await f.installer.uninstall()).toMatchObject({
+      expect(await f.installer.uninstall(revision)).toMatchObject({
         revision: null,
         ready: false,
         warnings: [],

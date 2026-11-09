@@ -19,6 +19,7 @@ import { useBrowserView } from '../panel/components/browser-view/viewState';
 import { useBrowserRequestUi } from '../panel/hooks/useBrowserRequestUi';
 import TranslationDictEditor from './components/TranslationDictEditor';
 import AgentPermissionsSection from './components/AgentPermissionsSection';
+import { InstalledPresets } from './components/InstalledPresets';
 import { ProfileInstallModal } from '../panel/components/modal/ProfileInstallModal';
 import { Button } from './components/Button';
 import {
@@ -53,7 +54,11 @@ const Options: FC<OptionsProps> = ({ embeddedTabId }) => {
   const importView = useBrowserView('requestImport');
   const casesView = useBrowserView('requestCases');
   const captureView = useBrowserView('captureLauncher');
-  const declaredServices = new Set(Object.values(settings.operations ?? {}).map(operation => operation.setting).filter(Boolean));
+  const declaredServices = new Set(
+    Object.values(settings.operations ?? {})
+      .map(operation => operation.setting)
+      .filter(Boolean),
+  );
   const availableServices = {
     accountsEnabled: declaredServices.has('accountsEnabled'),
     requestCasesEnabled: Boolean(casesView.selected || captureView.selected),
@@ -66,8 +71,9 @@ const Options: FC<OptionsProps> = ({ embeddedTabId }) => {
   const profileConfirmation = searchParams.get('profileConfirmation');
   const isEmbedded = embeddedTabId !== undefined || searchParams.get('iframe') === '1';
   const parsedSettingsTabId = Number(searchParams.get('tabId'));
-  const settingsTabId = embeddedTabId ?? (
-    isEmbedded && Number.isInteger(parsedSettingsTabId) && parsedSettingsTabId > 0
+  const settingsTabId =
+    embeddedTabId ??
+    (isEmbedded && Number.isInteger(parsedSettingsTabId) && parsedSettingsTabId > 0
       ? parsedSettingsTabId
       : null);
   const [config, setConfig] = useState<Config>(DEFAULT_CONFIG);
@@ -388,9 +394,7 @@ const Options: FC<OptionsProps> = ({ embeddedTabId }) => {
                 <div className="flex items-center gap-2">
                   <Settings className="w-5 h-5 text-blue-600" />
                   <h1 className="text-base font-medium">{t('settingsTitle')}</h1>
-                  <span className="text-xs text-text-secondary">
-                    v{getExtensionVersion()}
-                  </span>
+                  <span className="text-xs text-text-secondary">v{getExtensionVersion()}</span>
                 </div>
 
                 {/* Save Status */}
@@ -684,6 +688,8 @@ const Options: FC<OptionsProps> = ({ embeddedTabId }) => {
                   {showPermissions && <AgentPermissionsSection />}
                 </div>
 
+                <InstalledPresets />
+
                 {/* Agent Side Panel Floating Entry */}
                 {!isEmbedded && (
                   <div className="bg-bg-secondary border border-border rounded p-4">
@@ -714,57 +720,63 @@ const Options: FC<OptionsProps> = ({ embeddedTabId }) => {
                 )}
 
                 {/* External Services */}
-                {hasServices && <div className="bg-bg-secondary border border-border rounded p-4">
-                  <h2 className="text-xs font-medium mb-1 text-text-primary">
-                    {t('externalServices')}
-                  </h2>
-                  <p className="text-xs text-text-secondary mb-3">{t('externalServicesDesc')}</p>
-                  <div className="flex gap-2 flex-wrap">
-                    {[
-                      {
-                        available: availableServices.accountsEnabled,
-                        label: t('accountsServices'),
-                        enabled: config.accountsEnabled,
-                        onToggle: handleAccountEnabledToggle,
-                      },
-                      {
-                        available: availableServices.requestCasesEnabled,
-                        label: t('requestCasesServices'),
-                        enabled: config.requestCasesEnabled,
-                        onToggle: handleRequestCasesEnabledToggle,
-                      },
-                      {
-                        available: availableServices.requestMetadataEnabled,
-                        label: requestUiDefinition ? browserUiText(requestUiDefinition.setting.label, getCurrentLanguage()) : '',
-                        enabled: config.requestMetadataEnabled,
-                        onToggle: handleRequestMetadataEnabledToggle,
-                      },
-                      {
-                        available: availableServices.requestImportEnabled,
-                        label: t('requestImportServices'),
-                        enabled: config.requestImportEnabled,
-                        onToggle: handleRequestImportEnabledToggle,
-                      },
-                      {
-                        available: availableServices.trackingMetadataEnabled,
-                        label: t('trackingMetadataServices'),
-                        enabled: config.trackingMetadataEnabled,
-                        onToggle: handleTrackingMetadataEnabledToggle,
-                      },
-                    ].filter(item => item.available && item.label).map(({ label, enabled, onToggle }) => (
-                      <Button
-                        key={label}
-                        onClick={onToggle}
-                        disabled={saveStatus === 'saving'}
-                        aria-pressed={enabled}
-                        variant={enabled ? 'primary' : 'secondary'}
-                        className={clsx(!enabled && 'line-through opacity-50')}
-                      >
-                        {label}
-                      </Button>
-                    ))}
+                {hasServices && (
+                  <div className="bg-bg-secondary border border-border rounded p-4">
+                    <h2 className="text-xs font-medium mb-1 text-text-primary">
+                      {t('externalServices')}
+                    </h2>
+                    <p className="text-xs text-text-secondary mb-3">{t('externalServicesDesc')}</p>
+                    <div className="flex gap-2 flex-wrap">
+                      {[
+                        {
+                          available: availableServices.accountsEnabled,
+                          label: t('accountsServices'),
+                          enabled: config.accountsEnabled,
+                          onToggle: handleAccountEnabledToggle,
+                        },
+                        {
+                          available: availableServices.requestCasesEnabled,
+                          label: t('requestCasesServices'),
+                          enabled: config.requestCasesEnabled,
+                          onToggle: handleRequestCasesEnabledToggle,
+                        },
+                        {
+                          available: availableServices.requestMetadataEnabled,
+                          label: requestUiDefinition
+                            ? browserUiText(requestUiDefinition.setting.label, getCurrentLanguage())
+                            : '',
+                          enabled: config.requestMetadataEnabled,
+                          onToggle: handleRequestMetadataEnabledToggle,
+                        },
+                        {
+                          available: availableServices.requestImportEnabled,
+                          label: t('requestImportServices'),
+                          enabled: config.requestImportEnabled,
+                          onToggle: handleRequestImportEnabledToggle,
+                        },
+                        {
+                          available: availableServices.trackingMetadataEnabled,
+                          label: t('trackingMetadataServices'),
+                          enabled: config.trackingMetadataEnabled,
+                          onToggle: handleTrackingMetadataEnabledToggle,
+                        },
+                      ]
+                        .filter(item => item.available && item.label)
+                        .map(({ label, enabled, onToggle }) => (
+                          <Button
+                            key={label}
+                            onClick={onToggle}
+                            disabled={saveStatus === 'saving'}
+                            aria-pressed={enabled}
+                            variant={enabled ? 'primary' : 'secondary'}
+                            className={clsx(!enabled && 'line-through opacity-50')}
+                          >
+                            {label}
+                          </Button>
+                        ))}
+                    </div>
                   </div>
-                </div>}
+                )}
               </div>
             </div>
 
@@ -783,9 +795,14 @@ const Options: FC<OptionsProps> = ({ embeddedTabId }) => {
         <ProfileInstallModal
           initialSource={searchParams.get('profileSource')}
           confirmation={profileConfirmation}
-          onClose={() => void chrome.tabs.getCurrent().then(tab => {
-            if (tab?.id !== undefined) return chrome.tabs.remove(tab.id);
-          }).catch(() => {})}
+          onClose={() =>
+            void chrome.tabs
+              .getCurrent()
+              .then(tab => {
+                if (tab?.id !== undefined) return chrome.tabs.remove(tab.id);
+              })
+              .catch(() => {})
+          }
         />
       )}
     </div>

@@ -3366,5 +3366,62 @@
   },
   "presetInstallConflictHint": {
     "message": "安装器遇到来源冲突时会暂停整批安装。现有组件已保留，请先处理冲突后重试。"
+  },
+  "presetManagementTitle": {
+    "message": "能力预设"
+  },
+  "presetManagementDescription": {
+    "message": "安装团队预设，启用客户端模拟、服务集成等能力。"
+  },
+  "presetManagementInstall": {
+    "message": "安装"
+  },
+  "presetManagementLocal": {
+    "message": "含本机组件"
+  },
+  "presetManagementUpdate": {
+    "message": "更新"
+  },
+  "presetManagementCurrent": {
+    "message": "已是最新版本。"
+  },
+  "presetManagementUpdated": {
+    "message": "Preset 已更新。"
+  },
+  "presetManagementPermission": {
+    "message": "更新需要授权。请在安装确认页完成授权。"
+  },
+  "presetManagementUpdateSource": {
+    "message": "请通过原安装入口更新此 Preset。"
+  },
+  "presetManagementRetry": {
+    "message": "安装状态正在变化，请稍后重试。"
+  },
+  "presetManagementUpdateFailed": {
+    "message": "更新检查失败，请重试。"
+  },
+  "presetManagementRemove": {
+    "message": "卸载"
+  },
+  "presetManagementConfirm": {
+    "message": "确认卸载"
+  },
+  "presetManagementRemoved": {
+    "message": "Preset 已卸载。"
+  },
+  "presetManagementRemovalPending": {
+    "message": "卸载尚未完成，请重新连接相关浏览器后检查。"
+  },
+  "presetManagementRemoveBrowserUpdate": {
+    "message": "请更新 $1 的 Mearl 扩展和本机服务后重试。"
+  },
+  "presetManagementRemoveBrowserReconnect": {
+    "message": "无法读取 $1 的预设，请重新连接后重试。"
+  },
+  "presetManagementRemoveSelectionChanged": {
+    "message": "预设安装状态已变化，请重试。"
+  },
+  "presetManagementRemoveFailed": {
+    "message": "卸载失败，请检查当前安装状态后重试。"
   }
 }

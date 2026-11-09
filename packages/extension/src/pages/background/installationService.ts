@@ -1,4 +1,4 @@
-import type { PresetAutoUpdateResult } from '../../shared/presetAutoUpdate';
+import type { InstalledPreset, PresetAutoUpdateResult } from '../../shared/presetAutoUpdate';
 import { getExtensionVersion } from '../../shared/extensionVersion';
 import {
   loadInstallationConfig,
@@ -9,9 +9,11 @@ import {
   validateInstallationOrigin,
   type InstallationConfig,
   type InstallationPreset,
+  type PresetUninstallResult,
 } from '@mearl/preset/installation';
 import {
   BrowserBundleStore,
+  BundleError,
   prepareBrowserPreset,
   createBundleFetchLoader,
   bundleDigest,
@@ -41,6 +43,7 @@ import {
 } from './browserCapabilityRegistry';
 import { withCookieInjection } from './utils/dnr';
 import { synchronizeBrowserPreset } from './browserPresetSync';
+import { CUSTOM_INSTALL_PAGE_URL } from './installPage';
 
 const SESSION_PREFIX = 'mearl-installation:';
 const SESSION_LIFETIME = 15 * 60_000;
@@ -119,8 +122,10 @@ interface NativeInstallation {
   protocol: 1;
   selection: string | null;
   id?: string;
+  version?: string;
   source?: string;
   browserRequired?: boolean;
+  uninstallSupported?: boolean;
 }
 export interface InstallationDependencies {
   native?: {
@@ -705,7 +710,70 @@ export function createInstallationService(dependencies: InstallationDependencies
     return view(session);
   }
 
+  async function managementState() {
+    const browser = await registry().installationStatus(true);
+    const native = await dependencies.native?.capture();
+    const attached = Boolean(
+      native?.selection &&
+      (native.selection === browser.installationRevision ||
+        (native.id === browser.presetId && native.source === browser.presetSource)),
+    );
+    const presets: InstalledPreset[] = [];
+    if (browser.presetId && !attached) {
+      presets.push({
+        id: browser.presetId,
+        version: browser.presetVersion,
+        source: browser.presetSource,
+        browserRevision: browser.browserRevision,
+        canUninstall: !browser.installationRevision || native !== undefined,
+      });
+    }
+    if (native?.id && native.selection) {
+      presets.push({
+        id: native.id,
+        version: native.version ?? (attached ? browser.presetVersion : undefined),
+        source: native.source,
+        browserRevision: attached ? browser.browserRevision : null,
+        nativeRevision: native.selection,
+        canUninstall: native.uninstallSupported === true,
+      });
+    }
+    return { presets, installationToken: browser.installationToken ?? null };
+  }
+
   return {
+    async installedPresets(): Promise<InstalledPreset[]> {
+      return (await managementState()).presets;
+    },
+    async presetInstallUrl(): Promise<string | undefined> {
+      return CUSTOM_INSTALL_PAGE_URL ?? (await configuration()).guide?.url;
+    },
+    async uninstallPreset(
+      browserRevision: unknown,
+      nativeRevision: unknown,
+    ): Promise<PresetUninstallResult> {
+      const { presets, installationToken } = await managementState();
+      const current = presets.find(
+        preset =>
+          preset.browserRevision === browserRevision && preset.nativeRevision === nativeRevision,
+      );
+      if (!current?.canUninstall) return { ready: false, blocker: { reason: 'selection-changed' } };
+      if (current.nativeRevision) {
+        const result = await dependencies.native!.request(
+          { operation: 'uninstall', expectedRevision: current.nativeRevision },
+          160_000,
+        );
+        return { ready: result?.ready === true, blocker: result?.blocker };
+      }
+      if (!current.browserRevision) throw new Error('INSTALLATION_SELECTION_CHANGED');
+      try {
+        await registry().uninstallPreset(current.browserRevision, installationToken);
+      } catch (error) {
+        if (!(error instanceof BundleError) || error.code !== 'BUNDLE_CONFLICT') throw error;
+        return { ready: false, blocker: { reason: 'selection-changed' } };
+      }
+      return { ready: true };
+    },
     async autoUpdate(): Promise<PresetAutoUpdateResult> {
       if (running.size) return { status: 'skipped' };
       const accepted = await registry().captureInstallationSelection();

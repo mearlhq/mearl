@@ -11,7 +11,11 @@ const configMocks = vi.hoisted(() => ({
   getConfig: vi.fn(),
   updateConfig: vi.fn(),
 }));
-const browserUiMocks = vi.hoisted(() => ({ appProfiles: [] as Array<{ id: string; label: string; available?: boolean }>, control: undefined as SelectedBrowserControl | undefined, settings: {} as { mtopGateways?: Record<string, { prod: string; pre: string }> } }));
+const browserUiMocks = vi.hoisted(() => ({
+  appProfiles: [] as Array<{ id: string; label: string; available?: boolean }>,
+  control: undefined as SelectedBrowserControl | undefined,
+  settings: {} as { mtopGateways?: Record<string, { prod: string; pre: string }> },
+}));
 const permissionPromptMocks = vi.hoisted(() => ({
   getPageHostPermissionGranted: vi.fn(),
   showHostPermissionPromptIfNeeded: vi.fn(),
@@ -97,7 +101,12 @@ vi.mock('../../../utils/config', () => ({
   updateConfig: configMocks.updateConfig,
   onConfigChange: vi.fn(() => () => {}),
 }));
-vi.mock('../../../utils/browserUiSettings', () => ({ useBrowserAppProfiles: () => browserUiMocks.appProfiles, useBrowserControl: (text: (key: string) => string) => browserUiMocks.control ?? networkControlFixture(browserUiMocks.settings, key => ({ en: text(key) })) }));
+vi.mock('../../../utils/browserUiSettings', () => ({
+  useBrowserAppProfiles: () => browserUiMocks.appProfiles,
+  useBrowserControl: (text: (key: string) => string) =>
+    browserUiMocks.control ??
+    networkControlFixture(browserUiMocks.settings, key => ({ en: text(key) })),
+}));
 
 vi.mock('../../../hooks/useContentScriptUnreachableToast', () => ({
   getPageHostPermissionGranted: permissionPromptMocks.getPageHostPermissionGranted,
@@ -125,42 +134,94 @@ describe('QuickSettingsMenu', () => {
     let finish!: (value: unknown) => void;
     vi.mocked(chrome.runtime.sendMessage).mockImplementation((...args) =>
       (args[0] as { action?: string }).action === 'browserControlGet'
-        ? new Promise(resolve => { finish = resolve; }) as never
+        ? (new Promise(resolve => {
+            finish = resolve;
+          }) as never)
         : original(...args),
     );
     const view = render(<QuickSettingsMenu onShowSettings={vi.fn()} />);
     await waitFor(() => expect(finish).toBeTypeOf('function'));
-    expect(view.container.querySelector('[data-quick-settings-open]')).toHaveAttribute('data-quick-settings-open', 'false');
+    expect(view.container.querySelector('[data-quick-settings-open]')).toHaveAttribute(
+      'data-quick-settings-open',
+      'false',
+    );
     expect(screen.getByText('envSwitchOff')).toHaveAttribute('aria-pressed', 'false');
-    await act(async () => { finish({ success: true, value: 'pre' }); });
-    expect(screen.getByText('requestEnvironmentPreRelease')).toHaveAttribute('aria-pressed', 'true');
+    await act(async () => {
+      finish({ success: true, value: 'pre' });
+    });
+    expect(screen.getByText('requestEnvironmentPreRelease')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
     fireEvent.mouseEnter(screen.getByTitle('settings').parentElement!);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'requestEnvironmentPreRelease' })).toBeVisible());
-    expect(screen.getByRole('button', { name: 'requestEnvironmentPreRelease' })).toHaveAttribute('aria-pressed', 'true');
-    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ action: 'browserControlGet', tabId: 1 });
-    expect(vi.mocked(chrome.runtime.sendMessage).mock.calls.filter(([request]) => (request as unknown as { action?: string })?.action === 'browserControlGet')).toHaveLength(1);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'requestEnvironmentPreRelease' })).toBeVisible(),
+    );
+    expect(screen.getByRole('button', { name: 'requestEnvironmentPreRelease' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+      action: 'browserControlGet',
+      tabId: 1,
+    });
+    expect(
+      vi
+        .mocked(chrome.runtime.sendMessage)
+        .mock.calls.filter(
+          ([request]) =>
+            (request as unknown as { action?: string })?.action === 'browserControlGet',
+        ),
+    ).toHaveLength(1);
   });
 
   it('tracks tab changes while closed and keeps the same tab selection on a transient read failure', async () => {
     let activate!: () => void;
-    chrome.tabs.onActivated = { addListener: vi.fn(listener => { activate = listener; }), removeListener: vi.fn() } as unknown as typeof chrome.tabs.onActivated;
+    chrome.tabs.onActivated = {
+      addListener: vi.fn(listener => {
+        activate = listener;
+      }),
+      removeListener: vi.fn(),
+    } as unknown as typeof chrome.tabs.onActivated;
     const original = vi.mocked(chrome.runtime.sendMessage).getMockImplementation()!;
     let failure = false;
     vi.mocked(chrome.runtime.sendMessage).mockImplementation((...args) => {
       const request = args[0] as { action?: string; tabId?: number };
-      if (request.action === 'browserControlGet') return (failure ? Promise.reject(new Error('Temporary failure')) : Promise.resolve({ success: true, value: request.tabId === 1 ? 'pre' : 'prod' })) as never;
+      if (request.action === 'browserControlGet')
+        return (
+          failure
+            ? Promise.reject(new Error('Temporary failure'))
+            : Promise.resolve({ success: true, value: request.tabId === 1 ? 'pre' : 'prod' })
+        ) as never;
       return original(...args);
     });
     render(<QuickSettingsMenu onShowSettings={vi.fn()} />);
-    await waitFor(() => expect(screen.getByText('requestEnvironmentPreRelease')).toHaveAttribute('aria-pressed', 'true'));
+    await waitFor(() =>
+      expect(screen.getByText('requestEnvironmentPreRelease')).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      ),
+    );
     failure = true;
-    await act(async () => { activate(); });
-    expect(screen.getByText('requestEnvironmentPreRelease')).toHaveAttribute('aria-pressed', 'true');
+    await act(async () => {
+      activate();
+    });
+    expect(screen.getByText('requestEnvironmentPreRelease')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
     chrome.devtools.inspectedWindow.tabId = 2;
-    await act(async () => { activate(); });
-    expect(screen.getByText('requestEnvironmentPreRelease')).toHaveAttribute('aria-pressed', 'false');
+    await act(async () => {
+      activate();
+    });
+    expect(screen.getByText('requestEnvironmentPreRelease')).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
     failure = false;
-    await act(async () => { activate(); });
+    await act(async () => {
+      activate();
+    });
     expect(screen.getByText('requestEnvironmentProd')).toHaveAttribute('aria-pressed', 'true');
     chrome.devtools.inspectedWindow.tabId = 1;
   });
@@ -170,41 +231,79 @@ describe('QuickSettingsMenu', () => {
     let finish!: (value: unknown) => void;
     vi.mocked(chrome.runtime.sendMessage).mockImplementation((...args) =>
       (args[0] as { action?: string }).action === 'browserControlGet'
-        ? new Promise(resolve => { finish = resolve; }) as never
+        ? (new Promise(resolve => {
+            finish = resolve;
+          }) as never)
         : original(...args),
     );
     const { rerender } = render(<QuickSettingsMenu onShowSettings={vi.fn()} />);
     await waitFor(() => expect(finish).toBeTypeOf('function'));
     const finishOld = finish;
-    browserUiMocks.settings = { mtopGateways: { next: { prod: 'next.example.test', pre: 'pre.next.example.test' } } };
+    browserUiMocks.settings = {
+      mtopGateways: { next: { prod: 'next.example.test', pre: 'pre.next.example.test' } },
+    };
     rerender(<QuickSettingsMenu onShowSettings={vi.fn()} />);
     await waitFor(() => expect(finish).not.toBe(finishOld));
-    await act(async () => { finishOld({ success: true, value: 'pre' }); });
-    expect(screen.getByText('requestEnvironmentPreRelease')).toHaveAttribute('aria-pressed', 'false');
-    await act(async () => { finish({ success: true, value: 'prod' }); });
+    await act(async () => {
+      finishOld({ success: true, value: 'pre' });
+    });
+    expect(screen.getByText('requestEnvironmentPreRelease')).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+    await act(async () => {
+      finish({ success: true, value: 'prod' });
+    });
     expect(screen.getByText('requestEnvironmentProd')).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('renders package-defined choices in the original menu and binds actions to their exact owner', async () => {
     const control = networkControlFixture(browserUiMocks.settings, key => ({ en: key }))!;
-    browserUiMocks.control = { ...control, bundleId: 'example', revision: 'custom', definition: { ...control.definition, label: { en: 'Request target' }, options: [control.definition.options[0], { ...control.definition.options[1], value: 'qa', label: { en: 'QA' } }] } };
+    browserUiMocks.control = {
+      ...control,
+      bundleId: 'example',
+      revision: 'custom',
+      definition: {
+        ...control.definition,
+        label: { en: 'Request target' },
+        options: [
+          control.definition.options[0],
+          { ...control.definition.options[1], value: 'qa', label: { en: 'QA' } },
+        ],
+      },
+    };
     render(<QuickSettingsMenu onShowSettings={vi.fn()} />);
     fireEvent.mouseEnter(screen.getByTitle('settings').parentElement!);
     const qa = await screen.findByRole('button', { name: 'QA' });
     expect(screen.getByText('Request target')).toBeInTheDocument();
     expect(screen.queryByText('requestEnvironmentProd')).toBeNull();
     fireEvent.click(qa);
-    await waitFor(() => expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ action: 'browserControlSet', tabId: 1, value: 'qa', controlId: 'environment', bundleId: 'example', revision: 'custom' }));
+    await waitFor(() =>
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        action: 'browserControlSet',
+        tabId: 1,
+        value: 'qa',
+        controlId: 'environment',
+        bundleId: 'example',
+        revision: 'custom',
+      }),
+    );
     await waitFor(() => expect(qa).toHaveAttribute('aria-pressed', 'true'));
   });
   it('shows configured Protocol gateways without relying on the network reachability', async () => {
     chrome.storage.session.get = vi.fn(async () => ({
-      [SERVICE_DEFAULTS_CACHE_KEY]: { },
+      [SERVICE_DEFAULTS_CACHE_KEY]: {},
     })) as unknown as typeof chrome.storage.session.get;
     render(<QuickSettingsMenu onShowSettings={vi.fn()} />);
     fireEvent.mouseEnter(screen.getByTitle('settings').parentElement!);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'requestEnvironmentPreRelease' })).toBeEnabled());
-    await waitFor(() => expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ action: 'browserControlGet' })));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'requestEnvironmentPreRelease' })).toBeEnabled(),
+    );
+    await waitFor(() =>
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'browserControlGet' }),
+      ),
+    );
     expect(configMocks.updateConfig).not.toHaveBeenCalled();
   });
 
@@ -217,7 +316,9 @@ describe('QuickSettingsMenu', () => {
     expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
       expect.objectContaining({ action: 'browserControlGet' }),
     );
-    browserUiMocks.settings = { mtopGateways: { enterprise: { prod: 'api.example.test', pre: 'pre.example.test' } } };
+    browserUiMocks.settings = {
+      mtopGateways: { enterprise: { prod: 'api.example.test', pre: 'pre.example.test' } },
+    };
     rerender(<QuickSettingsMenu onShowSettings={vi.fn()} />);
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'requestEnvironmentPreRelease' })).toBeEnabled(),
@@ -238,7 +339,10 @@ describe('QuickSettingsMenu', () => {
       expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
         action: 'browserControlSet',
         tabId: 1,
-        value: 'pre', controlId: 'environment', bundleId: 'fixture', revision: JSON.stringify(browserUiMocks.settings.mtopGateways),
+        value: 'pre',
+        controlId: 'environment',
+        bundleId: 'fixture',
+        revision: JSON.stringify(browserUiMocks.settings.mtopGateways),
       }),
     );
     await waitFor(() => expect(pre).toHaveAttribute('aria-pressed', 'true'));
@@ -265,7 +369,10 @@ describe('QuickSettingsMenu', () => {
       expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
         action: 'browserControlSet',
         tabId: 1,
-        value: 'default', controlId: 'environment', bundleId: 'fixture', revision: JSON.stringify(browserUiMocks.settings.mtopGateways),
+        value: 'default',
+        controlId: 'environment',
+        bundleId: 'fixture',
+        revision: JSON.stringify(browserUiMocks.settings.mtopGateways),
       }),
     );
     await waitFor(() => expect(reset).toHaveAttribute('aria-pressed', 'true'));
@@ -301,10 +408,9 @@ describe('QuickSettingsMenu', () => {
 
   it('refreshes the environment after switching tabs and receiving an Agent update', async () => {
     let activate!: () => void;
-    const changes: Array<(
-      changes: Record<string, chrome.storage.StorageChange>,
-      area: chrome.storage.AreaName,
-    ) => void> = [];
+    const changes: Array<
+      (changes: Record<string, chrome.storage.StorageChange>, area: chrome.storage.AreaName) => void
+    > = [];
     chrome.tabs.onActivated = {
       addListener: vi.fn(listener => {
         activate = listener;
@@ -343,7 +449,11 @@ describe('QuickSettingsMenu', () => {
         ),
       );
       secondTarget = 'prod';
-      act(() => changes.forEach(change => change({ 'networkControlV1:2': { newValue: 'prod' } }, 'session')));
+      act(() =>
+        changes.forEach(change =>
+          change({ 'networkControlV1:2': { newValue: 'prod' } }, 'session'),
+        ),
+      );
       await waitFor(() =>
         expect(screen.getByRole('button', { name: 'requestEnvironmentProd' })).toHaveAttribute(
           'aria-pressed',
@@ -358,23 +468,37 @@ describe('QuickSettingsMenu', () => {
   it('hides App controls while discovery is pending and exposes only installed profiles', async () => {
     const existingHandler = vi.mocked(chrome.runtime.sendMessage).getMockImplementation()!;
     let finishCatalog!: (result: unknown) => void;
-    const catalog = new Promise(resolve => { finishCatalog = resolve; });
+    const catalog = new Promise(resolve => {
+      finishCatalog = resolve;
+    });
     vi.mocked(chrome.runtime.sendMessage).mockImplementation((...args) => {
-      if ((args[0] as { action?: string }).action === 'appProfileCatalogGet') return catalog as never;
+      if ((args[0] as { action?: string }).action === 'appProfileCatalogGet')
+        return catalog as never;
       return existingHandler(...args);
     });
     render(<QuickSettingsMenu onShowSettings={vi.fn()} />);
     fireEvent.mouseEnter(screen.getByTitle('settings').parentElement!);
-    await waitFor(() => expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ action: 'appProfileCatalogGet' }));
+    await waitFor(() =>
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ action: 'appProfileCatalogGet' }),
+    );
     expect(screen.queryByRole('menu', { name: '客户端' })).toBeNull();
     expect(screen.queryByRole('button', { name: '自动开启端与设备模拟' })).toBeNull();
     expect(screen.getByRole('button', { name: 'iPhone 17 Pro' })).toBeEnabled();
-    await act(async () => finishCatalog({ success: true, profiles: [
-      { id: 'partner/app', label: 'Partner App', available: true },
-      { id: 'missing/app', label: 'Missing App', available: false },
-    ] }));
+    await act(async () =>
+      finishCatalog({
+        success: true,
+        profiles: [
+          { id: 'partner/app', label: 'Partner App', available: true },
+          { id: 'missing/app', label: 'Missing App', available: false },
+        ],
+      }),
+    );
     const menu = await screen.findByRole('menu', { name: '客户端' });
-    expect(within(menu).getAllByRole('menuitemradio').map(item => item.textContent)).toEqual(['Partner App']);
+    expect(
+      within(menu)
+        .getAllByRole('menuitemradio')
+        .map(item => item.textContent),
+    ).toEqual(['Partner App']);
     expect(screen.queryByText('Missing App')).toBeNull();
     expect(screen.getByRole('button', { name: 'Partner App' })).toBeEnabled();
     fireEvent.click(within(menu).getByRole('menuitem', { name: '添加端模拟' }));
@@ -398,7 +522,11 @@ describe('QuickSettingsMenu', () => {
   it('renders installed App controls on the first open while the full catalog is still pending', async () => {
     browserUiMocks.appProfiles = [{ id: 'partner/app', label: 'Partner App' }];
     const original = vi.mocked(chrome.runtime.sendMessage).getMockImplementation()!;
-    vi.mocked(chrome.runtime.sendMessage).mockImplementation((...args) => (args[0] as { action?: string }).action === 'appProfileCatalogGet' ? new Promise(() => {}) : original(...args));
+    vi.mocked(chrome.runtime.sendMessage).mockImplementation((...args) =>
+      (args[0] as { action?: string }).action === 'appProfileCatalogGet'
+        ? new Promise(() => {})
+        : original(...args),
+    );
     render(<QuickSettingsMenu onShowSettings={vi.fn()} />);
     expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith({ action: 'appProfileCatalogGet' });
     fireEvent.mouseEnter(screen.getByTitle('settings').parentElement!);
@@ -406,26 +534,43 @@ describe('QuickSettingsMenu', () => {
     await waitFor(() => expect(app).toBeEnabled());
     expect(screen.getByRole('button', { name: 'iPhone 17 Pro' })).toBeEnabled();
     fireEvent.click(app);
-    await waitFor(() => expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ action: 'quickAppProfileSet', profile: 'partner/app' })));
+    await waitFor(() =>
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'quickAppProfileSet', profile: 'partner/app' }),
+      ),
+    );
   });
 
   it('discards an earlier full catalog after the installed selection changes', async () => {
     browserUiMocks.appProfiles = [{ id: 'old/app', label: 'Old App' }];
     const original = vi.mocked(chrome.runtime.sendMessage).getMockImplementation()!;
     let finish!: (result: unknown) => void;
-    let pending = new Promise(resolve => { finish = resolve; });
-    vi.mocked(chrome.runtime.sendMessage).mockImplementation((...args) => (args[0] as { action?: string }).action === 'appProfileCatalogGet' ? pending : original(...args));
+    let pending = new Promise(resolve => {
+      finish = resolve;
+    });
+    vi.mocked(chrome.runtime.sendMessage).mockImplementation((...args) =>
+      (args[0] as { action?: string }).action === 'appProfileCatalogGet'
+        ? pending
+        : original(...args),
+    );
     const view = render(<QuickSettingsMenu onShowSettings={vi.fn()} />);
     fireEvent.mouseEnter(screen.getByTitle('settings').parentElement!);
     await screen.findByRole('button', { name: 'Old App' });
-    await waitFor(() => expect(view.container.querySelector('[data-quick-settings-open]')).toHaveAttribute('data-quick-settings-open', 'true'));
+    await waitFor(() =>
+      expect(view.container.querySelector('[data-quick-settings-open]')).toHaveAttribute(
+        'data-quick-settings-open',
+        'true',
+      ),
+    );
     pending = new Promise(() => {});
     browserUiMocks.appProfiles = [{ id: 'new/app', label: 'New App' }];
     view.rerender(<QuickSettingsMenu onShowSettings={vi.fn()} />);
     expect(screen.getByRole('button', { name: 'New App' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Old App' })).toBeNull();
     // A completed request from the previous selection cannot replace the new bootstrap.
-    await act(async () => finish({ success: true, profiles: [{ id: 'old/app', label: 'Old App' }] }));
+    await act(async () =>
+      finish({ success: true, profiles: [{ id: 'old/app', label: 'Old App' }] }),
+    );
     expect(screen.queryByRole('button', { name: 'Old App', hidden: true })).toBeNull();
   });
   it('opens the installer directly when no App capability is installed', async () => {
@@ -440,7 +585,9 @@ describe('QuickSettingsMenu', () => {
     expect(gear).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(gear);
     expect(gear).toHaveAttribute('aria-expanded', 'true');
-    await waitFor(() => expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ action: 'appProfileCatalogGet' }));
+    await waitFor(() =>
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ action: 'appProfileCatalogGet' }),
+    );
     expect(screen.queryByRole('menu', { name: '客户端' })).toBeNull();
     expect(screen.queryByRole('button', { name: '自动开启端与设备模拟' })).toBeNull();
     expect(screen.getByRole('button', { name: 'iPhone 17 Pro' })).toBeEnabled();
@@ -449,12 +596,41 @@ describe('QuickSettingsMenu', () => {
     fireEvent.click(app);
     expect(await screen.findByRole('dialog', { name: '添加端模拟' })).toBeInTheDocument();
   });
+
+  it('ignores a remembered App that arrives after its removal from the catalog', async () => {
+    const original = vi.mocked(chrome.runtime.sendMessage).getMockImplementation()!;
+    let finishProfile!: (value: unknown) => void;
+    const profile = new Promise(resolve => {
+      finishProfile = resolve;
+    });
+    vi.mocked(chrome.runtime.sendMessage).mockImplementation((...args) => {
+      const request = args[0] as { action?: string };
+      if (request.action === 'appProfileCatalogGet')
+        return Promise.resolve({ success: true, profiles: [] }) as never;
+      if (request.action === 'quickAppProfileGet') return profile as never;
+      return original(...args);
+    });
+    render(<QuickSettingsMenu onShowSettings={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'settings' }));
+    await waitFor(() =>
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ action: 'appProfileCatalogGet' }),
+    );
+    await act(async () => finishProfile({ success: true, profile: null, lastProfile: 'travel' }));
+    expect(screen.getByRole('button', { name: '客户端' })).toHaveAttribute(
+      'aria-haspopup',
+      'dialog',
+    );
+    expect(screen.queryByRole('button', { name: 'travel' })).toBeNull();
+  });
+
   it('allows closing an active App after its catalog becomes unavailable without offering reactivation', async () => {
     const original = vi.mocked(chrome.runtime.sendMessage).getMockImplementation()!;
     vi.mocked(chrome.runtime.sendMessage).mockImplementation((...args) => {
       const request = args[0] as { action?: string };
-      if (request.action === 'appProfileCatalogGet') return Promise.resolve({ success: true, profiles: [] }) as never;
-      if (request.action === 'quickAppProfileGet') return Promise.resolve({ success: true, profile: 'partner/app' }) as never;
+      if (request.action === 'appProfileCatalogGet')
+        return Promise.resolve({ success: true, profiles: [] }) as never;
+      if (request.action === 'quickAppProfileGet')
+        return Promise.resolve({ success: true, profile: 'partner/app' }) as never;
       return original(...args);
     });
     render(<QuickSettingsMenu onShowSettings={vi.fn()} />);
@@ -466,15 +642,19 @@ describe('QuickSettingsMenu', () => {
     expect(within(menu).queryByRole('menuitemradio')).toBeNull();
     fireEvent.click(close);
     await waitFor(() => expect(screen.queryByRole('button', { name: 'partner/app' })).toBeNull());
-    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ action: 'quickAppProfileSet', profile: null }));
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'quickAppProfileSet', profile: null }),
+    );
   });
 
   it('allows disabling an existing automatic rule without an installed App', async () => {
     const original = vi.mocked(chrome.runtime.sendMessage).getMockImplementation()!;
     vi.mocked(chrome.runtime.sendMessage).mockImplementation((...args) => {
       const request = args[0] as { action?: string };
-      if (request.action === 'appProfileCatalogGet') return Promise.resolve({ success: true, profiles: [] }) as never;
-      if (request.action === 'quickSimulationAutoRuleGet') return Promise.resolve({ success: true, enabled: true, domain: 'example.test' }) as never;
+      if (request.action === 'appProfileCatalogGet')
+        return Promise.resolve({ success: true, profiles: [] }) as never;
+      if (request.action === 'quickSimulationAutoRuleGet')
+        return Promise.resolve({ success: true, enabled: true, domain: 'example.test' }) as never;
       return original(...args);
     });
     render(<QuickSettingsMenu onShowSettings={vi.fn()} />);
@@ -482,8 +662,14 @@ describe('QuickSettingsMenu', () => {
     const close = await screen.findByRole('button', { name: '自动开启端与设备模拟' });
     await waitFor(() => expect(close).toBeEnabled());
     fireEvent.click(close);
-    await waitFor(() => expect(screen.queryByRole('button', { name: '自动开启端与设备模拟' })).toBeNull());
-    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ action: 'quickSimulationAutoRuleSet', tabId: 1, enabled: false });
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: '自动开启端与设备模拟' })).toBeNull(),
+    );
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+      action: 'quickSimulationAutoRuleSet',
+      tabId: 1,
+      enabled: false,
+    });
   });
 
   it('uses the installed catalog order for the primary profiles', async () => {
@@ -492,7 +678,10 @@ describe('QuickSettingsMenu', () => {
       if ((args[0] as { action?: string }).action === 'appProfileCatalogGet') {
         return Promise.resolve({
           success: true,
-          profiles: [...listBuiltinAppProfiles().reverse(), { id: 'partner/tmall', label: '天猫', available: true }],
+          profiles: [
+            ...listBuiltinAppProfiles().reverse(),
+            { id: 'partner/tmall', label: '天猫', available: true },
+          ],
         }) as never;
       }
       return existingHandler(...args);
@@ -522,10 +711,12 @@ describe('QuickSettingsMenu', () => {
   beforeEach(() => {
     browserUiMocks.appProfiles = [];
     browserUiMocks.control = undefined;
-    browserUiMocks.settings = { mtopGateways: { enterprise: { prod: 'api.example.test', pre: 'pre.example.test' } } };
+    browserUiMocks.settings = {
+      mtopGateways: { enterprise: { prod: 'api.example.test', pre: 'pre.example.test' } },
+    };
     chrome.storage.session = {
       get: vi.fn(async () => ({
-        [SERVICE_DEFAULTS_CACHE_KEY]: { },
+        [SERVICE_DEFAULTS_CACHE_KEY]: {},
       })),
     } as unknown as typeof chrome.storage.session;
     configMocks.getConfig.mockReset().mockResolvedValue({
@@ -573,7 +764,14 @@ describe('QuickSettingsMenu', () => {
           enabled?: boolean;
           appVersion?: string;
         };
-        if (request.action === 'appProfileCatalogGet') return { success: true, profiles: [...listBuiltinAppProfiles(), { id: 'partner/tmall', label: '天猫', available: true }] };
+        if (request.action === 'appProfileCatalogGet')
+          return {
+            success: true,
+            profiles: [
+              ...listBuiltinAppProfiles(),
+              { id: 'partner/tmall', label: '天猫', available: true },
+            ],
+          };
         if (request.action === 'browserControlGet' || request.action === 'browserControlSet') {
           return { success: true, value: request.value ?? 'default' };
         }
@@ -664,7 +862,8 @@ describe('QuickSettingsMenu', () => {
       setupManagedPath: '/home/test/.mearl/chrome-extension',
     });
     vi.mocked(chrome.runtime.sendMessage).mockImplementation(async message => {
-        if ((message as { action?: string }).action === 'appProfileCatalogGet') return { success: true, profiles: listBuiltinAppProfiles() };
+      if ((message as { action?: string }).action === 'appProfileCatalogGet')
+        return { success: true, profiles: listBuiltinAppProfiles() };
       const request = message as unknown as { action?: string };
       if (request.action === 'updateSetupExtension') {
         return { success: true, updated: true, version: '2.8.1' };
@@ -678,7 +877,8 @@ describe('QuickSettingsMenu', () => {
         onShowSettings={vi.fn()}
         remoteConfig={{
           latestVersion: '2.8.1',
-          downloadUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.1/mearl-chrome-v2.8.1.zip',
+          downloadUrl:
+            'https://github.com/mearlhq/mearl/releases/download/v2.8.1/mearl-chrome-v2.8.1.zip',
         }}
       />,
     );
@@ -702,7 +902,9 @@ describe('QuickSettingsMenu', () => {
   it('does not show update UI for a store installation', async () => {
     render(<QuickSettingsMenu onShowSettings={vi.fn()} />);
     await waitFor(() => expect(installationMocks.getExtensionInstallationInfo).toHaveBeenCalled());
-    expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'updateSetupExtension' }));
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'updateSetupExtension' }),
+    );
     expect(remoteConfigMocks.fetchRemoteConfig).not.toHaveBeenCalled();
     expect(screen.queryByTestId('extension-update-dot')).toBeNull();
     expect(screen.queryByRole('button', { name: '立即更新' })).toBeNull();
@@ -716,7 +918,8 @@ describe('QuickSettingsMenu', () => {
     });
     remoteConfigMocks.fetchRemoteConfig.mockResolvedValue({
       latestVersion: '2.8.1',
-      downloadUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.1/mearl-chrome-v2.8.1.zip',
+      downloadUrl:
+        'https://github.com/mearlhq/mearl/releases/download/v2.8.1/mearl-chrome-v2.8.1.zip',
     });
 
     render(<QuickSettingsMenu onShowSettings={vi.fn()} />);
@@ -784,7 +987,10 @@ describe('QuickSettingsMenu', () => {
 
     fireEvent.click(inactiveAppButton);
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: '阅读器' })).toHaveAttribute('aria-pressed', 'true'),
+      expect(screen.getByRole('button', { name: '阅读器' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      ),
     );
     expect(chrome.runtime.sendMessage).toHaveBeenLastCalledWith({
       action: 'quickAppProfileSet',
@@ -911,7 +1117,8 @@ describe('QuickSettingsMenu', () => {
 
   it('shows the App profile already active on the inspected tab', async () => {
     vi.mocked(chrome.runtime.sendMessage).mockImplementation(async message => {
-        if ((message as { action?: string }).action === 'appProfileCatalogGet') return { success: true, profiles: listBuiltinAppProfiles() };
+      if ((message as { action?: string }).action === 'appProfileCatalogGet')
+        return { success: true, profiles: listBuiltinAppProfiles() };
       const request = message as unknown as { action?: string; profile?: unknown };
       if (request.action === 'quickAppProfileGet') return { success: true, profile: 'chat' };
       return { success: true, profile: request.profile };
@@ -931,7 +1138,8 @@ describe('QuickSettingsMenu', () => {
 
   it('shows the last App profile as the inactive default after reload', async () => {
     vi.mocked(chrome.runtime.sendMessage).mockImplementation(async message => {
-        if ((message as { action?: string }).action === 'appProfileCatalogGet') return { success: true, profiles: listBuiltinAppProfiles() };
+      if ((message as { action?: string }).action === 'appProfileCatalogGet')
+        return { success: true, profiles: listBuiltinAppProfiles() };
       const request = message as unknown as { action?: string };
       if (request.action === 'quickAppProfileGet') {
         return { success: true, profile: null, lastProfile: 'chat' };
@@ -959,7 +1167,8 @@ describe('QuickSettingsMenu', () => {
 
   it('keeps global inactive defaults when the current tab has a different automatic rule', async () => {
     vi.mocked(chrome.runtime.sendMessage).mockImplementation(async message => {
-        if ((message as { action?: string }).action === 'appProfileCatalogGet') return { success: true, profiles: listBuiltinAppProfiles() };
+      if ((message as { action?: string }).action === 'appProfileCatalogGet')
+        return { success: true, profiles: listBuiltinAppProfiles() };
       const request = message as unknown as { action?: string };
       if (request.action === 'quickAppProfileGet') {
         return { success: true, profile: null, lastProfile: 'chat' };
@@ -1004,7 +1213,8 @@ describe('QuickSettingsMenu', () => {
 
   it('restores the client and mobile preset as independent active choices', async () => {
     vi.mocked(chrome.runtime.sendMessage).mockImplementation(async message => {
-        if ((message as { action?: string }).action === 'appProfileCatalogGet') return { success: true, profiles: listBuiltinAppProfiles() };
+      if ((message as { action?: string }).action === 'appProfileCatalogGet')
+        return { success: true, profiles: listBuiltinAppProfiles() };
       const request = message as unknown as { action?: string };
       if (request.action === 'quickAppProfileGet') {
         return {
@@ -1059,7 +1269,8 @@ describe('QuickSettingsMenu', () => {
 
   it('关闭客户端时同步关闭设备模拟，并在重新开启时恢复历史设备', async () => {
     vi.mocked(chrome.runtime.sendMessage).mockImplementation(async message => {
-        if ((message as { action?: string }).action === 'appProfileCatalogGet') return { success: true, profiles: listBuiltinAppProfiles() };
+      if ((message as { action?: string }).action === 'appProfileCatalogGet')
+        return { success: true, profiles: listBuiltinAppProfiles() };
       const request = message as unknown as {
         action?: string;
         profile?: unknown;
@@ -1140,7 +1351,8 @@ describe('QuickSettingsMenu', () => {
 
   it('手动关闭客户端时同步关闭当前域的自动模拟状态', async () => {
     vi.mocked(chrome.runtime.sendMessage).mockImplementation(async message => {
-        if ((message as { action?: string }).action === 'appProfileCatalogGet') return { success: true, profiles: listBuiltinAppProfiles() };
+      if ((message as { action?: string }).action === 'appProfileCatalogGet')
+        return { success: true, profiles: listBuiltinAppProfiles() };
       const request = message as unknown as { action?: string; profile?: unknown };
       if (request.action === 'quickAppProfileGet') {
         return { success: true, profile: 'reader', appVersion: '10.0.0', os: 'ios' };
@@ -1192,7 +1404,8 @@ describe('QuickSettingsMenu', () => {
 
   it('手动关闭设备时同步关闭当前域的自动模拟状态', async () => {
     vi.mocked(chrome.runtime.sendMessage).mockImplementation(async message => {
-        if ((message as { action?: string }).action === 'appProfileCatalogGet') return { success: true, profiles: listBuiltinAppProfiles() };
+      if ((message as { action?: string }).action === 'appProfileCatalogGet')
+        return { success: true, profiles: listBuiltinAppProfiles() };
       const request = message as unknown as { action?: string };
       if (request.action === 'quickAppProfileGet') {
         return { success: true, profile: 'reader', appVersion: '10.0.0', os: 'ios' };
@@ -1234,8 +1447,13 @@ describe('QuickSettingsMenu', () => {
 
   it('仅在设备模拟启用时切换设备外壳', async () => {
     vi.mocked(chrome.runtime.sendMessage).mockImplementation(async message => {
-        if ((message as { action?: string }).action === 'appProfileCatalogGet') return { success: true, profiles: listBuiltinAppProfiles() };
-      const request = message as unknown as { action?: string; deviceShell?: boolean; enabled?: boolean };
+      if ((message as { action?: string }).action === 'appProfileCatalogGet')
+        return { success: true, profiles: listBuiltinAppProfiles() };
+      const request = message as unknown as {
+        action?: string;
+        deviceShell?: boolean;
+        enabled?: boolean;
+      };
       if (request.action === 'quickAppProfileGet') {
         return { success: true, profile: null, os: 'ios' };
       }
@@ -1274,7 +1492,9 @@ describe('QuickSettingsMenu', () => {
     await waitFor(() => expect(frame).toHaveAttribute('aria-pressed', 'true'));
     expect(toggle).toHaveAttribute('aria-pressed', 'true');
     expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
-      action: 'quickDevicePhoneFrameSet', tabId: 1, enabled: true,
+      action: 'quickDevicePhoneFrameSet',
+      tabId: 1,
+      enabled: true,
     });
 
     fireEvent.click(toggle);
@@ -1290,7 +1510,8 @@ describe('QuickSettingsMenu', () => {
 
   it('App 开关不重复发送由设备状态决定的系统字段', async () => {
     vi.mocked(chrome.runtime.sendMessage).mockImplementation(async message => {
-        if ((message as { action?: string }).action === 'appProfileCatalogGet') return { success: true, profiles: listBuiltinAppProfiles() };
+      if ((message as { action?: string }).action === 'appProfileCatalogGet')
+        return { success: true, profiles: listBuiltinAppProfiles() };
       const request = message as unknown as {
         action?: string;
         profile?: unknown;
@@ -1346,7 +1567,8 @@ describe('QuickSettingsMenu', () => {
 
   it('已知设备预设通过单个按钮在横竖屏间切换', async () => {
     vi.mocked(chrome.runtime.sendMessage).mockImplementation(async message => {
-        if ((message as { action?: string }).action === 'appProfileCatalogGet') return { success: true, profiles: listBuiltinAppProfiles() };
+      if ((message as { action?: string }).action === 'appProfileCatalogGet')
+        return { success: true, profiles: listBuiltinAppProfiles() };
       const request = message as unknown as {
         action?: string;
         preset?: string;
@@ -1413,7 +1635,8 @@ describe('QuickSettingsMenu', () => {
 
   it('横屏时在横屏按钮左侧展示并持久化分屏开关', async () => {
     vi.mocked(chrome.runtime.sendMessage).mockImplementation(async message => {
-        if ((message as { action?: string }).action === 'appProfileCatalogGet') return { success: true, profiles: listBuiltinAppProfiles() };
+      if ((message as { action?: string }).action === 'appProfileCatalogGet')
+        return { success: true, profiles: listBuiltinAppProfiles() };
       const request = message as unknown as {
         action?: string;
         splitScreen?: boolean;
@@ -1476,7 +1699,8 @@ describe('QuickSettingsMenu', () => {
 
   it('回填并切换当前设备的适应窗口状态', async () => {
     vi.mocked(chrome.runtime.sendMessage).mockImplementation(async message => {
-        if ((message as { action?: string }).action === 'appProfileCatalogGet') return { success: true, profiles: listBuiltinAppProfiles() };
+      if ((message as { action?: string }).action === 'appProfileCatalogGet')
+        return { success: true, profiles: listBuiltinAppProfiles() };
       const request = message as unknown as {
         action?: string;
         preset?: string;
@@ -1527,7 +1751,8 @@ describe('QuickSettingsMenu', () => {
 
   it('主设备按钮关闭再开启时保留适应窗口偏好', async () => {
     vi.mocked(chrome.runtime.sendMessage).mockImplementation(async message => {
-        if ((message as { action?: string }).action === 'appProfileCatalogGet') return { success: true, profiles: listBuiltinAppProfiles() };
+      if ((message as { action?: string }).action === 'appProfileCatalogGet')
+        return { success: true, profiles: listBuiltinAppProfiles() };
       const request = message as unknown as {
         action?: string;
         preset?: string;
@@ -1584,7 +1809,8 @@ describe('QuickSettingsMenu', () => {
 
   it('APP 模拟切换失败时使用现有 Toast 且不插入错误行', async () => {
     vi.mocked(chrome.runtime.sendMessage).mockImplementation(async message => {
-        if ((message as { action?: string }).action === 'appProfileCatalogGet') return { success: true, profiles: listBuiltinAppProfiles() };
+      if ((message as { action?: string }).action === 'appProfileCatalogGet')
+        return { success: true, profiles: listBuiltinAppProfiles() };
       const request = message as unknown as { action?: string };
       if (request.action === 'quickAppProfileGet') return { success: true, profile: null };
       if (request.action === 'quickAppProfileSet') return { success: false, error: 'failed' };
@@ -1767,7 +1993,8 @@ describe('QuickSettingsMenu', () => {
 
   it('从自适应设备切回固定设备时恢复固定设备偏好', async () => {
     vi.mocked(chrome.runtime.sendMessage).mockImplementation(async message => {
-        if ((message as { action?: string }).action === 'appProfileCatalogGet') return { success: true, profiles: listBuiltinAppProfiles() };
+      if ((message as { action?: string }).action === 'appProfileCatalogGet')
+        return { success: true, profiles: listBuiltinAppProfiles() };
       const request = message as unknown as {
         action?: string;
         preset?: 'ios-adaptive' | 'iphone-17-pro';
@@ -1844,7 +2071,8 @@ describe('QuickSettingsMenu', () => {
 
   it('恢复当前标签页已生效的设备预设', async () => {
     vi.mocked(chrome.runtime.sendMessage).mockImplementation(async message => {
-        if ((message as { action?: string }).action === 'appProfileCatalogGet') return { success: true, profiles: listBuiltinAppProfiles() };
+      if ((message as { action?: string }).action === 'appProfileCatalogGet')
+        return { success: true, profiles: listBuiltinAppProfiles() };
       const request = message as unknown as { action?: string };
       if (request.action === 'quickAppProfileGet') {
         return { success: true, profile: null, os: 'ios' };
@@ -1868,7 +2096,8 @@ describe('QuickSettingsMenu', () => {
 
   it('自定义 Agent 设备尺寸清除失败时保留状态并使用 Toast', async () => {
     vi.mocked(chrome.runtime.sendMessage).mockImplementation(async message => {
-        if ((message as { action?: string }).action === 'appProfileCatalogGet') return { success: true, profiles: listBuiltinAppProfiles() };
+      if ((message as { action?: string }).action === 'appProfileCatalogGet')
+        return { success: true, profiles: listBuiltinAppProfiles() };
       const request = message as unknown as { action?: string };
       if (request.action === 'quickAppProfileGet') {
         return { success: true, profile: null, os: 'ios' };

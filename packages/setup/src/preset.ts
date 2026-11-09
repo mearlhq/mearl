@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { invoke, invokeLocalHost, listLiveBrowsers, SOCKET_PATH } from '@mearl/client/local';
 import { uninstallOfficialPluginCatalog } from '@mearl/client/plugin';
 import { mergePresetDefaults, type JsonObject } from '@mearl/preset';
+import type { PresetUninstallBlocker } from '@mearl/preset/installation';
 import {
   BundleError,
   createBundleFetchLoader,
@@ -51,6 +52,15 @@ export { PresetBrowserTransfer } from './presetBrowserTransfer.js';
 export interface PresetHostTarget {
   id: string;
   socketPath?: string;
+}
+
+export class PresetUninstallBlockedError extends Error {
+  constructor(
+    readonly blocker: PresetUninstallBlocker,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 export interface PresetHostStatus {
   id: string;
@@ -683,8 +693,10 @@ export class PresetInstaller {
     return this.resumeSelected(options);
   }
 
-  async uninstall(): Promise<PresetInstallStatus> {
+  async uninstall(expectedRevision?: string): Promise<PresetInstallStatus> {
     const current = await this.store.current({ verifyResources: false });
+    if (expectedRevision !== undefined && current.receipt?.revision !== expectedRevision)
+      throw new BundleError('BUNDLE_CONFLICT', 'The installed preset changed before removal');
     const { receipt, preset } = current;
     const configured = process.env.MEARL_SOCKET_PATH?.trim();
     const live = this.options.hosts
@@ -696,21 +708,25 @@ export class PresetInstaller {
       .hosts?.()
       .filter(target => !configured || target.socketPath === configured);
     const browserTargets =
-      explicitHosts ??
+      explicitHosts?.map(target => ({ ...target, name: target.id })) ??
       connectedPresetExtensions(live).map(browser => ({
         id: browser.browserId,
         socketPath: browser.socketPath,
+        name: browser.browserName || browser.browserId,
       }));
     if (configured && !browserTargets.length)
       throw new Error('MEARL_SOCKET_PATH does not identify a connected extension.');
     const selections = (
       await Promise.all(
         browserTargets.map(async target => {
-          const status = await this.invokeHost('preset_browser_status', {}, target, 15);
+          const status = await this.invokeHost('preset_browser_status', {}, target, 15).catch(
+            () => undefined,
+          );
           if (status?.browserRevision === null && !status.error) return;
           if (typeof status?.browserRevision !== 'string')
-            throw new Error(
-              `Cannot read the preset in ${target.id}. Reconnect the extension and retry.`,
+            throw new PresetUninstallBlockedError(
+              { reason: 'browser-unavailable', browser: target.name },
+              `Cannot read the preset in ${target.name}. Reconnect the extension and retry.`,
             );
           if (
             receipt &&
@@ -723,8 +739,9 @@ export class PresetInstaller {
               'Set MEARL_SOCKET_PATH to remove a browser preset without a local selection.',
             );
           if (status.uninstallSupported !== true || status.installationToken === undefined) {
-            throw new Error(
-              `Update the Native Host and extension for ${target.id} before removing its preset.`,
+            throw new PresetUninstallBlockedError(
+              { reason: 'browser-update-required', browser: target.name },
+              `Update the Native Host and extension for ${target.name} before removing its preset.`,
             );
           }
           return { target, status };

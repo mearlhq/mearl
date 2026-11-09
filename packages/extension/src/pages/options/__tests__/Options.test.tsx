@@ -1,19 +1,28 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Options from '../Options';
+import { ToastContainer } from '../../panel/components/ToastContainer';
+import { PRESET_MANAGEMENT_ACTION } from '../../../shared/presetAutoUpdate';
 import {
   DEFAULT_TAB_PAGE_OVERRIDES,
   TAB_PAGE_OVERRIDES_GET_ACTION,
   TAB_PAGE_OVERRIDES_SET_ACTION,
 } from '../../../shared/tabPageOverrides';
 
-const installed = vi.hoisted(() => ({ operations: {} as Record<string, {hook:string;setting:string}>, views: {} as Record<string, unknown> }));
-vi.mock('../../panel/utils/browserUiSettings', () => ({ useBrowserUiSettings: () => ({ operations: installed.operations }) }));
-vi.mock('../../panel/components/browser-view/viewState', () => ({ useBrowserView: (slot: string) => ({ loaded: true, selected: installed.views[slot] }) }));
+const installed = vi.hoisted(() => ({
+  operations: {} as Record<string, { hook: string; setting: string }>,
+  views: {} as Record<string, unknown>,
+}));
+vi.mock('../../panel/utils/browserUiSettings', () => ({
+  useBrowserUiSettings: () => ({ operations: installed.operations }),
+}));
+vi.mock('../../panel/components/browser-view/viewState', () => ({
+  useBrowserView: (slot: string) => ({ loaded: true, selected: installed.views[slot] }),
+}));
 vi.mock('../../panel/utils/i18n', () => ({
   initI18n: vi.fn(async () => {}),
   getCurrentLanguage: () => 'en',
-  t: (key: string) => key,
+  t: (key: string, substitutions?: string) => (substitutions ? `${key}: ${substitutions}` : key),
 }));
 vi.mock('../../../shared/hooks/useFontSize', () => ({
   useFontSize: () => ({ currentLevel: 1, setLevel: vi.fn() }),
@@ -74,6 +83,133 @@ describe('Options settings', () => {
     );
   });
 
+  it.each([undefined, 'https://guide.example.test/installed.html'])(
+    'offers the configured install page for an empty preset list (%s)',
+    async installUrl => {
+      window.history.replaceState({}, '', '?iframe=1&tabId=7');
+      const previous = vi.mocked(chrome.runtime.sendMessage).getMockImplementation()!;
+      vi.mocked(chrome.runtime.sendMessage).mockImplementation(async (message, ...args) => {
+        const request = message as { action?: string; operation?: string };
+        if (request.action !== PRESET_MANAGEMENT_ACTION) return previous(message, ...args);
+        return { success: true, data: request.operation === 'status' ? [] : installUrl };
+      });
+      render(<Options />);
+      if (installUrl) {
+        const link = await screen.findByRole('link', { name: 'presetManagementInstall' });
+        expect(link).toHaveAttribute('href', installUrl);
+        expect(link).toHaveAttribute('target', '_blank');
+      } else {
+        await waitFor(() =>
+          expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+            action: PRESET_MANAGEMENT_ACTION,
+            operation: 'install-url',
+          }),
+        );
+        expect(screen.queryByRole('region', { name: 'presetManagementTitle' })).toBeNull();
+      }
+    },
+  );
+
+  it.each([true, false])(
+    'updates an installed preset and offers removal only when supported (%s)',
+    async canUninstall => {
+      window.history.replaceState({}, '', '?iframe=1&tabId=7');
+      const preset = {
+        id: 'team',
+        version: '1.0.0',
+        source: 'https://example.test/team.json',
+        browserRevision: 'a'.repeat(64),
+        nativeRevision: 'b'.repeat(64),
+        canUninstall,
+      };
+      const previous = vi.mocked(chrome.runtime.sendMessage).getMockImplementation()!;
+      let installed = true;
+      let uninstallBlocked = true;
+      let completeUpdate!: () => void;
+      const updating = new Promise<void>(resolve => {
+        completeUpdate = resolve;
+      });
+      vi.mocked(chrome.runtime.sendMessage).mockImplementation(async (message, ...args) => {
+        const request = message as unknown as { action?: string; operation?: string } | undefined;
+        if (request?.action !== PRESET_MANAGEMENT_ACTION) return previous(message, ...args);
+        if (request.operation === 'update') {
+          await updating;
+          return { success: true, data: { status: 'current' } };
+        }
+        if (request.operation === 'uninstall') {
+          if (uninstallBlocked) {
+            uninstallBlocked = false;
+            return {
+              success: true,
+              data: {
+                ready: false,
+                blocker: { reason: 'browser-update-required', browser: 'Example Browser' },
+              },
+            };
+          }
+          installed = false;
+          return { success: true, data: { ready: true } };
+        }
+        if (request.operation === 'install-url') return { success: true, data: undefined };
+        return { success: true, data: installed ? [preset] : [] };
+      });
+      render(
+        <>
+          <Options />
+          <ToastContainer />
+        </>,
+      );
+      expect(await screen.findByText(preset.id)).toBeVisible();
+      expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith({
+        action: PRESET_MANAGEMENT_ACTION,
+        operation: 'install-url',
+      });
+      expect(screen.getByText('v1.0.0')).toBeVisible();
+      const updateButton = screen.getByRole('button', { name: 'presetManagementUpdate' });
+      fireEvent.click(updateButton);
+      expect(updateButton).toHaveAttribute('aria-busy', 'true');
+      expect(updateButton).toBeDisabled();
+      expect(screen.queryByText('presetInstallWorking')).not.toBeInTheDocument();
+      completeUpdate();
+      expect(await screen.findByText('presetManagementCurrent')).toBeInTheDocument();
+      if (!canUninstall) {
+        expect(
+          screen.queryByRole('button', { name: 'presetManagementRemove' }),
+        ).not.toBeInTheDocument();
+        return;
+      }
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'presetManagementRemove' })).toBeEnabled(),
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'presetManagementRemove' }));
+      expect(screen.getByRole('button', { name: 'presetManagementConfirm' })).toBeVisible();
+      expect(installed).toBe(true);
+      fireEvent.click(screen.getByRole('button', { name: 'cancel' }));
+      expect(
+        screen.queryByRole('button', { name: 'presetManagementConfirm' }),
+      ).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'presetManagementRemove' }));
+      fireEvent.click(screen.getByRole('button', { name: 'presetManagementConfirm' }));
+      expect(
+        await screen.findByText('presetManagementRemoveBrowserUpdate: Example Browser'),
+      ).toBeVisible();
+      expect(screen.getByText(preset.id)).toBeVisible();
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'presetManagementRemove' })).toBeEnabled(),
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'presetManagementRemove' }));
+      fireEvent.click(screen.getByRole('button', { name: 'presetManagementConfirm' }));
+      expect(await screen.findByText('presetManagementRemoved')).toBeInTheDocument();
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        action: PRESET_MANAGEMENT_ACTION,
+        operation: 'uninstall',
+        browserRevision: preset.browserRevision,
+        nativeRevision: preset.nativeRevision,
+      });
+      await waitFor(() => expect(screen.queryByText(preset.id)).not.toBeInTheDocument());
+    },
+  );
+
   it('uses the supplied preview tab for embedded settings', async () => {
     window.history.replaceState({}, '', '?iframe=1&tabId=7');
     const title = document.title;
@@ -132,7 +268,15 @@ describe('Options settings', () => {
     const values: Record<string, boolean> = {};
     chrome.storage.session = {
       get: vi.fn().mockResolvedValue({
-        'external-service-defaults': {  services: { accountsEnabled: true, requestCasesEnabled: true, requestMetadataEnabled: true, requestImportEnabled: true, trackingMetadataEnabled: true }},
+        'external-service-defaults': {
+          services: {
+            accountsEnabled: true,
+            requestCasesEnabled: true,
+            requestMetadataEnabled: true,
+            requestImportEnabled: true,
+            trackingMetadataEnabled: true,
+          },
+        },
       }),
     } as any;
     vi.mocked(chrome.storage.sync.get).mockImplementation((defaults, callback) =>
@@ -315,16 +459,24 @@ describe('Options settings', () => {
       expect.objectContaining({ action: TAB_PAGE_OVERRIDES_SET_ACTION }),
     );
   });
-it('hides the external services section without installed modules', async () => {
-  installed.operations = {}; installed.views = {}; render(<Options />);
-  await screen.findByRole('switch', { name: 'mcpService' });
-  expect(screen.queryByText('externalServices')).toBeNull();
-});
-it('shows only installed service settings even when disabled', async () => {
-  installed.operations = { accounts: { hook: 'accounts', setting: 'accountsEnabled' } }; installed.views = {};
-  render(<Options />); await screen.findByRole('button', { name: 'accountsServices' });
-  expect(screen.getByText('externalServices')).toBeVisible();
-  for (const name of ['requestCasesServices','requestImportServices','trackingMetadataServices']) expect(screen.queryByText(name)).toBeNull();
-});
-
+  it('hides the external services section without installed modules', async () => {
+    installed.operations = {};
+    installed.views = {};
+    render(<Options />);
+    await screen.findByRole('switch', { name: 'mcpService' });
+    expect(screen.queryByText('externalServices')).toBeNull();
+  });
+  it('shows only installed service settings even when disabled', async () => {
+    installed.operations = { accounts: { hook: 'accounts', setting: 'accountsEnabled' } };
+    installed.views = {};
+    render(<Options />);
+    await screen.findByRole('button', { name: 'accountsServices' });
+    expect(screen.getByText('externalServices')).toBeVisible();
+    for (const name of [
+      'requestCasesServices',
+      'requestImportServices',
+      'trackingMetadataServices',
+    ])
+      expect(screen.queryByText(name)).toBeNull();
+  });
 });

@@ -12,6 +12,15 @@ export interface InstallationConfig {
   presets?: Record<string, InstallationPreset>;
 }
 
+export type PresetUninstallBlocker =
+  | { reason: 'selection-changed' }
+  | { reason: 'browser-update-required' | 'browser-unavailable'; browser: string };
+
+export interface PresetUninstallResult {
+  ready: boolean;
+  blocker?: PresetUninstallBlocker;
+}
+
 function record(value: unknown, allowed: string[]): Record<string, unknown> {
   if (
     !value ||

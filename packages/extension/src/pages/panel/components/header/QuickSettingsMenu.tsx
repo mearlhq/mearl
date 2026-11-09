@@ -282,21 +282,40 @@ export const QuickSettingsMenu: FC<QuickSettingsMenuProps> = ({
   dropdownAlign = 'default',
   remoteConfig,
 }) => {
-  const getContextTabId = useCallback(() => inspectedTabId === undefined
-    ? getActiveTabId() : Promise.resolve(inspectedTabId), [inspectedTabId]);
+  const getContextTabId = useCallback(
+    () => (inspectedTabId === undefined ? getActiveTabId() : Promise.resolve(inspectedTabId)),
+    [inspectedTabId],
+  );
   const [config, setConfig] = useState<ExtensionConfig>(DEFAULT_CONFIG);
   const [configReady, setConfigReady] = useState(false);
-  const [controlState, setControlState] = useState<{ key: string; tabId: number; value: string } | null>(null);
+  const [controlState, setControlState] = useState<{
+    key: string;
+    tabId: number;
+    value: string;
+  } | null>(null);
   const controlRevisionRef = useRef(0);
   const control = useBrowserControl(t);
-  const controlKey = control ? JSON.stringify([control.bundleId, control.revision, control.definition.id]) : '';
+  const controlKey = control
+    ? JSON.stringify([control.bundleId, control.revision, control.definition.id])
+    : '';
   const controlValue = controlState?.key === controlKey ? controlState.value : null;
   const controlTabId = controlState?.key === controlKey ? controlState.tabId : null;
   const [pagePermissionGranted, setPagePermissionGranted] = useState<boolean | null>(null);
   const [appProfile, setAppProfile] = useState<QuickAppProfileName | null>(null);
+  const [lastAppProfile, setLastAppProfile] = useState<QuickAppProfileName | null>(null);
   const installedProfiles = useBrowserAppProfiles();
-  const [discoveredProfiles, setDiscoveredProfiles] = useState<{ source: AppProfileMenuEntry[]; profiles: AppProfileMenuEntry[] }>();
-  const profileCatalog = discoveredProfiles?.source === installedProfiles ? discoveredProfiles.profiles : installedProfiles;
+  const [discoveredProfiles, setDiscoveredProfiles] = useState<{
+    source: AppProfileMenuEntry[];
+    profiles: AppProfileMenuEntry[];
+  }>();
+  const profileCatalog =
+    discoveredProfiles?.source === installedProfiles
+      ? discoveredProfiles.profiles
+      : installedProfiles;
+  const selectedAppProfile =
+    appProfile ??
+    profileCatalog.find(profile => profile.id === lastAppProfile)?.id ??
+    profileCatalog[0]?.id;
   const [otherProfilesExpanded, setOtherProfilesExpanded] = useState(false);
   const [profileInstallOpen, setProfileInstallOpen] = useState(false);
   const appSelectorRef = useRef<HTMLButtonElement>(null);
@@ -346,7 +365,6 @@ export const QuickSettingsMenu: FC<QuickSettingsMenuProps> = ({
   const [extensionUpdating, setExtensionUpdating] = useState(false);
   const [agentFloatingButtonTransitionReady, setAgentFloatingButtonTransitionReady] =
     useState(false);
-  const lastAppProfileRef = useRef<QuickAppProfileName | null>(null);
   const lastDevicePresetRef = useRef<QuickDevicePresetName>('iphone-17-pro');
   const autoSimulationRuleRef = useRef<QuickSimulationAutoRule | null>(null);
   const { currentLevel, totalLevels, setLevel } = useFontSize();
@@ -371,14 +389,20 @@ export const QuickSettingsMenu: FC<QuickSettingsMenuProps> = ({
       try {
         const tabId = await getContextTabId();
         if (disposed || currentRevision !== controlRevisionRef.current) return;
-        setControlState(previous => previous?.key === controlKey && previous.tabId === tabId ? previous : null);
+        setControlState(previous =>
+          previous?.key === controlKey && previous.tabId === tabId ? previous : null,
+        );
         const response: BrowserControlResponse | undefined =
           tabId === null
             ? undefined
             : await chrome.runtime.sendMessage({ action: BROWSER_CONTROL_GET_ACTION, tabId });
         if (disposed || currentRevision !== controlRevisionRef.current) return;
         if (response?.success && tabId !== null)
-          setControlState({ key: controlKey, tabId, value: response.value ?? control.definition.defaultValue });
+          setControlState({
+            key: controlKey,
+            tabId,
+            value: response.value ?? control.definition.defaultValue,
+          });
       } catch {
         // Keep a confirmed selection for the same tab during a transient read failure.
       }
@@ -499,10 +523,10 @@ export const QuickSettingsMenu: FC<QuickSettingsMenuProps> = ({
       .then(result => {
         if (cancelled) return;
         if (!result?.success) return;
-        const profiles = parseAppProfileMenu(result.profiles).filter(profile => profile.available !== false);
+        const profiles = parseAppProfileMenu(result.profiles).filter(
+          profile => profile.available !== false,
+        );
         setDiscoveredProfiles({ source: installedProfiles, profiles });
-        if (!profiles.some(profile => profile.id === lastAppProfileRef.current))
-          lastAppProfileRef.current = profiles[0]?.id ?? null;
       })
       .catch(() => {});
     return () => {
@@ -528,9 +552,8 @@ export const QuickSettingsMenu: FC<QuickSettingsMenuProps> = ({
       })) as QuickAppProfileResponse | undefined;
       if (response?.success) {
         const profile = response.profile ?? null;
-        const lastProfile = profile ?? response.lastProfile;
         setAppProfile(profile);
-        if (lastProfile) lastAppProfileRef.current = lastProfile;
+        setLastAppProfile(profile ?? response.lastProfile ?? null);
         setAppVersion(response.appVersion ?? null);
       }
       return response;
@@ -693,11 +716,15 @@ export const QuickSettingsMenu: FC<QuickSettingsMenuProps> = ({
       const response = (await chrome.runtime.sendMessage({
         action: BROWSER_CONTROL_SET_ACTION,
         tabId,
-        value, controlId: control.definition.id, bundleId: control.bundleId, revision: control.revision,
+        value,
+        controlId: control.definition.id,
+        bundleId: control.bundleId,
+        revision: control.revision,
       })) as BrowserControlResponse | undefined;
       if (!response?.success)
         throw new Error(response?.error || 'Failed to change browser control');
-      if (revision === controlRevisionRef.current) setControlState({ key: controlKey, tabId, value: response.value ?? value });
+      if (revision === controlRevisionRef.current)
+        setControlState({ key: controlKey, tabId, value: response.value ?? value });
       showToast(browserUiText(control.definition.messages.changed, getCurrentLanguage()), 'info');
     } catch {
       showToast(browserUiText(control.definition.messages.failed, getCurrentLanguage()), 'error');
@@ -722,7 +749,7 @@ export const QuickSettingsMenu: FC<QuickSettingsMenuProps> = ({
       return;
     }
 
-    const profile = appProfile ?? lastAppProfileRef.current ?? profileCatalog[0]?.id;
+    const profile = selectedAppProfile;
     if (enabled && !profile) return;
     const preset = deviceEmulationPreset ?? lastDevicePresetRef.current;
     const rememberedRule = autoSimulationRuleRef.current;
@@ -803,9 +830,8 @@ export const QuickSettingsMenu: FC<QuickSettingsMenuProps> = ({
       })) as QuickAppProfileResponse | undefined;
       if (!response?.success) throw new Error(response?.error || 'App profile update failed');
       const profile = response.profile ?? null;
-      const lastProfile = profile ?? response.lastProfile;
       setAppProfile(profile);
-      if (lastProfile) lastAppProfileRef.current = lastProfile;
+      setLastAppProfile(profile ?? response.lastProfile ?? null);
       if (!profile && autoSimulationEnabled) {
         autoSimulationRuleRef.current = null;
         setAutoSimulationEnabled(false);
@@ -1045,7 +1071,9 @@ export const QuickSettingsMenu: FC<QuickSettingsMenuProps> = ({
 
   const getAppProfileLabel = (profile: QuickAppProfileName): string => {
     const entry = profileCatalog.find(item => item.id === profile);
-    return entry?.definition?.labels ? browserUiText(entry.definition.labels, getCurrentLanguage()) : entry?.label ?? profile;
+    return entry?.definition?.labels
+      ? browserUiText(entry.definition.labels, getCurrentLanguage())
+      : (entry?.label ?? profile);
   };
 
   const hasAppProfiles = profileCatalog.length > 0;
@@ -1056,7 +1084,8 @@ export const QuickSettingsMenu: FC<QuickSettingsMenuProps> = ({
     ? [...primaryProfiles, ...additionalProfiles]
     : primaryProfiles;
 
-  const getDevicePresetLabel = (preset: QuickDevicePresetName) => getQuickDevicePresetLabel(preset, t);
+  const getDevicePresetLabel = (preset: QuickDevicePresetName) =>
+    getQuickDevicePresetLabel(preset, t);
 
   const renderDevicePresetOption = (preset: QuickDevicePresetName) => (
     <button
@@ -1074,8 +1103,9 @@ export const QuickSettingsMenu: FC<QuickSettingsMenuProps> = ({
     </button>
   );
 
-  const selectedAppProfile = appProfile ?? lastAppProfileRef.current ?? profileCatalog[0]?.id;
-  const appSelectorLabel = selectedAppProfile ? getAppProfileLabel(selectedAppProfile) : t('deviceSimulationApp');
+  const appSelectorLabel = selectedAppProfile
+    ? getAppProfileLabel(selectedAppProfile)
+    : t('deviceSimulationApp');
   const deviceSelectorLabel = deviceEmulationActive
     ? deviceEmulationPreset
       ? getDevicePresetLabel(deviceEmulationPreset)
@@ -1117,7 +1147,11 @@ export const QuickSettingsMenu: FC<QuickSettingsMenuProps> = ({
   ];
 
   return (
-    <div className="relative flex" onMouseEnter={() => openQuickSettings()} onMouseLeave={handleMouseLeave}>
+    <div
+      className="relative flex"
+      onMouseEnter={() => openQuickSettings()}
+      onMouseLeave={handleMouseLeave}
+    >
       <button
         type="button"
         className="relative inline-flex p-0.5 rounded transition-colors cursor-pointer text-text-secondary hover:text-text-primary hover:bg-bg-hover focus-visible:outline focus-visible:outline-blue-500"
@@ -1219,7 +1253,10 @@ export const QuickSettingsMenu: FC<QuickSettingsMenuProps> = ({
 
             {control && (
               <div>
-                <div className="text-2xs text-text-secondary mb-1" title={browserUiText(control.definition.description, getCurrentLanguage())}>
+                <div
+                  className="text-2xs text-text-secondary mb-1"
+                  title={browserUiText(control.definition.description, getCurrentLanguage())}
+                >
                   {browserUiText(control.definition.label, getCurrentLanguage())}
                 </div>
                 <div className="flex gap-1">
@@ -1362,7 +1399,10 @@ export const QuickSettingsMenu: FC<QuickSettingsMenuProps> = ({
                     ref={appSelectorRef}
                     type="button"
                     onClick={() => {
-                      if (hasAppMenu) void handleAppProfileChange(appProfile ? null : selectedAppProfile ?? null);
+                      if (hasAppMenu)
+                        void handleAppProfileChange(
+                          appProfile ? null : (selectedAppProfile ?? null),
+                        );
                       else openProfileInstaller();
                     }}
                     className={clsx(
@@ -1372,74 +1412,86 @@ export const QuickSettingsMenu: FC<QuickSettingsMenuProps> = ({
                     aria-pressed={appProfile !== null}
                     aria-haspopup={hasAppMenu ? 'menu' : 'dialog'}
                     disabled={hasAppMenu && (!appProfileReady || appProfileLoading)}
-                    title={appProfile ? t('appSimulationCancelHint') : hasAppMenu ? appSelectorLabel : t('appProfileInstallAction')}
+                    title={
+                      appProfile
+                        ? t('appSimulationCancelHint')
+                        : hasAppMenu
+                          ? appSelectorLabel
+                          : t('appProfileInstallAction')
+                    }
                   >
                     <span className="truncate">{appSelectorLabel}</span>
-                    {hasAppMenu
-                      ? <ChevronDown className="h-3 w-3 shrink-0" aria-hidden="true" />
-                      : <Plus className="h-3 w-3 shrink-0" aria-hidden="true" />}
-                  </button>
-                  {hasAppMenu && <div
-                    className={clsx(
-                      'absolute left-0 top-full z-30 min-w-full pt-1 transition-opacity',
-                      openMenu === 'app'
-                        ? 'pointer-events-auto opacity-100'
-                        : 'pointer-events-none opacity-0',
+                    {hasAppMenu ? (
+                      <ChevronDown className="h-3 w-3 shrink-0" aria-hidden="true" />
+                    ) : (
+                      <Plus className="h-3 w-3 shrink-0" aria-hidden="true" />
                     )}
-                  >
+                  </button>
+                  {hasAppMenu && (
                     <div
-                      className="max-h-[min(14rem,45vh)] min-w-28 overflow-y-auto overscroll-contain rounded border border-border bg-bg-primary p-1 shadow-lg"
-                      role="menu"
-                      aria-label={t('deviceSimulationApp')}
+                      className={clsx(
+                        'absolute left-0 top-full z-30 min-w-full pt-1 transition-opacity',
+                        openMenu === 'app'
+                          ? 'pointer-events-auto opacity-100'
+                          : 'pointer-events-none opacity-0',
+                      )}
                     >
-                      {visibleProfiles.map(({ id, available }) => {
-                        const profile = id as QuickAppProfileName;
-                        return (
+                      <div
+                        className="max-h-[min(14rem,45vh)] min-w-28 overflow-y-auto overscroll-contain rounded border border-border bg-bg-primary p-1 shadow-lg"
+                        role="menu"
+                        aria-label={t('deviceSimulationApp')}
+                      >
+                        {visibleProfiles.map(({ id, available }) => {
+                          const profile = id as QuickAppProfileName;
+                          return (
+                            <button
+                              key={profile}
+                              type="button"
+                              onClick={() =>
+                                void handleAppProfileChange(appProfile === profile ? null : profile)
+                              }
+                              className={selectorMenuItemClass(
+                                appProfile === profile,
+                                !appProfileReady || appProfileLoading,
+                              )}
+                              role="menuitemradio"
+                              aria-checked={appProfile === profile}
+                              disabled={
+                                !appProfileReady || appProfileLoading || available === false
+                              }
+                            >
+                              {getAppProfileLabel(profile)}
+                            </button>
+                          );
+                        })}
+                        {!otherProfilesExpanded && additionalProfiles.length > 0 && (
                           <button
-                            key={profile}
                             type="button"
-                            onClick={() =>
-                              void handleAppProfileChange(appProfile === profile ? null : profile)
-                            }
-                            className={selectorMenuItemClass(
-                              appProfile === profile,
-                              !appProfileReady || appProfileLoading,
-                            )}
-                            role="menuitemradio"
-                            aria-checked={appProfile === profile}
-                            disabled={!appProfileReady || appProfileLoading || available === false}
+                            role="menuitem"
+                            aria-expanded={false}
+                            onClick={() => setOtherProfilesExpanded(true)}
+                            className="mt-1 flex w-full cursor-pointer items-center justify-between gap-2 border-t border-border px-1.5 py-1 text-left text-2xs text-text-secondary hover:bg-bg-hover hover:text-text-primary"
                           >
-                            {getAppProfileLabel(profile)}
+                            {t('appSimulationShowMore')}
+                            <ChevronDown className="h-3 w-3 shrink-0" aria-hidden="true" />
                           </button>
-                        );
-                      })}
-                      {!otherProfilesExpanded && additionalProfiles.length > 0 && (
+                        )}
+                        {visibleProfiles.length > 0 && (
+                          <div role="separator" className="mx-1.5 my-0.75 border-t border-border" />
+                        )}
                         <button
                           type="button"
                           role="menuitem"
-                          aria-expanded={false}
-                          onClick={() => setOtherProfilesExpanded(true)}
-                          className="mt-1 flex w-full cursor-pointer items-center justify-between gap-2 border-t border-border px-1.5 py-1 text-left text-2xs text-text-secondary hover:bg-bg-hover hover:text-text-primary"
+                          aria-haspopup="dialog"
+                          onClick={openProfileInstaller}
+                          className={clsx(selectorMenuItemClass(false, false), 'gap-1')}
                         >
-                          {t('appSimulationShowMore')}
-                          <ChevronDown className="h-3 w-3 shrink-0" aria-hidden="true" />
+                          <Plus className="h-3 w-3 shrink-0" aria-hidden="true" />
+                          {t('appProfileInstallAction')}
                         </button>
-                      )}
-                      {visibleProfiles.length > 0 && (
-                        <div role="separator" className="mx-1.5 my-0.75 border-t border-border" />
-                      )}
-                      <button
-                        type="button"
-                        role="menuitem"
-                        aria-haspopup="dialog"
-                        onClick={openProfileInstaller}
-                        className={clsx(selectorMenuItemClass(false, false), 'gap-1')}
-                      >
-                        <Plus className="h-3 w-3 shrink-0" aria-hidden="true" />
-                        {t('appProfileInstallAction')}
-                      </button>
+                      </div>
                     </div>
-                  </div>}
+                  )}
                 </div>
                 <div className="col-span-2 flex min-w-0 gap-1">
                   <div className="relative min-w-0 flex-1" {...deviceMenuHandlers}>
@@ -1494,20 +1546,22 @@ export const QuickSettingsMenu: FC<QuickSettingsMenuProps> = ({
                       </div>
                     </div>
                   </div>
-                  {(hasAppProfiles || autoSimulationEnabled) && <button
-                    type="button"
-                    onClick={() => void handleAutoSimulationToggle()}
-                    className={clsx(
-                      iconToggleButtonClass(autoSimulationEnabled, autoSimulationButtonDisabled),
-                      'h-6 w-6 self-center border border-border',
-                    )}
-                    title={autoSimulationHint}
-                    aria-label={t('deviceSimulationAuto')}
-                    aria-pressed={autoSimulationEnabled}
-                    disabled={autoSimulationButtonDisabled}
-                  >
-                    <Zap className="h-3 w-3" aria-hidden="true" />
-                  </button>}
+                  {(hasAppProfiles || autoSimulationEnabled) && (
+                    <button
+                      type="button"
+                      onClick={() => void handleAutoSimulationToggle()}
+                      className={clsx(
+                        iconToggleButtonClass(autoSimulationEnabled, autoSimulationButtonDisabled),
+                        'h-6 w-6 self-center border border-border',
+                      )}
+                      title={autoSimulationHint}
+                      aria-label={t('deviceSimulationAuto')}
+                      aria-pressed={autoSimulationEnabled}
+                      disabled={autoSimulationButtonDisabled}
+                    >
+                      <Zap className="h-3 w-3" aria-hidden="true" />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
