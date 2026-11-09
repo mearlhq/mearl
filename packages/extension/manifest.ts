@@ -8,6 +8,20 @@ import { DEVICE_PREVIEW_PANEL_PAGE } from './src/shared/devicePreviewPanel';
 const installationOrigin = `${new URL(installationSite.url).origin}/*`;
 const contentScriptMatches = [...ALLOWED_ORIGINS_LIST, installationOrigin];
 
+function customWebsiteUrl(value: string | undefined): URL | undefined {
+  if (!value?.trim()) return;
+  const url = new URL(value);
+  if (
+    url.protocol !== 'https:' ||
+    url.username || url.password || url.search || url.hash ||
+    url.hostname.includes('*') || url.origin === new URL(installationSite.url).origin
+  ) throw new Error('MEARL_WEBSITE_URL must be a separate HTTPS website directory URL');
+  if (!url.pathname.endsWith('/')) url.pathname += '/';
+  return url;
+}
+
+export const customWebsite = customWebsiteUrl(process.env.MEARL_WEBSITE_URL);
+
 interface ContentScriptDefinition {
   matches: string[];
   js: string[];
@@ -119,7 +133,7 @@ const manifest: ManifestV3Export = {
     'tabGroups',
     'offscreen',
   ],
-  host_permissions: [...ALLOWED_ORIGINS_LIST, 'https://www.google-analytics.com/*', 'https://skills.sh/*', 'https://api.github.com/*', installationOrigin],
+  host_permissions: [...ALLOWED_ORIGINS_LIST, 'https://www.google-analytics.com/*', 'https://skills.sh/*', 'https://api.github.com/*', installationOrigin, ...(customWebsite ? [`https://${customWebsite.hostname}/*`] : [])],
   optional_host_permissions: ['<all_urls>'],
 };
 

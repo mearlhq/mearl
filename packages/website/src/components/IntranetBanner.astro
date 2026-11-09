@@ -1,0 +1,52 @@
+---
+import { ArrowRight, X } from '@lucide/astro';
+import type { Locale } from '../lib/site';
+
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+const t = locale === 'en'
+  ? { message: 'The intranet site is reachable.', visit: 'Open intranet site', never: 'Don’t show again', close: 'Close intranet notice' }
+  : { message: '检测到可访问内网官网。', visit: '前往内网官网', never: '不再提示', close: '关闭内网提示' };
+---
+<aside class="intranet-banner" data-intranet-banner aria-label={t.message} hidden>
+  <div class="intranet-banner-content">
+    <span>{t.message}</span>
+    <a data-intranet-link>{t.visit}<ArrowRight size={14} aria-hidden="true" /></a>
+    <div class="intranet-banner-actions">
+      <button type="button" data-intranet-never>{t.never}</button>
+      <button type="button" data-intranet-close aria-label={t.close} title={t.close}><X size={16} aria-hidden="true" /></button>
+    </div>
+  </div>
+</aside>
+<script>
+  import { initGuide } from '../scripts/welcome-guide';
+  void initGuide();
+  window.addEventListener('pageshow', event => { if (event.persisted) void initGuide(); });
+</script>
+<style>
+  .intranet-banner { background: var(--blue-soft); border-bottom: 1px solid var(--accent-border); color: var(--ink); }
+  .intranet-banner-content {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
+    padding-block: 5px;
+    font-size: var(--text-small);
+  }
+  .intranet-banner-content a { display: inline-flex; gap: 4px; align-items: center; color: var(--blue); font-weight: 650; }
+  .intranet-banner-actions { display: flex; align-items: center; gap: 4px; margin-inline-start: auto; }
+  .intranet-banner-actions button {
+    display: inline-grid;
+    place-items: center;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 4px 6px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .intranet-banner-actions button:hover { background: var(--surface); color: var(--ink); }
+  .intranet-banner-actions [data-intranet-close] { min-width: 36px; }
+</style>

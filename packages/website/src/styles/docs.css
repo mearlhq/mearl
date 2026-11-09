@@ -5,6 +5,7 @@
   --docs-title: #16223a;
   --docs-border: #dfe5ef;
   --docs-content: 1440px;
+  --docs-gutter: clamp(16px, 3vw, 42px);
   --header-height: 66px;
   background: var(--docs-canvas);
   font-size: 15px;
@@ -23,11 +24,13 @@
   background: color-mix(in srgb, var(--docs-canvas) 92%, transparent);
   border-bottom: 1px solid var(--docs-border);
 }
-.docs-header {
+.docs-header, .intranet-banner-content {
   max-width: var(--docs-content);
-  height: 100%;
   margin-inline: auto;
-  padding-inline: clamp(16px, 3vw, 42px);
+  padding-inline: var(--docs-gutter);
+}
+.docs-header {
+  height: 100%;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -92,7 +95,7 @@
 .docs-toc-mobile { display: none; }
 .docs-detail {
   position: relative;
-  border-radius: 14px;
+  border-radius: 8px;
   border: 1px solid var(--docs-border);
   background: var(--docs-hero);
   padding: clamp(24px, 3.5vw, 48px);
@@ -125,11 +128,11 @@
 .docs-figure { margin: 16px 0 0; }
 .docs-figure-portrait { max-width: 290px; }
 .docs-figure-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px; max-width: 596px; }
-.docs-figure a { display: block; border-radius: 8px; }
+.docs-figure a { display: block; border-radius: 6px; }
 .docs-figure a:hover img { border-color: var(--blue); }
-.docs-figure img { display: block; width: 100%; height: auto; border: 1px solid var(--docs-border); border-radius: 8px; }
+.docs-figure img { display: block; width: 100%; height: auto; border: 1px solid var(--docs-border); border-radius: 6px; }
 .docs-figure figcaption { margin-top: 8px; color: var(--muted); font-size: 13px; }
-.docs-code { border: 1px solid var(--docs-border); border-radius: 9px; background: var(--docs-panel); }
+.docs-code { border: 1px solid var(--docs-border); border-radius: 6px; background: var(--docs-panel); }
 .docs-code-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 9px 6px 14px; border-bottom: 1px solid var(--docs-border); color: var(--muted); font-size: 12px; }
 .docs-code-bar span, .docs-next { display: inline-flex; align-items: center; gap: 7px; }
 .docs-code-bar button { padding: 3px 9px; min-height: 30px; border: 1px solid var(--docs-border); border-radius: 5px; color: var(--muted); background: var(--docs-canvas); cursor: pointer; }
@@ -157,7 +160,7 @@
 .docs-guide-links { display: flex; flex-wrap: wrap; gap: 6px 17px; margin-top: 14px; }
 .docs-guide-links a { display: inline-flex; align-items: center; gap: 4px; }
 .docs-topic-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
-.docs-topic-grid a { display: block; padding: 14px 16px; border: 1px solid var(--docs-border); border-radius: 8px; background: var(--docs-panel); text-decoration: none; }
+.docs-topic-grid a { display: block; padding: 14px 16px; border: 1px solid var(--docs-border); border-radius: 6px; background: var(--docs-panel); text-decoration: none; }
 .docs-topic-grid a:hover { border-color: var(--accent-border); background: var(--docs-hero); }
 .docs-task-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .docs-topic-grid strong { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -171,7 +174,7 @@
 .docs-markdown h2 { margin: 30px 0 10px; padding-top: 20px; border-top: 1px solid var(--docs-border); font-size: clamp(22px, 3.3cqw, 29px); line-height: 1.25; }
 .docs-markdown h3 { margin: 21px 0 8px; }
 .docs-markdown :not(pre) > code { padding: 1px 4px; border-radius: 4px; background: var(--docs-panel); color: var(--docs-title); font-size: .9em; }
-.docs-markdown pre { margin: 0 0 16px; padding: 13px 15px; overflow: auto; border: 1px solid var(--docs-border); border-radius: 8px; font-size: 13px; }
+.docs-markdown pre { margin: 0 0 16px; padding: 13px 15px; overflow: auto; border: 1px solid var(--docs-border); border-radius: 6px; font-size: 13px; }
 [data-theme="dark"] .docs-markdown .astro-code,
 [data-theme="dark"] .docs-markdown .astro-code span { color: var(--shiki-dark) !important; background-color: var(--shiki-dark-bg) !important; }
 .docs-markdown table { display: block; max-width: 100%; overflow-x: auto; margin: 0 0 16px; border-collapse: collapse; }

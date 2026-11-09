@@ -127,7 +127,25 @@ export async function probeWithoutLocalNetwork(
   return supportsPublicProbe(guide.url) ? probeGuide(guide, { publicOnly: true, signal }) : false;
 }
 
+const dismissedKey = 'mearl-intranet-banner-dismissed';
+
+function isDismissed(scope: 'localStorage' | 'sessionStorage'): boolean {
+  try {
+    return window[scope].getItem(dismissedKey) === '1';
+  } catch {
+    return false;
+  }
+}
+
 export async function initGuide(): Promise<void> {
+  const banner = document.querySelector<HTMLElement>('[data-intranet-banner]');
+  const link = banner?.querySelector<HTMLAnchorElement>('[data-intranet-link]');
+  const close = banner?.querySelector<HTMLButtonElement>('[data-intranet-close]');
+  const never = banner?.querySelector<HTMLButtonElement>('[data-intranet-never]');
+  if (!banner || !link || !close || !never) return;
+  banner.hidden = true;
+  if (banner.dataset.dismissed || isDismissed('localStorage') || isDismissed('sessionStorage'))
+    return;
   const lifetime = new AbortController();
   const { signal } = lifetime;
   window.addEventListener('pagehide', () => lifetime.abort(), { once: true, signal });
@@ -150,9 +168,22 @@ export async function initGuide(): Promise<void> {
     const reachable = mayAutoProbe(permission, navigator.userAgent)
       ? await probeGuide(guide, { signal })
       : await probeWithoutLocalNetwork(guide, signal);
-    if (reachable && !signal.aborted) window.location.replace(guide.url);
+    if (!reachable || signal.aborted) return;
+    link.href = guide.url;
+    const dismiss = (scope: 'localStorage' | 'sessionStorage') => {
+      banner.hidden = true;
+      banner.dataset.dismissed = 'true';
+      try {
+        window[scope].setItem(dismissedKey, '1');
+      } catch {
+        /* The banner can still be dismissed on this page. */
+      }
+    };
+    close.onclick = () => dismiss('sessionStorage');
+    never.onclick = () => dismiss('localStorage');
+    banner.hidden = false;
   } catch {
-    // Guide discovery is optional for the public welcome page.
+    // Guide discovery is optional for the public site.
   } finally {
     lifetime.abort();
   }

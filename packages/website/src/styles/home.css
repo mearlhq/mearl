@@ -37,7 +37,7 @@
   margin: 0;
   padding: clamp(12px, 2vw, 20px);
   border: 1px solid var(--docs-border);
-  border-radius: 16px;
+  border-radius: 8px;
   background: var(--docs-panel);
 }
 
@@ -56,8 +56,8 @@
 
 .product-comparison-view { margin: 0; }
 .product-comparison-view h3 { margin: 0 0 5px; color: var(--docs-title); font-size: 13px; }
-.product-comparison-view a { display: block; border-radius: 8px; }
-.product-comparison-view img { display: block; width: 100%; height: auto; border-radius: 8px; }
+.product-comparison-view a { display: block; border-radius: 6px; }
+.product-comparison-view img { display: block; width: 100%; height: auto; border-radius: 6px; }
 .product-comparison-view figcaption { padding-top: 8px; color: var(--muted); font-size: 13px; }
 .product-comparison-links { margin-top: 12px; }
 
@@ -103,7 +103,7 @@
 .product-start {
   align-items: center;
   padding: clamp(20px, 4vw, 40px);
-  border-radius: 14px;
+  border-radius: 8px;
   background: var(--docs-hero);
 }
 .product-start p { margin-bottom: 0; }

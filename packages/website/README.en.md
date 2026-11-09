@@ -4,7 +4,7 @@
 
 The site includes a product overview and separate guides for installation, the first agent task, browser connections, page automation, web debugging, authenticated requests, device and App emulation, EgoLite, Skill plugins, and bb-browser adapters. Simplified Chinese is the default. The language switch opens the matching English page; the English homepage is `en.html`, and other English pages are under `en/`. Both languages follow the browser's color preference until the visitor switches themes.
 
-The extension opens `installed.html` under the URL in `packages/preset/installation-site.json` on first installation. The default is `https://mearlhq.github.io/mearl/`. The welcome page includes toolbar, DevTools, and agent setup instructions. Configured installation-guide detection runs on the welcome page.
+The standard extension opens `installed.html` under the URL in `packages/preset/installation-site.json` on first installation. The default is `https://mearlhq.github.io/mearl/`. The welcome page includes toolbar, DevTools, and agent setup instructions.
 
 ```sh
 pnpm dev:website
@@ -38,7 +38,7 @@ The catalog uses this format:
 }
 ```
 
-The guide URL must use an HTTPS origin distinct from the public website. The welcome page sends a cross-origin `HEAD` request to the configured URL and navigates there with `location.replace` when the request resolves.
+The guide URL must use an HTTPS origin distinct from the public website. When the guide is reachable, the public site shows a banner below its navigation with a link to the intranet site. Closing it hides the banner for the current tab session. “Don’t show again” remembers the choice in that browser.
 
 Set the Pages deployment source to GitHub Actions. The `Deploy installation website` workflow runs automatically when a push to `main` changes the website code, build dependencies, reference documents rendered on the site, or deployment configuration. Other pushes skip the website workflow. You can also run it manually after updating the repository secret.
 
@@ -46,8 +46,18 @@ The workflow reads the optional repository secret `MEARL_INSTALLATION_CONFIG`, v
 
 ## Environment detection
 
-The probe uses `no-cors` mode, follows redirects, omits credentials, disables caching, and includes a fresh query value. The welcome page treats an opaque response as a signal of network reachability. The browser hides the HTTP status and response contents. The public welcome page stays visible if the probe fails, receives no final response within five seconds, or cannot run silently.
+The public site sends a cross-origin `HEAD` request to the guide. The probe uses `no-cors` mode, follows redirects, omits credentials, disables caching, and includes a fresh query value. The public site treats an opaque response as a signal of network reachability. The browser hides the HTTP status and response contents. The banner stays hidden if the probe fails, receives no final response within five seconds, or cannot run silently.
 
-The welcome page automatically probes the guide URL when Local Network Access is already granted. Without a grant, browsers that support Permissions Policy probe from a frame with local network access disabled. This also supports HTTPS guides reached through a proxy. Other browsers with address-space controls only probe public IP space. Leaving the page cancels the probe.
+The public site automatically probes the guide URL when Local Network Access is already granted. Without a grant, browsers that support Permissions Policy probe from a frame with local network access disabled. This also supports HTTPS guides reached through a proxy. Other browsers with address-space controls only probe public IP space. Leaving the page cancels the probe.
 
 This website is an installation entry point. Installed capability packages must continue working without keeping the website open or online. The web-to-extension installation bridge is a separate integration step.
+
+## Custom extension welcome page
+
+Set one HTTPS website directory URL when building a team extension. The URL can include a subpath.
+
+```sh
+MEARL_WEBSITE_URL=https://team.example.com/mearl/ pnpm --filter @mearl/extension... build
+```
+
+On first installation, the extension sends a credential-free `HEAD` request to `installed.html` under that directory. A successful response within five seconds opens the team welcome page. Otherwise, the extension opens the public welcome page. The team build declares host access for checking the response. Users can enable a Preset on the website or run setup.

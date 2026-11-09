@@ -61,12 +61,6 @@ const common = siteCopy[locale];
   </div>
 </BaseLayout>
 
-<script>
-  import { initGuide } from '../scripts/welcome-guide';
-  void initGuide();
-  window.addEventListener('pageshow', event => { if (event.persisted) void initGuide(); });
-</script>
-
 <style>
   .installed-role-link { display: inline-flex; align-items: center; gap: 5px; color: var(--blue); text-decoration: none; }
   .installed-role-link:hover { color: var(--blue-hover); }

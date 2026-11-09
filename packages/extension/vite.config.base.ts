@@ -6,7 +6,7 @@ import { ManifestV3Export } from '@crxjs/vite-plugin';
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, BuildOptions } from 'vite';
 import { stripDevIcons, crxI18n, wrapInjectedIIFE, validateClassicContentScripts, emitToolboxPreactRuntime, emitAppProfileRuntime } from './custom-vite-plugins';
-import manifest from './manifest';
+import manifest, { customWebsite } from './manifest';
 import pkg from './package.json';
 
 const isDev = process.env.__DEV__ === 'true';
@@ -34,6 +34,7 @@ export const baseBuildOptions: BuildOptions = {
 export default defineConfig({
   define: {
     __MEARL_BUILD_CHANNEL__: JSON.stringify(isDev ? 'development' : 'production'),
+    __MEARL_WEBSITE_URL__: JSON.stringify(customWebsite?.href ?? ''),
   },
   resolve: {
     tsconfigPaths: true,

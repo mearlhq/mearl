@@ -26,6 +26,8 @@ afterEach(() => {
   controller.abort();
   window.dispatchEvent(new Event('pagehide'));
   document.body.replaceChildren();
+  localStorage.clear();
+  sessionStorage.clear();
   vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -182,6 +184,13 @@ describe('silent welcome page discovery', () => {
   });
 
   beforeEach(() => {
+    document.body.innerHTML = `
+      <aside data-intranet-banner hidden>
+        <a data-intranet-link>Open</a>
+        <button data-intranet-close>Close</button>
+        <button data-intranet-never>Don't show again</button>
+      </aside>
+      <main>Welcome</main>`;
     vi.stubGlobal('navigator', {
       userAgent: 'Chrome/148',
       permissions: { query: vi.fn().mockResolvedValue({ state: 'granted' }) },
@@ -189,21 +198,48 @@ describe('silent welcome page discovery', () => {
     vi.spyOn(installation, 'loadInstallationConfig').mockResolvedValue({ schemaVersion: 1, guide });
   });
 
-  it('replaces the welcome page when the guide is reachable', async () => {
+  it('shows a link without replacing the current page when the guide is reachable', async () => {
     const replace = vi.spyOn(window.location, 'replace').mockImplementation(() => {});
     fetchMock.mockResolvedValue(headResponse());
     await initGuide();
-    expect(replace).toHaveBeenCalledExactlyOnceWith(guide.url);
+    expect(replace).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-intranet-banner]')).not.toHaveProperty('hidden', true);
+    expect(document.querySelector('[data-intranet-link]')).toHaveProperty('href', guide.url);
+  });
+
+  it.each([
+    ['close', 'sessionStorage'],
+    ['never', 'localStorage'],
+  ] as const)('can dismiss using %s', async (button, scope) => {
+    fetchMock.mockResolvedValue(headResponse());
+    await initGuide();
+    document.querySelector<HTMLButtonElement>(`[data-intranet-${button}]`)!.click();
+    const banner = document.querySelector<HTMLElement>('[data-intranet-banner]')!;
+    expect(banner.hidden).toBe(true);
+    expect(window[scope].getItem('mearl-intranet-banner-dismissed')).toBe('1');
+
+    delete banner.dataset.dismissed;
+    await initGuide();
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(banner.hidden).toBe(true);
   });
 
   it('stays on the public welcome page after a failed probe', async () => {
-    document.body.innerHTML = '<main>Welcome</main>';
     const replace = vi.spyOn(window.location, 'replace').mockImplementation(() => {});
     fetchMock.mockRejectedValueOnce(new TypeError('Offline'));
     await initGuide();
     expect(replace).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledOnce();
-    expect(document.body.innerHTML).toBe('<main>Welcome</main>');
+    expect(document.querySelector('[data-intranet-banner]')).toHaveProperty('hidden', true);
+  });
+
+  it('hides a previously visible banner when the guide becomes unreachable', async () => {
+    fetchMock.mockResolvedValueOnce(headResponse()).mockRejectedValueOnce(new TypeError('Offline'));
+    const banner = document.querySelector('[data-intranet-banner]');
+    await initGuide();
+    expect(banner).toHaveProperty('hidden', false);
+    await initGuide();
+    expect(banner).toHaveProperty('hidden', true);
   });
 
   it('does not request access when a silent probe is unavailable', async () => {

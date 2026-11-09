@@ -4,7 +4,7 @@
 
 官网包含产品概览，以及安装、首个 Agent 任务、浏览器连接、网页自动化、网页调试、带登录态的请求、设备与 App 模拟、EgoLite、Skill 插件和 bb-browser 适配器的独立指南。默认使用简体中文。语言切换链接指向对应的英文页面，英文首页为 `en.html`，其余英文页面位于 `en/`。两种语言默认跟随浏览器配色，也支持手动切换。
 
-扩展首次安装时会打开 `packages/preset/installation-site.json` 中 URL 下的 `installed.html`，默认为 `https://mearlhq.github.io/mearl/`。欢迎页包含工具栏、DevTools 和 Agent 配置说明。已配置的安装引导连接检测在欢迎页运行。
+标准扩展首次安装时会打开 `packages/preset/installation-site.json` 中 URL 下的 `installed.html`，默认为 `https://mearlhq.github.io/mearl/`。欢迎页包含工具栏、DevTools 和 Agent 配置说明。
 
 ```sh
 pnpm dev:website
@@ -38,7 +38,7 @@ MEARL_INSTALLATION_CONFIG="$(cat /path/to/installation.json)" pnpm build:website
 }
 ```
 
-引导 URL 必须使用与公共网站不同的 HTTPS origin。欢迎页向配置的引导地址发起跨域 `HEAD` 请求。收到响应后通过 `location.replace` 进入配置的地址。
+引导 URL 必须使用与公网官网不同的 HTTPS origin。探测到可访问时，公网官网在导航栏下方显示横幅，用户可点击进入内网官网。「关闭」在当前标签页会话内隐藏横幅，「不再提示」会记住此浏览器中的选择。
 
 将 Pages 的部署来源设为 GitHub Actions。`Deploy installation website` 工作流在 `main` 收到涉及官网代码、构建依赖、站内参考文档或部署配置的推送时自动运行。其他推送跳过官网工作流。更新仓库密钥后也可以手动运行。
 
@@ -46,8 +46,18 @@ MEARL_INSTALLATION_CONFIG="$(cat /path/to/installation.json)" pnpm build:website
 
 ## 环境检测
 
-探测使用 `no-cors` 模式，跟随重定向，省略凭据，禁用缓存并携带新的查询值。浏览器返回不透明响应时，欢迎页将其视为网络可达。HTTP 状态和响应内容对欢迎页不可见。连接失败、五秒内未收到最终响应或无法静默探测时，继续显示公网欢迎页。
+官网通过跨域 `HEAD` 探测引导地址。请求使用 `no-cors` 模式，跟随重定向，省略凭据，禁用缓存并携带新的查询值。浏览器返回不透明响应时，官网将其视为网络可达。HTTP 状态和响应内容对官网不可见。连接失败、五秒内未收到最终响应或无法静默探测时，横幅保持隐藏。
 
-欢迎页在已取得 Local Network Access 授权时自动检测引导地址。未获授权时，支持权限策略的浏览器在禁用本地网络权限的 iframe 内检测，兼容经代理访问的 HTTPS 引导。其他支持地址空间限制的浏览器仅自动探测公共 IP 空间。离开页面时取消探测。
+公网官网在已取得 Local Network Access 授权时自动检测引导地址。未获授权时，支持权限策略的浏览器在禁用本地网络权限的 iframe 内检测，兼容经代理访问的 HTTPS 引导。其他支持地址空间限制的浏览器仅自动探测公共 IP 空间。离开页面时取消探测。
 
 网站是安装入口。已安装的能力包必须在网站关闭或离线时继续运行。网页到扩展的安装桥是独立集成步骤。
+
+## 定制扩展欢迎页
+
+构建团队扩展时，通过一个 HTTPS 官网目录 URL 指定欢迎页，支持子路径。
+
+```sh
+MEARL_WEBSITE_URL=https://team.example.com/mearl/ pnpm --filter @mearl/extension... build
+```
+
+首次安装时，扩展向该目录下的 `installed.html` 发送不带凭据的 `HEAD` 请求。五秒内收到成功响应时打开团队欢迎页，否则打开公网欢迎页。定制构建声明团队官网的主机权限，用于检测响应。用户可以在官网手动启用 Preset，或运行 setup 命令。
