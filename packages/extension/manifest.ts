@@ -133,7 +133,17 @@ const manifest: ManifestV3Export = {
     'tabGroups',
     'offscreen',
   ],
-  host_permissions: [...ALLOWED_ORIGINS_LIST, 'https://www.google-analytics.com/*', 'https://skills.sh/*', 'https://api.github.com/*', installationOrigin, ...(customWebsite ? [`https://${customWebsite.hostname}/*`] : [])],
+  host_permissions: [
+    ...ALLOWED_ORIGINS_LIST,
+    'https://www.google-analytics.com/*',
+    'https://skills.sh/*',
+    'https://api.github.com/*',
+    // Release downloads for the remote config and toolbox catalog redirect to the asset host.
+    'https://github.com/*',
+    'https://release-assets.githubusercontent.com/*',
+    installationOrigin,
+    ...(customWebsite ? [`https://${customWebsite.hostname}/*`] : []),
+  ],
   optional_host_permissions: ['<all_urls>'],
 };
 
