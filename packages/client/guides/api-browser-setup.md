@@ -5,6 +5,7 @@
 ## 目录
 
 - [浏览器实例](#browser-instances)
+- [Electron 桌面应用](#electron-cdp)
 - [控制会话与人工交接](#control-sessions)
 - [目标宿主与高级路由参数](#cloud-connectors)
 - [可选浏览器 Provider](#browser-providers)
@@ -32,6 +33,29 @@ mearl browser_launch --payload '{"provider":"<providerId>","providerOptions":{}}
 不带 `--session` 的 `browser_release` 通过 `--browser <id|名称>` 选择普通浏览器，只在用户明确要求结束调试、退出接管或清理环境时调用。它会释放 debugger/CDP 控制，清理依赖当前调试连接的 Mock、设备/时区模拟与持续采集，保留浏览器和标签页；存在活动控制会话时拒绝浏览器级释放。用户要求的终态依赖这些效果时保持控制。会话任务的收尾见[控制会话](#control-sessions)；Provider 的 detach 或其他收尾遵循 `mearl <providerId>`。
 
 浏览器访问入口不会出现在 `browser_list` 中。只有用户明确需要时才运行 `mearl check --browser <id|名称>`，并把返回的 `browserAccess.url` 按敏感信息处理，不写入日志或转发给无关方。
+
+<a id="electron-cdp"></a>
+
+## Electron 桌面应用
+
+Electron 应用开放 Chromium CDP 后，可用 Mearl 操作其渲染页面，复用页面快照、点击、输入和截图。原生菜单、系统弹窗和主进程调试不在这条链路内，具体能力以目标实际响应为准。
+
+先使用应用已提供的调试端口；需要启动应用时，可按应用支持的方式传 `--remote-debugging-port=9223`（示例端口）。该参数须在应用启动时生效，已运行实例不一定接受再次启动的参数；重启前确认不会中断用户工作。不要把主进程的 `--inspect` 端口当作渲染页面端点。参见 [Electron 调试开关](https://www.electronjs.org/docs/latest/api/command-line-switches#--remote-debugging-portport)。
+
+对已确认的本机端口，在单独终端运行 CDP 宿主并保持进程运行：
+
+```bash
+mearl-native-host --daemon --cdp-port 9223 --browser-id electron-app --browser-name "Electron App"
+```
+
+在另一个终端用 `mearl browser_list` 找到该实例，后续沿用返回的 `browserId`：
+
+```bash
+mearl tab_list --browser '<browserId>'
+mearl page_snapshot --browser '<browserId>' --payload '{"tabId":12345,"mode":"viewport"}'
+```
+
+`tabId` 使用 `tab_list` 返回的真实值。优先操作已有应用窗口，不用 `tab_open` 导航替换应用主界面；未列出页面时先检查端点与页面目标，不把连接成功等同于应用已可操作。
 
 <a id="control-sessions"></a>
 
