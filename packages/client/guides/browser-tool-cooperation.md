@@ -4,7 +4,7 @@ Mearl 单独使用时沿用主 Skill 的页面操作流程。任务已有 Ego、
 
 ## EgoLite
 
-使用独立 `@mearl/provider-ego`，安装入口和支持范围以 Provider 自身 README 为准。本地源码构建后可用 `{{setup}} provider install '@mearl/provider-ego@/absolute/path/to/provider-ego'` 安装并注册；也可指定 GitHub Release 安装包地址。
+使用独立 `@mearl/provider-ego`，安装入口和支持范围以 Provider 自身 README 为准。Mearl 3.0.6+ 可用 `{{setup}} provider install @mearl/provider-ego` 安装并注册；源码构建后可指定 `@mearl/provider-ego@/absolute/path/to/provider-ego`，也可指定带包名的 GitHub Release 安装包地址。
 
 - 无需浏览器扩展。已有扩展可关闭 Agent 服务，保留人工调试面板。Mearl 本地运行时仍负责 Provider 路由和已安装 App 资源解析。
 - 一个 Provider 浏览器对应一个 Ego Space。启动时传 `providerOptions.name`；已有任务传数字 `providerOptions.spaceId`。只关联 Agent 所有的 Space，不隐式认领用户 Space。

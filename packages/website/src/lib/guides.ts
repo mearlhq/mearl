@@ -37,7 +37,7 @@ const findProfiles = 'mearl set_app_profile --help';
 const wechatMiniProgram = `npx @mearl/setup plugin install mearlhq/wechat-profile --github --skill wechat-miniprogram
 mearl wxa run ./dist`;
 const chineseBqb = 'https://github.com/F-loat/ChineseBQB-weapp';
-const egoSetup = `npx @mearl/setup provider install '@mearl/provider-ego@/absolute/path/to/provider-ego'
+const egoSetup = `npx @mearl/setup@latest provider install @mearl/provider-ego
 mearl browser_launch --payload '{"provider":"ego","providerOptions":{"name":"My task"}}'`;
 const pluginSetup = `npx @mearl/setup plugin install mearlhq/mearl --github --skill notes-memory
 mearl notes --help
@@ -649,7 +649,7 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
         {
           id: 'setup',
           title: 'Install the independent Provider',
-          text: 'Register a built provider-ego directory with Mearl setup. Requires Node.js 22.23.4+, Mearl 3.0.5+ and ego-browser on PATH. The development package is not yet published to npm. No separate mearl-ego Skill is required. Source builds require a Native Host SDK archive exporting external-page-host; npm 3.0.5 does not include that API.',
+          text: 'Install @mearl/provider-ego with Mearl setup. Requires Node.js 22.23.4+, Mearl 3.0.6+ and ego-browser on PATH. No separate mearl-ego Skill is required. The package bundles the native page SDK; source builds use the published SDK pinned in the lockfile.',
           command: egoSetup,
           links: [
             {
@@ -677,9 +677,9 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
           id: 'control',
           title: 'Keep control in Ego',
           text: 'Use the Provider CLI for handoff, resume and finish; resume only after the user explicitly returns control. Ego blocks native page operations during takeover. finish keeps no Agent pages by default; use --keep with Ego Page labels to retain results. browser_release only detaches the Provider and does not finish the Space or clear emulation.',
-          command: `node /absolute/path/to/provider-ego/dist/cli.js handoff <spaceId>
-node /absolute/path/to/provider-ego/dist/cli.js resume <spaceId>
-node /absolute/path/to/provider-ego/dist/cli.js finish <spaceId> --keep p1,p2`,
+          command: `mearl-ego handoff <spaceId>
+mearl-ego resume <spaceId>
+mearl-ego finish <spaceId> --keep p1,p2`,
         },
         {
           id: 'emulation',
@@ -707,7 +707,7 @@ node /absolute/path/to/provider-ego/dist/cli.js finish <spaceId> --keep p1,p2`,
         {
           id: 'setup',
           title: '安装独立 Provider',
-          text: '通过 Mearl setup 注册已构建的 provider-ego 本地目录。需要 Node.js 22.23.4+、Mearl 3.0.5+，且 ego-browser 可执行。开发包尚未发布到 npm，无需单独安装 mearl-ego Skill。源码构建需要包含 external-page-host 导出的 Native Host SDK 归档，npm 3.0.5 尚无此接口。',
+          text: '通过 Mearl setup 安装 @mearl/provider-ego。需要 Node.js 22.23.4+、Mearl 3.0.6+，且 ego-browser 可执行，无需单独安装 mearl-ego Skill。安装包已内置原生页面 SDK；源码构建使用锁文件中固定的已发布 SDK。',
           command: egoSetup,
           links: [
             { label: 'Provider 源码与构建说明', url: 'https://github.com/mearlhq/provider-ego' },
@@ -732,9 +732,9 @@ node /absolute/path/to/provider-ego/dist/cli.js finish <spaceId> --keep p1,p2`,
           id: 'control',
           title: '由 Ego 统一控制权',
           text: '使用 Provider CLI 交接、恢复和完成任务，仅在用户明确交还后恢复。接管期间 Ego 阻断原生页面操作。finish 默认不保留 Agent 页面；用 --keep 指定 Ego Page label 保留结果页。browser_release 只解绑 Provider，不结束 Space，也不清除模拟。',
-          command: `node /absolute/path/to/provider-ego/dist/cli.js handoff <spaceId>
-node /absolute/path/to/provider-ego/dist/cli.js resume <spaceId>
-node /absolute/path/to/provider-ego/dist/cli.js finish <spaceId> --keep p1,p2`,
+          command: `mearl-ego handoff <spaceId>
+mearl-ego resume <spaceId>
+mearl-ego finish <spaceId> --keep p1,p2`,
         },
         {
           id: 'emulation',
