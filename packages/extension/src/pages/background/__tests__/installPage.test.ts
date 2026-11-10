@@ -29,13 +29,20 @@ describe('installation welcome page', () => {
     await expect(openInstallPage('install')).resolves.toBeUndefined();
   });
 
-  it.each([true, false])(
-    'uses the custom welcome page only when reachable (%s)',
-    async reachable => {
+  it.each(['opaque', 'network-error', 'timeout'])(
+    'selects the welcome page after a %s probe',
+    async result => {
       vi.resetModules();
       vi.stubGlobal('__MEARL_WEBSITE_URL__', 'https://team.example.test/mearl/');
       const { openInstallPage: openCustomPage } = await import('../installPage');
-      fetchPage.mockResolvedValue({ ok: reachable });
+      const reachable = result === 'opaque';
+      if (reachable) fetchPage.mockResolvedValue({ type: 'opaque', status: 0, ok: false });
+      else
+        fetchPage.mockRejectedValue(
+          result === 'timeout'
+            ? new DOMException('Timed out', 'TimeoutError')
+            : new TypeError('Failed to fetch'),
+        );
 
       await openCustomPage('install');
 
@@ -44,7 +51,8 @@ describe('installation welcome page', () => {
         welcome,
         expect.objectContaining({
           method: 'HEAD',
-          redirect: 'error',
+          mode: 'no-cors',
+          redirect: 'follow',
           credentials: 'omit',
           signal: expect.any(AbortSignal),
         }),

@@ -23,7 +23,6 @@ async function fixture() {
   await writeFile(resolve(source, 'packages/extension/package.json'), JSON.stringify({ name: 'extension', private: true, version }));
   await writeFile(resolve(source, 'packages/mcp-server/server.json'), JSON.stringify({ version, packages: [{ version }] }));
   await writeFile(resolve(source, 'skills/example/SKILL.md'), `---\nname: example\nversion: "${version}"\n---\n`);
-  await writeFile(resolve(source, 'packages/website/public/toolbox.json'), '{"tools":[]}\n');
   await writeFile(resolve(source, 'LICENSE'), 'Fixture license\n');
   await writeFile(resolve(source, 'packages/cloud/.gitkeep'), '');
   git(source, 'init', '-b', 'codex/open-source-ready');

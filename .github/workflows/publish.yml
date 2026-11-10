@@ -90,6 +90,7 @@ jobs:
         working-directory: ${{ runner.temp }}/mearl-release
       - name: Build release packages and extension
         env:
+          MEARL_WEBSITE_URL: ${{ vars.MEARL_WEBSITE_URL }}
           VITE_MEARL_ANALYTICS_ID: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.channel == 'stable' && vars.VITE_MEARL_ANALYTICS_ID || '' }}
           VITE_MEARL_ANALYTICS_SECRET: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.channel == 'stable' && secrets.VITE_MEARL_ANALYTICS_SECRET || '' }}
         run: |

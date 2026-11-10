@@ -1,4 +1,5 @@
 import installationSite from '@mearl/preset/installation-site.json';
+import { loadEnv } from 'vite';
 import type { ManifestV3Export } from '@crxjs/vite-plugin';
 import { ALLOWED_ORIGINS_LIST } from './src/shared/allowedOrigins';
 import { EARLY_CONTENT_SCRIPT_FILES } from './src/shared/appProfileRuntimeAsset';
@@ -20,7 +21,9 @@ function customWebsiteUrl(value: string | undefined): URL | undefined {
   return url;
 }
 
-export const customWebsite = customWebsiteUrl(process.env.MEARL_WEBSITE_URL);
+export const customWebsite = customWebsiteUrl(
+  loadEnv(process.env.__DEV__ === 'true' ? 'development' : 'production', import.meta.dirname, 'MEARL_WEBSITE_URL').MEARL_WEBSITE_URL,
+);
 
 interface ContentScriptDefinition {
   matches: string[];
@@ -142,7 +145,6 @@ const manifest: ManifestV3Export = {
     'https://github.com/*',
     'https://release-assets.githubusercontent.com/*',
     installationOrigin,
-    ...(customWebsite ? [`https://${customWebsite.hostname}/*`] : []),
   ],
   optional_host_permissions: ['<all_urls>'],
 };

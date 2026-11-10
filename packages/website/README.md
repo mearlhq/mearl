@@ -60,4 +60,6 @@ MEARL_INSTALLATION_CONFIG="$(cat /path/to/installation.json)" pnpm build:website
 MEARL_WEBSITE_URL=https://team.example.com/mearl/ pnpm --filter @mearl/extension... build
 ```
 
-首次安装时，扩展向该目录下的 `installed.html` 发送不带凭据的 `HEAD` 请求。五秒内收到成功响应时打开团队欢迎页，否则打开公网欢迎页。定制构建声明团队官网的主机权限，用于检测响应。用户可以在官网手动启用 Preset，或运行 setup 命令。
+本地可在 `packages/extension/.env.local` 中设置 `MEARL_WEBSITE_URL`；该文件不提交。发布工作流读取同名 GitHub 仓库变量。进程环境变量优先于本地配置。
+
+首次安装时，扩展向该目录下的 `installed.html` 发送不带凭据的 `no-cors HEAD` 请求，跟随重定向。五秒内完成请求时打开团队欢迎页，否则打开公网欢迎页。探测不依赖团队官网的 Manifest 主机权限，不读取响应内容或 HTTP 状态；不透明响应也表示网络可达。用户可以在官网手动启用 Preset，或运行 setup 命令。

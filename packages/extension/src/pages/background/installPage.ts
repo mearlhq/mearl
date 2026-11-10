@@ -16,12 +16,13 @@ export async function openInstallPage(
     CUSTOM_INSTALL_PAGE_URL &&
     (await fetch(CUSTOM_INSTALL_PAGE_URL, {
       method: 'HEAD',
+      mode: 'no-cors',
       credentials: 'omit',
       cache: 'no-store',
-      redirect: 'error',
+      redirect: 'follow',
       signal: AbortSignal.timeout(5_000),
     }).then(
-      response => response.ok,
+      () => true,
       () => false,
     ));
   try {

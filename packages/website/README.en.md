@@ -60,4 +60,6 @@ Set one HTTPS website directory URL when building a team extension. The URL can 
 MEARL_WEBSITE_URL=https://team.example.com/mearl/ pnpm --filter @mearl/extension... build
 ```
 
-On first installation, the extension sends a credential-free `HEAD` request to `installed.html` under that directory. A successful response within five seconds opens the team welcome page. Otherwise, the extension opens the public welcome page. The team build declares host access for checking the response. Users can enable a Preset on the website or run setup.
+For local builds, set `MEARL_WEBSITE_URL` in the untracked `packages/extension/.env.local` file. The release workflow reads the GitHub repository variable of the same name. Process environment variables take precedence over local configuration.
+
+On first installation, the extension sends a credential-free `no-cors HEAD` request to `installed.html` under that directory and follows redirects. A completed request within five seconds opens the team welcome page. Otherwise, the extension opens the public welcome page. The probe does not depend on Manifest host permissions for the team website or read response content or HTTP status; an opaque response also indicates network reachability. Users can enable a Preset on the website or run setup.
