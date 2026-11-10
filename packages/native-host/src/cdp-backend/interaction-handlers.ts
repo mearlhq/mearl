@@ -92,6 +92,7 @@ import {
 } from './app-profile-handlers.js';
 import {
   applyCdpDeviceShell,
+  canLoadCdpDeviceShell,
   clearCdpDeviceShell,
   getCdpDeviceShellInputOffset,
   isCdpDeviceShellActive,
@@ -785,8 +786,7 @@ export async function cdpPageType(session: PageSession, data: PageTypeParams): P
         returnByValue: true,
       });
       const value = result.result?.value as
-        | { typed: boolean; tag: string; error?: string }
-        | undefined;
+        { typed: boolean; tag: string; error?: string } | undefined;
       if (!value) throw new Error('cdp_page_type: evaluation returned no value');
       if (value.error) throw new PageActionPreconditionError(value.error);
       return { typed: true, tag: value.tag };
@@ -1091,7 +1091,8 @@ export async function cdpPageNavigate(
     { url: input.url },
     timeout + 5000,
   );
-  if (isCdpAppProfileActive(session)) await waitForCdpAppProfileLoad(session, timeout);
+  if (isCdpDeviceShellActive(session)) await waitForCdpDeviceShellLoad(session);
+  else if (isCdpAppProfileActive(session)) await waitForCdpAppProfileLoad(session, timeout);
   else await waitForPageLoad(session, timeout);
   return { success: true, url: result.url ?? input.url, frameId: result.frameId };
 }
@@ -1270,7 +1271,10 @@ export async function cdpSetDeviceEmulation(
   }
 
   let reloaded = false;
-  if (data?.reload !== false || deviceShellChanged || hadDeviceShell !== deviceShell) {
+  if (
+    (data?.reload !== false || deviceShellChanged || hadDeviceShell !== deviceShell) &&
+    (!deviceShell || (await canLoadCdpDeviceShell(session)))
+  ) {
     clearPageRefsForNavigation(session);
     try {
       await sendCdpPageCommand(session, session.client, 'Page.reload', {});

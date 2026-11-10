@@ -715,6 +715,11 @@ export async function sendCdpDeviceShellPageCommand(
   ) => sendCdpPageCommand(session, client, command, commandParams, timeoutMs);
   const state = deviceShellStates.get(session);
   if (!state) return send(session.client, method, params);
+  // Before the first HTTP navigation, only the outer document exists. Other
+  // actions must still require a ready business WebView.
+  if (method === 'Page.navigate' && !(await canLoadCdpDeviceShell(session))) {
+    return send(session.client, method, params);
+  }
   const endpoint = await resolveCdpDeviceShellPageEndpoint(session);
   if (endpoint.frameId === undefined) return send(endpoint.client, method, params);
 
@@ -931,6 +936,12 @@ function hasLoadedRootWebView(frameTree: Record<string, any> | undefined): boole
   return Array.isArray(frameTree.childFrames)
     ? frameTree.childFrames.some((child: Record<string, any>) => hasLoadedRootWebView(child))
     : false;
+}
+
+/** The shell bootstrap only runs on HTTP documents; blank/new tabs prepare it for navigation. */
+export async function canLoadCdpDeviceShell(session: PageSession): Promise<boolean> {
+  const { frameTree } = await session.client.sendCommand('Page.getFrameTree');
+  return /^https?:/i.test(frameTree?.frame?.url ?? '');
 }
 
 export async function waitForCdpDeviceShellLoad(

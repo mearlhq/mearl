@@ -32,7 +32,7 @@ afterEach(() => {
   clearCdpFetchInterceptionState();
 });
 
-function createSession(restoreProbe?: unknown) {
+function createSession(restoreProbe?: unknown, documentUrl = 'https://example.test/') {
   const listeners = new Map<string, (params: any) => void>();
   let nextDocumentScriptId = 1;
   const sendCommand = vi.fn(async (method: string, params?: Record<string, unknown>) => {
@@ -44,16 +44,18 @@ function createSession(restoreProbe?: unknown) {
     if (method === 'Page.getFrameTree') {
       return {
         frameTree: {
-          frame: { id: 'main', url: 'https://example.test/' },
-          childFrames: [
-            {
-              frame: {
-                id: 'root-webview',
-                name: '__mearl_root__',
-                url: 'https://example.test/',
-              },
-            },
-          ],
+          frame: { id: 'main', url: documentUrl },
+          childFrames: documentUrl.startsWith('https:')
+            ? [
+                {
+                  frame: {
+                    id: 'root-webview',
+                    name: '__mearl_root__',
+                    url: 'https://example.test/',
+                  },
+                },
+              ]
+            : [],
         },
       };
     }
@@ -153,6 +155,30 @@ function createSession(restoreProbe?: unknown) {
   } as any;
   return { listeners, sendCommand, session };
 }
+
+it.each(['about:blank', 'chrome://newtab/', 'chrome://new-tab-page/', 'https://example.test/'])(
+  'prepares the App shell before navigation from %s without waiting for an impossible WebView',
+  async url => {
+    const { session, sendCommand } = createSession(undefined, url);
+    const webDocument = url.startsWith('https:');
+    const result = await cdpSetAppProfile(session, {
+      enabled: true,
+      profile: 'shop',
+      reload: false,
+      emulation: { preset: 'iphone-17-pro', deviceShell: true },
+    });
+    expect(result.reloaded).toBe(webDocument);
+    expect(session.emulation.deviceShell).toBe(true);
+    expect(sendCommand.mock.calls.some(([method]) => method === 'Page.reload')).toBe(webDocument);
+    expect(
+      sendCommand.mock.calls.some(
+        ([method, params]) =>
+          method === 'Page.addScriptToEvaluateOnNewDocument' &&
+          String(params?.source).includes('data-mearl-root-webview'),
+      ),
+    ).toBe(true);
+  },
+);
 
 let directory: string;
 let window: Window;

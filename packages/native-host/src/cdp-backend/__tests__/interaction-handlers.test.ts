@@ -357,12 +357,20 @@ describe('native CDP interaction handlers', () => {
   });
 
   it('rejects a disabled option reached by a DOM point click', async () => {
-    const session = { client: { sendCommand: vi.fn(async () => ({
-      result: { value: { error: 'Cannot select a disabled option' } },
-    })), on: vi.fn(() => () => {}) } } as any;
-    await expect(cdpPageClick(session, {
-      point: { x: 20, y: 30 }, clickMode: 'dom',
-    })).rejects.toMatchObject({ pageActionFailureStage: 'precondition' });
+    const session = {
+      client: {
+        sendCommand: vi.fn(async () => ({
+          result: { value: { error: 'Cannot select a disabled option' } },
+        })),
+        on: vi.fn(() => () => {}),
+      },
+    } as any;
+    await expect(
+      cdpPageClick(session, {
+        point: { x: 20, y: 30 },
+        clickMode: 'dom',
+      }),
+    ).rejects.toMatchObject({ pageActionFailureStage: 'precondition' });
   });
 
   it('uses the DOM fallback for point clicks on a hidden page', async () => {
@@ -533,30 +541,51 @@ describe('native CDP interaction handlers', () => {
   });
 
   it.each([
-    ['selector', 'auto'], ['ref', 'auto'], ['text', 'auto'],
-    ['selector', 'mouse'], ['ref', 'mouse'], ['text', 'mouse'],
+    ['selector', 'auto'],
+    ['ref', 'auto'],
+    ['text', 'auto'],
+    ['selector', 'mouse'],
+    ['ref', 'mouse'],
+    ['text', 'mouse'],
   ] as const)('dispatches native options via %s in %s mode', async (mode, clickMode) => {
     const selectionState = { valueBefore: 'old', valueAfter: 'new', selectedAfter: true };
-    const coords = { x: 20, y: 30, tag: 'select', text: 'Old New', sourceTarget: { tag: 'option', text: 'New' } };
+    const coords = {
+      x: 20,
+      y: 30,
+      tag: 'select',
+      text: 'Old New',
+      sourceTarget: { tag: 'option', text: 'New' },
+    };
     const selection = { tag: 'option', text: 'New', selectionState };
     let backendCalls = 0;
     const sendCommand = vi.fn(async (method: string, params?: any) => {
       if (method === 'DOM.resolveNode') return { object: { objectId: 'option' } };
-      if (method === 'Accessibility.getFullAXTree') return { nodes: [
-        { role: { value: 'option' }, name: { value: 'New' }, backendDOMNodeId: 44 },
-      ] };
-      if (method === 'Runtime.callFunctionOn') return { result: { value: backendCalls++ === 0 ? coords : selection } };
+      if (method === 'Accessibility.getFullAXTree')
+        return {
+          nodes: [{ role: { value: 'option' }, name: { value: 'New' }, backendDOMNodeId: 44 }],
+        };
+      if (method === 'Runtime.callFunctionOn')
+        return { result: { value: backendCalls++ === 0 ? coords : selection } };
       if (method === 'Runtime.evaluate') {
-        if (params.expression === 'document.visibilityState') return { result: { value: 'visible' } };
-        if (params.expression.includes('Cannot resolve element coordinates')) return { result: { value: coords } };
-        if (params.expression.includes('Cannot resolve clickable element')) return { result: { value: selection } };
+        if (params.expression === 'document.visibilityState')
+          return { result: { value: 'visible' } };
+        if (params.expression.includes('Cannot resolve element coordinates'))
+          return { result: { value: coords } };
+        if (params.expression.includes('Cannot resolve clickable element'))
+          return { result: { value: selection } };
       }
       return {};
     });
     const session = { client: { sendCommand, on: vi.fn(() => () => {}) } } as any;
-    const ref = getPageRefRegistry(session).registerDelta({ backendNodeId: 44, role: 'option', name: 'New' });
-    const params = mode === 'text' ? { text: 'New', role: 'option' }
-      : { selector: mode === 'ref' ? ref : '#target' };
+    const ref = getPageRefRegistry(session).registerDelta({
+      backendNodeId: 44,
+      role: 'option',
+      name: 'New',
+    });
+    const params =
+      mode === 'text'
+        ? { text: 'New', role: 'option' }
+        : { selector: mode === 'ref' ? ref : '#target' };
     const result = await cdpPageClick(session, { ...params, clickMode });
     if (clickMode === 'auto') {
       expect(result).toMatchObject({ tag: 'option', dispatchMode: 'dom', selectionState });
@@ -564,8 +593,9 @@ describe('native CDP interaction handlers', () => {
       expect(result).toMatchObject({ dispatchMode: 'trusted-input', pointerType: 'mouse' });
       expect(result).not.toHaveProperty('selectionState');
     }
-    expect(sendCommand.mock.calls.some(([method]) => method.startsWith('Input.')))
-      .toBe(clickMode === 'mouse');
+    expect(sendCommand.mock.calls.some(([method]) => method.startsWith('Input.'))).toBe(
+      clickMode === 'mouse',
+    );
   });
 
   it('preserves controlState for checkbox selectors on the adaptive JS path', async () => {
@@ -868,58 +898,111 @@ describe('native CDP interaction handlers', () => {
     expect(session.emulation).toBeUndefined();
   });
 
-  it('forces a reload when the device shell iframe is enabled or removed', async () => {
+  it.each(['https://example.test/', 'about:blank', 'chrome://newtab/'])(
+    'reloads a device shell only on a supported document: %s',
+    async url => {
+      const sendCommand = vi.fn(async (method: string, params?: any) => {
+        if (method === 'Page.addScriptToEvaluateOnNewDocument') {
+          expect(params.source).toContain('data-mearl-root-webview');
+          return { identifier: 'device-shell-script' };
+        }
+        if (method === 'Page.getFrameTree') {
+          return {
+            frameTree: {
+              frame: { id: 'top', name: '', url },
+              childFrames: url.startsWith('https:')
+                ? [
+                    {
+                      frame: {
+                        id: 'root',
+                        name: '__mearl_root__',
+                        url: 'https://example.test/',
+                      },
+                    },
+                  ]
+                : [],
+            },
+          };
+        }
+        if (method === 'Runtime.evaluate') return { result: { value: 'complete' } };
+        return {};
+      });
+      const session = {
+        client: { sendCommand, on: vi.fn(() => () => {}) },
+      } as any;
+
+      await expect(
+        cdpSetDeviceEmulation(session, {
+          enabled: true,
+          preset: 'iphone-15-pro',
+          deviceShell: true,
+          reload: false,
+        }),
+      ).resolves.toMatchObject({
+        enabled: true,
+        deviceShell: true,
+        reloaded: url.startsWith('https:'),
+      });
+      expect(sendCommand.mock.calls.some(([method]) => method === 'Page.reload')).toBe(
+        url.startsWith('https:'),
+      );
+
+      sendCommand.mockClear();
+      await expect(
+        cdpSetDeviceEmulation(session, { enabled: false, reload: false }),
+      ).resolves.toEqual({
+        enabled: false,
+        deviceShell: false,
+        splitScreen: false,
+        reloaded: true,
+      });
+      expect(sendCommand).toHaveBeenCalledWith('Page.removeScriptToEvaluateOnNewDocument', {
+        identifier: 'device-shell-script',
+      });
+      expect(sendCommand).toHaveBeenCalledWith('Page.reload', {});
+    },
+  );
+
+  it('navigates a prepared blank shell at the top level and requires its WebView afterwards', async () => {
+    let url = 'about:blank';
+    let rootReady = false;
     const sendCommand = vi.fn(async (method: string, params?: any) => {
-      if (method === 'Page.addScriptToEvaluateOnNewDocument') {
-        expect(params.source).toContain('data-mearl-root-webview');
-        return { identifier: 'device-shell-script' };
-      }
-      if (method === 'Page.getFrameTree') {
+      if (method === 'Page.addScriptToEvaluateOnNewDocument') return { identifier: 'shell-script' };
+      if (method === 'Page.getFrameTree')
         return {
           frameTree: {
-            frame: { id: 'top', name: '', url: 'https://example.test/' },
-            childFrames: [
-              {
-                frame: {
-                  id: 'root',
-                  name: '__mearl_root__',
-                  url: 'https://example.test/',
-                },
-              },
-            ],
+            frame: { id: 'top', url },
+            childFrames: rootReady ? [{ frame: { id: 'root', name: '__mearl_root__', url } }] : [],
           },
         };
+      if (method === 'Page.navigate') {
+        url = params.url;
+        rootReady = true;
+        return { frameId: 'top' };
       }
-      if (method === 'Runtime.evaluate') return { result: { value: 'complete' } };
       return {};
     });
-    const session = {
-      client: { sendCommand, on: vi.fn(() => () => {}) },
-    } as any;
-
-    await expect(
-      cdpSetDeviceEmulation(session, {
-        enabled: true,
-        preset: 'iphone-15-pro',
-        deviceShell: true,
-        reload: false,
-      }),
-    ).resolves.toMatchObject({ enabled: true, deviceShell: true, reloaded: true });
-    expect(sendCommand).toHaveBeenCalledWith('Page.reload', {});
-
-    sendCommand.mockClear();
-    await expect(
-      cdpSetDeviceEmulation(session, { enabled: false, reload: false }),
-    ).resolves.toEqual({
-      enabled: false,
-      deviceShell: false,
-      splitScreen: false,
-      reloaded: true,
+    const session = { client: { sendCommand, on: vi.fn(() => () => {}) } } as any;
+    await cdpSetDeviceEmulation(session, {
+      enabled: true,
+      preset: 'iphone-17-pro',
+      deviceShell: true,
+      reload: false,
     });
-    expect(sendCommand).toHaveBeenCalledWith('Page.removeScriptToEvaluateOnNewDocument', {
-      identifier: 'device-shell-script',
-    });
-    expect(sendCommand).toHaveBeenCalledWith('Page.reload', {});
+    await expect(cdpPageNavigate(session, { url: 'https://example.test/' })).resolves.toMatchObject(
+      { success: true },
+    );
+    expect(sendCommand).toHaveBeenCalledWith(
+      'Page.navigate',
+      { url: 'https://example.test/' },
+      35000,
+    );
+    expect(sendCommand.mock.calls.some(([method]) => method === 'Page.reload')).toBe(false);
+    rootReady = false;
+    await expect(cdpPageNavigate(session, { url: 'https://example.test/next' })).rejects.toThrow(
+      'WebView is not ready',
+    );
+    expect(sendCommand.mock.calls.filter(([method]) => method === 'Page.navigate')).toHaveLength(1);
   });
 
   it('waits for selectors and conditions with the shared response shape', async () => {

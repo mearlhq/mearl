@@ -56,6 +56,7 @@ import { registerActions } from './action-registry.js';
 import { registerPageSessionInitializer } from './page-session-initializers.js';
 import {
   applyCdpDeviceShell,
+  canLoadCdpDeviceShell,
   setCdpDeviceShellNavigationProxy,
   clearCdpDeviceShell,
   isCdpDeviceShellActive,
@@ -1647,7 +1648,10 @@ export async function cdpSetAppProfile(
       await setCdpNetworkControl(session, data.networkControl);
     }
     let reloaded = false;
-    if (data.reload !== false || shellChanged) {
+    if (
+      (data.reload !== false || shellChanged) &&
+      (!deviceShell || (await canLoadCdpDeviceShell(session)))
+    ) {
       clearPageRefsForNavigation(session);
       await sendCdpPageCommand(session, session.client, 'Page.reload', {});
       if (deviceShell) await waitForCdpDeviceShellLoad(session);
