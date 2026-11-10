@@ -434,6 +434,23 @@ function printAdvancedCommandHelp(commandName: string, action: string): void {
   );
 }
 
+function printInternalCommandHelp(commandName: string, action: string): void {
+  console.error(
+    [
+      action,
+      action === '__extension_reload'
+        ? '  重载目标浏览器中的 Mearl 扩展。'
+        : '  内部动作透传入口；是否支持及参数要求由目标宿主决定。',
+      '',
+      '用法：',
+      `  ${commandName} ${action} [--payload '<JSON>'] [--browser <id|名称>] [--local] [--timeout <seconds>]`,
+      '',
+      '--local 只使用本机连接；多浏览器时用 --browser 指定目标。',
+      '此帮助不会连接浏览器或执行动作。内部动作不属于稳定的公共 API。',
+    ].join('\n'),
+  );
+}
+
 function printUnknownCommand(commandName: string, args: string[]): void {
   const input = commandInput(args) || args[0] || '';
   const suggestions = findCommandSuggestions(args, SUGGESTABLE_COMMANDS);
@@ -760,6 +777,8 @@ export async function runMearlCli(args: string[], options: MearlCliOptions = {})
     } else if (args[0] === 'check') printCheckHelp(commandName);
     else if (ADVANCED_BUILTIN_COMMANDS.has(args[0]!)) {
       printAdvancedCommandHelp(commandName, args[0]!);
+    } else if (args[0]?.startsWith('__')) {
+      printInternalCommandHelp(commandName, args[0]);
     } else if (args[0]?.startsWith('-')) {
       printUsage(commandName, clientVersion);
       console.error(formatCapabilityHelp(await readHelpCapabilities(args)));

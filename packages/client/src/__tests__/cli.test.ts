@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../capabilityHelp.js', async importOriginal => ({
-  ...await importOriginal<typeof import('../capabilityHelp.js')>(),
+  ...(await importOriginal<typeof import('../capabilityHelp.js')>()),
   readHelpCapabilities: vi.fn(async () => undefined),
 }));
 
@@ -35,7 +35,10 @@ describe('runMearlCli', () => {
     temporaryDirectories.push(directory);
     vi.stubEnv('MEARL_PLUGIN_DIR', join(directory, 'registry'));
     const entry = join(directory, 'main.mjs');
-    writeFileSync(entry, `export const defaultCommand = 'status'; export default app => app.command('status', () => ({ ready: true }));`);
+    writeFileSync(
+      entry,
+      `export const defaultCommand = 'status'; export default app => app.command('status', () => ({ ready: true }));`,
+    );
     registerPlugin('sample_status', entry);
     const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -43,7 +46,10 @@ describe('runMearlCli', () => {
     expect(JSON.parse(String(write.mock.calls[0]?.[0]))).toEqual({ ready: true });
     expect(error).not.toHaveBeenCalled();
     const requiredEntry = join(directory, 'required.mjs');
-    writeFileSync(requiredEntry, `export const defaultCommand = 'read'; export default app => app.command('read <url>', input => input);`);
+    writeFileSync(
+      requiredEntry,
+      `export const defaultCommand = 'read'; export default app => app.command('read <url>', input => input);`,
+    );
     registerPlugin('required_request', requiredEntry);
     expect(await runMearlCli(['required_request'])).toBe(2);
     expect(error).toHaveBeenCalledWith(expect.stringContaining('url'));
@@ -53,14 +59,26 @@ describe('runMearlCli', () => {
     temporaryDirectories.push(directory);
     vi.stubEnv('MEARL_PLUGIN_DIR', join(directory, 'registry'));
     const entry = join(directory, 'main.mjs');
-    writeFileSync(entry, `export const name = 'sample_request'; export const defaultCommand = 'request'; export default app => app.command('request <url>', input => app.invoke('send_request', input));`);
+    writeFileSync(
+      entry,
+      `export const name = 'sample_request'; export const defaultCommand = 'request'; export default app => app.command('request <url>', input => app.invoke('send_request', input));`,
+    );
     registerPlugin('sample_request', entry);
-    const invoke = vi.spyOn(UnifiedClient.prototype, 'invoke').mockResolvedValue({ status: 200, body: 'ok' });
+    const invoke = vi
+      .spyOn(UnifiedClient.prototype, 'invoke')
+      .mockResolvedValue({ status: 200, body: 'ok' });
     vi.spyOn(UnifiedClient.prototype, 'disconnect').mockImplementation(() => undefined);
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-    for (const args of [['--payload', '{"url":"https://example.test/","method":"POST"}'], ['--url=https://example.test/', '--method=POST']]) {
+    for (const args of [
+      ['--payload', '{"url":"https://example.test/","method":"POST"}'],
+      ['--url=https://example.test/', '--method=POST'],
+    ]) {
       expect(await runMearlCli(['sample_request', ...args, '--browser=target'])).toBe(0);
-      expect(invoke).toHaveBeenLastCalledWith('send_request', { url: 'https://example.test/', method: 'POST' }, expect.objectContaining({ browser: 'target' }));
+      expect(invoke).toHaveBeenLastCalledWith(
+        'send_request',
+        { url: 'https://example.test/', method: 'POST' },
+        expect.objectContaining({ browser: 'target' }),
+      );
     }
   });
   it('serves guide discovery before browser invocation or capability lookup', async () => {
@@ -491,6 +509,26 @@ describe('runMearlCli', () => {
     expect(invoke).not.toHaveBeenCalled();
   });
 
+  it.each(['--help', '-h'])(
+    'prints internal reload help for %s without dispatching',
+    async flag => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const invoke = vi.spyOn(UnifiedClient.prototype, 'invoke');
+      await expect(runMearlCli(['__extension_reload', flag])).resolves.toBe(0);
+      expect(error).toHaveBeenCalledWith(expect.stringContaining('重载目标浏览器中的 Mearl 扩展'));
+      expect(error).toHaveBeenCalledWith(expect.stringContaining('--browser'));
+      expect(invoke).not.toHaveBeenCalled();
+    },
+  );
+
+  it('describes internal passthrough without claiming that the host supports an unknown action', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const invoke = vi.spyOn(UnifiedClient.prototype, 'invoke');
+    await expect(runMearlCli(['__unknown_internal_action', '--help'])).resolves.toBe(0);
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('是否支持及参数要求由目标宿主决定'));
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
   it('keeps the generic help fallback for unrelated commands', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
@@ -636,11 +674,21 @@ describe('parseClientArgs', () => {
       },
     });
     expect(() =>
-      parseClientArgs(['identity', 'request', 'https://api.example.com/v1/items', 'ata', '--auth'], true),
+      parseClientArgs(
+        ['identity', 'request', 'https://api.example.com/v1/items', 'ata', '--auth'],
+        true,
+      ),
     ).toThrow('argument missing');
     expect(
       parseClientArgs(
-        ['identity', 'request', 'https://api.example.com/v1/items', 'ata', '--auth', 'ticket-query'],
+        [
+          'identity',
+          'request',
+          'https://api.example.com/v1/items',
+          'ata',
+          '--auth',
+          'ticket-query',
+        ],
         true,
       ),
     ).toMatchObject({ pluginInput: { auth: 'ticket-query' } });
