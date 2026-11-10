@@ -20,7 +20,7 @@ MCP 工具与 CLI、SDK 共用浏览器动作、插件入口和控制会话。
 
 浏览器工具与 CLI、SDK 使用同一返回结构。快照中的 `@eN` 可直接操作，内部节点映射只保存在运行时。
 常规响应的 `session` 包含会话 ID、浏览器、传输、状态和代次；标签页清单通过 `browser_tab_list`
-查询，`browser_control` 的交接结果还包含会话页面的 `tabs`。`browser_run_actions` 的步骤使用各 action 的返回结构。
+查询，`browser_control` 的普通会话交接结果还包含会话页面的 `tabs`。外部 Provider 使用 `browser` 且不传 `session`，返回 `{ controlSessionMode: "external", operation, control }`，可按 Provider 声明执行 `handoff`、`resume` 或带 `keepTabIds` 的 `finish`。`browser_run_actions` 的步骤使用各 action 的返回结构。
 `browser_get_requests` 指定非空 `fields` 时默认只返回提取字段及请求元数据；同时需要正文时传
 `includeBody:true`。省略正文时不返回 `postData` / `responseBody` 字段。
 

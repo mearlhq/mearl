@@ -3,6 +3,9 @@ import type {
   BrowserCapabilities,
   BrowserControlSessionMode,
   ProviderEnhancementTarget,
+  BrowserProviderOperation,
+  BrowserControlParams,
+  ExternalBrowserControlResult,
 } from '@mearl/browser-core';
 
 export { MEARL_PROVIDER_PROTOCOL_VERSION } from './protocol.js';
@@ -172,8 +175,7 @@ export interface ProviderBrowserType {
 export type ProviderBrowserStatus = 'connected' | 'pairing' | 'running_disconnected' | 'stopped';
 export type ProviderOwnership = 'owned' | 'attached';
 export type ProviderPersistence = 'ephemeral' | 'persistent';
-export type ProviderBrowserOperation =
-  'start' | 'close' | 'detach' | 'deleteData' | 'access' | 'syncCookies';
+export type ProviderBrowserOperation = BrowserProviderOperation;
 
 export type ProviderBrowserControl =
   | {
@@ -300,6 +302,11 @@ export interface BrowserProviderDefinition {
   launch: (options: JsonObject, context: ProviderContext) => Promise<ProviderBrowser>;
   start?: (request: ProviderInstanceRequest, context: ProviderContext) => Promise<ProviderBrowser>;
   close: (request: ProviderCloseRequest, context: ProviderContext) => Promise<unknown>;
+  /** Explicit lifecycle control for external task owners; never creates a Mearl session. */
+  control?: (
+    request: ProviderInstanceRequest & BrowserControlParams,
+    context: ProviderContext,
+  ) => Promise<ExternalBrowserControlResult>;
   detach?: (request: ProviderInstanceRequest, context: ProviderContext) => Promise<unknown>;
   syncCookies?: (request: ProviderSyncCookiesRequest, context: ProviderContext) => Promise<unknown>;
   getAccess?: (
@@ -326,6 +333,10 @@ export interface ProviderRuntime {
   launch(options: JsonObject, context?: ProviderContext): Promise<ProviderBrowser>;
   start(request: ProviderInstanceRequest, context?: ProviderContext): Promise<ProviderBrowser>;
   close(request: ProviderCloseRequest, context?: ProviderContext): Promise<unknown>;
+  control(
+    request: ProviderInstanceRequest & BrowserControlParams,
+    context?: ProviderContext,
+  ): Promise<ExternalBrowserControlResult>;
   detach(request: ProviderInstanceRequest, context?: ProviderContext): Promise<unknown>;
   syncCookies(request: ProviderSyncCookiesRequest, context?: ProviderContext): Promise<unknown>;
   getAccess(request: ProviderInstanceRequest, context?: ProviderContext): Promise<ProviderAccess>;

@@ -212,6 +212,8 @@ The SDK checks Mearl host support at startup and before operations; unsupported 
 An instance's control mode is fixed within a runtime. External mode rejects Mearl `--session`; external tools own page ownership and handoff.
 Providers omitting this field retain default behavior.
 
+To support unified handoff, implement `BrowserProviderDefinition.control(request, context)` and advertise the supported `handoff`, `resume` and `finish` operations on each instance. Mearl forwards `browser_control` without creating a Mearl session. Requests contain the Provider-local `browserId`, `operation`, optional `tabId` and `reason`; only `finish` accepts `keepTabIds`. Return `{ controlSessionMode: "external", operation, control }`, where control is respectively `user`, `agent` or `finished`. Providers must validate control ownership and retained pages, reject unsupported parameters, and keep handoff preflight responsive while page operations wait. Resume only after the user explicitly returns control.
+
 External Providers can bind Mearl Extension environment enhancement to authorized pages through
 `createProviderEnhancementClient(providerId, browserId)`, calling `bind`, `invoke`, and `release`. Only device, App, and time-zone enhancement is allowed,
 as advertised by the Extension. The current Extension exposes only time zones.

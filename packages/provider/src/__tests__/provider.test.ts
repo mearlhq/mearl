@@ -98,6 +98,66 @@ function fixtureDefinition(
 }
 
 describe('@mearl/provider', () => {
+  it('validates external lifecycle support and retention before calling the Provider', async () => {
+    const browser = {
+      browserId: 'space',
+      name: 'Task',
+      status: 'connected' as const,
+      persistence: 'persistent' as const,
+      operations: ['handoff', 'resume', 'finish'] as const,
+      control: {
+        kind: 'provider' as const,
+        capabilities: {
+          actions: [],
+          screenshot: 'none' as const,
+          controlSessionMode: 'external' as const,
+        },
+      },
+    };
+    const control = vi.fn(async ({ operation }) => ({
+      controlSessionMode: 'external' as const,
+      operation,
+      control:
+        operation === 'handoff'
+          ? ('user' as const)
+          : operation === 'resume'
+            ? ('agent' as const)
+            : ('finished' as const),
+    }));
+    const runtime = createProviderRuntime(
+      fixtureDefinition(uniqueId('control'), {
+        browserType: {
+          name: 'External',
+          controlSessionModes: ['external'],
+          inputSchema: { type: 'object', properties: {} },
+        },
+        listBrowsers: async () => [{ ...browser, operations: [...browser.operations] }],
+        control,
+      }),
+    );
+    await expect(
+      runtime.control({ browserId: 'space', operation: 'finish', keepTabIds: [2] }),
+    ).resolves.toMatchObject({ control: 'finished' });
+    expect(control).toHaveBeenCalledWith(
+      { browserId: 'space', operation: 'finish', keepTabIds: [2] },
+      {},
+    );
+    await expect(runtime.control({ browserId: 'missing', operation: 'resume' })).rejects.toThrow(
+      'not found',
+    );
+    await expect(
+      runtime.control({ browserId: 'space', operation: 'finish', keepTabIds: [-1] }),
+    ).rejects.toThrow('keepTabIds');
+    expect(control).toHaveBeenCalledTimes(1);
+    control.mockResolvedValueOnce({
+      controlSessionMode: 'external',
+      operation: 'handoff',
+      control: 'agent',
+    });
+    await expect(runtime.control({ browserId: 'space', operation: 'handoff' })).rejects.toThrow(
+      'Invalid external',
+    );
+  });
   it.each([undefined, MEARL_PROVIDER_PROTOCOL_VERSION - 1])(
     'rejects caller protocol %s before launching a browser',
     async protocolVersion => {

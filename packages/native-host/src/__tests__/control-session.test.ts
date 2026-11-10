@@ -12,6 +12,52 @@ vi.mock('node:crypto', async importOriginal => {
 });
 
 describe('control sessions', () => {
+  it('resolves browser control by unique session or owned page without guessing between tasks', async () => {
+    const manager = new ControlSessionManager({
+      browserId: () => 'browser',
+      transport: () => 'extension',
+      invoke: vi.fn(async () => ({})),
+      cleanup: vi.fn(async () => {}),
+      download: vi.fn(),
+      notify: vi.fn(),
+    });
+    try {
+      await expect(manager.invoke('browser_control', { operation: 'handoff' })).rejects.toThrow(
+        'CONTROL_SESSION_NOT_FOUND',
+      );
+      const first = manager.registry.create('extension');
+      manager.registry.claim(first.sessionId, 1, 'attached');
+      expect(await manager.invoke('browser_control', { operation: 'handoff' })).toMatchObject({
+        session: { sessionId: first.sessionId, status: 'user' },
+      });
+      expect(await manager.invoke('browser_control', { operation: 'resume' })).toMatchObject({
+        session: { sessionId: first.sessionId, status: 'active' },
+      });
+      const second = manager.registry.create('extension');
+      manager.registry.claim(second.sessionId, 2, 'attached');
+      await expect(manager.invoke('browser_control', { operation: 'handoff' })).rejects.toThrow(
+        'CONTROL_SESSION_AMBIGUOUS',
+      );
+      expect(manager.registry.info(first.sessionId).status).toBe('active');
+      expect(manager.registry.info(second.sessionId).status).toBe('active');
+      expect(
+        await manager.invoke('browser_control', { operation: 'handoff', tabId: 2 }),
+      ).toMatchObject({ session: { sessionId: second.sessionId, status: 'user' } });
+      await expect(
+        manager.invoke('browser_control', { operation: 'resume', tabId: 1 }, second.sessionId),
+      ).rejects.toThrow('TAB_NOT_IN_CONTROL_SESSION');
+      await expect(
+        manager.invoke('browser_control', { operation: 'resume', tabId: 99 }),
+      ).rejects.toThrow('CONTROL_SESSION_NOT_FOUND');
+      await manager.invoke('browser_release', {}, first.sessionId);
+      expect(await manager.invoke('browser_control', { operation: 'resume' })).toMatchObject({
+        session: { sessionId: second.sessionId, status: 'active' },
+      });
+    } finally {
+      await manager.artifacts.dispose();
+    }
+  });
+
   it('returns state on ordinary calls and the owned page inventory on handoff', async () => {
     const business = { refs: { record: 'value' }, session: { tabs: [99] } };
     const manager = new ControlSessionManager({
@@ -313,34 +359,31 @@ describe('control sessions', () => {
     },
   );
 
-  it.each(['send_request'])(
-    'waits for unscoped %s before releasing the browser',
-    async action => {
-      const registry = new ControlSessionRegistry(() => 'browser');
-      let finish!: () => void;
-      const request = registry.run(
-        undefined,
-        action,
-        {},
-        () =>
-          new Promise<void>(resolve => {
-            finish = resolve;
-          }),
-      );
+  it.each(['send_request'])('waits for unscoped %s before releasing the browser', async action => {
+    const registry = new ControlSessionRegistry(() => 'browser');
+    let finish!: () => void;
+    const request = registry.run(
+      undefined,
+      action,
+      {},
+      () =>
+        new Promise<void>(resolve => {
+          finish = resolve;
+        }),
+    );
+    await Promise.resolve();
+    const cleanup = vi.fn(async () => {});
+    const release = registry.releaseBrowser(cleanup);
+    try {
       await Promise.resolve();
-      const cleanup = vi.fn(async () => {});
-      const release = registry.releaseBrowser(cleanup);
-      try {
-        await Promise.resolve();
-        expect(cleanup).not.toHaveBeenCalled();
-      } finally {
-        finish();
-        await request;
-        await release;
-      }
-      expect(cleanup).toHaveBeenCalledOnce();
-    },
-  );
+      expect(cleanup).not.toHaveBeenCalled();
+    } finally {
+      finish();
+      await request;
+      await release;
+    }
+    expect(cleanup).toHaveBeenCalledOnce();
+  });
 
   it('waits for browser-wide changes before releasing and permits independent app profiles', async () => {
     const registry = new ControlSessionRegistry(() => 'browser');
@@ -861,12 +904,27 @@ describe('background page activity lifetime', () => {
 describe('read-only capability targets', () => {
   it.each(['tabId', 'tabIds', 'openerTabId'])('rejects %s before claiming a page', async field => {
     const invoke = vi.fn(async () => ({ apps: { status: 'available', entries: [] } }));
-    const manager = new ControlSessionManager({ browserId: () => 'browser', transport: () => 'extension', invoke, cleanup: vi.fn(), download: vi.fn(), notify: vi.fn() });
+    const manager = new ControlSessionManager({
+      browserId: () => 'browser',
+      transport: () => 'extension',
+      invoke,
+      cleanup: vi.fn(),
+      download: vi.fn(),
+      notify: vi.fn(),
+    });
     const session = manager.registry.create('extension');
     try {
-      await expect(manager.invoke('get_capabilities', { [field]: field === 'tabIds' ? [7] : 7 }, session.sessionId)).rejects.toThrow('does not accept page targets');
+      await expect(
+        manager.invoke(
+          'get_capabilities',
+          { [field]: field === 'tabIds' ? [7] : 7 },
+          session.sessionId,
+        ),
+      ).rejects.toThrow('does not accept page targets');
       expect(manager.registry.info(session.sessionId).tabs).toEqual([]);
       expect(invoke).not.toHaveBeenCalled();
-    } finally { await manager.artifacts.dispose(); }
+    } finally {
+      await manager.artifacts.dispose();
+    }
   });
 });

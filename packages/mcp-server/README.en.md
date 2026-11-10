@@ -20,7 +20,7 @@ Set `observe: false` for bare page actions. Do not routinely append wait, snapsh
 
 Browser tools return the same structures as the CLI and SDK. Snapshot `@eN` refs are directly actionable; internal node mappings remain in the runtime.
 Ordinary response `session` includes session ID, browser, transport, state, and generation. Query tabs with `browser_tab_list`;
-`browser_control` handoff also includes session `tabs`. `browser_run_actions` steps retain each action's return structure.
+`browser_control` handoff for ordinary sessions also includes session `tabs`. External Providers use `browser` without `session` and return `{ controlSessionMode: "external", operation, control }`, supporting the advertised `handoff`, `resume` or `finish` operations, with optional `keepTabIds` for finish. `browser_run_actions` steps retain each action's return structure.
 With nonempty `fields`, `browser_get_requests` returns extracted fields and request metadata by default. To also include bodies, pass
 `includeBody:true`. Otherwise `postData` / `responseBody` are omitted.
 

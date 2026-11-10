@@ -127,6 +127,20 @@ export class ControlSessionManager {
     )
       throw new Error('Internal session fields are reserved');
     validateRequiredActionTabId(action, data);
+    if (action === 'browser_control' && sessionId === undefined) {
+      const candidates = this.registry
+        .list()
+        .filter(
+          session => data.tabId === undefined || session.tabs.some(tab => tab.tabId === data.tabId),
+        );
+      if (candidates.length === 0)
+        throw new Error(
+          'CONTROL_SESSION_NOT_FOUND: no control session matches this browser and page',
+        );
+      if (candidates.length > 1)
+        throw new Error('CONTROL_SESSION_AMBIGUOUS: specify --session or tabId to select a task');
+      sessionId = candidates[0].sessionId;
+    }
     const created = sessionId === 'new';
     if (sessionId === 'new') {
       if (!['tab_open', 'page_snapshot', 'page_screenshot'].includes(action))
@@ -140,12 +154,14 @@ export class ControlSessionManager {
     if (requestedTransport && transport !== requestedTransport)
       throw new Error('A session cannot change transport');
     if (action === 'browser_control') {
+      if (data.keepTabIds !== undefined)
+        throw new Error('keepTabIds is only supported by external Provider finish');
       if (!sessionId || !['handoff', 'resume'].includes(data.operation))
-        throw new Error('browser_control requires --session and handoff/resume');
-      if (data.operation === 'resume')
-        return { session: await this.userControl(sessionId, 'resume') };
+        throw new Error('browser_control supports handoff/resume for this browser');
       if (data.tabId !== undefined && !info!.tabs.some(tab => tab.tabId === data.tabId))
         throw new Error('TAB_NOT_IN_CONTROL_SESSION');
+      if (data.operation === 'resume')
+        return { session: await this.userControl(sessionId, 'resume') };
       return { session: await this.userControl(sessionId, 'handoff', data.reason) };
     }
     if (action === 'browser_release' && sessionId) {

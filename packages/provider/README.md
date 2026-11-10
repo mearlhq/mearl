@@ -212,6 +212,8 @@ SDK 在服务启动和操作前确认 Mearl 控制宿主支持此模式；旧宿
 同一运行时内实例的控制模式固定。该模式不接受 Mearl `--session`，页面归属和交接仍由外部工具负责。
 未声明该字段的 Provider 保持原有行为。
 
+支持统一交接入口时，实现 `BrowserProviderDefinition.control(request, context)`，并在实例的 `operations` 中声明 `handoff`、`resume`、`finish` 中实际支持的操作。Mearl 将 `browser_control` 转发给该方法，不创建 Mearl 会话。请求包含 Provider 内的 `browserId`、`operation`，以及可选的 `tabId`、`reason`；只有 `finish` 可带 `keepTabIds`。返回 `{ controlSessionMode: "external", operation, control }`，其中 control 分别为 `user`、`agent`、`finished`。Provider 必须校验控制权和保留页归属，拒绝不支持的参数，并让交接预检在页面操作等待期间仍可响应。只有用户明确交还后才可 resume。
+
 外部 Provider 可用 `createProviderEnhancementClient(providerId, browserId)` 为已获准页面绑定 Mearl
 Extension 的环境增强，依次调用 `bind`、`invoke`、`release`。这条通道只允许设备、App、时区类增强，
 具体范围取决于 Extension 返回的能力；当前 Extension 实现仅开放时区。

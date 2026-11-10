@@ -89,18 +89,25 @@ export const COMMANDS = [
   },
   {
     name: 'browser_control',
-    description: '把控制会话交给用户；用户在 Mearl 浏览器管理页交还后重新观察页面',
+    description: '交接或恢复浏览器控制；外部 Provider 也可结束任务',
     params: [
       {
         name: 'operation',
-        type: '"handoff" | "resume"',
+        type: '"handoff" | "resume" | "finish"',
         required: true,
         description: '交给用户操作；resume 仅在用户明确交还后使用',
       },
       { name: 'tabId', type: 'number', description: '可选的目标页面' },
       { name: 'reason', type: 'string', description: '用户需要处理的事项' },
+      {
+        name: 'keepTabIds',
+        type: 'number[]',
+        description: '外部 Provider finish 时保留的结果页；默认不保留任务页面',
+      },
     ],
-    notes: ['必须携带 --session；接管停止后续派发，已经发出的操作可能仍然生效。'],
+    notes: [
+      '统一使用 --browser 选择目标。普通浏览器自动选择唯一的控制会话；多个会话时用 tabId 或 --session 明确任务。外部 Provider 由宿主管理任务，不传 --session。finish 仅用于支持它的外部 Provider。仅在用户明确交还后 resume；已经发出的操作可能仍然生效。',
+    ],
   },
   {
     name: 'page_download',

@@ -153,6 +153,8 @@ SDK 宿主可从 `@mearl/client/script` 导入 `executeScript(code, options)`，
 
 ### 控制会话与文件
 
+接管和交还统一使用 `mearl browser_control --browser '<browserId>' --payload '{"operation":"handoff"}'`（交还为 `resume`）。普通浏览器自动选择唯一的未结束会话；存在多个会话时，用 `tabId` 或 `--session` 明确目标，无匹配会话时返回错误。Ego 的任务由其 Space 管理，无需额外会话参数。
+
 多步骤任务首次 `tab_open` 或 `page_snapshot` 使用 `--session new`，响应在原结果旁附带 `session`，后续用其 `sessionId` 自动路由，无需额外创建/查询 action。Session 绑定一个浏览器与传输；页面首次使用自动关联，复用页面与新建页面分别记录。同一页面只允许一个会话控制，旧调用不能绕过占用；Session 不隔离 Cookie 或存储。
 
 `sessionId` 是形如 `s_aB3d_E-f` 的短 ID。会话及其浏览器、传输映射保存在常驻控制宿主的内存中；新的 CLI 进程会内部查询本机和远端宿主完成路由，无需调用方保存或传递路由信息，也不写入会话映射文件。控制宿主退出后会话失效。
@@ -222,7 +224,7 @@ npx @mearl/setup provider uninstall example-device
 
 CLI、SDK、MCP 使用同一返回结构。快照中的 `@eN` 可直接用于操作，内部节点映射只保存在运行时。
 常规响应的 `session` 包含会话 ID、浏览器、传输、状态和代次；标签页清单通过 `tab_list` 查询，
-`browser_control` 的交接结果还包含会话页面的 `tabs`。`run_actions` 的步骤使用各 action 的返回结构。
+`browser_control` 的普通会话交接结果包含会话页面的 `tabs`。外部 Provider 不传 `session`，返回 `{ controlSessionMode: "external", operation, control }`；支持的 Provider 可用 `operation: "finish"` 和 `keepTabIds` 完成任务并保留结果页。`run_actions` 的步骤使用各 action 的返回结构。
 stdout 在管道或重定向时默认输出紧凑 JSON，在交互终端默认美化；`--compact` 可强制紧凑排版，不改变返回字段和值。快照会折叠无名称、无 ref 且无状态的分组，控件状态与文本内容完整保留。
 
 `get_requests` 指定非空 `fields` 时默认省略请求体和响应体，只返回提取字段及请求元数据；

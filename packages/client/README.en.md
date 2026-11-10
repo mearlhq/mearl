@@ -153,6 +153,8 @@ It supports `signal` cancellation and `executionTimeoutSec`, sharing executors w
 
 ### Control sessions and files
 
+Use `mearl browser_control --browser '<browserId>' --payload '{"operation":"handoff"}'` for handoff and `resume` for return. Ordinary browsers automatically select their sole unfinished session; use `tabId` or `--session` when multiple sessions exist. No matching session returns an error. Ego manages its task through its Space without an additional session parameter.
+
 For multi-step tasks, use `--session new` on the first `tab_open` or `page_snapshot`. The response adds `session` alongside ordinary results; later `sessionId` routes automatically without separate creation/query actions. Sessions bind one browser/transport and associate pages on first use, tracking reused and created pages separately. One session controls a page at a time; sessionless calls cannot bypass ownership. Sessions do not isolate Cookies/storage.
 
 `sessionId` is a short ID such as `s_aB3d_E-f`. The resident control host keeps sessions/browser/transport mappings in memory. New CLI processes internally query local/remote hosts for routing, without caller-managed routing or mapping files. Control-host exit invalidates sessions.
@@ -222,7 +224,7 @@ without connecting to browsers or executing suggestions. For example, `mearl tab
 
 CLI, SDK, and MCP share return structures. Snapshot `@eN` refs are directly actionable; internal mappings remain runtime-local.
 Ordinary `session` includes session ID, browser, transport, state, and generation. Query tabs with `tab_list`;
-`browser_control` handoff also returns session `tabs`. `run_actions` steps preserve individual action results.
+`browser_control` handoff for ordinary sessions also returns session `tabs`. External Providers omit `session` and return `{ controlSessionMode: "external", operation, control }`; supported Providers accept `operation: "finish"` with `keepTabIds` to finish a task while retaining result pages. `run_actions` steps preserve individual action results.
 stdout defaults to compact JSON in pipes/redirection and pretty output in interactive terminals. `--compact` forces compact layout without changing values. Snapshots collapse unnamed, stateless groups without refs while preserving control states and text.
 
 With nonempty `fields`, `get_requests` omits request/response bodies by default, returning extracted fields and metadata;

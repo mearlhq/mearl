@@ -188,13 +188,17 @@ describe.skipIf(process.env.MEARL_RUN_CONTROL_INTEGRATION !== '1')(
         await client.invoke(
           'browser_control',
           { operation: 'handoff', reason: 'integration user' },
-          options,
+          { browser: 'mearl:local:' + browserId },
         );
         await assert.rejects(
           client.invoke('page_click', { tabId, selector: '#export' }, options),
           /CONTROL_SESSION_PAUSED/,
         );
-        await client.invoke('browser_control', { operation: 'resume' }, options);
+        await client.invoke(
+          'browser_control',
+          { operation: 'resume' },
+          { browser: 'mearl:local:' + browserId },
+        );
         await client.invoke('page_snapshot', { tabId }, options);
         const keep = await client.invoke(
           'browser_release',

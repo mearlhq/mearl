@@ -77,20 +77,52 @@ describe('external Provider control', () => {
     const { service, browser, request } = fixture();
     browser.capabilities!.controlSessionMode = 'external';
     for (const session of ['new', 's_existing', '']) {
-      for (const action of ['page_snapshot', 'tab_open', 'browser_release', 'get_versions', 'browser_instances']) {
-        await expect(service.invoke(browser.browserId, action, { tabId: 7 }, session)).rejects.toThrow('CONTROL_SESSION_UNSUPPORTED');
+      for (const action of [
+        'page_snapshot',
+        'tab_open',
+        'browser_release',
+        'get_versions',
+        'browser_instances',
+      ]) {
+        await expect(
+          service.invoke(browser.browserId, action, { tabId: 7 }, session),
+        ).rejects.toThrow('CONTROL_SESSION_UNSUPPORTED');
       }
     }
     expect(service.list()).toEqual([]);
     expect(request).not.toHaveBeenCalled();
   });
 
-  it('leaves handoff to the Provider even without a session argument', async () => {
+  it('forwards declared external control without creating a Mearl session', async () => {
     const { service, browser, request } = fixture();
     browser.capabilities!.controlSessionMode = 'external';
-    await expect(service.invoke(browser.browserId, 'browser_control', { operation: 'handoff' })).rejects.toThrow('CONTROL_SESSION_UNSUPPORTED');
+    browser.operations = ['handoff', 'resume', 'finish'];
+    for (const operation of ['handoff', 'resume', 'finish']) {
+      await service.invoke(browser.browserId, 'browser_control', { operation });
+      expect(request).toHaveBeenLastCalledWith(
+        browser,
+        'browser_control',
+        { operation },
+        'local',
+        undefined,
+      );
+    }
     expect(service.list()).toEqual([]);
-    expect(request).not.toHaveBeenCalled();
+    const calls = request.mock.calls.length;
+    await expect(
+      service.invoke(browser.browserId, 'browser_control', {
+        operation: 'finish',
+        keepTabIds: [-1],
+      }),
+    ).rejects.toThrow('keepTabIds');
+    await expect(
+      service.invoke(browser.browserId, 'browser_control', { operation: 'resume' }, 'new'),
+    ).rejects.toThrow('CONTROL_SESSION_UNSUPPORTED');
+    browser.operations = [];
+    await expect(
+      service.invoke(browser.browserId, 'browser_control', { operation: 'handoff' }),
+    ).rejects.toThrow('does not support');
+    expect(request).toHaveBeenCalledTimes(calls);
   });
 
   it('keeps ordinary validation and artifact handling without creating a task session or clearing the page', async () => {
@@ -99,8 +131,15 @@ describe('external Provider control', () => {
     const observed = await service.invoke(browser.browserId, 'page_snapshot', { tabId: 7 });
     expect(observed).toEqual({ tabId: 7 });
     await expect(service.invoke(browser.browserId, 'page_snapshot', {})).rejects.toThrow('tabId');
-    await expect(service.invoke(browser.browserId, 'page_snapshot', { tabId: 7, __mearlControlSource: 'local' })).rejects.toThrow('reserved');
-    const artifact = await service.invoke(browser.browserId, '__artifact_init', { filename: 'data.txt' });
+    await expect(
+      service.invoke(browser.browserId, 'page_snapshot', {
+        tabId: 7,
+        __mearlControlSource: 'local',
+      }),
+    ).rejects.toThrow('reserved');
+    const artifact = await service.invoke(browser.browserId, '__artifact_init', {
+      filename: 'data.txt',
+    });
     expect(artifact.artifact.artifactId).toBeTruthy();
     await service.invoke(browser.browserId, 'browser_release');
     expect(request.mock.calls.map(call => call[1])).toEqual(['page_snapshot', 'browser_instances']);
@@ -114,7 +153,9 @@ describe('external Provider control', () => {
     expect(service.find(first.session.sessionId)).toBeDefined();
     browser.capabilities!.controlSessionMode = 'external';
     expect(service.find(first.session.sessionId)).toBeUndefined();
-    await expect(service.invoke(browser.browserId, 'page_click', { tabId: 7 }, first.session.sessionId)).rejects.toThrow('CONTROL_SESSION_UNSUPPORTED');
+    await expect(
+      service.invoke(browser.browserId, 'page_click', { tabId: 7 }, first.session.sessionId),
+    ).rejects.toThrow('CONTROL_SESSION_UNSUPPORTED');
     expect(request).toHaveBeenCalledOnce();
   });
 });
@@ -123,8 +164,19 @@ describe('Mearl control over ordinary Provider actions', () => {
   it('rejects native dialog parameters before an older Provider can turn them into ordinary Enter', async () => {
     const { service, browser, request } = fixture();
     browser.capabilities!.actions.push('page_press', 'run_actions');
-    await expect(service.invoke(browser.browserId, 'page_press', { tabId: 7, key: 'Enter', dialogId: 'dialog' })).rejects.toThrow('not negotiated');
-    await expect(service.invoke(browser.browserId, 'run_actions', { tabId: 7, actions: [{ action: 'page_press', data: { key: 'Enter', dialogId: 'dialog' } }] })).rejects.toThrow('not negotiated');
+    await expect(
+      service.invoke(browser.browserId, 'page_press', {
+        tabId: 7,
+        key: 'Enter',
+        dialogId: 'dialog',
+      }),
+    ).rejects.toThrow('not negotiated');
+    await expect(
+      service.invoke(browser.browserId, 'run_actions', {
+        tabId: 7,
+        actions: [{ action: 'page_press', data: { key: 'Enter', dialogId: 'dialog' } }],
+      }),
+    ).rejects.toThrow('not negotiated');
     expect(request).not.toHaveBeenCalled();
   });
   it('describes a Provider from its advertised actions without inventing App support or dispatching a page action', async () => {
@@ -139,8 +191,16 @@ describe('Mearl control over ordinary Provider actions', () => {
     const { service, browser, request } = fixture();
     browser.capabilities!.actions.push('get_capabilities');
     request.mockResolvedValueOnce({ apps: { status: 'available', entries: [] } } as any);
-    await expect(service.invoke(browser.browserId, 'get_capabilities', { app: 'example/app' })).resolves.toMatchObject({ apps: { status: 'available' } });
-    expect(request).toHaveBeenCalledWith(browser, 'get_capabilities', expect.objectContaining({ app: 'example/app' }), 'local', undefined);
+    await expect(
+      service.invoke(browser.browserId, 'get_capabilities', { app: 'example/app' }),
+    ).resolves.toMatchObject({ apps: { status: 'available' } });
+    expect(request).toHaveBeenCalledWith(
+      browser,
+      'get_capabilities',
+      expect.objectContaining({ app: 'example/app' }),
+      'local',
+      undefined,
+    );
   });
   it('rejects an incompatible running browser before dispatch', async () => {
     const { service, browser, request } = fixture();

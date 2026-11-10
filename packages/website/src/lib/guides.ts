@@ -649,7 +649,7 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
         {
           id: 'setup',
           title: 'Install the independent Provider',
-          text: 'Install @mearl/provider-ego with Mearl setup. Requires Node.js 22.23.4+, Mearl 3.0.6+ and ego-browser on PATH. No separate mearl-ego Skill is required. The package bundles the native page SDK; source builds use the published SDK pinned in the lockfile.',
+          text: 'Install @mearl/provider-ego 0.1.1+ with Mearl setup. Requires Node.js 22.23.4+, Mearl 3.0.7+ and ego-browser on PATH. Control uses the unified mearl command without an additional CLI or Skill. The package bundles the native page SDK; source builds use the published SDK pinned in the lockfile.',
           command: egoSetup,
           links: [
             {
@@ -676,10 +676,10 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
         {
           id: 'control',
           title: 'Keep control in Ego',
-          text: 'Use the Provider CLI for handoff, resume and finish; resume only after the user explicitly returns control. Ego blocks native page operations during takeover. finish keeps no Agent pages by default; use --keep with Ego Page labels to retain results. browser_release only detaches the Provider and does not finish the Space or clear emulation.',
-          command: `mearl-ego handoff <spaceId>
-mearl-ego resume <spaceId>
-mearl-ego finish <spaceId> --keep p1,p2`,
+          text: 'Use mearl browser_control with the full browserId for handoff, resume and finish, without --session. Resume only after the user explicitly returns control. Ego blocks native page operations during takeover. finish keeps no Agent pages by default; keepTabIds accepts numeric IDs from tab_list. browser_release only detaches the Provider and does not finish the Space or clear emulation.',
+          command: `mearl browser_control --browser '<browserId>' --payload '{"operation":"handoff"}'
+mearl browser_control --browser '<browserId>' --payload '{"operation":"resume"}'
+mearl browser_control --browser '<browserId>' --payload '{"operation":"finish","keepTabIds":[1,2]}'`,
         },
         {
           id: 'emulation',
@@ -707,7 +707,7 @@ mearl-ego finish <spaceId> --keep p1,p2`,
         {
           id: 'setup',
           title: '安装独立 Provider',
-          text: '通过 Mearl setup 安装 @mearl/provider-ego。需要 Node.js 22.23.4+、Mearl 3.0.6+，且 ego-browser 可执行，无需单独安装 mearl-ego Skill。安装包已内置原生页面 SDK；源码构建使用锁文件中固定的已发布 SDK。',
+          text: '通过 Mearl setup 安装 @mearl/provider-ego 0.1.1+。需要 Node.js 22.23.4+、Mearl 3.0.7+，且 ego-browser 可执行。控制操作统一使用 mearl 命令，无需额外 CLI 或 Skill。安装包已内置原生页面 SDK；源码构建使用锁文件中固定的已发布 SDK。',
           command: egoSetup,
           links: [
             { label: 'Provider 源码与构建说明', url: 'https://github.com/mearlhq/provider-ego' },
@@ -731,10 +731,10 @@ mearl-ego finish <spaceId> --keep p1,p2`,
         {
           id: 'control',
           title: '由 Ego 统一控制权',
-          text: '使用 Provider CLI 交接、恢复和完成任务，仅在用户明确交还后恢复。接管期间 Ego 阻断原生页面操作。finish 默认不保留 Agent 页面；用 --keep 指定 Ego Page label 保留结果页。browser_release 只解绑 Provider，不结束 Space，也不清除模拟。',
-          command: `mearl-ego handoff <spaceId>
-mearl-ego resume <spaceId>
-mearl-ego finish <spaceId> --keep p1,p2`,
+          text: '使用 mearl browser_control 和完整 browserId 交接、恢复和完成任务，不传 --session，仅在用户明确交还后恢复。接管期间 Ego 阻断原生页面操作。finish 默认不保留 Agent 页面；keepTabIds 使用 tab_list 返回的数字 ID 保留结果页。browser_release 只解绑 Provider，不结束 Space，也不清除模拟。',
+          command: `mearl browser_control --browser '<browserId>' --payload '{"operation":"handoff"}'
+mearl browser_control --browser '<browserId>' --payload '{"operation":"resume"}'
+mearl browser_control --browser '<browserId>' --payload '{"operation":"finish","keepTabIds":[1,2]}'`,
         },
         {
           id: 'emulation',

@@ -606,15 +606,17 @@ async function main() {
   const tools = defineMcpTools([
     {
       name: 'browser_control',
-      description: '交给用户操作当前会话；用户在 Mearl 中交还后重新观察页面',
+      description:
+        '交接、恢复控制；统一使用 browser 选择目标，普通浏览器自动选择唯一会话，多个会话时用 tabId 或 session 指定任务。外部 Provider 不传 session，支持的 Provider 可 finish。仅在用户明确交还后 resume。',
       inputSchema: {
         type: 'object',
         properties: {
-          operation: { type: 'string', enum: ['handoff', 'resume'] },
+          operation: { type: 'string', enum: ['handoff', 'resume', 'finish'] },
+          keepTabIds: { type: 'array', items: { type: 'integer', minimum: 0 }, uniqueItems: true },
           reason: { type: 'string' },
           tabId: { type: 'number' },
         },
-        required: ['operation', 'session'],
+        required: ['operation'],
       },
     },
     {

@@ -30,14 +30,22 @@ import type {
 } from './types.js';
 import { MEARL_PROVIDER_PROTOCOL_VERSION } from './types.js';
 import { assertProviderProtocolVersion } from './protocol.js';
-import { assertProviderControlSessionMode, ensureProviderControlHost, readProviderControlHost } from './control-host.js';
+import { parseExternalBrowserControl } from '@mearl/browser-core';
+import {
+  assertProviderControlSessionMode,
+  ensureProviderControlHost,
+  readProviderControlHost,
+} from './control-host.js';
 
 const MAX_REQUEST_BYTES = 16 * 1024 * 1024;
 const activeProviderIds = new Set<string>();
 
 function assertControlHost(browser: ProviderBrowser): void {
   validateProviderBrowser(browser);
-  if (browser.control.kind === 'provider' && browser.control.capabilities.controlSessionMode === 'external') {
+  if (
+    browser.control.kind === 'provider' &&
+    browser.control.capabilities.controlSessionMode === 'external'
+  ) {
     assertProviderControlSessionMode(readProviderControlHost(), 'external');
   }
 }
@@ -68,7 +76,8 @@ function isProviderActionRequest(value: unknown): value is ProviderActionRequest
     typeof request.action === 'string' &&
     request.action.length > 0 &&
     typeof request.protocolVersion === 'number' &&
-    (request.deadline === undefined || (Number.isSafeInteger(request.deadline) && request.deadline! > 0)) &&
+    (request.deadline === undefined ||
+      (Number.isSafeInteger(request.deadline) && request.deadline! > 0)) &&
     (request.data === undefined ||
       (request.data !== null &&
         typeof request.data === 'object' &&
@@ -105,7 +114,8 @@ function providerContext(request: ProviderActionRequest): ProviderContext {
 export function createProviderServer(options: ProviderServerOptions): ProviderServer {
   const runtime = createProviderRuntime(options.definition);
   const descriptor = options.definition.descriptor;
-  const requiresExternalControl = options.definition.browserType.controlSessionModes?.includes('external') === true;
+  const requiresExternalControl =
+    options.definition.browserType.controlSessionModes?.includes('external') === true;
   const socketPath = options.socketPath ?? providerSocketPath(descriptor.providerId);
   let server: net.Server | null = null;
   let browserIds = new Set<string>();
@@ -124,7 +134,9 @@ export function createProviderServer(options: ProviderServerOptions): ProviderSe
     const available = await runtime.listBrowsers();
     const selected = requested
       ? available.find(browser => browser.browserId === requested)
-      : available.length === 1 ? available[0] : undefined;
+      : available.length === 1
+        ? available[0]
+        : undefined;
     if (selected) {
       assertControlHost(selected);
       return selected.browserId;
@@ -150,7 +162,10 @@ export function createProviderServer(options: ProviderServerOptions): ProviderSe
     if (request.action === '__provider_enhancement_target') {
       const browserId = await providerBrowserId(request.browserId);
       if (!runtime.getEnhancementTarget) throw new Error('BROWSER_ENHANCEMENT_TARGET_UNSUPPORTED');
-      return runtime.getEnhancementTarget({ browserId, tabId: request.data?.tabId as number }, context);
+      return runtime.getEnhancementTarget(
+        { browserId, tabId: request.data?.tabId as number },
+        context,
+      );
     }
     if (request.action === 'browser_providers') {
       if (request.browserId) throw new Error('Provider management does not accept browserId');
@@ -191,6 +206,10 @@ export function createProviderServer(options: ProviderServerOptions): ProviderSe
             context,
           );
       }
+    }
+    if (request.action === 'browser_control') {
+      const browserId = await providerBrowserId(request.browserId);
+      return runtime.control({ browserId, ...parseExternalBrowserControl(request.data) }, context);
     }
     if (
       request.action !== 'get_versions' &&

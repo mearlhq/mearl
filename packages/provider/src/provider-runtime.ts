@@ -14,7 +14,7 @@ import { MEARL_PROVIDER_PROTOCOL_VERSION } from './types.js';
 import { isProviderAction } from './actions.js';
 import { isProviderControlSessionModes } from './protocol.js';
 import type { BrowserControlSessionMode } from '@mearl/browser-core';
-import { isProviderEnhancementTarget } from '@mearl/browser-core';
+import { isProviderEnhancementTarget, parseExternalBrowserControl } from '@mearl/browser-core';
 
 const LIFECYCLE_OPERATIONS = new Set([
   'start',
@@ -23,10 +23,16 @@ const LIFECYCLE_OPERATIONS = new Set([
   'deleteData',
   'access',
   'syncCookies',
+  'handoff',
+  'resume',
+  'finish',
 ]);
 
 function assertDeadline(context: { deadline?: number }): void {
-  if (context.deadline !== undefined && (!Number.isSafeInteger(context.deadline) || Date.now() >= context.deadline))
+  if (
+    context.deadline !== undefined &&
+    (!Number.isSafeInteger(context.deadline) || Date.now() >= context.deadline)
+  )
     throw new Error('Provider request deadline exceeded');
 }
 
@@ -152,8 +158,7 @@ export function isProviderInputSchema(value: unknown, depth = 0): value is Provi
     if (
       Object.values(properties).some(item => {
         const condition = (item as Record<string, unknown>).formVisibleWhen as
-          | Record<string, unknown>
-          | undefined;
+          Record<string, unknown> | undefined;
         return condition !== undefined && !(String(condition.field) in properties);
       })
     ) {
@@ -452,8 +457,10 @@ function validateDefinition(definition: BrowserProviderDefinition): void {
   }
   if (!definition.browserType.name?.trim())
     throw new Error('provider browser type name is required');
-  if (definition.browserType.controlSessionModes !== undefined &&
-      !isProviderControlSessionModes(definition.browserType.controlSessionModes))
+  if (
+    definition.browserType.controlSessionModes !== undefined &&
+    !isProviderControlSessionModes(definition.browserType.controlSessionModes)
+  )
     throw new Error('Provider control session modes are invalid');
   if (
     !isProviderInputSchema(definition.browserType.inputSchema) ||
@@ -544,7 +551,10 @@ export function createProviderRuntime(definition: BrowserProviderDefinition): Pr
 
   const rememberControlMode = (browser: ProviderBrowser): void => {
     if (browser.control.kind !== 'none') {
-      controlModes.set(browser.browserId, browser.control.capabilities?.controlSessionMode ?? 'mearl');
+      controlModes.set(
+        browser.browserId,
+        browser.control.capabilities?.controlSessionMode ?? 'mearl',
+      );
     }
   };
 
@@ -556,7 +566,9 @@ export function createProviderRuntime(definition: BrowserProviderDefinition): Pr
       if (!declaredModes.has(mode))
         throw new Error(`Provider did not declare control session mode: ${mode}`);
       if (previous !== undefined && previous !== mode) {
-        throw new Error('CONTROL_SESSION_MODE_CHANGED: use a new browserId to change task control mode');
+        throw new Error(
+          'CONTROL_SESSION_MODE_CHANGED: use a new browserId to change task control mode',
+        );
       }
     }
     const implementations = {
@@ -564,6 +576,9 @@ export function createProviderRuntime(definition: BrowserProviderDefinition): Pr
       detach: definition.detach,
       access: definition.getAccess,
       syncCookies: definition.syncCookies,
+      handoff: definition.control,
+      resume: definition.control,
+      finish: definition.control,
     };
     for (const [operation, implementation] of Object.entries(implementations)) {
       if (
@@ -661,6 +676,32 @@ export function createProviderRuntime(definition: BrowserProviderDefinition): Pr
       await requireBrowser(request.browserId, request.deleteData ? 'deleteData' : 'close', context);
       return definition.close(request, context);
     },
+    async control(request, context = {}) {
+      const { browserId, ...data } = request;
+      const params = parseExternalBrowserControl(data);
+      const browser = await requireBrowser(browserId, params.operation, context);
+      if (
+        browser.status !== 'connected' ||
+        browser.control.kind !== 'provider' ||
+        browser.control.capabilities.controlSessionMode !== 'external' ||
+        !definition.control
+      )
+        throw new Error('Provider does not support external browser control');
+      const result = await definition.control({ browserId, ...params }, context);
+      const expected =
+        params.operation === 'handoff'
+          ? 'user'
+          : params.operation === 'resume'
+            ? 'agent'
+            : 'finished';
+      if (
+        result?.controlSessionMode !== 'external' ||
+        result.operation !== params.operation ||
+        result.control !== expected
+      )
+        throw new Error('Invalid external browser control result');
+      return result;
+    },
     async detach(request, context = {}): Promise<unknown> {
       await requireBrowser(request.browserId, 'detach', context);
       if (!definition.detach) throw new Error('Provider does not implement detach');
@@ -716,11 +757,18 @@ export function createProviderRuntime(definition: BrowserProviderDefinition): Pr
     },
     async getEnhancementTarget(request, context = {}) {
       assertDeadline(context);
-      if (!definition.getEnhancementTarget) throw new Error('BROWSER_ENHANCEMENT_TARGET_UNSUPPORTED');
-      if (!Number.isSafeInteger(request.tabId) || request.tabId < 0) throw new Error('A valid Provider tabId is required');
-      const browser = (await listBrowsers(context)).find(item => item.browserId === request.browserId);
-      if (browser?.status !== 'connected' || browser.control.kind !== 'provider' ||
-        browser.control.capabilities.controlSessionMode !== 'external')
+      if (!definition.getEnhancementTarget)
+        throw new Error('BROWSER_ENHANCEMENT_TARGET_UNSUPPORTED');
+      if (!Number.isSafeInteger(request.tabId) || request.tabId < 0)
+        throw new Error('A valid Provider tabId is required');
+      const browser = (await listBrowsers(context)).find(
+        item => item.browserId === request.browserId,
+      );
+      if (
+        browser?.status !== 'connected' ||
+        browser.control.kind !== 'provider' ||
+        browser.control.capabilities.controlSessionMode !== 'external'
+      )
         throw new Error('BROWSER_ENHANCEMENT_OWNER_UNAVAILABLE');
       assertDeadline(context);
       const target = await definition.getEnhancementTarget(request, context);
@@ -728,18 +776,25 @@ export function createProviderRuntime(definition: BrowserProviderDefinition): Pr
         throw new Error('Invalid Provider enhancement target');
       assertDeadline(context);
       return target.ready
-        ? { tabId: target.tabId, ready: true, ...(target.mainFrameId ? { mainFrameId: target.mainFrameId } : {}),
-            ...(target.targetId ? { targetId: target.targetId } : {}), url: target.url,
-            ...(target.initialEnvironment ? { initialEnvironment: structuredClone(target.initialEnvironment) } : {}),
+        ? {
+            tabId: target.tabId,
+            ready: true,
+            ...(target.mainFrameId ? { mainFrameId: target.mainFrameId } : {}),
+            ...(target.targetId ? { targetId: target.targetId } : {}),
+            url: target.url,
+            ...(target.initialEnvironment
+              ? { initialEnvironment: structuredClone(target.initialEnvironment) }
+              : {}),
           }
         : { tabId: target.tabId, ready: false };
     },
     async invokeAction(actionContext): Promise<unknown> {
-      const browser = (await listBrowsers({ controlSource: actionContext.controlSource,
-        ...(actionContext.deadline !== undefined ? { deadline: actionContext.deadline } : {}),
-      })).find(
-        item => item.browserId === actionContext.browserId,
-      );
+      const browser = (
+        await listBrowsers({
+          controlSource: actionContext.controlSource,
+          ...(actionContext.deadline !== undefined ? { deadline: actionContext.deadline } : {}),
+        })
+      ).find(item => item.browserId === actionContext.browserId);
       if (!browser) throw new Error(`Provider browser not found: ${actionContext.browserId}`);
       if (browser.status !== 'connected') {
         throw new Error(`Provider browser ${actionContext.browserId} is not connected`);

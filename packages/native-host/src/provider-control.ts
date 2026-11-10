@@ -1,4 +1,9 @@
-import { describeBrowserCapabilities, findMatchingTabs, type ControlSessionInfo } from '@mearl/browser-core';
+import {
+  describeBrowserCapabilities,
+  findMatchingTabs,
+  parseExternalBrowserControl,
+  type ControlSessionInfo,
+} from '@mearl/browser-core';
 import { ControlSessionManager } from './control-session-manager.js';
 import type { BrowserRecord } from './browser-registry.js';
 import { assertProviderProtocolVersion, type ProviderHostContextData } from '@mearl/provider';
@@ -166,31 +171,47 @@ export class ProviderControlService {
     origin: string,
     host?: ProviderHostContextData,
   ) {
-    const nativeDialogPress = (action: string, payload: any) => action === 'page_press' &&
+    const nativeDialogPress = (action: string, payload: any) =>
+      action === 'page_press' &&
       (payload?.dialogId !== undefined || payload?.promptText !== undefined);
-    if (nativeDialogPress(action, data) || (action === 'run_actions' && Array.isArray(data?.actions) &&
-      data.actions.some((step: any) => nativeDialogPress(step?.action, step?.data)))) {
-      throw new Error('Provider native dialog handling is not negotiated. Use the built-in CDP or extension transport.');
+    if (
+      nativeDialogPress(action, data) ||
+      (action === 'run_actions' &&
+        Array.isArray(data?.actions) &&
+        data.actions.some((step: any) => nativeDialogPress(step?.action, step?.data)))
+    ) {
+      throw new Error(
+        'Provider native dialog handling is not negotiated. Use the built-in CDP or extension transport.',
+      );
     }
-    if (action === 'get_capabilities' && !browser.capabilities?.actions.includes('get_capabilities')) {
-      return describeBrowserCapabilities(['get_capabilities', ...(browser.capabilities?.actions ?? [])], undefined, data);
+    if (
+      action === 'get_capabilities' &&
+      !browser.capabilities?.actions.includes('get_capabilities')
+    ) {
+      return describeBrowserCapabilities(
+        ['get_capabilities', ...(browser.capabilities?.actions ?? [])],
+        undefined,
+        data,
+      );
     }
     if (action === 'browser_release') {
       action = 'browser_instances';
       data = { operation: 'detach' };
     }
     const lifecycle =
-      action === 'browser_close'
-        ? data.deleteProfile === true
-          ? 'deleteData'
-          : 'close'
-        : action === 'get_browser_access_url'
-          ? 'access'
-          : action === 'browser_instances'
-            ? data.operation === 'sync_cookies'
-              ? 'syncCookies'
-              : data.operation
-            : undefined;
+      action === 'browser_control'
+        ? data.operation
+        : action === 'browser_close'
+          ? data.deleteProfile === true
+            ? 'deleteData'
+            : 'close'
+          : action === 'get_browser_access_url'
+            ? 'access'
+            : action === 'browser_instances'
+              ? data.operation === 'sync_cookies'
+                ? 'syncCookies'
+                : data.operation
+              : undefined;
     if (lifecycle && !browser.operations?.includes(lifecycle))
       throw new Error(`Provider browser does not support ${lifecycle}`);
     if (!lifecycle && action !== 'get_versions') {
@@ -248,13 +269,14 @@ export class ProviderControlService {
       if (deadline !== undefined) providerRequestTimeoutMs(action, data, deadline);
       this.reap();
       const browser = this.browser(browserId);
-      if (
-        browser.capabilities?.controlSessionMode === 'external' &&
-        (sessionId !== undefined || action === 'browser_control')
-      ) {
+      if (browser.capabilities?.controlSessionMode === 'external' && sessionId !== undefined) {
         throw new Error(
-          'CONTROL_SESSION_UNSUPPORTED: this Provider manages task control externally; use its native handoff/resume without --session.',
+          'CONTROL_SESSION_UNSUPPORTED: this Provider manages task control externally; use browser_control without --session.',
         );
+      }
+      if (browser.capabilities?.controlSessionMode === 'external' && action === 'browser_control') {
+        const params = parseExternalBrowserControl(data);
+        return this.request(browser, action, params, origin);
       }
       const { manager } = this.getControl(browser);
       if (action === 'get_versions' || action === 'get_browser_access_url')

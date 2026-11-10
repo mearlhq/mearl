@@ -2,6 +2,7 @@ export * from './appProfileDefinition.js';
 export * from './types.js';
 export * from './browserEnhancement.js';
 export * from './browserDiscovery.js';
+export * from './externalBrowserControl.js';
 export * from './providerAppResources.js';
 export * from './eventFilters.js';
 export * from './requestSerializer.js';

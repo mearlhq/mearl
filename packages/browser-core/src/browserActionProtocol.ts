@@ -154,7 +154,15 @@ export type BrowserJsonValue =
   BrowserJsonPrimitive | BrowserJsonValue[] | { [key: string]: BrowserJsonValue };
 
 export type BrowserProviderOperation =
-  'start' | 'close' | 'detach' | 'deleteData' | 'access' | 'syncCookies';
+  | 'start'
+  | 'close'
+  | 'detach'
+  | 'deleteData'
+  | 'access'
+  | 'syncCookies'
+  | 'handoff'
+  | 'resume'
+  | 'finish';
 
 export interface BrowserProviderIdentity {
   id: string;
@@ -290,9 +298,17 @@ export interface BrowserReleaseParams {
 }
 
 export interface BrowserControlParams {
-  operation: 'handoff' | 'resume';
+  operation: 'handoff' | 'resume' | 'finish';
   tabId?: number;
   reason?: string;
+  /** External Provider finish only; retain these result pages. */
+  keepTabIds?: number[];
+}
+
+export interface ExternalBrowserControlResult {
+  controlSessionMode: 'external';
+  operation: BrowserControlParams['operation'];
+  control: 'agent' | 'user' | 'finished';
 }
 
 export interface BrowserArtifact {
@@ -924,7 +940,10 @@ export interface BrowserActionMap {
   browser_list: { request: BrowserListParams | undefined; response: BrowserListResult };
   browser_select_browser: { request: SelectBrowserParams; response: SelectBrowserResult };
   browser_release: { request: BrowserReleaseParams; response: BrowserReleaseResult };
-  browser_control: { request: BrowserControlParams; response: { session: ControlSessionInfo } };
+  browser_control: {
+    request: BrowserControlParams;
+    response: { session: ControlSessionInfo } | ExternalBrowserControlResult;
+  };
   page_download: { request: PageDownloadParams; response: PageDownloadResult };
   browser_launch: { request: BrowserLaunchParams; response: ManagedBrowserInfo };
   browser_close: { request: BrowserCloseParams; response: unknown };
