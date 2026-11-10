@@ -6,7 +6,7 @@ version: "3.0.0"
 
 # Mearl
 
-`mearl` 命令未安装时，执行 `npx --yes @mearl/setup --local --yes --skip-skill` 安装本机 CLI 和 Native Host。
+`mearl` 命令未安装时，执行 `npx --yes @mearl/setup --yes --skip-skill` 安装本机 CLI 和 Native Host。
 
 配置本机浏览器时，用 `mearl check` 验证连接。需要手动安装扩展时，运行 `npx --yes @mearl/setup extension --extract`，请用户在 `chrome://extensions/` 开启开发者模式并加载命令输出的解压目录。如果连接检查找不到浏览器，请用户在 Mearl Popup 的「设置 → 服务集成」中确认「Agent 服务」已开启，然后重新验证连接。
 
