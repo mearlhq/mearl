@@ -28,13 +28,13 @@
 任务要运行小程序工程或已编译的微信产物时，先用 `mearl --help` 检查已注册插件中是否有 `wxa`。缺失时，从已包含此 Skill 且当前可访问的官方来源补装：
 
 ```bash
-{{setup}} plugin install https://github.com/mearlhq/wechat-profile --github --skill wechat-miniprogram --yes
+{{setup}} plugin install https://github.com/mearlhq/profile-wechat --github --skill wechat-miniprogram --yes
 ```
 
 官方来源暂不可用且本机已有包含此 Skill 的源码时，可直接注册：
 
 ```bash
-{{setup}} plugin "/path/to/wechat-profile/skills/wechat-miniprogram"
+{{setup}} plugin "/path/to/profile-wechat/skills/wechat-miniprogram"
 ```
 
 两种方式都会准备运行依赖并注册 `wxa`。读取对应目录中的 `wechat-miniprogram` Skill，查看 `mearl wxa run --help` 后用 `mearl wxa run <项目路径>` 编译并打开预览。框架项目先构建微信产物。看完可以直接关闭预览标签页。若安装失败，报告具体阻塞。用户只要求普通微信 H5 / WebView 模拟时，查询目标浏览器是否支持微信端模拟。

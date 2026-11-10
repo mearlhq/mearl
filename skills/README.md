@@ -56,4 +56,4 @@ npx @mearl/setup plugin install mearlhq/mearl --github --skill browser-tab-manag
 
 依赖新宿主或扩展能力的 Skill，应在对应 Mearl 版本发布后再对外推广。见[发布说明](../docs/releases.md)。
 
-微信小程序 Skill 从 [WeChat Profile](https://github.com/mearlhq/wechat-profile) 安装。
+微信小程序 Skill 从 [WeChat Profile](https://github.com/mearlhq/profile-wechat) 安装。

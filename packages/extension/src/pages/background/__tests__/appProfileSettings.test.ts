@@ -20,9 +20,18 @@ vi.mock('../deviceShellRules', () => shellMocks);
 vi.mock('../appProfileCatalog', () => ({ getAppProfileCatalog: variants.catalog }));
 vi.mock('../agentHandlers/appProfileHandlers', () => ({ handleSetAppProfile: variants.set }));
 vi.mock('../quickSimulationAutoRules', () => ({
-  runQuickSimulationUpdateWithAutoRuleSync: (_tabId: number, _rule: unknown, update: () => unknown) => update(),
+  runQuickSimulationUpdateWithAutoRuleSync: (
+    _tabId: number,
+    _rule: unknown,
+    update: () => unknown,
+  ) => update(),
 }));
-import { getAppProfileVariants, selectAppProfileVariant, setAppProfileSetting, setAppProfileRuntimeResponses } from '../appProfileSettings';
+import {
+  getAppProfileVariants,
+  selectAppProfileVariant,
+  setAppProfileSetting,
+  setAppProfileRuntimeResponses,
+} from '../appProfileSettings';
 
 describe('app profile settings persistence and rollback', () => {
   const emulation = { presetName: 'iphone-17-pro', orientation: 'portrait' };
@@ -54,26 +63,48 @@ describe('app profile settings persistence and rollback', () => {
   it.each([
     { languages: ['en', 'zh-CN'], language: 'en' },
     { languages: ['zh-CN'], language: undefined },
-  ])('switches within the active bundle with target languages $languages', async ({ languages, language }) => {
-    rules.getAppProfileForTab.mockResolvedValue({
-      profile: 'wechat', settingsGroup: 'webview',
-      binding: { explicitOptions: { language: 'en' } },
-    });
-    variants.catalog.mockResolvedValue({ profiles: [
-      { id: 'wechat', label: 'WeChat', plugin: 'wechat-profile', definition: { settingsGroup: 'webview' } },
-      { id: 'wechat-mini', label: 'Mini-program', plugin: 'wechat-profile', definition: { settingsGroup: 'webview', policies: { languages } } },
-      { id: 'other', label: 'Other', plugin: 'another-bundle', definition: { settingsGroup: 'webview' } },
-    ] });
-    expect(await getAppProfileVariants(7, 'wechat')).toEqual([
-      { value: 'wechat', label: 'WeChat' }, { value: 'wechat-mini', label: 'Mini-program' },
-    ]);
-    await expect(selectAppProfileVariant(7, 'wechat', 'other')).rejects.toThrow('unavailable');
-    await selectAppProfileVariant(7, 'wechat', 'wechat-mini');
-    expect(variants.set).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({ tabId: 7, enabled: true, profile: 'wechat-mini', language }),
-      expect.any(Function),
-    );
-  });
+  ])(
+    'switches within the active bundle with target languages $languages',
+    async ({ languages, language }) => {
+      rules.getAppProfileForTab.mockResolvedValue({
+        profile: 'wechat',
+        settingsGroup: 'webview',
+        binding: { explicitOptions: { language: 'en' } },
+      });
+      variants.catalog.mockResolvedValue({
+        profiles: [
+          {
+            id: 'wechat',
+            label: 'WeChat',
+            plugin: 'profile-wechat',
+            definition: { settingsGroup: 'webview' },
+          },
+          {
+            id: 'wechat-mini',
+            label: 'Mini-program',
+            plugin: 'profile-wechat',
+            definition: { settingsGroup: 'webview', policies: { languages } },
+          },
+          {
+            id: 'other',
+            label: 'Other',
+            plugin: 'another-bundle',
+            definition: { settingsGroup: 'webview' },
+          },
+        ],
+      });
+      expect(await getAppProfileVariants(7, 'wechat')).toEqual([
+        { value: 'wechat', label: 'WeChat' },
+        { value: 'wechat-mini', label: 'Mini-program' },
+      ]);
+      await expect(selectAppProfileVariant(7, 'wechat', 'other')).rejects.toThrow('unavailable');
+      await selectAppProfileVariant(7, 'wechat', 'wechat-mini');
+      expect(variants.set).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ tabId: 7, enabled: true, profile: 'wechat-mini', language }),
+        expect.any(Function),
+      );
+    },
+  );
 
   it('persists the language option in one write', async () => {
     rules.getAppProfileForTab.mockResolvedValue(resolveAppProfile('wallet').injected);

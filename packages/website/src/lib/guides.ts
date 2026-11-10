@@ -34,7 +34,7 @@ mearl get_logs --payload '{"tabId":12345,"after":"<cursor>","level":"error"}'`;
 const signedRequest = `mearl send_request --browser '<browserId>' --payload '{"url":"https://api.example.com/me"}'`;
 const emulate = `mearl set_device_emulation --payload '{"tabId":12345,"enabled":true,"preset":"iphone-17-pro"}'`;
 const findProfiles = 'mearl set_app_profile --help';
-const wechatMiniProgram = `npx @mearl/setup plugin install mearlhq/wechat-profile --github --skill wechat-miniprogram
+const wechatMiniProgram = `npx @mearl/setup plugin install mearlhq/profile-wechat --github --skill wechat-miniprogram
 mearl wxa run ./dist`;
 const chineseBqb = 'https://github.com/F-loat/ChineseBQB-weapp';
 const egoSetup = `npx @mearl/setup@latest provider install @mearl/provider-ego
@@ -467,7 +467,7 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
           ],
           screenshot: ['appBrowser', 'appWebView'],
           links: [
-            { label: 'WeChat H5 emulation', url: 'https://github.com/mearlhq/wechat-profile' },
+            { label: 'WeChat H5 emulation', url: 'https://github.com/mearlhq/profile-wechat' },
             { label: 'Capability packages', path: 'docs/capability-model.md' },
           ],
         },
@@ -486,7 +486,7 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
             { label: 'ChineseBQB-weapp example project', url: chineseBqb },
             {
               label: 'WeChat mini-program runtime guide',
-              url: 'https://github.com/mearlhq/wechat-profile/blob/main/docs/wechat-miniprogram.md',
+              url: 'https://github.com/mearlhq/profile-wechat/blob/main/docs/wechat-miniprogram.md',
             },
           ],
         },
@@ -526,7 +526,7 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
             { label: 'ChineseBQB-weapp', url: chineseBqb },
             {
               label: 'Runtime notices',
-              url: 'https://github.com/mearlhq/wechat-profile/blob/main/skills/wechat-miniprogram/assets/runtime/THIRD_PARTY_NOTICES.md',
+              url: 'https://github.com/mearlhq/profile-wechat/blob/main/skills/wechat-miniprogram/assets/runtime/THIRD_PARTY_NOTICES.md',
             },
           ],
         },
@@ -574,7 +574,7 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
           links: [
             {
               label: '微信端模拟',
-              url: 'https://github.com/mearlhq/wechat-profile/blob/main/README.zh-CN.md',
+              url: 'https://github.com/mearlhq/profile-wechat/blob/main/README.zh-CN.md',
             },
             { label: '能力包文档', path: 'docs/capability-model.md' },
           ],
@@ -594,7 +594,7 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
             { label: 'ChineseBQB-weapp 示例项目', url: chineseBqb },
             {
               label: '微信小程序运行指南',
-              url: 'https://github.com/mearlhq/wechat-profile/blob/main/docs/wechat-miniprogram.zh-CN.md',
+              url: 'https://github.com/mearlhq/profile-wechat/blob/main/docs/wechat-miniprogram.zh-CN.md',
             },
           ],
         },
@@ -634,7 +634,7 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
             { label: 'ChineseBQB-weapp', url: chineseBqb },
             {
               label: '运行时第三方声明',
-              url: 'https://github.com/mearlhq/wechat-profile/blob/main/skills/wechat-miniprogram/assets/runtime/THIRD_PARTY_NOTICES.md',
+              url: 'https://github.com/mearlhq/profile-wechat/blob/main/skills/wechat-miniprogram/assets/runtime/THIRD_PARTY_NOTICES.md',
             },
           ],
         },

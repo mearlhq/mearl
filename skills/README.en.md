@@ -56,4 +56,4 @@ npx @mearl/setup plugin install mearlhq/mearl --github --skill browser-tab-manag
 
 Publish the matching Mearl host and extension before advertising Skills that require their new capabilities. See the [release guide](../docs/releases.en.md).
 
-Install the WeChat mini-program Skill from [WeChat Profile](https://github.com/mearlhq/wechat-profile).
+Install the WeChat mini-program Skill from [WeChat Profile](https://github.com/mearlhq/profile-wechat).

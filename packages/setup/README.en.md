@@ -31,7 +31,7 @@ Install optional cloud protocols through a preset before selecting `--cloud-mode
 ## Install App emulation
 
 ```bash
-npx @mearl/setup profile install mearlhq/wechat-profile
+npx @mearl/setup profile install mearlhq/profile-wechat
 ```
 
 The source can be a public GitHub `owner/repo`, `owner/repo@ref`, or a full HTTPS bundle manifest URL. GitHub sources load the root `bundle.json` from the resolved commit. The command installs every App emulation configuration declared by that bundle and preserves the active Preset. When multiple local extensions are connected, select a target with `--browser`. Confirm source access in the extension if prompted.

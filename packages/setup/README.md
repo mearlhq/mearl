@@ -31,7 +31,7 @@ npx @mearl/setup preset <update|status|uninstall>
 ## 安装端模拟
 
 ```bash
-npx @mearl/setup profile install mearlhq/wechat-profile
+npx @mearl/setup profile install mearlhq/profile-wechat
 ```
 
 来源支持公开 GitHub 仓库的 `owner/repo`、`owner/repo@ref`，或能力包清单的完整 HTTPS 地址。GitHub 来源从解析后的提交读取根目录 `bundle.json`。命令安装能力包声明的全部端模拟配置，保留当前 Preset。有多个本地扩展连接时，用 `--browser` 选择目标。若扩展提示授权，请确认来源。

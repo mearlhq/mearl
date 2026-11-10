@@ -505,7 +505,7 @@ describe('QuickSettingsMenu', () => {
     const dialog = within(await screen.findByRole('dialog', { name: '添加端模拟' }));
     const source = dialog.getByRole('textbox', { name: '端模拟来源' });
     fireEvent.click(dialog.getByRole('button', { name: /微信/ }));
-    expect(source).toHaveValue('mearlhq/wechat-profile');
+    expect(source).toHaveValue('mearlhq/profile-wechat');
     fireEvent.change(source, { target: { value: 'example/profiles' } });
     expect(source).toHaveValue('example/profiles');
     const close = dialog.getByTitle('Close (ESC)');
