@@ -8,10 +8,14 @@ const accountMocks = vi.hoisted(() => ({
   borrow: vi.fn(),
   ticket: vi.fn(),
   setLoginOpen: vi.fn(async () => {}),
-  loginSnapshot: { open: false, definition: undefined as undefined | { url: string; title: { en: string } } },
+  loginSnapshot: {
+    open: false,
+    definition: undefined as undefined | { url: string; title: { en: string } },
+  },
   requestAccounts: vi.fn(),
   retryAccounts: vi.fn(),
   accountsError: '',
+  retainAccounts: false,
   labelCache: new Map<string, string>(),
   settings: { logins: { accounts: { url: 'https://accounts.example.test/' } } },
   openWindow: vi.fn(),
@@ -19,14 +23,17 @@ const accountMocks = vi.hoisted(() => ({
 
 vi.mock('../../../hooks/useAccounts', () => ({
   useAccounts: () => ({
-    accounts: accountMocks.accountsError ? [] : [
-      {
-        id: 1,
-        loginId: 'test-account',
-        principalId: 10001,
-        site: 'CN',
-      },
-    ],
+    accounts:
+      accountMocks.accountsError && !accountMocks.retainAccounts
+        ? []
+        : [
+            {
+              id: 1,
+              loginId: 'test-account',
+              principalId: 10001,
+              site: 'CN',
+            },
+          ],
     initialized: true,
     loading: false,
     error: accountMocks.accountsError,
@@ -35,10 +42,17 @@ vi.mock('../../../hooks/useAccounts', () => ({
   }),
 }));
 
-vi.mock('../../LoginModal', () => ({ LoginModal: ({ isOpen, url, onClose }: { isOpen: boolean; url: string; onClose: () => void }) => isOpen ? <div data-testid="accepted-login" data-url={url}><button onClick={onClose}>close-login</button></div> : null }));
+vi.mock('../../LoginModal', () => ({
+  LoginModal: ({ isOpen, url, onClose }: { isOpen: boolean; url: string; onClose: () => void }) =>
+    isOpen ? (
+      <div data-testid="accepted-login" data-url={url}>
+        <button onClick={onClose}>close-login</button>
+      </div>
+    ) : null,
+}));
 
 vi.mock('../../../utils/i18n', () => ({
-  t: (key: string, value?: string) => key === 'accountLogin' && value ? `${key}: ${value}` : key,
+  t: (key: string, value?: string) => (key === 'accountLogin' && value ? `${key}: ${value}` : key),
 }));
 
 vi.mock('../../../utils/accounts', () => ({
@@ -46,15 +60,22 @@ vi.mock('../../../utils/accounts', () => ({
   fetchAccountSso: accountMocks.ticket,
   fetchAccountIdentity: accountMocks.fetchAccountIdentity,
   readAccountLabelCache: (scope: string) => accountMocks.labelCache.get(scope) ?? '',
-  writeAccountLabelCache: (scope: string, label: string) => accountMocks.labelCache.set(scope, label),
+  writeAccountLabelCache: (scope: string, label: string) =>
+    accountMocks.labelCache.set(scope, label),
   fetchAccountQr: accountMocks.fetchAccountQr,
   isAccountLoginError: (error: string) => error === 'ACCOUNT_LOGIN_REQUIRED',
   withAccountAutoLogin: async (request: () => Promise<unknown>) => ({ result: await request() }),
   redirectAccountLoginPage: vi.fn(),
 }));
 
-vi.mock('../../../utils/browserUiLogin', () => ({ useBrowserUiLogin: () => accountMocks.loginSnapshot, setBrowserUiLoginOpen: accountMocks.setLoginOpen }));
-vi.mock('../../../utils/browserUiSettings', () => ({ useBrowserUiSettings: () => accountMocks.settings, getBrowserUiSettingsCacheScope: (settings: unknown) => JSON.stringify(settings) }));
+vi.mock('../../../utils/browserUiLogin', () => ({
+  useBrowserUiLogin: () => accountMocks.loginSnapshot,
+  setBrowserUiLoginOpen: accountMocks.setLoginOpen,
+}));
+vi.mock('../../../utils/browserUiSettings', () => ({
+  useBrowserUiSettings: () => accountMocks.settings,
+  getBrowserUiSettingsCacheScope: (settings: unknown) => JSON.stringify(settings),
+}));
 
 vi.mock('../../../utils/qrCode', () => ({
   generateQrCodeSvgMarkup: () => '<svg viewBox="0 0 21 21"></svg>',
@@ -68,17 +89,49 @@ describe('AccountBadge', () => {
     accountMocks.setLoginOpen.mockClear();
     accountMocks.retryAccounts.mockClear();
     accountMocks.requestAccounts.mockClear();
-    accountMocks.borrow.mockReset().mockResolvedValue({ success: true, data: { id: 2, principalId: 123, site: 'test', loginId: 'borrowed', provider: { bundleId: 'accounts', revision: 'one' } } });
-    accountMocks.ticket.mockReset().mockResolvedValue({ success: true, data: 'https://accounts.example.test/ticket' });
+    accountMocks.borrow
+      .mockReset()
+      .mockResolvedValue({
+        success: true,
+        data: {
+          id: 2,
+          principalId: 123,
+          site: 'test',
+          loginId: 'borrowed',
+          provider: { bundleId: 'accounts', revision: 'one' },
+        },
+      });
+    accountMocks.ticket
+      .mockReset()
+      .mockResolvedValue({ success: true, data: 'https://accounts.example.test/ticket' });
     accountMocks.loginSnapshot = { open: false, definition: undefined };
     accountMocks.accountsError = '';
+    accountMocks.retainAccounts = false;
     vi.spyOn(window, 'open').mockImplementation(accountMocks.openWindow);
     accountMocks.openWindow.mockReset();
-    accountMocks.fetchAccountIdentity.mockReset().mockResolvedValue({ value: '10001', watch: [{ name: 'session-id', domain: 'example.test' }] });
+    accountMocks.fetchAccountIdentity
+      .mockReset()
+      .mockResolvedValue({
+        value: '10001',
+        watch: [{ name: 'session-id', domain: 'example.test' }],
+      });
     accountMocks.fetchAccountQr.mockReset().mockResolvedValue({
       success: true,
-      data: { url: 'https://account.example/mobile', alternateUrl: 'https://account.example/mobile/harmony' },
+      data: {
+        url: 'https://account.example/mobile',
+        alternateUrl: 'https://account.example/mobile/harmony',
+      },
     });
+  });
+
+  it('shows a retry alongside cached accounts when loading fails', async () => {
+    accountMocks.accountsError = 'Network unavailable';
+    accountMocks.retainAccounts = true;
+    render(<AccountBadge />);
+    expect(screen.getByText('test-account')).toBeInTheDocument();
+    expect(screen.getByText('accountsLoadFailed')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('retry'));
+    expect(accountMocks.retryAccounts).toHaveBeenCalledWith({ requestPermission: true });
   });
 
   it('keeps quick borrow, accepted-provider SSO and list refresh in the same toolbar flow', async () => {
@@ -98,7 +151,12 @@ describe('AccountBadge', () => {
       fireEvent.change(input, { target: { value: 'borrowed' } });
       fireEvent.keyDown(input, { key: 'Enter' });
       await waitFor(() => expect(accountMocks.borrow).toHaveBeenCalledWith('borrowed'));
-      await waitFor(() => expect(accountMocks.ticket).toHaveBeenCalledWith(123, 'test', { bundleId: 'accounts', revision: 'one' }));
+      await waitFor(() =>
+        expect(accountMocks.ticket).toHaveBeenCalledWith(123, 'test', {
+          bundleId: 'accounts',
+          revision: 'one',
+        }),
+      );
       await waitFor(() => expect(accountMocks.retryAccounts).toHaveBeenCalled());
       expect(frames).toHaveLength(1);
       expect(frames[0].src).toBe('https://accounts.example.test/ticket');
@@ -108,7 +166,11 @@ describe('AccountBadge', () => {
   });
   it('shows a freshly verified cached label while list normalization is still unavailable', async () => {
     accountMocks.accountsError = 'pending';
-    accountMocks.fetchAccountIdentity.mockResolvedValue({ value: '10001', watch: [], loginId: 'cached-account' });
+    accountMocks.fetchAccountIdentity.mockResolvedValue({
+      value: '10001',
+      watch: [],
+      loginId: 'cached-account',
+    });
     render(<AccountBadge showRequestCountToggle={false} />);
     await screen.findByText('cached-account');
     expect(accountMocks.requestAccounts).not.toHaveBeenCalled();
@@ -118,31 +180,42 @@ describe('AccountBadge', () => {
     accountMocks.accountsError = 'pending';
     accountMocks.labelCache.set(JSON.stringify(accountMocks.settings), 'cached-account');
     let finish!: (identity: unknown) => void;
-    accountMocks.fetchAccountIdentity.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    accountMocks.fetchAccountIdentity.mockImplementation(
+      () =>
+        new Promise(resolve => {
+          finish = resolve;
+        }),
+    );
     render(<AccountBadge showRequestCountToggle={false} />);
     expect(screen.getByTitle('cached-account')).toHaveTextContent('cached-account');
     expect(screen.queryByTitle('accountCurrentAccount')).toBeNull();
     expect(accountMocks.fetchAccountIdentity).toHaveBeenCalledExactlyOnceWith();
-    await act(async () => { finish({ value: '', watch: [] }); });
+    await act(async () => {
+      finish({ value: '', watch: [] });
+    });
     expect(screen.getByTitle('account').textContent).toBe('');
     expect(accountMocks.labelCache.get(JSON.stringify(accountMocks.settings))).toBe('');
   });
 
-  it.each(['empty identity', 'ACCOUNT_LOGIN_REQUIRED'])('does not flash the expired name on the next popup after %s', async result => {
-    accountMocks.accountsError = 'pending';
-    const scope = JSON.stringify(accountMocks.settings);
-    accountMocks.labelCache.set(scope, 'expired-account');
-    if (result === 'empty identity') accountMocks.fetchAccountIdentity.mockResolvedValue({ value: '', watch: [] });
-    else accountMocks.fetchAccountIdentity.mockRejectedValue(new Error(result));
-    const first = render(<AccountBadge showRequestCountToggle={false} />);
-    await waitFor(() => expect(screen.getByTitle('account').textContent).toBe(''));
-    expect(accountMocks.labelCache.get(scope)).toBe('');
-    first.unmount();
-    accountMocks.fetchAccountIdentity.mockImplementation(() => new Promise(() => {}));
-    render(<AccountBadge showRequestCountToggle={false} />);
-    expect(screen.queryByText('expired-account')).toBeNull();
-    expect(screen.getByTitle('account').textContent).toBe('');
-  });
+  it.each(['empty identity', 'ACCOUNT_LOGIN_REQUIRED'])(
+    'does not flash the expired name on the next popup after %s',
+    async result => {
+      accountMocks.accountsError = 'pending';
+      const scope = JSON.stringify(accountMocks.settings);
+      accountMocks.labelCache.set(scope, 'expired-account');
+      if (result === 'empty identity')
+        accountMocks.fetchAccountIdentity.mockResolvedValue({ value: '', watch: [] });
+      else accountMocks.fetchAccountIdentity.mockRejectedValue(new Error(result));
+      const first = render(<AccountBadge showRequestCountToggle={false} />);
+      await waitFor(() => expect(screen.getByTitle('account').textContent).toBe(''));
+      expect(accountMocks.labelCache.get(scope)).toBe('');
+      first.unmount();
+      accountMocks.fetchAccountIdentity.mockImplementation(() => new Promise(() => {}));
+      render(<AccountBadge showRequestCountToggle={false} />);
+      expect(screen.queryByText('expired-account')).toBeNull();
+      expect(screen.getByTitle('account').textContent).toBe('');
+    },
+  );
 
   it('retains the cached label after a transient identity failure', async () => {
     accountMocks.labelCache.set(JSON.stringify(accountMocks.settings), 'cached-account');
@@ -156,19 +229,34 @@ describe('AccountBadge', () => {
     accountMocks.accountsError = 'pending';
     let finishFresh!: (identity: unknown) => void;
     let finishCache!: (identity: unknown) => void;
-    accountMocks.fetchAccountIdentity.mockImplementation(options => new Promise(resolve => {
-      if (options?.cachedOnly) finishCache = resolve; else finishFresh = resolve;
-    }));
+    accountMocks.fetchAccountIdentity.mockImplementation(
+      options =>
+        new Promise(resolve => {
+          if (options?.cachedOnly) finishCache = resolve;
+          else finishFresh = resolve;
+        }),
+    );
     const first = render(<AccountBadge showRequestCountToggle={false} />);
-    await act(async () => { finishCache({ value: '', watch: [], loginId: 'cached-account' }); });
+    await act(async () => {
+      finishCache({ value: '', watch: [], loginId: 'cached-account' });
+    });
     expect(screen.getByTitle('cached-account')).toHaveTextContent('cached-account');
     expect(screen.queryByTitle('accountCurrentAccount')).toBeNull();
-    await act(async () => { finishFresh({ value: 'new', watch: [], loginId: 'new-account' }); });
+    await act(async () => {
+      finishFresh({ value: 'new', watch: [], loginId: 'new-account' });
+    });
     expect(screen.getByTitle('new-account')).toHaveTextContent('new-account');
-    await waitFor(() => expect(accountMocks.labelCache.get(JSON.stringify(accountMocks.settings))).toBe('new-account'));
+    await waitFor(() =>
+      expect(accountMocks.labelCache.get(JSON.stringify(accountMocks.settings))).toBe(
+        'new-account',
+      ),
+    );
     first.unmount();
     render(<AccountBadge showRequestCountToggle={false} />);
-    await act(async () => { finishFresh({ value: 'new', watch: [], loginId: 'new-account' }); finishCache({ value: '', watch: [], loginId: 'cached-account' }); });
+    await act(async () => {
+      finishFresh({ value: 'new', watch: [], loginId: 'new-account' });
+      finishCache({ value: '', watch: [], loginId: 'cached-account' });
+    });
     expect(screen.getByTitle('new-account')).toHaveTextContent('new-account');
   });
 
@@ -188,32 +276,59 @@ describe('AccountBadge', () => {
     render(<AccountBadge showRequestCountToggle={false} />);
     await screen.findByTitle('test-account');
     let finish!: (identity: unknown) => void;
-    accountMocks.fetchAccountIdentity.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    accountMocks.fetchAccountIdentity.mockImplementation(
+      () =>
+        new Promise(resolve => {
+          finish = resolve;
+        }),
+    );
     const cookieListener = vi.mocked(chrome.cookies.onChanged.addListener).mock.calls.at(-1)![0];
-    act(() => cookieListener({ cookie: { name: 'session-id', domain: '.example.test' }, removed: false } as chrome.cookies.CookieChangeInfo));
+    act(() =>
+      cookieListener({
+        cookie: { name: 'session-id', domain: '.example.test' },
+        removed: false,
+      } as chrome.cookies.CookieChangeInfo),
+    );
     expect(screen.getByTitle('test-account')).toHaveTextContent('test-account');
-    await act(async () => { finish({ value: 'next', watch: [], loginId: 'next-account' }); });
+    await act(async () => {
+      finish({ value: 'next', watch: [], loginId: 'next-account' });
+    });
     expect(screen.getByTitle('next-account')).toHaveTextContent('next-account');
   });
 
   it('refreshes identity on preset changes and ignores the previous provider’s delayed response', async () => {
     let resolveOld!: (value: unknown) => void;
-    accountMocks.fetchAccountIdentity.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve; }));
+    accountMocks.fetchAccountIdentity.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveOld = resolve;
+        }),
+    );
     const { rerender } = render(<AccountBadge />);
     accountMocks.settings = { logins: { accounts: { url: 'https://next.example.test/' } } };
-    accountMocks.fetchAccountIdentity.mockResolvedValue({ value: '10001', watch: [{ name: 'next', domain: 'next.example.test' }] });
+    accountMocks.fetchAccountIdentity.mockResolvedValue({
+      value: '10001',
+      watch: [{ name: 'next', domain: 'next.example.test' }],
+    });
     rerender(<AccountBadge />);
     await waitFor(() => expect(screen.getByTitle('accountCurrentAccount')).toBeInTheDocument());
-    await act(async () => { resolveOld({ value: 'old', watch: [] }); });
+    await act(async () => {
+      resolveOld({ value: 'old', watch: [] });
+    });
     expect(screen.getByTitle('accountCurrentAccount')).toBeInTheDocument();
-    expect(accountMocks.fetchAccountIdentity.mock.calls.filter(([options]) => !options?.cachedOnly)).toHaveLength(2);
+    expect(
+      accountMocks.fetchAccountIdentity.mock.calls.filter(([options]) => !options?.cachedOnly),
+    ).toHaveLength(2);
     accountMocks.settings = { logins: { accounts: { url: 'https://accounts.example.test/' } } };
   });
 
   it('opens the configured portal synchronously from the original toolbar button', () => {
     render(<AccountBadge />);
     fireEvent.click(screen.getByTitle('accountOpenPortal'));
-    expect(accountMocks.openWindow).toHaveBeenCalledExactlyOnceWith('https://accounts.example.test/', '_blank');
+    expect(accountMocks.openWindow).toHaveBeenCalledExactlyOnceWith(
+      'https://accounts.example.test/',
+      '_blank',
+    );
   });
 
   it('uses the named login lease and releases it on unmount', async () => {
@@ -227,20 +342,33 @@ describe('AccountBadge', () => {
 
   it('uses current preset text after a previous login closes', () => {
     accountMocks.accountsError = 'ACCOUNT_LOGIN_REQUIRED';
-    accountMocks.loginSnapshot = { open: false, definition: { url: 'https://previous.example.test/', title: { en: 'Previous' } } };
+    accountMocks.loginSnapshot = {
+      open: false,
+      definition: { url: 'https://previous.example.test/', title: { en: 'Previous' } },
+    };
     render(<AccountBadge />);
-    expect(screen.getByRole('button', { name: 'accountLogin: accounts.example.test' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'accountLogin: accounts.example.test' }),
+    ).toBeInTheDocument();
     expect(screen.queryByText('accountLogin: previous.example.test')).toBeNull();
   });
 
   it('renders the accepted login URL and retains close-and-refresh behavior', async () => {
-    accountMocks.loginSnapshot = { open: true, definition: { url: 'https://accepted.example.test/', title: { en: 'Account' } } };
+    accountMocks.loginSnapshot = {
+      open: true,
+      definition: { url: 'https://accepted.example.test/', title: { en: 'Account' } },
+    };
     render(<AccountBadge />);
-    expect(screen.getByTestId('accepted-login')).toHaveAttribute('data-url', 'https://accepted.example.test/');
+    expect(screen.getByTestId('accepted-login')).toHaveAttribute(
+      'data-url',
+      'https://accepted.example.test/',
+    );
     fireEvent.click(screen.getByRole('button', { name: 'close-login' }));
     await waitFor(() => expect(accountMocks.setLoginOpen).toHaveBeenCalledWith('accounts', false));
     expect(accountMocks.retryAccounts).toHaveBeenCalled();
-    expect(accountMocks.fetchAccountIdentity.mock.calls.filter(([options]) => !options?.cachedOnly)).toHaveLength(2);
+    expect(
+      accountMocks.fetchAccountIdentity.mock.calls.filter(([options]) => !options?.cachedOnly),
+    ).toHaveLength(2);
   });
 
   it('marks the account matching the current provider identity', async () => {
@@ -251,9 +379,11 @@ describe('AccountBadge', () => {
   });
 
   it('keeps the account entry visible while resolving the current identity', async () => {
-    let resolveUserId!: (identity: {value: string; watch: []}) => void;
-    accountMocks.fetchAccountIdentity.mockImplementation(
-      options => options?.cachedOnly ? Promise.resolve({ value: '', watch: [] }) : new Promise<{value: string; watch: []}>(resolve => (resolveUserId = resolve)),
+    let resolveUserId!: (identity: { value: string; watch: [] }) => void;
+    accountMocks.fetchAccountIdentity.mockImplementation(options =>
+      options?.cachedOnly
+        ? Promise.resolve({ value: '', watch: [] })
+        : new Promise<{ value: string; watch: [] }>(resolve => (resolveUserId = resolve)),
     );
 
     render(<AccountBadge showRequestCountToggle={false} />);
@@ -300,15 +430,20 @@ describe('AccountBadge', () => {
   it('loads the selected provider when settings change while the account menu is open', async () => {
     vi.useFakeTimers();
     const { rerender } = render(<AccountBadge />);
-    await act(async () => { await Promise.resolve(); });
-    const dropdown = screen.getByPlaceholderText('accountSearchPlaceholder').parentElement!.parentElement!.parentElement!;
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const dropdown = screen.getByPlaceholderText('accountSearchPlaceholder').parentElement!
+      .parentElement!.parentElement!;
     fireEvent.mouseEnter(dropdown.parentElement!);
     act(() => vi.advanceTimersByTime(200));
     expect(dropdown).toHaveClass('visible');
     accountMocks.requestAccounts.mockClear();
     accountMocks.settings = { logins: { accounts: { url: 'https://next.example.test/' } } };
     rerender(<AccountBadge />);
-    await act(async () => { await Promise.resolve(); });
+    await act(async () => {
+      await Promise.resolve();
+    });
     expect(accountMocks.requestAccounts).toHaveBeenCalled();
     expect(dropdown).toHaveClass('visible');
     accountMocks.settings = { logins: { accounts: { url: 'https://accounts.example.test/' } } };
@@ -320,9 +455,8 @@ describe('AccountBadge', () => {
     await act(async () => {
       await Promise.resolve();
     });
-    const dropdown =
-      screen.getByPlaceholderText('accountSearchPlaceholder').parentElement!.parentElement!
-        .parentElement!;
+    const dropdown = screen.getByPlaceholderText('accountSearchPlaceholder').parentElement!
+      .parentElement!.parentElement!;
     const trigger = dropdown.parentElement!;
     fireEvent.mouseEnter(trigger);
     act(() => vi.advanceTimersByTime(199));
@@ -346,9 +480,8 @@ describe('AccountBadge', () => {
     await act(async () => {
       await Promise.resolve();
     });
-    const dropdown =
-      screen.getByPlaceholderText('accountSearchPlaceholder').parentElement!.parentElement!
-        .parentElement!;
+    const dropdown = screen.getByPlaceholderText('accountSearchPlaceholder').parentElement!
+      .parentElement!.parentElement!;
     const trigger = dropdown.parentElement!;
     fireEvent.mouseEnter(trigger);
     act(() => vi.advanceTimersByTime(100));

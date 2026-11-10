@@ -10,6 +10,12 @@ import { t } from '../utils/i18n';
 import { accountStateStorageKeys } from '../../../shared/browserUiSettings';
 import { accountPermissionUrl } from '../../../shared/browserCapabilityPermissions';
 import { useBrowserUiSettings } from '../utils/browserUiSettings';
+import { missingPresetPermissions } from '../../../shared/presetPermissions';
+import {
+  PROXY_PERMISSION_STORAGE_KEY,
+  DISABLED_BUILTIN_ORIGINS_STORAGE_KEY,
+  AGENT_ALLOW_ALL_DOMAINS_STORAGE_KEY,
+} from '../../../shared/proxyPermissions';
 
 interface UseAccountsResult {
   accounts: BrowserAccountItem[];
@@ -119,6 +125,44 @@ export function useAccounts(): UseAccountsResult {
     if (fetched) return;
     await doFetch();
   }, [fetched, doFetch]);
+
+  useEffect(() => {
+    if (!permissionOrigin) return;
+    let active = true;
+    const recover = async () => {
+      try {
+        const missing = await missingPresetPermissions([`${permissionOrigin}/*`]);
+        if (active && !missing.missingOrigins.length && !missing.missingAuthorization.length)
+          await doFetch();
+      } catch {
+        // Keep the existing error and explicit retry when permission inspection fails.
+      }
+    };
+    const onAdded = () => void recover();
+    const onChanged = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+      if (
+        area === 'sync' &&
+        [
+          PROXY_PERMISSION_STORAGE_KEY,
+          DISABLED_BUILTIN_ORIGINS_STORAGE_KEY,
+          AGENT_ALLOW_ALL_DOMAINS_STORAGE_KEY,
+        ].some(key => Object.hasOwn(changes, key))
+      )
+        void recover();
+    };
+    const added = chrome.permissions.onAdded as chrome.events.Event<
+      (permissions: chrome.permissions.Permissions) => void
+    >;
+    added.addListener(onAdded);
+    chrome.storage.onChanged.addListener(onChanged);
+    // A grant can complete before the failed request reaches this mounted UI.
+    void recover();
+    return () => {
+      active = false;
+      added.removeListener(onAdded);
+      chrome.storage.onChanged.removeListener(onChanged);
+    };
+  }, [permissionOrigin, doFetch]);
 
   const retryAccounts = useCallback(
     async ({ requestPermission = false } = {}) => {

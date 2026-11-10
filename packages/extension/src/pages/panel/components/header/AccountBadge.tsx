@@ -438,7 +438,7 @@ export const AccountBadge: FC<AccountBadgeProps> = ({
 
               {/* Account list */}
               <div className="max-h-64 overflow-y-auto">
-                {accounts.length === 0 ? (
+                {(error || accounts.length === 0) && (
                   <div className="px-2 py-4 text-center text-2xs text-text-secondary">
                     {error ? (
                       isAccountLoginError(error) ? (
@@ -473,87 +473,86 @@ export const AccountBadge: FC<AccountBadgeProps> = ({
                       noDataText
                     )}
                   </div>
-                ) : (
-                  accounts.map(account => (
-                    <div
-                      key={account.id}
-                      onMouseDown={handleAccountMouseDown}
-                      onClick={e => handleAccountClick(e, String(account.id))}
-                      className="flex items-center px-2 py-1.5 text-2xs cursor-pointer transition-colors hover:bg-bg-hover text-text-primary"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium flex items-center gap-1">
-                          <span className="truncate">{account.loginId}</span>
-                          <span
-                            className="inline-flex items-center shrink-0 hover:text-text-primary cursor-pointer transition-colors"
-                            title={t('copy')}
-                            onClick={async e => {
-                              e.stopPropagation();
-                              const success = await copyToClipboard(account.loginId);
-                              if (success) {
-                                setCopiedAccountId(account.id);
-                                setTimeout(() => setCopiedAccountId(null), 2000);
-                              }
-                            }}
-                          >
-                            {copiedAccountId === account.id ? (
-                              <Check size={9} className="text-green-500" />
-                            ) : (
-                              <Copy size={9} className="opacity-50" />
-                            )}
-                          </span>
-                        </div>
-                        <div className="text-3xs opacity-75 flex items-center gap-0.5">
-                          {[account.site, account.ownerName].filter(Boolean).join(' · ')}
-                          {account.principalId != null && (
-                            <>
-                              {(account.site || account.ownerName) && ' · '}
-                              <span className="font-mono">{account.principalId}</span>
-                            </>
+                )}
+                {accounts.map(account => (
+                  <div
+                    key={account.id}
+                    onMouseDown={handleAccountMouseDown}
+                    onClick={e => handleAccountClick(e, String(account.id))}
+                    className="flex items-center px-2 py-1.5 text-2xs cursor-pointer transition-colors hover:bg-bg-hover text-text-primary"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium flex items-center gap-1">
+                        <span className="truncate">{account.loginId}</span>
+                        <span
+                          className="inline-flex items-center shrink-0 hover:text-text-primary cursor-pointer transition-colors"
+                          title={t('copy')}
+                          onClick={async e => {
+                            e.stopPropagation();
+                            const success = await copyToClipboard(account.loginId);
+                            if (success) {
+                              setCopiedAccountId(account.id);
+                              setTimeout(() => setCopiedAccountId(null), 2000);
+                            }
+                          }}
+                        >
+                          {copiedAccountId === account.id ? (
+                            <Check size={9} className="text-green-500" />
+                          ) : (
+                            <Copy size={9} className="opacity-50" />
                           )}
-                        </div>
+                        </span>
                       </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        {String(account.principalId ?? '') === accountIdentity && (
-                          <span
-                            className="relative w-1.5 h-1.5 shrink-0"
-                            title={t('accountCurrentAccount')}
-                          >
-                            <span className="absolute inset-0 rounded-full bg-green-500 animate-ping opacity-75" />
-                            <span className="relative block w-1.5 h-1.5 rounded-full bg-green-500" />
-                          </span>
-                        )}
-                        {account.principalId && account.site && (
+                      <div className="text-3xs opacity-75 flex items-center gap-0.5">
+                        {[account.site, account.ownerName].filter(Boolean).join(' · ')}
+                        {account.principalId != null && (
                           <>
-                            <button
-                              ref={
-                                showQrForAccountId === String(account.id) ? qrButtonRef : undefined
-                              }
-                              className="qr-code-button p-1 rounded text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-colors cursor-pointer"
-                              title={t('accountMobileSsoQr')}
-                              onClick={e => handleFetchMobileSsoQr(account, e)}
-                              disabled={loadingQrAccountId === String(account.id)}
-                            >
-                              {loadingQrAccountId === String(account.id) ? (
-                                <Loader2 size={12} className="animate-spin" />
-                              ) : (
-                                <QrCode size={12} />
-                              )}
-                            </button>
-                            {showQrForAccountId === String(account.id) && mobileSsoQrUrl && (
-                              <QRCodePopup
-                                url={mobileSsoQrUrl}
-                                harmonyUrl={alternateQrUrl}
-                                targetRef={qrButtonRef}
-                                onClose={() => setShowQrForAccountId(null)}
-                              />
-                            )}
+                            {(account.site || account.ownerName) && ' · '}
+                            <span className="font-mono">{account.principalId}</span>
                           </>
                         )}
                       </div>
                     </div>
-                  ))
-                )}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {String(account.principalId ?? '') === accountIdentity && (
+                        <span
+                          className="relative w-1.5 h-1.5 shrink-0"
+                          title={t('accountCurrentAccount')}
+                        >
+                          <span className="absolute inset-0 rounded-full bg-green-500 animate-ping opacity-75" />
+                          <span className="relative block w-1.5 h-1.5 rounded-full bg-green-500" />
+                        </span>
+                      )}
+                      {account.principalId && account.site && (
+                        <>
+                          <button
+                            ref={
+                              showQrForAccountId === String(account.id) ? qrButtonRef : undefined
+                            }
+                            className="qr-code-button p-1 rounded text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-colors cursor-pointer"
+                            title={t('accountMobileSsoQr')}
+                            onClick={e => handleFetchMobileSsoQr(account, e)}
+                            disabled={loadingQrAccountId === String(account.id)}
+                          >
+                            {loadingQrAccountId === String(account.id) ? (
+                              <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                              <QrCode size={12} />
+                            )}
+                          </button>
+                          {showQrForAccountId === String(account.id) && mobileSsoQrUrl && (
+                            <QRCodePopup
+                              url={mobileSsoQrUrl}
+                              harmonyUrl={alternateQrUrl}
+                              targetRef={qrButtonRef}
+                              onClose={() => setShowQrForAccountId(null)}
+                            />
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

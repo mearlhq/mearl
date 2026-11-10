@@ -5,7 +5,15 @@ import {
   browserDomainPermissionError,
   browserHostPermissionError,
 } from '../../../../shared/browserCapabilityPermissions';
-const fixture = vi.hoisted(() => ({ settings: {}, fetch: vi.fn(), normalize: vi.fn() }));
+const fixture = vi.hoisted(() => ({
+  settings: {},
+  fetch: vi.fn(),
+  normalize: vi.fn(),
+  permissions: vi.fn(),
+}));
+vi.mock('../../../../shared/presetPermissions', () => ({
+  missingPresetPermissions: fixture.permissions,
+}));
 vi.mock('../../utils/browserUiSettings', () => ({ useBrowserUiSettings: () => fixture.settings }));
 vi.mock('../../utils/i18n', () => ({ t: (key: string) => key }));
 vi.mock('../useLocalStorage', async () => {
@@ -19,11 +27,126 @@ vi.mock('../../utils/accounts', () => ({
 }));
 beforeEach(() => {
   fixture.settings = {};
+  fixture.permissions
+    .mockReset()
+    .mockResolvedValue({
+      missingOrigins: ['https://accounts.example.test/*'],
+      missingAuthorization: [],
+    });
+  chrome.permissions = { onAdded: { addListener: vi.fn(), removeListener: vi.fn() } } as any;
+  vi.mocked(chrome.storage.onChanged.addListener).mockClear();
   fixture.fetch.mockReset();
   fixture.normalize
     .mockReset()
     .mockImplementation(async (accounts: unknown[]) => ({ success: true, data: accounts }));
   vi.mocked(chrome.runtime.sendMessage).mockReset();
+});
+
+it.each(['browser-first', 'authorization-first'])(
+  'recovers after both permission layers are granted (%s)',
+  async order => {
+    const origin = 'https://accounts.example.test';
+    fixture.settings = { logins: { accounts: { url: `${origin}/` } } };
+    fixture.permissions.mockResolvedValue({
+      missingOrigins: [origin],
+      missingAuthorization: [origin],
+    });
+    fixture.fetch.mockResolvedValueOnce({
+      success: false,
+      error: browserHostPermissionError(new URL(origin)),
+    });
+    const { result } = renderHook(() => useAccounts());
+    await act(async () => {
+      await result.current.requestAccounts();
+    });
+    const onAdded = vi.mocked(chrome.permissions.onAdded.addListener).mock.calls[0][0];
+    const onChanged = vi.mocked(chrome.storage.onChanged.addListener).mock.calls.at(-1)![0];
+    fixture.permissions.mockResolvedValue({
+      missingOrigins: order === 'browser-first' ? [] : [origin],
+      missingAuthorization: order === 'browser-first' ? [origin] : [],
+    });
+    await act(async () => {
+      if (order === 'browser-first') onAdded({ origins: [`${origin}/*`] });
+      else onChanged({ proxyCookieAllowedOrigins: { newValue: [`${origin}/*`] } }, 'sync');
+    });
+    expect(fixture.fetch).toHaveBeenCalledTimes(1);
+    fixture.permissions.mockResolvedValue({ missingOrigins: [], missingAuthorization: [] });
+    fixture.fetch.mockResolvedValue({
+      success: true,
+      data: { accountList: [{ id: 1, loginId: 'recovered' }] },
+    });
+    await act(async () => {
+      if (order === 'browser-first')
+        onChanged({ proxyCookieAllowedOrigins: { newValue: [`${origin}/*`] } }, 'sync');
+      else onAdded({ origins: [`${origin}/*`] });
+    });
+    await waitFor(() => expect(result.current.accounts).toEqual([{ id: 1, loginId: 'recovered' }]));
+    expect(result.current.error).toBe('');
+    expect(fixture.fetch).toHaveBeenCalledTimes(2);
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalled();
+  },
+);
+
+it('retains cached accounts after a network failure and supports explicit retry', async () => {
+  const accounts = [{ id: 1, loginId: 'cached' }];
+  fixture.fetch.mockResolvedValueOnce({ success: true, data: { accountList: accounts } });
+  const { result } = renderHook(() => useAccounts());
+  await act(async () => {
+    await result.current.requestAccounts();
+  });
+  await waitFor(() => expect(result.current.accounts).toEqual(accounts));
+  fixture.fetch.mockResolvedValueOnce({ success: false, error: 'Network unavailable' });
+  await act(async () => {
+    await result.current.retryAccounts();
+  });
+  expect(result.current.accounts).toEqual(accounts);
+  expect(result.current.error).toBe('Network unavailable');
+  expect(chrome.permissions.onAdded.addListener).not.toHaveBeenCalled();
+  fixture.fetch.mockResolvedValueOnce({ success: true, data: { accountList: [] } });
+  await act(async () => {
+    await result.current.retryAccounts();
+  });
+  await waitFor(() => expect(result.current.accounts).toEqual([]));
+  expect(result.current.error).toBe('');
+});
+
+it('recovers when permission was granted before the failed response reached the UI', async () => {
+  const url = new URL('https://accounts.example.test/');
+  fixture.settings = { logins: { accounts: { url: url.href } } };
+  fixture.permissions.mockResolvedValue({ missingOrigins: [], missingAuthorization: [] });
+  fixture.fetch
+    .mockResolvedValueOnce({ success: false, error: browserDomainPermissionError(url) })
+    .mockResolvedValueOnce({ success: true, data: { accountList: [{ id: 1 }] } });
+  const { result } = renderHook(() => useAccounts());
+  await act(async () => {
+    await result.current.requestAccounts();
+  });
+  await waitFor(() => expect(result.current.accounts).toEqual([{ id: 1 }]));
+  expect(fixture.fetch).toHaveBeenCalledTimes(2);
+  expect(result.current.error).toBe('');
+});
+
+it('does not retry a disposed account view after a pending permission check resolves', async () => {
+  const url = new URL('https://accounts.example.test/');
+  fixture.settings = { logins: { accounts: { url: url.href } } };
+  let finish!: (value: unknown) => void;
+  fixture.permissions.mockImplementation(
+    () =>
+      new Promise(resolve => {
+        finish = resolve;
+      }),
+  );
+  fixture.fetch.mockResolvedValue({ success: false, error: browserHostPermissionError(url) });
+  const { result, unmount } = renderHook(() => useAccounts());
+  await act(async () => {
+    await result.current.requestAccounts();
+  });
+  unmount();
+  await act(async () => {
+    finish({ missingOrigins: [], missingAuthorization: [] });
+  });
+  expect(fixture.fetch).toHaveBeenCalledTimes(1);
+  expect(chrome.storage.onChanged.removeListener).toHaveBeenCalled();
 });
 it('drops account results accepted before a preset switch and allows the next provider to load', async () => {
   let finishOld!: (value: unknown) => void;
