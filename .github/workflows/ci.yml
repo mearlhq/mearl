@@ -18,6 +18,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+        env:
+          GH_TOKEN: ${{ github.token }}
       - run: npx --yes --package=node@20.18.0 -- node scripts/verify-node-runtime.mjs
       - run: pnpm typecheck
       - run: pnpm check:skills
