@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AGENT_ALLOW_ALL_DOMAINS_STORAGE_KEY,
@@ -25,7 +25,17 @@ describe('AgentPermissionsSection', () => {
         callback?.();
       }),
     } as unknown as typeof chrome.storage.sync;
-    chrome.runtime.sendMessage = vi.fn(async () => ({ success: true, data: { presetId: 'team', revision: 'fixture', origins: [], pending: [] } })) as any;
+    chrome.runtime.sendMessage = vi.fn(async (message: any) => {
+      if (message.data.operation === 'authorizeOrigin') {
+        storage[PROXY_PERMISSION_STORAGE_KEY] = [
+          ...new Set([...(storage[PROXY_PERMISSION_STORAGE_KEY] as string[]), message.data.origin]),
+        ];
+      }
+      return {
+        success: true,
+        data: { presetId: 'team', revision: 'fixture', origins: [], pending: [] },
+      };
+    }) as any;
     chrome.permissions = {
       request: vi.fn((_permissions, callback) => callback(true)),
     } as unknown as typeof chrome.permissions;
@@ -50,43 +60,87 @@ describe('AgentPermissionsSection', () => {
     expect(screen.queryByText('localhost')).not.toBeInTheDocument();
   });
 
-  it('requests browser permission before enabling access to all domains', async () => {
-    render(<AgentPermissionsSection />);
+  it.each([true, false])(
+    'saves all-domain access before browser permission resolves to %s',
+    async granted => {
+      let decide!: (granted: boolean) => void;
+      vi.mocked(chrome.permissions.request).mockImplementationOnce(
+        (_permissions, callback: any) => {
+          expect(storage[AGENT_ALLOW_ALL_DOMAINS_STORAGE_KEY]).toBe(true);
+          decide = callback;
+        },
+      );
+      render(<AgentPermissionsSection />);
 
-    const toggle = await screen.findByRole('button', { name: 'agentPermissionsAllDomains' });
-    fireEvent.click(toggle);
+      const toggle = await screen.findByRole('button', { name: 'agentPermissionsAllDomains' });
+      fireEvent.click(toggle);
 
-    await waitFor(() => expect(toggle).toHaveAttribute('aria-pressed', 'true'));
-    expect(chrome.permissions.request).toHaveBeenCalledWith(
-      { origins: ['<all_urls>'] },
-      expect.any(Function),
-    );
-    expect(storage[AGENT_ALLOW_ALL_DOMAINS_STORAGE_KEY]).toBe(true);
-    expect(
-      screen.queryByPlaceholderText('agentPermissionsInputPlaceholder'),
-    ).not.toBeInTheDocument();
-  });
-  it('keeps preset authorization pending after refusal and grants only displayed scopes on retry', async () => {
+      await waitFor(() => expect(toggle).toHaveAttribute('aria-pressed', 'true'));
+      expect(chrome.permissions.request).toHaveBeenCalledWith(
+        { origins: ['<all_urls>'] },
+        expect.any(Function),
+      );
+      expect(storage[AGENT_ALLOW_ALL_DOMAINS_STORAGE_KEY]).toBe(true);
+      expect(
+        screen.queryByPlaceholderText('agentPermissionsInputPlaceholder'),
+      ).not.toBeInTheDocument();
+      await act(async () => decide(granted));
+      expect(toggle).toHaveAttribute('aria-pressed', 'true');
+      expect(storage[AGENT_ALLOW_ALL_DOMAINS_STORAGE_KEY]).toBe(true);
+      fireEvent.click(toggle);
+      await waitFor(() => expect(toggle).toHaveAttribute('aria-pressed', 'false'));
+      expect(storage[AGENT_ALLOW_ALL_DOMAINS_STORAGE_KEY]).toBe(false);
+    },
+  );
+  it('keeps preset host authorization after browser refusal', async () => {
     const origin = 'https://accounts.example.test/*';
     chrome.runtime.sendMessage = vi.fn(async (message: any) => {
       if (message.data.operation === 'authorizePreset') {
         expect(message.data).toMatchObject({ presetId: 'team', revision: 'fixture' });
-        storage[PROXY_PERMISSION_STORAGE_KEY] = [...(storage[PROXY_PERMISSION_STORAGE_KEY] as string[]), '*://accounts.example.test/*'];
+        storage[PROXY_PERMISSION_STORAGE_KEY] = [
+          ...(storage[PROXY_PERMISSION_STORAGE_KEY] as string[]),
+          '*://accounts.example.test/*',
+        ];
       }
-      return { success: true, data: { presetId: 'team', revision: 'fixture', origins: [origin], pending: (storage[PROXY_PERMISSION_STORAGE_KEY] as string[]).includes('*://accounts.example.test/*') ? [] : [origin] } };
+      return {
+        success: true,
+        data: { presetId: 'team', revision: 'fixture', origins: [origin], pending: [origin] },
+      };
     }) as any;
     chrome.permissions.contains = vi.fn(async () => true);
-    vi.mocked(chrome.permissions.request).mockImplementationOnce((_value, callback: any) => callback(false));
+    vi.mocked(chrome.permissions.request).mockImplementationOnce((_value, callback: any) =>
+      callback(false),
+    );
     render(<AgentPermissionsSection />);
     const grant = await screen.findByRole('button', { name: 'presetPermissionsGrant' });
     fireEvent.click(grant);
     await waitFor(() => expect(grant).not.toBeDisabled());
-    expect(storage[PROXY_PERMISSION_STORAGE_KEY]).not.toContain('*://accounts.example.test/*');
-    fireEvent.click(grant);
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'presetPermissionsGrant' })).not.toBeInTheDocument());
-    expect(chrome.permissions.request).toHaveBeenLastCalledWith({ origins: [origin] }, expect.any(Function));
+    expect(screen.getByRole('button', { name: 'presetPermissionsGrant' })).toBeVisible();
+    expect(chrome.permissions.request).toHaveBeenLastCalledWith(
+      { origins: [origin] },
+      expect.any(Function),
+    );
     expect(storage[PROXY_PERMISSION_STORAGE_KEY]).toContain('*://accounts.example.test/*');
     expect(storage[AGENT_ALLOW_ALL_DOMAINS_STORAGE_KEY]).toBe(false);
   });
 
+  it('persists a domain while browser permission is pending and after the settings unmount', async () => {
+    let decide!: (granted: boolean) => void;
+    vi.mocked(chrome.permissions.request).mockImplementationOnce((_permissions, callback: any) => {
+      decide = callback;
+    });
+    const view = render(<AgentPermissionsSection />);
+    fireEvent.change(await screen.findByPlaceholderText('agentPermissionsInputPlaceholder'), {
+      target: { value: 'upload.example' },
+    });
+    storage[PROXY_PERMISSION_STORAGE_KEY] = ['*://*.another.example/*'];
+    fireEvent.click(screen.getByRole('button', { name: 'agentPermissionsGrant' }));
+    expect(storage[PROXY_PERMISSION_STORAGE_KEY]).toEqual([
+      '*://*.another.example/*',
+      '*://*.upload.example/*',
+    ]);
+    view.unmount();
+    await act(async () => decide(false));
+    expect(storage[PROXY_PERMISSION_STORAGE_KEY]).toContain('*://*.upload.example/*');
+  });
 });

@@ -202,6 +202,16 @@ it('rejects cancellation after asynchronous preparation before invoking the acce
   expect(mocks.invoke).not.toHaveBeenCalled();
 });
 
+it('persists manually requested origins through the background grant queue', async () => {
+  const input = { operation: 'authorizeOrigin', origin: '*://*.upload.example/*' };
+  expect(
+    await handleBrowserUiService(input, { ...sender, url: 'https://upload.example/' }),
+  ).toMatchObject({ success: false });
+  expect(mocks.grant).not.toHaveBeenCalled();
+  expect(await handleBrowserUiService(input, sender)).toMatchObject({ success: true });
+  expect(mocks.grant).toHaveBeenCalledExactlyOnceWith([input.origin]);
+});
+
 it('authorizes only the current preset selection through the background grant queue', async () => {
   mocks.status.mockResolvedValue({
     presetId: 'team',

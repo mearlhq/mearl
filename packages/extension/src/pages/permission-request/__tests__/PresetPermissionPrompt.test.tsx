@@ -30,6 +30,10 @@ it('requests the pending sites as one batch and closes after the extension saves
     .mockResolvedValueOnce({
       success: true,
       data: { presetId: 'test', revision, pending: [] },
+    })
+    .mockResolvedValueOnce({
+      success: true,
+      data: { presetId: 'test', revision, pending: [] },
     });
   mockChrome(sendMessage, request);
   const close = vi.spyOn(window, 'close').mockImplementation(() => {});
@@ -45,7 +49,8 @@ it('requests the pending sites as one batch and closes after the extension saves
   fireEvent.click(allow);
   expect(request).toHaveBeenCalledExactlyOnceWith({ origins: pending });
   await screen.findByRole('alert');
-  expect(sendMessage).toHaveBeenCalledOnce();
+  expect(sendMessage).toHaveBeenCalledTimes(2);
+  expect(sendMessage.mock.invocationCallOrder[1]).toBeLessThan(request.mock.invocationCallOrder[0]);
   expect(close).not.toHaveBeenCalled();
 
   fireEvent.click(allow);

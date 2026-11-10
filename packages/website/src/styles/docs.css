@@ -129,7 +129,7 @@
 .docs-code { border: 1px solid var(--docs-border); border-radius: 8px; background: var(--docs-panel); }
 .docs-code-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 9px 6px 14px; border-bottom: 1px solid var(--docs-border); color: var(--muted); font-size: 12px; }
 .docs-code-bar span, .docs-next { display: inline-flex; align-items: center; gap: 7px; }
-.docs-code-bar button { padding: 3px 9px; min-height: 30px; border: 1px solid var(--docs-border); border-radius: 5px; color: var(--muted); background: var(--docs-canvas); cursor: pointer; }
+.docs-code-bar button { padding: 3px 9px; min-width: 5.5em; min-height: 30px; border: 1px solid var(--docs-border); border-radius: 5px; color: var(--muted); background: var(--docs-canvas); cursor: pointer; }
 .docs-code-bar button:hover { color: var(--blue); }
 .docs-code pre { margin: 0; padding: 13px 15px; overflow: auto; color: var(--docs-title); font-size: 13px; line-height: 1.7; }
 .docs-prompt { background: var(--docs-accent-surface); border-color: var(--accent-border); }

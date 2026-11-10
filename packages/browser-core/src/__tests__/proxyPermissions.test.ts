@@ -19,7 +19,9 @@ it('describes missing domain permission as an undispatched action', () => {
     domain: 'upload.example',
     requestDispatched: false,
   });
-  expect(error.message).toContain('request_permission with domain="upload.example"');
+  expect(error.message).toContain(
+    `mearl request_permission --payload '{"domain":"upload.example"}'`,
+  );
 });
 
 describe('normalizeDomainInputToOrigin', () => {
@@ -75,9 +77,7 @@ describe('isOriginAllowedByDomain', () => {
   });
 
   it('ignores protocol, port and www when normalizing the domain', () => {
-    expect(isOriginAllowedByDomain('*://*.shop.com/*', 'https://www.item.shop.com:443')).toBe(
-      true,
-    );
+    expect(isOriginAllowedByDomain('*://*.shop.com/*', 'https://www.item.shop.com:443')).toBe(true);
   });
 
   it('returns false for an empty domain', () => {

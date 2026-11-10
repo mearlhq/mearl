@@ -1,10 +1,18 @@
 import { isOriginAllowedByDomain } from '@mearl/browser-core';
 import { validateInstallationOrigin } from '@mearl/preset/installation';
-import { getAgentAllowedOrigins, getAgentAllowAllDomains, getAllStoredAgentOrigins, getDisabledBuiltinOrigins, setStoredAgentOrigins, setDisabledBuiltinOrigins } from './proxyPermissions';
+import {
+  getAgentAllowedOrigins,
+  getAgentAllowAllDomains,
+  getAllStoredAgentOrigins,
+  getDisabledBuiltinOrigins,
+  setStoredAgentOrigins,
+  setDisabledBuiltinOrigins,
+} from './proxyPermissions';
 
 function agentOriginCovered(origin: string, allowed: string[]): boolean {
   const wildcard = /^(?:https?|\*):\/\/\*\./.test(origin);
-  const url = (value: string) => new URL(value.replace(/^\*:/, 'https:').replace(/^(https?:\/\/)\*\./, '$1'));
+  const url = (value: string) =>
+    new URL(value.replace(/^\*:/, 'https:').replace(/^(https?:\/\/)\*\./, '$1'));
   const target = url(origin);
   return allowed.some(scope => {
     if (scope === '<all_urls>') return true;
@@ -12,8 +20,16 @@ function agentOriginCovered(origin: string, allowed: string[]): boolean {
       const candidate = url(scope);
       if (candidate.hostname === '*') return true;
       const coveringWildcard = /^(?:https?|\*):\/\/\*\./.test(scope);
-      return isOriginAllowedByDomain(scope, target.hostname) && (!wildcard || coveringWildcard && (target.hostname === candidate.hostname || target.hostname.endsWith(`.${candidate.hostname}`)));
-    } catch { return false; }
+      return (
+        isOriginAllowedByDomain(scope, target.hostname) &&
+        (!wildcard ||
+          (coveringWildcard &&
+            (target.hostname === candidate.hostname ||
+              target.hostname.endsWith(`.${candidate.hostname}`))))
+      );
+    } catch {
+      return false;
+    }
   });
 }
 
@@ -24,23 +40,30 @@ export async function missingPresetPermissions(origins: string[]) {
   const allowed = await getAgentAllowedOrigins();
   const all = await getAgentAllowAllDomains();
   return {
-    missingOrigins: (await Promise.all(origins.map(async origin => await chrome.permissions.contains({ origins: [origin] }) ? null : origin))).filter((origin): origin is string => origin !== null),
+    missingOrigins: (
+      await Promise.all(
+        origins.map(async origin =>
+          (await chrome.permissions.contains({ origins: [origin] })) ? null : origin,
+        ),
+      )
+    ).filter((origin): origin is string => origin !== null),
     missingAuthorization: all ? [] : origins.filter(origin => !agentOriginCovered(origin, allowed)),
   };
 }
 
 let granting: Promise<void> = Promise.resolve();
-/** Browser grants and host authorization are both required before a declared scope becomes ready. */
+/** Persist host authorization independently; readiness still requires browser grants. */
 export function grantPresetOrigins(origins: string[]): Promise<void> {
   const scopes = origins.map(validateInstallationOrigin);
-  const result = granting.catch(() => {}).then(async () => {
-    if ((await missingPresetPermissions(scopes)).missingOrigins.length) throw new Error('INSTALLATION_PERMISSION_REQUIRED');
-    const allowed = await getAllStoredAgentOrigins();
-    const hosts = scopes.map(origin => origin.replace(/^(?:https?|\*):/, '*:'));
-    await setStoredAgentOrigins([...new Set([...allowed, ...hosts])]);
-    const disabled = await getDisabledBuiltinOrigins();
-    await setDisabledBuiltinOrigins(disabled.filter(origin => !hosts.includes(origin)));
-  });
+  const result = granting
+    .catch(() => {})
+    .then(async () => {
+      const allowed = await getAllStoredAgentOrigins();
+      const hosts = scopes.map(origin => origin.replace(/^(?:https?|\*):/, '*:'));
+      await setStoredAgentOrigins([...new Set([...allowed, ...hosts])]);
+      const disabled = await getDisabledBuiltinOrigins();
+      await setDisabledBuiltinOrigins(disabled.filter(origin => !hosts.includes(origin)));
+    });
   granting = result;
   return result;
 }

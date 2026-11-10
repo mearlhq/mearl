@@ -23,33 +23,63 @@ const BUILTIN_ORIGINS = new Set(DEFAULT_AGENT_ORIGINS);
 const isBuiltinOrigin = (origin: string) => BUILTIN_ORIGINS.has(origin);
 
 const AgentPermissionsSection: FC = () => {
-  const [preset, setPreset] = useState<{ id: string; revision: string; origins: string[] } | null>(null);
+  const [preset, setPreset] = useState<{ id: string; revision: string; origins: string[] } | null>(
+    null,
+  );
   const [presetBusy, setPresetBusy] = useState(false);
   const presetRead = useRef(0);
   const refreshPreset = async () => {
     const read = ++presetRead.current;
-    const result = await chrome.runtime.sendMessage({ action: 'browserUiService', data: { operation: 'presetPermissions' } });
+    const result = await chrome.runtime.sendMessage({
+      action: 'browserUiService',
+      data: { operation: 'presetPermissions' },
+    });
     const data = result?.data;
     if (read !== presetRead.current) return;
-    if (result?.success && typeof data?.presetId === 'string' && typeof data.revision === 'string' && Array.isArray(data.origins) && data.origins.length <= 64 && Array.isArray(data.pending)) {
-      setPreset(data.pending.length ? { id: data.presetId, revision: data.revision, origins: data.origins.map(validateInstallationOrigin) } : null);
+    if (
+      result?.success &&
+      typeof data?.presetId === 'string' &&
+      typeof data.revision === 'string' &&
+      Array.isArray(data.origins) &&
+      data.origins.length <= 64 &&
+      Array.isArray(data.pending)
+    ) {
+      setPreset(
+        data.pending.length
+          ? {
+              id: data.presetId,
+              revision: data.revision,
+              origins: data.origins.map(validateInstallationOrigin),
+            }
+          : null,
+      );
     } else setPreset(null);
   };
   const handlePresetGrant = async () => {
     if (!preset || presetBusy) return;
     const origins = preset.origins;
-    // The request starts in the click gesture; authorization follows Chrome's actual grants.
-    const request = new Promise<boolean>((resolve, reject) => chrome.permissions.request({ origins }, granted => {
-      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message)); else resolve(granted);
-    }));
+    const saved = chrome.runtime.sendMessage({
+      action: 'browserUiService',
+      data: { operation: 'authorizePreset', presetId: preset.id, revision: preset.revision },
+    });
+    // Start both operations in the click gesture; saving survives the popup closing.
+    const request = new Promise<boolean>((resolve, reject) =>
+      chrome.permissions.request({ origins }, granted => {
+        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+        else resolve(granted);
+      }),
+    );
     setPresetBusy(true);
     try {
-      if (!(await request)) throw new Error('Permission denied');
-      const result = await chrome.runtime.sendMessage({ action: 'browserUiService', data: { operation: 'authorizePreset', presetId: preset.id, revision: preset.revision } });
+      const [result, granted] = await Promise.all([saved, request]);
       if (!result?.success) throw new Error(result?.error || 'Preset authorization failed');
       await Promise.all([refreshPreset(), refreshDomains()]);
-    } catch { showToast(t('agentPermissionsGrantFailed'), 'error'); }
-    finally { setPresetBusy(false); }
+      if (!granted) throw new Error('Permission denied');
+    } catch {
+      showToast(t('agentPermissionsGrantFailed'), 'error');
+    } finally {
+      setPresetBusy(false);
+    }
   };
   const [allDomains, setAllDomains] = useState<string[]>([]);
   const [allowAllDomains, setAllowAllDomains] = useState<boolean | null>(null);
@@ -78,10 +108,16 @@ const AgentPermissionsSection: FC = () => {
 
   useEffect(() => {
     void refreshDomains();
-    const refresh = () => { void refreshPreset().catch(() => {}); };
-    const message = (value: { action?: string }) => { if (value?.action === BROWSER_REQUEST_UI_CHANGED) refresh(); };
-    const added = chrome.permissions.onAdded as chrome.events.Event<(permissions: chrome.permissions.Permissions) => void> | undefined;
-    const removed = chrome.permissions.onRemoved as chrome.events.Event<(permissions: chrome.permissions.Permissions) => void> | undefined;
+    const refresh = () => {
+      void refreshPreset().catch(() => {});
+    };
+    const message = (value: { action?: string }) => {
+      if (value?.action === BROWSER_REQUEST_UI_CHANGED) refresh();
+    };
+    const added = chrome.permissions.onAdded as
+      chrome.events.Event<(permissions: chrome.permissions.Permissions) => void> | undefined;
+    const removed = chrome.permissions.onRemoved as
+      chrome.events.Event<(permissions: chrome.permissions.Permissions) => void> | undefined;
     chrome.runtime.onMessage?.addListener(message);
     added?.addListener(refresh);
     removed?.addListener(refresh);
@@ -100,17 +136,14 @@ const AgentPermissionsSection: FC = () => {
 
     const nextEnabled = !allowAllDomains;
     setAllDomainsChanging(true);
+    setAllowAllDomains(nextEnabled);
     try {
-      if (nextEnabled) {
-        const granted = await requestAgentAllDomainsPermission();
-        if (!granted) {
-          showToast(t('agentPermissionsAllDomainsFailed'), 'error');
-          return;
-        }
-      }
-      await setAgentAllowAllDomains(nextEnabled);
-      setAllowAllDomains(nextEnabled);
+      const saved = setAgentAllowAllDomains(nextEnabled);
+      const request = nextEnabled ? requestAgentAllDomainsPermission() : Promise.resolve(true);
+      const [, granted] = await Promise.all([saved, request]);
+      if (!granted) showToast(t('agentPermissionsAllDomainsFailed'), 'error');
     } catch {
+      await refreshDomains();
       showToast(t('agentPermissionsAllDomainsFailed'), 'error');
     } finally {
       setAllDomainsChanging(false);
@@ -126,16 +159,14 @@ const AgentPermissionsSection: FC = () => {
 
     setDomainGrantStatus('granting');
     try {
-      const current = await getAllStoredAgentOrigins();
-      if (!current.includes(origin)) {
-        const granted = await requestAgentOriginPermission(origin);
-        if (!granted) {
-          setDomainGrantStatus('failed');
-          return;
-        }
-        await setStoredAgentOrigins([...current, origin]);
-      }
-      setDomainGrantStatus('idle');
+      const saved = chrome.runtime.sendMessage({
+        action: 'browserUiService',
+        data: { operation: 'authorizeOrigin', origin },
+      });
+      const request = requestAgentOriginPermission(origin);
+      const [result, granted] = await Promise.all([saved, request]);
+      if (!result?.success) throw new Error(result?.error || 'Domain authorization failed');
+      setDomainGrantStatus(granted ? 'idle' : 'failed');
       setDomainInput('');
       await refreshDomains();
     } catch {
@@ -198,9 +229,13 @@ const AgentPermissionsSection: FC = () => {
         <div className="my-2.5 rounded border border-border p-2 text-xs">
           <div className="flex items-center justify-between gap-2">
             <span>{t('presetPermissionsRequired', preset.id)}</span>
-            <Button onClick={handlePresetGrant} disabled={presetBusy} size="sm">{t('presetPermissionsGrant')}</Button>
+            <Button onClick={handlePresetGrant} disabled={presetBusy} size="sm">
+              {t('presetPermissionsGrant')}
+            </Button>
           </div>
-          <p className="mt-1.5 max-h-24 overflow-auto break-all text-text-secondary">{preset.origins.join(', ')}</p>
+          <p className="mt-1.5 max-h-24 overflow-auto break-all text-text-secondary">
+            {preset.origins.join(', ')}
+          </p>
         </div>
       )}
 

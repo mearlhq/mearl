@@ -66,19 +66,16 @@ export function PresetPermissionPrompt({ revision }: { revision: string }) {
   const preset = typeof state === 'object' ? state : undefined;
   const request = preset?.pending.length
     ? async () => {
-        if (!(await chrome.permissions.request({ origins: preset.pending }))) return false;
         try {
-          const result = await chrome.runtime.sendMessage({
+          const saved = chrome.runtime.sendMessage({
             action: 'browserUiService',
             data: { operation: 'authorizePreset', presetId: preset.presetId, revision },
           });
-          if (
-            !result?.success ||
-            result.data?.revision !== revision ||
-            result.data?.pending?.length !== 0
-          )
+          const permission = chrome.permissions.request({ origins: preset.pending });
+          const [result, granted] = await Promise.all([saved, permission]);
+          if (!result?.success || result.data?.revision !== revision)
             throw new Error('Preset permissions were not saved');
-          return true;
+          return granted;
         } catch (error) {
           refresh();
           throw error;

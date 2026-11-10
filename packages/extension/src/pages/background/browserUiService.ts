@@ -46,6 +46,11 @@ export async function handleBrowserUiService(
     if (!input || typeof input !== 'object' || Array.isArray(input))
       throw new Error('Expected a browser UI operation');
     const value = input as Record<string, unknown>;
+    if (value.operation === 'authorizeOrigin') {
+      if (typeof value.origin !== 'string') throw new Error('Expected an origin');
+      await grantPresetOrigins([value.origin]);
+      return { success: true };
+    }
     if (value.operation === 'loginClose') {
       if (typeof value.id !== 'string') throw new Error('Expected a login lease');
       await closeBrowserRequestLogin(value.id, sender);

@@ -339,13 +339,38 @@ describe('Toolbox', () => {
     expect(button).toHaveTextContent('toolboxInstallTools');
   });
 
+  it('shows catalog refresh in a reserved header slot without inserting list content', async () => {
+    const catalog = {
+      tools: parseToolboxCatalog(catalogFixture),
+      loading: true,
+      failed: false,
+      retry: vi.fn(),
+    };
+    mocks.catalog.mockReturnValue(catalog);
+    mocks.list.mockResolvedValue({ tools: [] });
+    const view = render(<Toolbox />);
+    fireEvent.click(await screen.findByRole('button', { name: 'toolboxInstallTools' }));
+    const dialog = screen.getByRole('dialog', { name: 'toolboxInstallTools' });
+    const status = within(dialog).getByRole('status', { name: 'toolboxCatalogRefreshing' });
+    expect(status.closest('h2')).not.toBeNull();
+    expect(within(dialog).queryByText('toolboxCatalogRefreshing')).toBeNull();
+    const slot = status.parentElement;
+    const list = dialog.querySelector('section');
+    mocks.catalog.mockReturnValue({ ...catalog, loading: false });
+    view.rerender(<Toolbox />);
+    expect(slot).toBeInTheDocument();
+    expect(slot).toBeEmptyDOMElement();
+    expect(dialog.querySelector('section')).toBe(list);
+    expect(within(dialog).queryByRole('status')).toBeNull();
+  });
+
   it('offers the website catalog in an empty toolbox and installs a selected tool', async () => {
     let installed = false;
     mocks.native.mockImplementation(async (action: string, input?: unknown) => {
       expect(action).toBe('agent_skills_install');
       expect(input).toEqual({
         providerId: 'codex',
-        source: 'mearlhq/mearl',
+        source: 'https://github.com/mearlhq/mearl',
         name: 'tinypng-compress',
         scope: 'global',
       });
@@ -364,7 +389,9 @@ describe('Toolbox', () => {
     expect(installButton).toHaveTextContent('toolboxInstallTools');
     fireEvent.click(installButton);
     const dialog = screen.getByRole('dialog', { name: 'toolboxInstallTools' });
-    expect(within(dialog).getByRole('region', { name: 'Mearl · mearlhq/mearl' })).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole('region', { name: 'Mearl · mearlhq/mearl' }),
+    ).toBeInTheDocument();
     expect(within(dialog).getAllByText('toolboxOfficial')).toHaveLength(
       catalogFixture.tools.length,
     );
@@ -391,42 +418,55 @@ describe('Toolbox', () => {
         : { success: true },
     );
     render(<Toolbox requestCasesEnabled />);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'toolboxRefresh' })).not.toBeDisabled());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'toolboxRefresh' })).not.toBeDisabled(),
+    );
     expect(screen.queryByText('toolboxNativeHostInstallDescription')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'toolboxInstallTools' }));
     const dialog = screen.getByRole('dialog', { name: 'toolboxInstallTools' });
     expect(within(dialog).getByText('toolboxNativeHostInstallDescription')).toBeVisible();
     expect(within(dialog).queryByText('toolboxCatalogLoadFailed')).toBeNull();
     mocks.list.mockResolvedValue({ tools: [] });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'agentChatNativeHostInstallReconnect' }));
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'agentChatNativeHostInstallReconnect' }),
+    );
     await within(dialog).findByText('toolboxCatalogLoadFailed');
     expect(within(dialog).queryByText('toolboxNativeHostInstallDescription')).toBeNull();
   });
 
-  it.each([false, true])('keeps the empty list quiet and shows the host guide only in the installer (outdated: %s)', async outdated => {
-    mocks.list.mockRejectedValue(outdated
-      ? new ExtensionRpcError('PROTOCOL_MISMATCH', 'Update required')
-      : new Error('Native Host not connected'));
-    vi.mocked(chrome.runtime.sendMessage).mockImplementation(async (message: unknown) =>
-      (message as { action?: string })?.action === 'getAgentStatus'
-        ? { success: true, status: { connected: outdated, extensionVersion: '3.0.0' } }
-        : { success: true },
-    );
-    render(<Toolbox />);
-    await screen.findByText('toolboxNoInstalledTools');
-    expect(screen.queryByText('toolboxNativeHostInstallDescription')).toBeNull();
-    expect(screen.queryByText('toolboxNativeHostUpdateDescription')).toBeNull();
-    expect(screen.queryByText('npx @mearl/setup')).toBeNull();
-    expect(screen.queryByText(/toolboxUnavailable/)).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'toolboxInstallTools' }));
-    const dialog = screen.getByRole('dialog', { name: 'toolboxInstallTools' });
-    expect(within(dialog).getByText(outdated ? 'toolboxNativeHostUpdateDescription' : 'toolboxNativeHostInstallDescription')).toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Close (ESC)' }));
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    expect(screen.getByText('toolboxNoInstalledTools')).toBeInTheDocument();
-    expect(screen.queryByText('toolboxNativeHostInstallDescription')).toBeNull();
-    expect(screen.queryByText('toolboxNativeHostUpdateDescription')).toBeNull();
-  });
+  it.each([false, true])(
+    'keeps the empty list quiet and shows the host guide only in the installer (outdated: %s)',
+    async outdated => {
+      mocks.list.mockRejectedValue(
+        outdated
+          ? new ExtensionRpcError('PROTOCOL_MISMATCH', 'Update required')
+          : new Error('Native Host not connected'),
+      );
+      vi.mocked(chrome.runtime.sendMessage).mockImplementation(async (message: unknown) =>
+        (message as { action?: string })?.action === 'getAgentStatus'
+          ? { success: true, status: { connected: outdated, extensionVersion: '3.0.0' } }
+          : { success: true },
+      );
+      render(<Toolbox />);
+      await screen.findByText('toolboxNoInstalledTools');
+      expect(screen.queryByText('toolboxNativeHostInstallDescription')).toBeNull();
+      expect(screen.queryByText('toolboxNativeHostUpdateDescription')).toBeNull();
+      expect(screen.queryByText('npx @mearl/setup')).toBeNull();
+      expect(screen.queryByText(/toolboxUnavailable/)).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'toolboxInstallTools' }));
+      const dialog = screen.getByRole('dialog', { name: 'toolboxInstallTools' });
+      expect(
+        within(dialog).getByText(
+          outdated ? 'toolboxNativeHostUpdateDescription' : 'toolboxNativeHostInstallDescription',
+        ),
+      ).toBeInTheDocument();
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Close (ESC)' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(screen.getByText('toolboxNoInstalledTools')).toBeInTheDocument();
+      expect(screen.queryByText('toolboxNativeHostInstallDescription')).toBeNull();
+      expect(screen.queryByText('toolboxNativeHostUpdateDescription')).toBeNull();
+    },
+  );
 
   it('keeps the catalog visible and guides installation when the Native Host is missing', async () => {
     mocks.list.mockRejectedValue(new Error('Native Host not connected'));
@@ -436,7 +476,9 @@ describe('Toolbox', () => {
         : { success: true },
     );
     render(<Toolbox requestCasesEnabled />);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'toolboxRefresh' })).not.toBeDisabled());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'toolboxRefresh' })).not.toBeDisabled(),
+    );
     expect(screen.queryByText('toolboxNativeHostInstallDescription')).toBeNull();
     expect(screen.getByRole('button', { name: /toolboxDeviceCaptureTitle/ })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'toolboxInstallTools' }));
@@ -628,7 +670,9 @@ describe('Toolbox', () => {
 
   it('persists the header divider, restores it and resets it with the order', async () => {
     const onPinnedCountChange = vi.fn();
-    const { unmount } = render(<Toolbox requestCasesEnabled onPinnedCountChange={onPinnedCountChange} />);
+    const { unmount } = render(
+      <Toolbox requestCasesEnabled onPinnedCountChange={onPinnedCountChange} />,
+    );
     await screen.findByRole('button', { name: /Workspace Notes/ });
     fireEvent.click(screen.getByRole('button', { name: 'toolboxSort' }));
     fireEvent.keyDown(screen.getByRole('separator'), { key: 'Home' });
@@ -1220,27 +1264,72 @@ describe('Toolbox', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-it.each([[false, false], [true, false], [false, true], [true, true]])('shows directory provenance and source-specific cache status (pending %s, cached %s)', async (pendingPriority, usingCache) => {
-  const repository = 'git@code.example.test:team/skills.git#release/v3';
-  const tool = { ...catalogFixture.tools[0], id: 'plugin:team-tool', plugin: 'team-tool', repository, skill: 'team-skill', title: 'Team tool', locales: undefined };
-  const source = { id: 'team', url: 'https://team.example/tools.json', label: 'Team' };
-  mocks.catalog.mockReturnValue({ tools: [tool], groups: [{ source, tools: [tool], pendingPriority }], issues: [{ source: { id: 'unavailable', label: 'Unavailable' }, reason: 'unavailable', usingCache }], loading: false, failed: true, retry: vi.fn() });
-  mocks.list.mockResolvedValue({ tools: [] });
-  render(<Toolbox />);
-  await screen.findByText('toolboxNoInstalledTools');
-  fireEvent.click(screen.getByRole('button', { name: 'toolboxInstallTools' }));
-  const dialog = screen.getByRole('dialog', { name: 'toolboxInstallTools' });
-  expect(within(dialog).getByRole('region', { name: `Team · ${repository}` })).toBeInTheDocument();
-  expect(within(dialog).getByText(usingCache ? 'toolboxCatalogSourceCached' : 'toolboxCatalogSourceFailed')).toBeInTheDocument();
-  expect(within(dialog).queryByText(usingCache ? 'toolboxCatalogSourceFailed' : 'toolboxCatalogSourceCached')).not.toBeInTheDocument();
-  const install = within(within(dialog).getByText('Team tool').closest('li')!).getByRole('button');
-  if (pendingPriority) {
-    expect(install).toBeDisabled();
-    expect(mocks.native).not.toHaveBeenCalledWith('agent_skills_install', expect.anything());
-    return;
-  }
-  fireEvent.click(install);
-  await waitFor(() => expect(mocks.native).toHaveBeenCalledWith('agent_skills_install', expect.objectContaining({ source: repository, name: 'team-skill' })));
-});
-
+  it.each([
+    [false, false],
+    [true, false],
+    [false, true],
+    [true, true],
+  ])(
+    'shows directory provenance and source-specific cache status (pending %s, cached %s)',
+    async (pendingPriority, usingCache) => {
+      const repository = 'git@code.example.test:team/skills.git#release/v3';
+      const tool = {
+        ...catalogFixture.tools[0],
+        id: 'plugin:team-tool',
+        plugin: 'team-tool',
+        repository,
+        skill: 'team-skill',
+        title: 'Team tool',
+        locales: undefined,
+      };
+      const source = { id: 'team', url: 'https://team.example/tools.json', label: 'Team' };
+      mocks.catalog.mockReturnValue({
+        tools: [tool],
+        groups: [{ source, tools: [tool], pendingPriority }],
+        issues: [
+          {
+            source: { id: 'unavailable', label: 'Unavailable' },
+            reason: 'unavailable',
+            usingCache,
+          },
+        ],
+        loading: false,
+        failed: true,
+        retry: vi.fn(),
+      });
+      mocks.list.mockResolvedValue({ tools: [] });
+      render(<Toolbox />);
+      await screen.findByText('toolboxNoInstalledTools');
+      fireEvent.click(screen.getByRole('button', { name: 'toolboxInstallTools' }));
+      const dialog = screen.getByRole('dialog', { name: 'toolboxInstallTools' });
+      expect(
+        within(dialog).getByRole('region', { name: `Team · ${repository}` }),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).getByText(
+          usingCache ? 'toolboxCatalogSourceCached' : 'toolboxCatalogSourceFailed',
+        ),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).queryByText(
+          usingCache ? 'toolboxCatalogSourceFailed' : 'toolboxCatalogSourceCached',
+        ),
+      ).not.toBeInTheDocument();
+      const install = within(within(dialog).getByText('Team tool').closest('li')!).getByRole(
+        'button',
+      );
+      if (pendingPriority) {
+        expect(install).toBeDisabled();
+        expect(mocks.native).not.toHaveBeenCalledWith('agent_skills_install', expect.anything());
+        return;
+      }
+      fireEvent.click(install);
+      await waitFor(() =>
+        expect(mocks.native).toHaveBeenCalledWith(
+          'agent_skills_install',
+          expect.objectContaining({ source: repository, name: 'team-skill' }),
+        ),
+      );
+    },
+  );
 });

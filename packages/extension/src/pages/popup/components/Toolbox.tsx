@@ -456,9 +456,20 @@ export function Toolbox({
   const [installDialogOpen, setInstallDialogOpen] = useState(false);
   const catalog = useToolboxCatalog(installDialogOpen);
   const installableTools = catalog.tools ?? [];
-  const installableRepositories = (catalog.groups ?? [{ source: { id: 'official', label: 'Mearl' }, tools: installableTools, pendingPriority: false }]).flatMap(group =>
+  const installableRepositories = (
+    catalog.groups ?? [
+      {
+        source: { id: 'official', label: 'Mearl' },
+        tools: installableTools,
+        pendingPriority: false,
+      },
+    ]
+  ).flatMap(group =>
     [...new Set(group.tools.map(tool => tool.repository))].map(repository => ({
-      source: group.source, pendingPriority: group.pendingPriority, repository, tools: group.tools.filter(tool => tool.repository === repository),
+      source: group.source,
+      pendingPriority: group.pendingPriority,
+      repository,
+      tools: group.tools.filter(tool => tool.repository === repository),
     })),
   );
   const [installingId, setInstallingId] = useState<string | null>(null);
@@ -799,8 +810,10 @@ export function Toolbox({
     }),
   ];
   const sortedRows = sortToolsByOrder(
-    rows.filter(row =>
-      (row.id !== 'builtin:capture' || requestCasesEnabled) && (row.id !== 'builtin:chat' || chatAvailable),
+    rows.filter(
+      row =>
+        (row.id !== 'builtin:capture' || requestCasesEnabled) &&
+        (row.id !== 'builtin:chat' || chatAvailable),
     ),
     toolOrder,
   );
@@ -1018,34 +1031,64 @@ export function Toolbox({
         ariaLabel={t('toolboxInstallTools')}
         contentStyle={{ maxWidth: 420, maxHeight: 'min(480px, calc(100vh - 24px))' }}
       >
-        <ModalHeader title={t('toolboxInstallTools')} onClose={() => setInstallDialogOpen(false)} />
+        <ModalHeader
+          title={
+            <span className="inline-flex items-center gap-2">
+              {t('toolboxInstallTools')}
+              <span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+                {!nativeHostUpdate && catalog.tools !== null && catalog.loading && (
+                  <span role="status" aria-label={t('toolboxCatalogRefreshing')}>
+                    <LoaderCircle
+                      className="h-3.5 w-3.5 animate-spin text-text-secondary"
+                      aria-hidden="true"
+                    />
+                  </span>
+                )}
+              </span>
+            </span>
+          }
+          onClose={() => setInstallDialogOpen(false)}
+        />
         <ModalContent>
           {!nativeHostUpdate && catalog.tools === null && catalog.loading && (
             <p role="status" className="py-4 text-center text-xs text-text-secondary">
               {t('toolboxLoading')}
             </p>
           )}
-          {!nativeHostUpdate && !loading && catalog.tools === null && catalog.failed && !catalog.issues?.length && (
-            <div role="alert" className="py-4 text-center text-xs text-text-secondary">
-              <p>{t('toolboxCatalogLoadFailed')}</p>
+          {!nativeHostUpdate &&
+            !loading &&
+            catalog.tools === null &&
+            catalog.failed &&
+            !catalog.issues?.length && (
+              <div role="alert" className="py-4 text-center text-xs text-text-secondary">
+                <p>{t('toolboxCatalogLoadFailed')}</p>
+                <button
+                  type="button"
+                  onClick={catalog.retry}
+                  className="mt-2 cursor-pointer rounded border border-border px-3 py-1 hover:bg-bg-hover"
+                >
+                  {t('retry')}
+                </button>
+              </div>
+            )}
+          {!nativeHostUpdate && Boolean(catalog.issues?.length) && (
+            <div role="alert" className="mb-2 space-y-1 break-words text-3xs text-text-secondary">
+              {catalog.issues?.map((issue, index) => (
+                <p key={`${issue.source.id}:${index}`}>
+                  {issue.reason === 'conflict'
+                    ? t('toolboxCatalogConflict', [issue.source.label, issue.plugin ?? ''])
+                    : issue.usingCache
+                      ? t('toolboxCatalogSourceCached', issue.source.label)
+                      : t('toolboxCatalogSourceFailed', issue.source.label)}
+                </p>
+              ))}
               <button
                 type="button"
                 onClick={catalog.retry}
-                className="mt-2 cursor-pointer rounded border border-border px-3 py-1 hover:bg-bg-hover"
+                className="cursor-pointer rounded border border-border px-2 py-1 hover:bg-bg-hover"
               >
                 {t('retry')}
               </button>
-            </div>
-          )}
-          {!nativeHostUpdate && catalog.tools !== null && catalog.loading && (
-            <p role="status" className="mb-2 text-3xs text-text-secondary">{t('toolboxCatalogRefreshing')}</p>
-          )}
-          {!nativeHostUpdate && Boolean(catalog.issues?.length) && (
-            <div role="alert" className="mb-2 space-y-1 break-words text-3xs text-text-secondary">
-              {catalog.issues?.map((issue, index) => <p key={`${issue.source.id}:${index}`}>
-                {issue.reason === 'conflict' ? t('toolboxCatalogConflict', [issue.source.label, issue.plugin ?? '']) : issue.usingCache ? t('toolboxCatalogSourceCached', issue.source.label) : t('toolboxCatalogSourceFailed', issue.source.label)}
-              </p>)}
-              <button type="button" onClick={catalog.retry} className="cursor-pointer rounded border border-border px-2 py-1 hover:bg-bg-hover">{t('retry')}</button>
             </div>
           )}
           {!nativeHostUpdate && catalog.tools?.length === 0 && (
@@ -1054,25 +1097,37 @@ export function Toolbox({
             </p>
           )}
           <div className="space-y-2">
-            {installableRepositories.map(({ source, pendingPriority, repository, tools: availableTools }) => (
-              <section key={`${source.id}:${repository}`} aria-label={`${source.label} · ${repository}`}>
-                <h3 className="mb-1 truncate text-3xs text-text-secondary" title={repository}>{source.label} · {repository}</h3>
-                <ul className="divide-y divide-border rounded border border-border bg-bg-primary">
-                  {availableTools.map(tool => (
-                    <InstallableToolRow
-                      key={tool.id}
-                      tool={tool}
-                      installed={tools.some(
-                        candidate => candidate.id === tool.id || candidate.plugin === tool.plugin,
-                      )}
-                      installing={installingId === tool.id}
-                      disabled={Boolean(installingId) || loading || Boolean(nativeHostUpdate) || pendingPriority}
-                      onInstall={installTool}
-                    />
-                  ))}
-                </ul>
-              </section>
-            ))}
+            {installableRepositories.map(
+              ({ source, pendingPriority, repository, tools: availableTools }) => (
+                <section
+                  key={`${source.id}:${repository}`}
+                  aria-label={`${source.label} · ${repository}`}
+                >
+                  <h3 className="mb-1 truncate text-3xs text-text-secondary" title={repository}>
+                    {source.label} · {repository}
+                  </h3>
+                  <ul className="divide-y divide-border rounded border border-border bg-bg-primary">
+                    {availableTools.map(tool => (
+                      <InstallableToolRow
+                        key={tool.id}
+                        tool={tool}
+                        installed={tools.some(
+                          candidate => candidate.id === tool.id || candidate.plugin === tool.plugin,
+                        )}
+                        installing={installingId === tool.id}
+                        disabled={
+                          Boolean(installingId) ||
+                          loading ||
+                          Boolean(nativeHostUpdate) ||
+                          pendingPriority
+                        }
+                        onInstall={installTool}
+                      />
+                    ))}
+                  </ul>
+                </section>
+              ),
+            )}
           </div>
           {nativeHostUpdate && (
             <NativeHostUpdateGuide

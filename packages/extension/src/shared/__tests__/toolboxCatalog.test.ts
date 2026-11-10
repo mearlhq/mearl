@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import catalog from '../../test/fixtures/toolboxCatalog';
-import { fetchToolboxCatalog, parseToolboxCatalog, toolboxSkillSource, toolboxCatalogSources, TOOLBOX_CATALOG_URL } from '../toolboxCatalog';
+import {
+  fetchToolboxCatalog,
+  parseToolboxCatalog,
+  toolboxSkillSource,
+  toolboxCatalogSources,
+  TOOLBOX_CATALOG_URL,
+} from '../toolboxCatalog';
 
 describe('website toolbox catalog', () => {
   it('loads website metadata and preserves install arguments and translations', async () => {
@@ -43,22 +49,69 @@ describe('website toolbox catalog', () => {
   });
 });
 
-it('pins official beta Skills without changing third-party or stable sources', () => {
-  expect(toolboxSkillSource('mearlhq/mearl', '3.0.0-beta.0')).toBe('https://github.com/mearlhq/mearl/tree/v3.0.0-beta.0');
-  expect(toolboxSkillSource('mearlhq/mearl', '3.0.0')).toBe('mearlhq/mearl');
-  expect(toolboxSkillSource('example/skills', '3.0.0-beta.0')).toBe('example/skills');
+it.each(['3.0.0', '3.0.0-beta.0'])('loads the website directory for release %s', async version => {
+  vi.resetModules();
+  const manifest = vi
+    .spyOn(chrome.runtime, 'getManifest')
+    .mockReturnValue({
+      manifest_version: 3,
+      name: 'Mearl',
+      version: '3.0.0',
+      version_name: version,
+    });
+  try {
+    const catalog = await import('../toolboxCatalog');
+    expect(catalog.TOOLBOX_CATALOG_URL).toBe('https://mearlhq.github.io/mearl/toolbox.json');
+  } finally {
+    manifest.mockRestore();
+  }
 });
 
 it('adds enabled directories while retaining the official source and deduplicating URLs', () => {
-  expect(toolboxCatalogSources({ team: { url: 'https://team.example/tools.json', label: 'Team' }, duplicate: { url: TOOLBOX_CATALOG_URL }, disabled: { enabled: false } })).toEqual([{ id: 'official', url: TOOLBOX_CATALOG_URL, label: 'Mearl' }, { id: 'team', url: 'https://team.example/tools.json', label: 'Team' }]);
+  expect(
+    toolboxCatalogSources({
+      team: { url: 'https://team.example/tools.json', label: 'Team' },
+      duplicate: { url: TOOLBOX_CATALOG_URL },
+      disabled: { enabled: false },
+    }),
+  ).toEqual([
+    { id: 'official', url: TOOLBOX_CATALOG_URL, label: 'Mearl' },
+    { id: 'team', url: 'https://team.example/tools.json', label: 'Team' },
+  ]);
 });
-it.each(['git@code.example.test:team/skills.git#release/v3', 'https://code.example.test/team/skills.git#release/v3'])('preserves a trusted directory Git source for the preset-selected manager: %s', repository => {
-  expect(parseToolboxCatalog({ tools: [{ ...catalog.tools[0], repository }] })[0].repository).toBe(repository);
+it.each([
+  'git@code.example.test:team/skills.git#release/v3',
+  'https://code.example.test/team/skills.git#release/v3',
+])('preserves a trusted directory Git source for the preset-selected manager: %s', repository => {
+  expect(parseToolboxCatalog({ tools: [{ ...catalog.tools[0], repository }] })[0].repository).toBe(
+    repository,
+  );
   expect(toolboxSkillSource(repository)).toBe(repository);
 });
-it.each(['file:///etc/passwd', 'https://user:secret@example.com/repo', 'ssh://user:secret@example.com/repo', 'https://example.com/repo?token=secret', '--source=evil', 'team/repo\n--yes'])('rejects unsafe install sources %s', repository => {
-  expect(() => parseToolboxCatalog({ tools: [{ ...catalog.tools[0], repository }] })).toThrow('Invalid toolbox catalog');
+it.each([
+  'file:///etc/passwd',
+  'https://user:secret@example.com/repo',
+  'ssh://user:secret@example.com/repo',
+  'https://example.com/repo?token=secret',
+  '--source=evil',
+  'team/repo\n--yes',
+])('rejects unsafe install sources %s', repository => {
+  expect(() => parseToolboxCatalog({ tools: [{ ...catalog.tools[0], repository }] })).toThrow(
+    'Invalid toolbox catalog',
+  );
 });
 it('bounds downloaded directory size before parsing or caching it', async () => {
-  await expect(fetchToolboxCatalog(vi.fn<typeof fetch>().mockResolvedValue(new Response('x'.repeat(256 * 1024 + 1))))).rejects.toThrow('256 KiB');
+  await expect(
+    fetchToolboxCatalog(
+      vi.fn<typeof fetch>().mockResolvedValue(new Response('x'.repeat(256 * 1024 + 1))),
+    ),
+  ).rejects.toThrow('256 KiB');
+});
+
+it('makes the official GitHub source explicit without reinterpreting custom sources', () => {
+  expect(toolboxSkillSource('mearlhq/mearl')).toBe('https://github.com/mearlhq/mearl');
+  expect(toolboxSkillSource('trip/mearl')).toBe('trip/mearl');
+  expect(toolboxSkillSource('https://github.com/example/tools')).toBe(
+    'https://github.com/example/tools',
+  );
 });

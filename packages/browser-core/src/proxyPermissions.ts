@@ -16,7 +16,7 @@ export class DomainPermissionError extends Error implements DomainPermissionFail
   constructor(
     readonly action: string,
     readonly domain: string,
-    message = `${action}: Access to "${domain}" is not authorized. Call request_permission with domain="${domain}" to request user authorization, then retry.`,
+    message = `${action}: Access to "${domain}" is not authorized. Request user authorization, then retry:\nmearl request_permission --payload '${JSON.stringify({ domain }).replace(/'/g, "'\\''")}'`,
   ) {
     super(message);
     this.name = 'DomainPermissionError';

@@ -1,5 +1,5 @@
 import { parseToolboxCatalogs, type ToolboxCatalogConfigs } from '@mearl/preset';
-import { getExtensionVersion } from './extensionVersion';
+import { INSTALLATION_SITE } from './installation';
 import { parseToolboxIcon, type ToolboxPluginToolLocale } from '@mearl/browser-core';
 
 export interface ToolboxInstallableTool {
@@ -13,21 +13,22 @@ export interface ToolboxInstallableTool {
   locales?: Record<string, ToolboxPluginToolLocale>;
 }
 
-const releaseVersion = getExtensionVersion();
-export const TOOLBOX_CATALOG_URL = releaseVersion.includes('-beta.')
-  ? `https://github.com/mearlhq/mearl/releases/download/v${releaseVersion}/toolbox.json`
-  : 'https://github.com/mearlhq/mearl/releases/latest/download/toolbox.json';
+export const TOOLBOX_CATALOG_URL = new URL('toolbox.json', INSTALLATION_SITE).href;
 
-export function toolboxSkillSource(repository: string, version = releaseVersion): string {
-  return repository === 'mearlhq/mearl' && version.includes('-beta.')
-    ? `https://github.com/mearlhq/mearl/tree/v${version}`
-    : repository;
+export function toolboxSkillSource(repository: string): string {
+  return repository === 'mearlhq/mearl' ? `https://github.com/${repository}` : repository;
 }
 
-export interface ToolboxCatalogSource { id: string; url: string; label: string }
+export interface ToolboxCatalogSource {
+  id: string;
+  url: string;
+  label: string;
+}
 export function toolboxCatalogSources(config?: ToolboxCatalogConfigs): ToolboxCatalogSource[] {
   const seen = new Set([TOOLBOX_CATALOG_URL]);
-  const sources: ToolboxCatalogSource[] = [{ id: 'official', url: TOOLBOX_CATALOG_URL, label: 'Mearl' }];
+  const sources: ToolboxCatalogSource[] = [
+    { id: 'official', url: TOOLBOX_CATALOG_URL, label: 'Mearl' },
+  ];
   for (const [id, entry] of Object.entries(parseToolboxCatalogs(config))) {
     if (entry.enabled === false || !entry.url || seen.has(entry.url)) continue;
     seen.add(entry.url);
@@ -38,12 +39,21 @@ export function toolboxCatalogSources(config?: ToolboxCatalogConfigs): ToolboxCa
 
 function validRepository(value: string): boolean {
   if (value.length > 2048 || /[\s\x00-\x1f\x7f]/.test(value) || value.startsWith('-')) return false;
-  if (/^[a-zA-Z0-9][a-zA-Z0-9_.-]*\/[a-zA-Z0-9][a-zA-Z0-9_.-]*(?:#[a-zA-Z0-9_./-]+)?$/.test(value)) return true;
+  if (/^[a-zA-Z0-9][a-zA-Z0-9_.-]*\/[a-zA-Z0-9][a-zA-Z0-9_.-]*(?:#[a-zA-Z0-9_./-]+)?$/.test(value))
+    return true;
   if (/^git@[a-zA-Z0-9.-]+:[a-zA-Z0-9_./-]+(?:#[a-zA-Z0-9_./-]+)?$/.test(value)) return true;
   try {
     const url = new URL(value);
-    return !url.password && !url.search && (url.protocol === 'https:' && !url.username || url.protocol === 'ssh:' && (!url.username || url.username === 'git')) && url.pathname.length > 1;
-  } catch { return false; }
+    return (
+      !url.password &&
+      !url.search &&
+      ((url.protocol === 'https:' && !url.username) ||
+        (url.protocol === 'ssh:' && (!url.username || url.username === 'git'))) &&
+      url.pathname.length > 1
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -108,8 +118,11 @@ export async function fetchToolboxCatalog(
   signal?: AbortSignal,
 ): Promise<ToolboxInstallableTool[]> {
   const response = await fetchImpl(url, {
-    cache: 'no-cache', credentials: 'omit',
-    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(5_000)]) : AbortSignal.timeout(5_000),
+    cache: 'no-cache',
+    credentials: 'omit',
+    signal: signal
+      ? AbortSignal.any([signal, AbortSignal.timeout(5_000)])
+      : AbortSignal.timeout(5_000),
   });
   if (!response.ok) throw new Error(`Toolbox catalog returned HTTP ${response.status}`);
   const reader = response.body?.getReader();
@@ -124,9 +137,15 @@ export async function fetchToolboxCatalog(
       if (size > 256 * 1024) throw new Error('Toolbox catalog exceeds 256 KiB');
       chunks.push(value);
     }
-  } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
+  } finally {
+    await reader.cancel().catch(() => {});
+    reader.releaseLock();
+  }
   const bytes = new Uint8Array(size);
   let offset = 0;
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
   return parseToolboxCatalog(JSON.parse(new TextDecoder().decode(bytes)));
 }
