@@ -74,7 +74,19 @@ npm install -g @mearl/mcp-server
 mearl-mcp-configure
 ```
 
-配置向导会自动完成所有设置，支持 **VSCode Copilot**、**Claude Code**、**Cursor**。完成后重启 MCP 客户端即可使用。
+配置向导支持 **VSCode Copilot**、**Claude Code**、**Cursor**、**Qoder**、**Codex**、**OpenCode v1/v2**、**Pi** 和 **DeepSeek Harness (dsh)**。完成后重启 MCP 客户端即可使用。
+
+新增客户端按配置目录检测，`--yes` 配置已检测客户端；未初始化的客户端可在交互向导中选择。
+
+| 客户端 | 用户配置 |
+| --- | --- |
+| OpenCode | `$XDG_CONFIG_HOME/opencode/opencode.json`（默认 `~/.config/opencode/`）；存在 `opencode.jsonc` 时优先编辑它 |
+| Pi | `$PI_CODING_AGENT_DIR/mcp.json`（默认 `~/.pi/agent/mcp.json`），需要支持原生 MCP 的 Pi |
+| DeepSeek Harness | `$DSH_HOME/cordis.patch.yml`（默认 `~/.dsh/cordis.patch.yml`），插入 `mcp-mearl`，适用于所有 profile |
+
+OpenCode 按已有 MCP 结构识别 v1/v2；没有可识别结构时读取 `opencode --version`，无法确定版本则报错且不写入。配置保留其他服务、设置及 JSONC/YAML 注释，DSH 的 `!!js` 标签也会保留；重复安装更新同一个条目，卸载只移除 Mearl 条目。损坏的配置会报错并保留原文件。
+
+已有远程 Mearl 条目时，安装器会报错并保留配置；需先移除该条目才能配置本地服务。OpenCode 卸载会检查 `opencode.json` 和 `opencode.jsonc` 两份文件。
 
 ## 使用
 

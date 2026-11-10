@@ -74,7 +74,19 @@ npm install -g @mearl/mcp-server
 mearl-mcp-configure
 ```
 
-The wizard configures **VSCode Copilot**, **Claude Code**, and **Cursor**. Restart the MCP client afterward.
+The wizard supports **VSCode Copilot**, **Claude Code**, **Cursor**, **Qoder**, **Codex**, **OpenCode v1/v2**, **Pi**, and **DeepSeek Harness (dsh)**. Restart the MCP client afterward.
+
+The added clients are detected by their configuration directories. `--yes` configures detected clients; clients that have not been initialized can be selected interactively.
+
+| Client | User configuration |
+| --- | --- |
+| OpenCode | `$XDG_CONFIG_HOME/opencode/opencode.json` (default directory `~/.config/opencode/`); edits `opencode.jsonc` preferentially when present |
+| Pi | `$PI_CODING_AGENT_DIR/mcp.json` (default `~/.pi/agent/mcp.json`); requires Pi with native MCP support |
+| DeepSeek Harness | `$DSH_HOME/cordis.patch.yml` (default `~/.dsh/cordis.patch.yml`); inserts `mcp-mearl` for all profiles |
+
+OpenCode's existing MCP structure identifies v1/v2. Without a recognizable structure, the installer reads `opencode --version`; an unknown version fails without writing. These adapters preserve other servers, settings, JSONC/YAML comments, and DSH `!!js` tags. Reinstallation updates the same entry; uninstall removes only the Mearl entry. Malformed configuration produces an error and leaves the original file untouched.
+
+An existing remote Mearl entry causes installation to fail without changing the configuration; remove that entry before configuring a local server. OpenCode uninstall checks both `opencode.json` and `opencode.jsonc`.
 
 ## Usage
 

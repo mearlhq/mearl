@@ -13,6 +13,7 @@ import prompts from 'prompts';
 import { Command, CommanderError } from 'commander';
 import { MCP_CLIENTS, MCPClientConfig } from './mcp-clients.js';
 import { uninstallNativeHost } from '@mearl/native-host';
+import { editClientConfig } from './client-config.js';
 
 // 检查是否全局安装
 function isGloballyInstalled(): boolean {
@@ -54,6 +55,12 @@ export function cleanMCPConfig(
 
     const content = readFileSync(configPath, 'utf-8');
     if (!content.trim()) return 'not-found';
+    if (clientConfig.format) {
+      const updated = editClientConfig(content, clientConfig.format, false, true);
+      if (updated === null) return 'not-found';
+      writeFileSync(configPath, updated);
+      return 'removed';
+    }
     if (clientConfig.useTomlFormat) {
       const updated = removeTomlMCPSection(content);
       if (updated === null) return 'not-found';
@@ -205,7 +212,9 @@ Options:
 
     // 检测哪些客户端有配置文件
     const availableClients = Object.entries(clients)
-      .filter(([_, client]) => fileExists(client.configPath))
+      .filter(([_, client]) =>
+        (client.cleanupPaths ?? [client.configPath]).some(path => fileExists(path)),
+      )
       .map(([key, client]) => ({
         title: client.name,
         value: key,
@@ -230,14 +239,15 @@ Options:
       if (selectedClients && selectedClients.length > 0) {
         for (const clientKey of selectedClients) {
           const client = clients[clientKey as keyof typeof clients];
-          const result = cleanConfig(client.configPath, client);
-
-          if (result === 'removed') {
-            log(`✅ 已清理 ${client.name}`);
-          } else if (result === 'not-found') {
-            log(`未找到 ${client.name} 配置`);
-          } else {
-            completed = false;
+          for (const configPath of client.cleanupPaths ?? [client.configPath]) {
+            const result = cleanConfig(configPath, client);
+            if (result === 'removed') {
+              log(`✅ 已清理 ${client.name}`);
+            } else if (result === 'not-found') {
+              log(`未找到 ${client.name} 配置`);
+            } else {
+              completed = false;
+            }
           }
         }
       } else {

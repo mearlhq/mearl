@@ -353,9 +353,15 @@ importers:
       commander:
         specifier: ^14.0.3
         version: 14.0.3
+      jsonc-parser:
+        specifier: ^3.3.1
+        version: 3.3.1
       prompts:
         specifier: ^2.4.2
         version: 2.4.2
+      yaml:
+        specifier: ^2.9.1
+        version: 2.9.1
     devDependencies:
       '@modelcontextprotocol/sdk':
         specifier: 1.32.0

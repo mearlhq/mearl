@@ -15,6 +15,7 @@ import { dirname, join } from 'node:path';
 import { HOST_NAME, DEFAULT_EXTENSION_ID } from './constants.js';
 import prompts from 'prompts';
 import { Command, CommanderError } from 'commander';
+import { editClientConfig } from './client-config.js';
 import {
   MCP_CLIENTS,
   getMCPServerConfig,
@@ -163,7 +164,7 @@ function updateTomlMCPConfig(configPath: string, useNpx: boolean): boolean {
 }
 
 // 添加或更新 MCP 配置
-function updateMCPConfig(
+export function updateMCPConfig(
   configPath: string,
   clientConfig: MCPClientConfig,
   useNpx: boolean,
@@ -172,6 +173,13 @@ function updateMCPConfig(
     return updateTomlMCPConfig(configPath, useNpx);
   }
   try {
+    if (clientConfig.format) {
+      const content = existsSync(configPath) ? readFileSync(configPath, 'utf8') : '';
+      const updated = editClientConfig(content, clientConfig.format, useNpx);
+      mkdirSync(dirname(configPath), { recursive: true });
+      if (updated !== null) writeFileSync(configPath, updated);
+      return true;
+    }
     // 确保目录存在
     const dir = dirname(configPath);
     if (!existsSync(dir)) {

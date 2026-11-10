@@ -2,7 +2,7 @@
  * MCP 客户端配置定义
  */
 
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
 import { homedir, platform } from 'os';
 import { existsSync } from 'fs';
 import { OFFICIAL_NPM_REGISTRY } from '@mearl/setup/npm-registry';
@@ -14,6 +14,18 @@ export interface MCPClientConfig {
   useServersFormat?: boolean;
   // Codex 使用 TOML 格式
   useTomlFormat?: boolean;
+  format?: 'opencode' | 'pi' | 'dsh';
+  cleanupPaths?: string[];
+}
+
+function homePath(value: string | undefined, fallback: string): string {
+  const path = value?.trim() || fallback;
+  return resolve(path === '~' ? homedir() : path.replace(/^~[/\\]/, `${homedir()}/`));
+}
+
+function openCodeConfigPaths(): string[] {
+  const dir = join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'opencode');
+  return ['opencode.json', 'opencode.jsonc'].map(name => join(dir, name));
 }
 
 /**
@@ -38,6 +50,34 @@ function getPlatformConfigPath(paths: { win32?: string; darwin?: string; linux?:
 }
 
 export const MCP_CLIENTS: Record<string, MCPClientConfig> = {
+  opencode: {
+    name: 'OpenCode',
+    get configPath() {
+      const [json, jsonc] = openCodeConfigPaths();
+      return existsSync(jsonc) ? jsonc : json;
+    },
+    get cleanupPaths() {
+      return openCodeConfigPaths();
+    },
+    format: 'opencode',
+  },
+  pi: {
+    name: 'Pi',
+    get configPath() {
+      return join(
+        homePath(process.env.PI_CODING_AGENT_DIR, join(homedir(), '.pi', 'agent')),
+        'mcp.json',
+      );
+    },
+    format: 'pi',
+  },
+  dsh: {
+    name: 'DeepSeek Harness',
+    get configPath() {
+      return join(homePath(process.env.DSH_HOME, join(homedir(), '.dsh')), 'cordis.patch.yml');
+    },
+    format: 'dsh',
+  },
   'vscode-copilot': {
     name: 'VSCode Copilot',
     configPath: getPlatformConfigPath({
