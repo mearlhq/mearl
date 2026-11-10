@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getConfig, onConfigChange, updateConfig } from '../config';
+import { mergeMissingBuiltinPresets } from '../urlQueryPresets';
 import {
   EXTERNAL_SERVICE_UPDATE_ACTION,
   SERVICE_DEFAULTS_CACHE_KEY,
@@ -51,6 +52,21 @@ beforeEach(() => {
 });
 
 describe('resolved extension config', () => {
+  it('seeds installed query presets on first use and respects saved deletions', async () => {
+    const defaults = [{ id: 'immersiveTitleBar', params: [{ key: 'fullscreen', value: 'true' }] }];
+    const initial = await getConfig();
+    expect(
+      mergeMissingBuiltinPresets(initial.queryPresets, initial.seenBuiltinPresetIds, defaults)
+        .presets,
+    ).toEqual(defaults);
+
+    preferences = { queryPresets: [], seenBuiltinPresetIds: ['immersiveTitleBar'] };
+    const saved = await getConfig();
+    expect(
+      mergeMissingBuiltinPresets(saved.queryPresets, saved.seenBuiltinPresetIds, defaults).presets,
+    ).toEqual([]);
+  });
+
   it('returns safe defaults without waiting for the background defaults refresh', async () => {
     vi.mocked(chrome.runtime.sendMessage).mockImplementation(() => new Promise(() => {}));
     const config = await getConfig();

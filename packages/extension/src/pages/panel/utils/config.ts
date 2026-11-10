@@ -58,7 +58,7 @@ export const DEFAULT_CONFIG: ExtensionConfig = {
   trackingMetadataEnabled: false,
   queryPresets: DEFAULT_QUERY_PRESETS,
   // 已展示记录只允许补入新内置项，尊重用户删除已有项的选择。
-  seenBuiltinPresetIds: ['immersiveTitleBar'],
+  seenBuiltinPresetIds: [],
 };
 
 /**
