@@ -661,7 +661,7 @@ export async function main(
     }
     return extensionInstalled ? localStatus : 1;
   }
-  if (!interactiveTerminal && !parsed.yes && parsed.operation !== 'update') {
+  if (!interactiveTerminal && !parsed.yes && parsed.operation === 'uninstall') {
     console.error('Non-interactive input detected. Re-run with --yes or --non-interactive.');
     return 2;
   }
@@ -673,7 +673,7 @@ export async function main(
       full: parsed.full,
       skipSkill: parsed.skipSkill,
       targetLine: parsed.targetLine,
-      yes: parsed.yes,
+      yes: parsed.yes || (!interactiveTerminal && parsed.operation === 'install'),
       ...(parsed.presetSource ? { presetSource: parsed.presetSource } : {}),
     };
     return await runSetupLifecycle(options, dependencies);

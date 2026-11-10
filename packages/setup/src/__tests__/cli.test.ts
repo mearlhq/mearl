@@ -445,10 +445,33 @@ describe('parseSetupArgs', () => {
     expect(() => parseSetupArgs(['qoder'])).toThrow('Unknown operation');
   });
 
-  it('fails before changing state when prompts are unavailable', async () => {
+  it.each([[], ['install'], ['--skip-skill'], ['--mcp'], ['--cloud']])(
+    'installs with defaults when prompts are unavailable: %j',
+    async (...args) => {
+      const runLifecycle = vi.fn().mockResolvedValue(true);
+      await expect(main(args, false, { runLifecycle })).resolves.toBe(0);
+      expect(runLifecycle).toHaveBeenCalledWith(
+        expect.objectContaining({ operation: 'install', yes: true }),
+        { onPresetStatus: expect.any(Function) },
+      );
+    },
+  );
+
+  it('preserves interactive installation prompts', async () => {
+    const runLifecycle = vi.fn().mockResolvedValue(true);
+    await expect(main([], true, { runLifecycle })).resolves.toBe(0);
+    expect(runLifecycle).toHaveBeenCalledWith(
+      expect.objectContaining({ operation: 'install', yes: false }),
+      { onPresetStatus: expect.any(Function) },
+    );
+  });
+
+  it('requires explicit confirmation for unattended uninstall', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    await expect(main(['install'], false)).resolves.toBe(2);
+    const runLifecycle = vi.fn();
+    await expect(main(['uninstall'], false, { runLifecycle })).resolves.toBe(2);
+    expect(runLifecycle).not.toHaveBeenCalled();
     expect(error).toHaveBeenCalledWith(
       'Non-interactive input detected. Re-run with --yes or --non-interactive.',
     );

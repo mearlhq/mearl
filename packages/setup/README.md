@@ -23,6 +23,8 @@ npx @mearl/setup preset apply [来源]
 npx @mearl/setup preset <update|status|uninstall>
 ```
 
+无交互终端时，`install` 自动采用安装默认项，无需额外传 `--yes`；交互终端保留安装提示。非交互卸载仍需显式传 `--yes` 或 `--non-interactive`。
+
 `--skip-skill` 保留独立管理的 Mearl Skill，不影响 preset 的选择、安装或其声明的托管资源。已有本机 preset、浏览器受信选择和发行默认配置仍按正常优先级处理。
 
 浏览器 Provider 独立安装和演进。安装后运行 `mearl <providerId>` 查看该版本声明的能力、

@@ -23,6 +23,8 @@ npx @mearl/setup preset apply [source]
 npx @mearl/setup preset <update|status|uninstall>
 ```
 
+Without an interactive terminal, `install` automatically accepts installation defaults and does not require an additional `--yes`. Interactive terminals retain installation prompts. Unattended uninstall still requires explicit `--yes` or `--non-interactive`.
+
 `--skip-skill` preserves the independently managed Mearl Skill. It does not affect preset selection, installation, or declared managed resources. Existing local presets, trusted browser selections, and distribution defaults retain their normal precedence.
 
 Browser Providers install and evolve independently. After installation, run `mearl <providerId>` to inspect that version's capabilities,
