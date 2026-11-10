@@ -18,6 +18,11 @@ import {
 
 const temporaryDirectories: string[] = [];
 
+vi.mock('../setupVersion.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../setupVersion.js')>()),
+  SETUP_VERSION: '3.0.0',
+}));
+
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
@@ -56,13 +61,15 @@ describe('browser extension release resolution', () => {
         vi.fn<typeof fetch>(async () =>
           Response.json({
             latestVersion: '2.8.1',
-            downloadUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.1/mearl-chrome-v2.8.1.zip',
+            downloadUrl:
+              'https://github.com/mearlhq/mearl/releases/download/v2.8.1/mearl-chrome-v2.8.1.zip',
             downloadSha256: 'A'.repeat(64),
           }),
         ),
       ),
     ).resolves.toEqual({
-      archiveUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.1/mearl-chrome-v2.8.1.zip',
+      archiveUrl:
+        'https://github.com/mearlhq/mearl/releases/download/v2.8.1/mearl-chrome-v2.8.1.zip',
       sha256: 'a'.repeat(64),
       version: '2.8.1',
     });
@@ -101,7 +108,8 @@ describe('updateSetupManagedBrowserExtensionFiles', () => {
       updateSetupManagedBrowserExtensionFiles(
         {
           release: {
-            archiveUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.1/mearl-chrome-v2.8.1.zip',
+            archiveUrl:
+              'https://github.com/mearlhq/mearl/releases/download/v2.8.1/mearl-chrome-v2.8.1.zip',
             sha256,
             version: '2.8.1',
           },
@@ -146,7 +154,8 @@ describe('updateSetupManagedBrowserExtensionFiles', () => {
       updateSetupManagedBrowserExtensionFiles(
         {
           release: {
-            archiveUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.1/mearl-chrome-v2.8.1.zip',
+            archiveUrl:
+              'https://github.com/mearlhq/mearl/releases/download/v2.8.1/mearl-chrome-v2.8.1.zip',
             sha256: '0'.repeat(64),
             version: '2.8.1',
           },
@@ -184,7 +193,11 @@ describe('installMearlBrowserExtension', () => {
     const fetchImpl = vi.fn<typeof fetch>(async input => {
       const url = String(input);
       if (url.endsWith('/config.json')) {
-        return Response.json({ latestVersion: '2.8.0', downloadUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip' });
+        return Response.json({
+          latestVersion: '2.8.0',
+          downloadUrl:
+            'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip',
+        });
       }
       return new Response(new Uint8Array([80, 75, 3, 4]), {
         headers: { 'content-length': '4' },
@@ -215,7 +228,8 @@ describe('installMearlBrowserExtension', () => {
       ),
     ).resolves.toEqual({
       activation: 'cdp',
-      archiveUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip',
+      archiveUrl:
+        'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip',
       extensionId: 'aoehhjnofngknnjefamjbplchbolghkm',
       filesUpdated: true,
       loaded: true,
@@ -233,7 +247,11 @@ describe('installMearlBrowserExtension', () => {
     const targetDirectory = path.join(root, 'chrome-extension');
     const fetchImpl = vi.fn<typeof fetch>(async input =>
       String(input).endsWith('/config.json')
-        ? Response.json({ latestVersion: '2.8.0', downloadUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip' })
+        ? Response.json({
+            latestVersion: '2.8.0',
+            downloadUrl:
+              'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip',
+          })
         : new Response(new Uint8Array([80, 75, 3, 4])),
     );
     const session = {
@@ -276,7 +294,11 @@ describe('installMearlBrowserExtension', () => {
     const targetDirectory = path.join(root, 'chrome-extension');
     const fetchImpl = vi.fn<typeof fetch>(async input =>
       String(input).endsWith('/config.json')
-        ? Response.json({ latestVersion: '2.8.0', downloadUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip' })
+        ? Response.json({
+            latestVersion: '2.8.0',
+            downloadUrl:
+              'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip',
+          })
         : new Response(new Uint8Array([80, 75, 3, 4])),
     );
     const session = {
@@ -328,7 +350,11 @@ describe('installMearlBrowserExtension', () => {
     );
     const fetchImpl = vi.fn<typeof fetch>(async input =>
       String(input).endsWith('/config.json')
-        ? Response.json({ latestVersion: '2.8.0', downloadUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip' })
+        ? Response.json({
+            latestVersion: '2.8.0',
+            downloadUrl:
+              'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip',
+          })
         : new Response(new Uint8Array([80, 75, 3, 4])),
     );
     const inspectInstalled = vi.fn(async () => ['chrome:profile-a']);
@@ -378,7 +404,11 @@ describe('installMearlBrowserExtension', () => {
     );
     const fetchImpl = vi.fn<typeof fetch>(async input =>
       String(input).endsWith('/config.json')
-        ? Response.json({ latestVersion: '2.8.0', downloadUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip' })
+        ? Response.json({
+            latestVersion: '2.8.0',
+            downloadUrl:
+              'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip',
+          })
         : new Response(new Uint8Array([80, 75, 3, 4])),
     );
     const inspectInstallation = vi.fn(async () => null);
@@ -427,8 +457,12 @@ describe('installMearlBrowserExtension', () => {
         schemaVersion: 1,
       }),
     );
-    const fetchImpl = vi.fn<typeof fetch>(
-      async () => Response.json({ latestVersion: '2.8.0', downloadUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip' }),
+    const fetchImpl = vi.fn<typeof fetch>(async () =>
+      Response.json({
+        latestVersion: '2.8.0',
+        downloadUrl:
+          'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip',
+      }),
     );
 
     await expect(
@@ -456,7 +490,11 @@ describe('installMearlBrowserExtension', () => {
     const targetDirectory = path.join(root, 'chrome-extension');
     const fetchImpl = vi.fn<typeof fetch>(async input =>
       String(input).endsWith('/config.json')
-        ? Response.json({ latestVersion: '2.8.0', downloadUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip' })
+        ? Response.json({
+            latestVersion: '2.8.0',
+            downloadUrl:
+              'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip',
+          })
         : new Response(new Uint8Array([80, 75, 3, 4])),
     );
     const extractArchive = vi.fn(async (_archivePath: string, destination: string) => {
@@ -499,8 +537,12 @@ describe('installMearlBrowserExtension', () => {
         connectCdp: vi.fn(async () => {
           throw new Error("'Extensions.loadUnpacked' wasn't found");
         }),
-        fetch: vi.fn<typeof fetch>(
-          async () => Response.json({ latestVersion: '2.8.0', downloadUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip' }),
+        fetch: vi.fn<typeof fetch>(async () =>
+          Response.json({
+            latestVersion: '2.8.0',
+            downloadUrl:
+              'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip',
+          }),
         ),
         sleep,
       },
@@ -519,8 +561,12 @@ describe('installMearlBrowserExtension', () => {
     const targetDirectory = path.join(root, 'chrome-extension');
     fs.mkdirSync(targetDirectory, { recursive: true });
     fs.writeFileSync(path.join(targetDirectory, 'existing.txt'), 'unchanged');
-    const fetchImpl = vi.fn<typeof fetch>(
-      async () => Response.json({ latestVersion: '2.8.0', downloadUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip' }),
+    const fetchImpl = vi.fn<typeof fetch>(async () =>
+      Response.json({
+        latestVersion: '2.8.0',
+        downloadUrl:
+          'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip',
+      }),
     );
     const installed = {
       id: 'aoehhjnofngknnjefamjbplchbolghkm',
@@ -553,7 +599,11 @@ describe('installMearlBrowserExtension', () => {
     const targetDirectory = path.join(root, 'chrome-extension');
     const fetchImpl = vi.fn<typeof fetch>(async input =>
       String(input).endsWith('/config.json')
-        ? Response.json({ latestVersion: '2.8.0', downloadUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip' })
+        ? Response.json({
+            latestVersion: '2.8.0',
+            downloadUrl:
+              'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip',
+          })
         : new Response(new Uint8Array([80, 75, 3, 4])),
     );
     const extractArchive = vi.fn(async (_archivePath: string, destination: string) => {
@@ -591,7 +641,11 @@ describe('installMearlBrowserExtension', () => {
     const targetDirectory = path.join(root, 'chrome-extension');
     const fetchImpl = vi.fn<typeof fetch>(async input =>
       String(input).endsWith('/config.json')
-        ? Response.json({ latestVersion: '2.8.0', downloadUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip' })
+        ? Response.json({
+            latestVersion: '2.8.0',
+            downloadUrl:
+              'https://github.com/mearlhq/mearl/releases/download/v2.8.0/mearl-chrome-v2.8.0.zip',
+          })
         : new Response(new Uint8Array([80, 75, 3, 4])),
     );
 
@@ -619,33 +673,60 @@ describe('installMearlBrowserExtension', () => {
   });
 });
 
-
 it('reads an explicit release configuration at request time', async () => {
   vi.stubEnv('MEARL_EXTENSION_CONFIG_URL', 'https://updates.example.com/releases/config.json');
-  const fetcher = vi.fn<typeof fetch>(async () => Response.json({ latestVersion: '3.0.0', downloadUrl: 'https://updates.example.com/releases/mearl-chrome-v3.0.0.zip' }));
-  await expect(fetchBrowserExtensionRelease(fetcher)).resolves.toEqual({ version: '3.0.0', archiveUrl: 'https://updates.example.com/releases/mearl-chrome-v3.0.0.zip' });
-  expect(fetcher).toHaveBeenCalledWith('https://updates.example.com/releases/config.json', { cache: 'no-store' });
+  const fetcher = vi.fn<typeof fetch>(async () =>
+    Response.json({
+      latestVersion: '3.0.0',
+      downloadUrl: 'https://updates.example.com/releases/mearl-chrome-v3.0.0.zip',
+    }),
+  );
+  await expect(fetchBrowserExtensionRelease(fetcher)).resolves.toEqual({
+    version: '3.0.0',
+    archiveUrl: 'https://updates.example.com/releases/mearl-chrome-v3.0.0.zip',
+  });
+  expect(fetcher).toHaveBeenCalledWith('https://updates.example.com/releases/config.json', {
+    cache: 'no-store',
+  });
 });
 
 it('does not invent a release when release metadata is missing', async () => {
-  await expect(fetchBrowserExtensionRelease(vi.fn<typeof fetch>(async () => Response.json({})))).rejects.toThrow();
+  await expect(
+    fetchBrowserExtensionRelease(vi.fn<typeof fetch>(async () => Response.json({}))),
+  ).rejects.toThrow();
 });
 
 it('installs a beta archive by verifying its numeric Chrome version and display release together', async () => {
   const root = temporaryDirectory();
   const targetDirectory = path.join(root, 'beta-extension');
-  const archiveUrl = 'https://github.com/mearlhq/mearl/releases/download/v3.0.0-beta.0/mearl-chrome-v3.0.0-beta.0.zip';
-  await expect(installMearlBrowserExtension({ targetDirectory }, {
-    fetch: vi.fn<typeof fetch>(async input => String(input).endsWith('/config.json')
-      ? Response.json({ latestVersion: '3.0.0-beta.0', downloadUrl: archiveUrl })
-      : new Response(new Uint8Array([80, 75, 3, 4]))),
-    inspectInstallation: vi.fn(async () => null),
-    extractArchive: async (_file, destination) => {
-      fs.writeFileSync(path.join(destination, 'manifest.json'), JSON.stringify({ key: 'stable-key', manifest_version: 3, name: 'Mearl', version: '3.0.0.0', version_name: '3.0.0-beta.0' }));
-    },
-  })).resolves.toMatchObject({ version: '3.0.0-beta.0' });
+  const archiveUrl =
+    'https://github.com/mearlhq/mearl/releases/download/v3.0.0-beta.0/mearl-chrome-v3.0.0-beta.0.zip';
+  await expect(
+    installMearlBrowserExtension(
+      { targetDirectory },
+      {
+        fetch: vi.fn<typeof fetch>(async input =>
+          String(input).endsWith('/config.json')
+            ? Response.json({ latestVersion: '3.0.0-beta.0', downloadUrl: archiveUrl })
+            : new Response(new Uint8Array([80, 75, 3, 4])),
+        ),
+        inspectInstallation: vi.fn(async () => null),
+        extractArchive: async (_file, destination) => {
+          fs.writeFileSync(
+            path.join(destination, 'manifest.json'),
+            JSON.stringify({
+              key: 'stable-key',
+              manifest_version: 3,
+              name: 'Mearl',
+              version: '3.0.0.0',
+              version_name: '3.0.0-beta.0',
+            }),
+          );
+        },
+      },
+    ),
+  ).resolves.toMatchObject({ version: '3.0.0-beta.0' });
 });
-
 
 describe('real extension ZIP extraction', () => {
   it('unpacks downloads into separate directories for manual loading and cleans up an invalid download', async () => {
@@ -656,9 +737,11 @@ describe('real extension ZIP extraction', () => {
     archive.addFile('assets/app.js', Buffer.from('example'));
     const buffer = new Uint8Array(archive.toBuffer());
     const archiveUrl = extensionArchiveUrl(manifest.version);
-    const fetchImpl = vi.fn<typeof fetch>(async input => input === archiveUrl
-      ? new Response(buffer)
-      : Response.json({ latestVersion: manifest.version, downloadUrl: archiveUrl }));
+    const fetchImpl = vi.fn<typeof fetch>(async input =>
+      input === archiveUrl
+        ? new Response(buffer)
+        : Response.json({ latestVersion: manifest.version, downloadUrl: archiveUrl }),
+    );
 
     const first = await downloadMearlBrowserExtension(directory, { fetch: fetchImpl });
     const second = await downloadMearlBrowserExtension(directory, { fetch: fetchImpl });
@@ -670,58 +753,90 @@ describe('real extension ZIP extraction', () => {
       expect(fs.existsSync(path.join(result.path, MEARL_EXTENSION_SETUP_MARKER))).toBe(false);
     }
 
-    fetchImpl.mockImplementation(async input => input === archiveUrl
-      ? new Response('invalid archive')
-      : Response.json({ latestVersion: manifest.version, downloadUrl: archiveUrl }));
+    fetchImpl.mockImplementation(async input =>
+      input === archiveUrl
+        ? new Response('invalid archive')
+        : Response.json({ latestVersion: manifest.version, downloadUrl: archiveUrl }),
+    );
     await expect(downloadMearlBrowserExtension(directory, { fetch: fetchImpl })).rejects.toThrow();
-    expect(fs.readdirSync(directory).sort()).toEqual([first.path, second.path].map(value => path.basename(value)).sort());
+    expect(fs.readdirSync(directory).sort()).toEqual(
+      [first.path, second.path].map(value => path.basename(value)).sort(),
+    );
   });
 
-  it.each(['file', 'symlink', 'traversal', 'windows-path', 'corrupt-deflate'])('handles a %s entry without escaping or damaging the installed extension', async kind => {
-    const root = temporaryDirectory();
-    const targetDirectory = path.join(root, 'chrome-extension');
-    const outside = path.join(root, 'outside.txt');
-    fs.mkdirSync(targetDirectory);
-    fs.writeFileSync(outside, 'outside-original');
-    fs.writeFileSync(path.join(targetDirectory, 'existing.txt'), 'installed-original');
-    fs.writeFileSync(path.join(targetDirectory, MEARL_EXTENSION_SETUP_MARKER), JSON.stringify({
-      schemaVersion: 1, extensionId: 'aoehhjnofngknnjefamjbplchbolghkm', path: targetDirectory,
-    }));
-    const archive = new AdmZip();
-    archive.addFile('manifest.json', Buffer.from(JSON.stringify({
-      manifest_version: 3, name: 'Mearl', version: '3.0.0', key: 'stable-key',
-    })));
-    archive.addFile('assets/', Buffer.alloc(0));
-    const entry = archive.addFile('assets/app.js', Buffer.from('example'));
-    if (kind === 'symlink') {
-      entry.header.attr = (0o120777 << 16) >>> 0;
-      archive.updateFile(entry, Buffer.from(outside));
-    } else if (kind === 'traversal') {
-      entry.entryName = '../outside.txt';
-    } else if (kind === 'windows-path') {
-      entry.entryName = 'C:\\outside.txt';
-    }
-    const buffer = archive.toBuffer();
-    if (kind === 'corrupt-deflate') {
-      const header = buffer.indexOf(Buffer.from('assets/app.js')) - 30;
-      expect(buffer.readUInt32LE(header)).toBe(0x04034b50);
-      const payload = header + 30 + buffer.readUInt16LE(header + 26) + buffer.readUInt16LE(header + 28);
-      buffer[payload] = 0x07; // Reserved DEFLATE block type: must reject, never crash the process.
-    }
-    const result = updateSetupManagedBrowserExtensionFiles({
-      targetDirectory,
-      release: { version: '3.0.0', archiveUrl: 'https://github.com/mearlhq/mearl/releases/download/v3.0.0/mearl-chrome-v3.0.0.zip' },
-    }, { fetch: vi.fn<typeof fetch>(async () => new Response(new Uint8Array(buffer))) });
-    if (kind === 'file') {
-      await expect(result).resolves.toMatchObject({ version: '3.0.0' });
-      expect(fs.readFileSync(path.join(targetDirectory, 'assets/app.js'), 'utf8')).toBe('example');
-      expect(fs.existsSync(path.join(targetDirectory, 'existing.txt'))).toBe(false);
-    } else {
-      if (kind === 'corrupt-deflate') await expect(result).rejects.toThrow();
-      else await expect(result).rejects.toThrow('unsafe entry');
-      expect(fs.readFileSync(path.join(targetDirectory, 'existing.txt'), 'utf8')).toBe('installed-original');
-    }
-    expect(fs.readFileSync(outside, 'utf8')).toBe('outside-original');
-    expect(fs.readdirSync(root).sort()).toEqual(['chrome-extension', 'outside.txt']);
-  });
+  it.each(['file', 'symlink', 'traversal', 'windows-path', 'corrupt-deflate'])(
+    'handles a %s entry without escaping or damaging the installed extension',
+    async kind => {
+      const root = temporaryDirectory();
+      const targetDirectory = path.join(root, 'chrome-extension');
+      const outside = path.join(root, 'outside.txt');
+      fs.mkdirSync(targetDirectory);
+      fs.writeFileSync(outside, 'outside-original');
+      fs.writeFileSync(path.join(targetDirectory, 'existing.txt'), 'installed-original');
+      fs.writeFileSync(
+        path.join(targetDirectory, MEARL_EXTENSION_SETUP_MARKER),
+        JSON.stringify({
+          schemaVersion: 1,
+          extensionId: 'aoehhjnofngknnjefamjbplchbolghkm',
+          path: targetDirectory,
+        }),
+      );
+      const archive = new AdmZip();
+      archive.addFile(
+        'manifest.json',
+        Buffer.from(
+          JSON.stringify({
+            manifest_version: 3,
+            name: 'Mearl',
+            version: '3.0.0',
+            key: 'stable-key',
+          }),
+        ),
+      );
+      archive.addFile('assets/', Buffer.alloc(0));
+      const entry = archive.addFile('assets/app.js', Buffer.from('example'));
+      if (kind === 'symlink') {
+        entry.header.attr = (0o120777 << 16) >>> 0;
+        archive.updateFile(entry, Buffer.from(outside));
+      } else if (kind === 'traversal') {
+        entry.entryName = '../outside.txt';
+      } else if (kind === 'windows-path') {
+        entry.entryName = 'C:\\outside.txt';
+      }
+      const buffer = archive.toBuffer();
+      if (kind === 'corrupt-deflate') {
+        const header = buffer.indexOf(Buffer.from('assets/app.js')) - 30;
+        expect(buffer.readUInt32LE(header)).toBe(0x04034b50);
+        const payload =
+          header + 30 + buffer.readUInt16LE(header + 26) + buffer.readUInt16LE(header + 28);
+        buffer[payload] = 0x07; // Reserved DEFLATE block type: must reject, never crash the process.
+      }
+      const result = updateSetupManagedBrowserExtensionFiles(
+        {
+          targetDirectory,
+          release: {
+            version: '3.0.0',
+            archiveUrl:
+              'https://github.com/mearlhq/mearl/releases/download/v3.0.0/mearl-chrome-v3.0.0.zip',
+          },
+        },
+        { fetch: vi.fn<typeof fetch>(async () => new Response(new Uint8Array(buffer))) },
+      );
+      if (kind === 'file') {
+        await expect(result).resolves.toMatchObject({ version: '3.0.0' });
+        expect(fs.readFileSync(path.join(targetDirectory, 'assets/app.js'), 'utf8')).toBe(
+          'example',
+        );
+        expect(fs.existsSync(path.join(targetDirectory, 'existing.txt'))).toBe(false);
+      } else {
+        if (kind === 'corrupt-deflate') await expect(result).rejects.toThrow();
+        else await expect(result).rejects.toThrow('unsafe entry');
+        expect(fs.readFileSync(path.join(targetDirectory, 'existing.txt'), 'utf8')).toBe(
+          'installed-original',
+        );
+      }
+      expect(fs.readFileSync(outside, 'utf8')).toBe('outside-original');
+      expect(fs.readdirSync(root).sort()).toEqual(['chrome-extension', 'outside.txt']);
+    },
+  );
 });

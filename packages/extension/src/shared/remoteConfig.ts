@@ -1,5 +1,7 @@
+import { INSTALLATION_SITE } from './installation';
+
 export const MEARL_REMOTE_BASE_URL = 'https://github.com/mearlhq/mearl/releases/';
-export const MEARL_REMOTE_CONFIG_URL = `${MEARL_REMOTE_BASE_URL}latest/download/config.json`;
+export const MEARL_REMOTE_CONFIG_URL = new URL('config.json', INSTALLATION_SITE).href;
 
 const RELEASE_VERSION_PATTERN =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-beta\.(0|[1-9]\d*))?$/;

@@ -1,20 +1,31 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   compareReleaseVersions,
   getExtensionChangelogUrl,
   getRemoteExtensionRelease,
+  fetchRemoteConfig,
 } from '../remoteConfig';
 
 describe('remote extension release', () => {
+  it('reads update configuration directly from the installation website', async () => {
+    const config = { latestVersion: '3.0.8' };
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json(config));
+    await expect(fetchRemoteConfig(fetcher)).resolves.toEqual(config);
+    expect(fetcher).toHaveBeenCalledExactlyOnceWith('https://mearlhq.github.io/mearl/config.json', {
+      cache: 'no-cache',
+    });
+  });
   it('validates the version-bound archive URL and builds the changelog anchor', () => {
     expect(
       getRemoteExtensionRelease({
         latestVersion: '2.8.1',
-        downloadUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.1/mearl-chrome-v2.8.1.zip',
+        downloadUrl:
+          'https://github.com/mearlhq/mearl/releases/download/v2.8.1/mearl-chrome-v2.8.1.zip',
         downloadSha256: 'A'.repeat(64),
       }),
     ).toEqual({
-      archiveUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.1/mearl-chrome-v2.8.1.zip',
+      archiveUrl:
+        'https://github.com/mearlhq/mearl/releases/download/v2.8.1/mearl-chrome-v2.8.1.zip',
       changelogUrl: 'https://github.com/mearlhq/mearl/releases/tag/v2.8.1',
       sha256: 'a'.repeat(64),
       version: '2.8.1',
@@ -31,7 +42,8 @@ describe('remote extension release', () => {
     expect(
       getRemoteExtensionRelease({
         latestVersion: '2.8.1',
-        downloadUrl: 'https://github.com/mearlhq/mearl/releases/download/v2.8.1/mearl-chrome-v2.8.1.zip',
+        downloadUrl:
+          'https://github.com/mearlhq/mearl/releases/download/v2.8.1/mearl-chrome-v2.8.1.zip',
         downloadSha256: 'invalid',
       }),
     ).toBeNull();

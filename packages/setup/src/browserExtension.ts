@@ -13,9 +13,7 @@ import { compareMearlReleaseVersions, isMearlReleaseVersion } from './version.js
 export const MEARL_EXTENSION_DOWNLOAD_PAGE = SETUP_VERSION.includes('-beta.')
   ? `https://github.com/mearlhq/mearl/releases/tag/v${SETUP_VERSION}`
   : 'https://github.com/mearlhq/mearl/releases/latest';
-export const MEARL_EXTENSION_REMOTE_CONFIG_URL = SETUP_VERSION.includes('-beta.')
-  ? `https://github.com/mearlhq/mearl/releases/download/v${SETUP_VERSION}/config.json`
-  : 'https://github.com/mearlhq/mearl/releases/latest/download/config.json';
+export const MEARL_EXTENSION_REMOTE_CONFIG_URL = 'https://mearlhq.github.io/mearl/config.json';
 export const MEARL_EXTENSION_DIRECTORY_NAME = 'chrome-extension';
 export const MEARL_EXTENSION_ID = 'aoehhjnofngknnjefamjbplchbolghkm';
 export const MEARL_EXTENSION_SETUP_MARKER = '.mearl-setup.json';
@@ -147,9 +145,10 @@ function validateExtensionRelease(release: BrowserExtensionRelease): BrowserExte
     throw new Error('Remote extension config has an invalid latestVersion');
   }
   const configSource = process.env.MEARL_EXTENSION_CONFIG_URL;
-  const expectedArchiveUrl = configSource && configSource !== MEARL_EXTENSION_REMOTE_CONFIG_URL
-    ? new URL(`mearl-chrome-v${release.version}.zip`, configSource).toString()
-    : extensionArchiveUrl(release.version);
+  const expectedArchiveUrl =
+    configSource && configSource !== MEARL_EXTENSION_REMOTE_CONFIG_URL
+      ? new URL(`mearl-chrome-v${release.version}.zip`, configSource).toString()
+      : extensionArchiveUrl(release.version);
   let archiveUrl: string;
   try {
     archiveUrl = new URL(release.archiveUrl).toString();
@@ -172,7 +171,13 @@ function validateExtensionRelease(release: BrowserExtensionRelease): BrowserExte
 export async function fetchBrowserExtensionRelease(
   fetchImpl: typeof fetch = fetch,
 ): Promise<BrowserExtensionRelease> {
-  const response = await fetchImpl(process.env.MEARL_EXTENSION_CONFIG_URL || MEARL_EXTENSION_REMOTE_CONFIG_URL, { cache: 'no-store' });
+  if (!process.env.MEARL_EXTENSION_CONFIG_URL && SETUP_VERSION.includes('-beta.')) {
+    return { version: SETUP_VERSION, archiveUrl: extensionArchiveUrl(SETUP_VERSION) };
+  }
+  const response = await fetchImpl(
+    process.env.MEARL_EXTENSION_CONFIG_URL || MEARL_EXTENSION_REMOTE_CONFIG_URL,
+    { cache: 'no-store' },
+  );
   if (!response.ok) {
     throw new Error(`Extension config returned HTTP ${response.status}`);
   }
@@ -410,8 +415,11 @@ async function inspectInstallationWithConnection(
     }
     let version = installed.version;
     try {
-      const manifest = JSON.parse(fs.readFileSync(path.join(installed.path, 'manifest.json'), 'utf8'));
-      if (manifest.version === installed.version) version = readExtensionReleaseVersion(manifest) ?? version;
+      const manifest = JSON.parse(
+        fs.readFileSync(path.join(installed.path, 'manifest.json'), 'utf8'),
+      );
+      if (manifest.version === installed.version)
+        version = readExtensionReleaseVersion(manifest) ?? version;
     } catch {}
     return {
       id: MEARL_EXTENSION_ID,
@@ -576,8 +584,10 @@ async function extractExtensionArchive(archivePath: string, destination: string)
     const name = entry.entryName;
     const type = (entry.header.attr >>> 16) & 0o170000;
     if (
-      name.includes('\\') || name.includes('\0') ||
-      path.posix.isAbsolute(name) || path.win32.isAbsolute(name) ||
+      name.includes('\\') ||
+      name.includes('\0') ||
+      path.posix.isAbsolute(name) ||
+      path.win32.isAbsolute(name) ||
       name.split('/').some(part => part === '..' || part === '.') ||
       (type !== 0 && type !== 0o100000 && type !== 0o040000)
     ) {
@@ -646,7 +656,13 @@ export async function downloadMearlBrowserExtension(
   await fs.promises.mkdir(parent, { recursive: true });
   const target = await fs.promises.mkdtemp(path.join(parent, `mearl-v${release.version}-`));
   try {
-    await downloadAndReplaceExtension(release, target, fetchImpl, dependencies.extractArchive ?? extractExtensionArchive, { managed: false });
+    await downloadAndReplaceExtension(
+      release,
+      target,
+      fetchImpl,
+      dependencies.extractArchive ?? extractExtensionArchive,
+      { managed: false },
+    );
     return { ...release, path: target };
   } catch (error) {
     await fs.promises.rm(target, { force: true, recursive: true });
@@ -663,9 +679,7 @@ export async function updateSetupManagedBrowserExtensionFiles(
     throw new Error('The running extension is not managed by Mearl setup');
   }
   const fetchImpl = dependencies.fetch ?? fetch;
-  const extractArchive =
-    dependencies.extractArchive ??
-    extractExtensionArchive;
+  const extractArchive = dependencies.extractArchive ?? extractExtensionArchive;
   const release = await downloadAndReplaceExtension(
     options.release,
     targetDirectory,
@@ -681,9 +695,7 @@ export async function installMearlBrowserExtension(
 ): Promise<BrowserExtensionInstallResult> {
   const connectCdp = dependencies.connectCdp ?? connectBrowserExtensionViaCdp;
   const fetchImpl = dependencies.fetch ?? fetch;
-  const extractArchive =
-    dependencies.extractArchive ??
-    extractExtensionArchive;
+  const extractArchive = dependencies.extractArchive ?? extractExtensionArchive;
   const loadUnpacked = dependencies.loadUnpacked ?? loadUnpackedViaCdp;
   const inspectInstallation = dependencies.inspectInstallation ?? inspectMearlExtensionViaCdp;
   const inspectInstalled = dependencies.inspectInstalled ?? inspectSetupManagedExtension;

@@ -8,7 +8,9 @@
 
 Beta 是迭代制品。Action 查询所有公开包的 npm 版本，在源码目标版本下选择已发布最大 beta 编号加一（首次从 beta.0 开始），再导出所选源码提交，在独立构建目录同步 npm 包、扩展 Manifest、MCP 元数据及 Skills 目录的版本，再构建、检查、测试和打包。版本文件不回写源码分支，也不生成正式更新日志或单独的版本提交。
 
-源码由 commit 和预发布标签定位，制品由自动选择的 beta 版本定位；标签中的源码版本字段可以保留日常迭代版本。GitHub 预发布只记录对应提交，附带扩展 ZIP、`config.json` 和许可证。工具箱目录 `toolbox.json` 随官网部署。npm 使用 `beta` 标签。
+源码由 commit 和预发布标签定位，制品由自动选择的 beta 版本定位；标签中的源码版本字段可以保留日常迭代版本。GitHub 预发布只记录对应提交，附带扩展 ZIP 和许可证。工具箱目录 `toolbox.json` 随官网部署。npm 使用 `beta` 标签。
+
+扩展、CLI 检查与稳定版 setup 从官网 `/mearl/config.json` 读取默认更新配置。npm 与 GitHub Release 发布成功后自动部署官网，不等待商店审核提交。官网构建时从 GitHub Release 解析版本和 ZIP 地址；无法解析时终止部署，保留已上线配置。beta setup 直接下载与自身版本一致的扩展 ZIP。ZIP 下载仍使用不可变的 Release 地址，Release 不附带更新配置。
 
 发布流程代码变更时自动运行仅验证流程：执行完整构建、Node 20.18.0 运行检查、类型检查、测试与打包，保存 Actions artifact；npm 发布与 GitHub 标签、预发布写入只在手动运行时执行。
 

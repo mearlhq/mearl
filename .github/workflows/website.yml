@@ -22,6 +22,7 @@ on:
       - 'tsconfig.base.json'
       - 'vitest.shared.ts'
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read

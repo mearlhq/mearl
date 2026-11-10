@@ -141,9 +141,6 @@ const manifest: ManifestV3Export = {
     'https://www.google-analytics.com/*',
     'https://skills.sh/*',
     'https://api.github.com/*',
-    // Release downloads for the remote config and toolbox catalog redirect to the asset host.
-    'https://github.com/*',
-    'https://release-assets.githubusercontent.com/*',
     installationOrigin,
   ],
   optional_host_permissions: ['<all_urls>'],

@@ -8,7 +8,9 @@ The main repository is `mearlhq/mearl`, and release source is merged into `main`
 
 Beta builds are iteration artifacts. The Action queries npm versions for all public packages and selects the highest published beta number plus one for the source target version, starting at beta.0. It exports the selected source commit into an independent build directory, synchronizes npm package versions, the extension Manifest, MCP metadata, and Skill directory versions, then builds, checks, tests, and packages. Version files are not written back to the source branch, and no stable changelog or separate version commit is generated.
 
-Source is identified by commit and prerelease tag; artifacts by the automatically selected beta version. The source-version field in a tag may retain the development version. GitHub prereleases record the corresponding commit and attach the extension ZIP, `config.json`, and license. The `toolbox.json` catalog is deployed with the website. npm uses the `beta` tag.
+Source is identified by commit and prerelease tag; artifacts by the automatically selected beta version. The source-version field in a tag may retain the development version. GitHub prereleases record the corresponding commit and attach the extension ZIP and license. The `toolbox.json` catalog is deployed with the website. npm uses the `beta` tag.
+
+The extension, CLI checks, and stable setup read default update configuration from the website's `/mearl/config.json`. The website deploys automatically after npm and GitHub Release publication succeeds, independently of store review submission. It resolves the version and ZIP URL from GitHub Releases at build time. Resolution failure stops deployment and preserves the live configuration. Beta setup downloads the extension ZIP matching its own version directly. ZIP downloads still use immutable Release URLs; releases do not attach update configuration.
 
 Release workflow code changes automatically run validation only: full build, Node 20.18.0 runtime checks, type checks, tests, and packaging, saved as an Actions artifact. npm publishing and GitHub tag/prerelease writes run only on manual invocation.
 

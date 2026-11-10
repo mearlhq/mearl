@@ -142,9 +142,8 @@ export async function packRelease(workspace, output, channel, env = process.env)
   const extensionFile = `mearl-chrome-v${version}.zip`;
   execFileSync('zip', ['-Xq', resolve(output, extensionFile), ...await zipFiles(extension)], { cwd: extension, env: { ...process.env, TZ: 'UTC' } });
   await cp(resolve(workspace, 'LICENSE'), resolve(output, 'LICENSE'));
-  await writeFile(resolve(output, 'config.json'), JSON.stringify({ latestVersion: version, downloadUrl: `https://github.com/${repository}/releases/download/v${version}/${extensionFile}` }, null, 2) + '\n');
   const assets = [];
-  for (const file of [extensionFile, 'config.json', 'LICENSE']) assets.push({ file, integrity: hash(await readFile(resolve(output, file))) });
+  for (const file of [extensionFile, 'LICENSE']) assets.push({ file, integrity: hash(await readFile(resolve(output, file))) });
   const release = { version, channel, sourceCommit: env.GITHUB_SHA, packages: packed, assets };
   await writeFile(resolve(output, 'release.json'), JSON.stringify(release, null, 2) + '\n');
   return release;

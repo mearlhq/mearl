@@ -27,7 +27,12 @@ export interface ProviderVersionInfo {
   protocolVersion: number;
 }
 
-export interface BrowserAccessCapability { kind: string; label?: string; environment?: string; port?: number }
+export interface BrowserAccessCapability {
+  kind: string;
+  label?: string;
+  environment?: string;
+  port?: number;
+}
 
 export type BrowserAccess = BrowserAccessCapability & { url: string };
 
@@ -136,7 +141,7 @@ const UPDATE_SOURCES = {
   client: 'https://registry.npmjs.org/@mearl%2Fclient/latest',
   'native-host': 'https://registry.npmjs.org/@mearl%2Fnative-host/latest',
   'cloud-connector': 'https://registry.npmjs.org/@mearl%2Fcloud-connector/latest',
-  extension: 'https://github.com/mearlhq/mearl/releases/latest/download/config.json',
+  extension: 'https://mearlhq.github.io/mearl/config.json',
 } as const;
 
 type UpdateComponent = keyof typeof UPDATE_SOURCES;
@@ -163,13 +168,17 @@ export function isNewerRelease(latest: string, installed: string): boolean {
 }
 
 async function fetchLatestVersion(component: string): Promise<string> {
-  const source = component === 'extension' ? process.env.MEARL_EXTENSION_CONFIG_URL || UPDATE_SOURCES.extension : UPDATE_SOURCES[component as UpdateComponent];
+  const source =
+    component === 'extension'
+      ? process.env.MEARL_EXTENSION_CONFIG_URL || UPDATE_SOURCES.extension
+      : UPDATE_SOURCES[component as UpdateComponent];
   const response = await fetch(source, {
     signal: AbortSignal.timeout(1500),
   });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const payload = (await response.json()) as { version?: unknown; latestVersion?: unknown };
-  const version = component === 'extension' ? (payload.latestVersion ?? payload.version) : payload.version;
+  const version =
+    component === 'extension' ? (payload.latestVersion ?? payload.version) : payload.version;
   if (!parseReleaseVersion(version)) throw new Error('Invalid release version');
   return version as string;
 }

@@ -49,7 +49,7 @@ it.each([
   await writeFile(resolve(extension, 'manifest.json'), JSON.stringify({ manifest_version: 3, version: chromeVersion, version_name: version }));
   const release = await packRelease(workspace, output, channel, env);
   expect(release.packages.map(value => value.name).sort()).toEqual(['@mearl/client', '@mearl/mcp-server']);
-  expect(release.assets.map(value => value.file)).toContain(`mearl-chrome-v${version}.zip`);
+  expect(release.assets.map(value => value.file).sort()).toEqual(['LICENSE', `mearl-chrome-v${version}.zip`]);
   const checked = await verifyRelease(source, output, channel, env);
   expect(checked.args).toContain(`--publish-branch=${branch}`);
   expect(checked.args).toContain(channel === 'patch' ? 'latest' : 'beta');

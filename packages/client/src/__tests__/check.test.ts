@@ -41,23 +41,43 @@ describe('runUnifiedCheck', () => {
   it.each([
     { source: undefined, payload: { version: '3.1.0' } },
     { source: 'https://releases.example.com/config.json', payload: { latestVersion: '3.1.0' } },
-  ])('reads public package metadata or a configured extension release source ($source)', async ({ source, payload }) => {
-    if (source) vi.stubEnv('MEARL_EXTENSION_CONFIG_URL', source);
-    else vi.stubEnv('MEARL_EXTENSION_CONFIG_URL', '');
-    const fetcher = vi.fn(async (url: string) => ({ ok: true, json: async () => url.includes('registry.npmjs.org') ? { version: '3.1.0' } : payload }));
-    vi.stubGlobal('fetch', fetcher);
-    try {
-      const { dependencies } = createDependencies(async action => {
-        if (action === 'browser_list') return { connectedCount: 1, browsers: [BROWSERS[0]] };
-        if (action === 'get_versions') return { nativeHost: '3.0.0', extension: '3.0.0' };
-        throw new Error(`unexpected ${action}`);
-      });
-      const result = await runUnifiedCheck({ clientVersion: '3.0.0', checkUpdates: true, json: true }, { ...dependencies, writeJson: () => {} });
-      expect(result.ok).toBe(true);
-      expect(result.updates?.find(item => item.component === 'extension')).toMatchObject({ installed: '3.0.0', latest: '3.1.0', status: 'available' });
-      expect(fetcher.mock.calls.some(([url]) => url === (source ?? 'https://github.com/mearlhq/mearl/releases/latest/download/config.json'))).toBe(true);
-    } finally { vi.unstubAllGlobals(); vi.unstubAllEnvs(); }
-  });
+  ])(
+    'reads public package metadata or a configured extension release source ($source)',
+    async ({ source, payload }) => {
+      if (source) vi.stubEnv('MEARL_EXTENSION_CONFIG_URL', source);
+      else vi.stubEnv('MEARL_EXTENSION_CONFIG_URL', '');
+      const fetcher = vi.fn(async (url: string) => ({
+        ok: true,
+        json: async () => (url.includes('registry.npmjs.org') ? { version: '3.1.0' } : payload),
+      }));
+      vi.stubGlobal('fetch', fetcher);
+      try {
+        const { dependencies } = createDependencies(async action => {
+          if (action === 'browser_list') return { connectedCount: 1, browsers: [BROWSERS[0]] };
+          if (action === 'get_versions') return { nativeHost: '3.0.0', extension: '3.0.0' };
+          throw new Error(`unexpected ${action}`);
+        });
+        const result = await runUnifiedCheck(
+          { clientVersion: '3.0.0', checkUpdates: true, json: true },
+          { ...dependencies, writeJson: () => {} },
+        );
+        expect(result.ok).toBe(true);
+        expect(result.updates?.find(item => item.component === 'extension')).toMatchObject({
+          installed: '3.0.0',
+          latest: '3.1.0',
+          status: 'available',
+        });
+        expect(
+          fetcher.mock.calls.some(
+            ([url]) => url === (source ?? 'https://mearlhq.github.io/mearl/config.json'),
+          ),
+        ).toBe(true);
+      } finally {
+        vi.unstubAllGlobals();
+        vi.unstubAllEnvs();
+      }
+    },
+  );
 
   it.each([{ local: true }, {}, { local: true, serverUrl: 'wss://example.com' }])(
     'includes offline launcher diagnostics for local discovery: %j',
