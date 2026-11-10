@@ -3,7 +3,10 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 const mocks = vi.hoisted(() => ({ settings: {} as any }));
-vi.mock('../../utils/browserUiSettings', () => ({ useBrowserUiSettings: () => mocks.settings }));
+vi.mock('../../utils/browserUiSettings', () => ({
+  useBrowserUiSettings: () => mocks.settings,
+  useSetupManagement: () => mocks.settings.setup,
+}));
 vi.mock('../../utils/i18n', () => ({
   t: (key: string, value?: string) => (value ? `${key}: ${value}` : key),
 }));
@@ -61,3 +64,21 @@ it.each([undefined, 'https://docs.example.test/agent'])(
     ).toBeInTheDocument();
   },
 );
+
+it('uses the preset registry for both setup display and copy', async () => {
+  mocks.settings = {
+    setup: {
+      package: '@example/setup',
+      version: 'latest',
+      registry: 'https://registry.example.test/',
+    },
+  };
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+  render(<AgentStatusModal isOpen agentConnected={false} onClose={() => {}} />);
+  const command = 'npx --registry=https://registry.example.test/ @example/setup@latest';
+  const code = screen.getByText(command);
+  expect(code).toBeInTheDocument();
+  fireEvent.click(code.parentElement!.querySelector('button')!);
+  expect(writeText).toHaveBeenCalledWith(command);
+});

@@ -71,7 +71,7 @@ it('keeps unsupported settings pending instead of reporting them as applied', ()
   });
 });
 
-it('keeps local setup management out of browser readiness', () => {
+it('exposes setup guidance without affecting browser readiness', () => {
   const management = {
     setup: {
       package: '@example/setup',
@@ -81,6 +81,7 @@ it('keeps local setup management out of browser readiness', () => {
     },
   };
   expect(resolveBrowserPresetSettings({ management }, {}, available)).toEqual({
+    setup: management.setup,
     simulation: {},
     pending: [],
   });

@@ -1,3 +1,4 @@
+import { setupManagementCommand } from '@mearl/preset';
 import { getExtensionVersion, setupCommand } from '../../../shared/extensionVersion';
 import { FC, useState, useEffect } from 'react';
 import { CheckCircle, ExternalLink, Link, Link2Off, Loader2 } from 'lucide-react';
@@ -13,7 +14,7 @@ import { clsx } from 'clsx';
 import { useCloudConnectorStatus } from '../hooks/useCloudConnectorStatus';
 import { getConfig, updateConfig } from '../utils/config';
 import { showToast } from '../utils/toast';
-import { useBrowserUiSettings } from '../utils/browserUiSettings';
+import { useBrowserUiSettings, useSetupManagement } from '../utils/browserUiSettings';
 import { extractCloudConnectorUrl } from '../utils/cloudConnectorInput';
 
 interface AgentStatusModalProps {
@@ -87,7 +88,6 @@ const AgentCapabilities: FC = () => (
 
 const version = getExtensionVersion();
 const MCP_SETUP_BASE_COMMAND = `npx @mearl/mcp-server${version.includes('-beta.') ? '@beta' : ''} configure`;
-const SKILL_CLI_COMMAND = setupCommand();
 
 export const AgentStatusModal: FC<AgentStatusModalProps> = ({
   isOpen,
@@ -97,6 +97,8 @@ export const AgentStatusModal: FC<AgentStatusModalProps> = ({
   size = 'default',
 }) => {
   const settings = useBrowserUiSettings();
+  const setup = useSetupManagement();
+  const skillCliCommand = setup ? setupManagementCommand(setup) : setupCommand();
   const skillAgentPrompt = t('skillSetupAgentPrompt', settings.links?.skillSetup ?? MEARL_DOC_URL);
   const [extensionId, setExtensionId] = useState<string>(DEFAULT_EXTENSION_ID);
   const shouldShowExtensionId = extensionId !== DEFAULT_EXTENSION_ID;
@@ -365,13 +367,16 @@ export const AgentStatusModal: FC<AgentStatusModalProps> = ({
                     </div>
                   ) : (
                     <div className="bg-bg-primary rounded border border-border p-2.5 font-mono text-xs flex items-center justify-between gap-2">
-                      <code className="min-w-0 flex-1 truncate text-text-primary">
-                        {skillSetupMode === 'cli' ? SKILL_CLI_COMMAND : skillAgentPrompt}
+                      <code
+                        className={clsx(
+                          'min-w-0 flex-1 text-text-primary',
+                          skillSetupMode === 'cli' ? 'whitespace-normal break-all' : 'truncate',
+                        )}
+                      >
+                        {skillSetupMode === 'cli' ? skillCliCommand : skillAgentPrompt}
                       </code>
                       <CopyButton
-                        text={
-                          skillSetupMode === 'cli' ? SKILL_CLI_COMMAND : skillAgentPrompt
-                        }
+                        text={skillSetupMode === 'cli' ? skillCliCommand : skillAgentPrompt}
                         iconOnly
                         size="sm"
                       />
@@ -425,7 +430,6 @@ export const AgentStatusModal: FC<AgentStatusModalProps> = ({
           </a>
         </ModalFooter>
       </Modal>
-
     </>
   );
 };

@@ -1,3 +1,4 @@
+import { parseSetupManagement, type SetupManagement } from '@mearl/preset';
 import { useEffect, useSyncExternalStore } from 'react';
 import { parseBrowserUiSettings, type BrowserUiSettings } from '../../../shared/browserUiSettings';
 import { BROWSER_REQUEST_UI_CHANGED } from '../../../shared/browserRequestUi';
@@ -11,6 +12,7 @@ import { parseAppProfileMenu, type AppProfileMenuEntry } from '../../../shared/a
 
 let settings: BrowserUiSettings = {};
 let cacheScope: string | undefined;
+let setup: SetupManagement | undefined;
 let browserControl: SelectedBrowserControl | undefined;
 let appProfiles: AppProfileMenuEntry[] = [];
 let loaded = false;
@@ -56,6 +58,7 @@ export function refreshBrowserUiSettings(): Promise<BrowserUiSettings> {
           definition: validateBrowserControl(response.browserControl.definition),
         };
       }
+      setup = parseSetupManagement(response.setup ? { setup: response.setup } : undefined);
       settings = nextSettings;
       cacheScope = typeof response.cacheScope === 'string' ? response.cacheScope : undefined;
       browserControl = nextControl;
@@ -93,6 +96,10 @@ export function useBrowserUiSettings() {
     void ensureBrowserUiSettings().catch(console.warn);
   }, []);
   return value;
+}
+export function useSetupManagement() {
+  useBrowserUiSettings();
+  return setup;
 }
 export function useBrowserControl(_text: (key: string) => string) {
   useBrowserUiSettings();

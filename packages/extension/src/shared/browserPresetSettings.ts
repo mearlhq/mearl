@@ -1,4 +1,10 @@
-import { mergePresetDefaults, resolveCapabilityConfig, type JsonObject } from '@mearl/preset';
+import {
+  mergePresetDefaults,
+  resolveCapabilityConfig,
+  parseSetupManagement,
+  type SetupManagement,
+  type JsonObject,
+} from '@mearl/preset';
 import { parseBrowserUiSettings, type BrowserUiSettings } from './browserUiSettings';
 import { BundleError } from '@mearl/preset/bundles';
 import {
@@ -10,6 +16,7 @@ import {
 } from './quickAppProfile';
 
 export interface BrowserPresetSettings {
+  setup?: SetupManagement;
   services?: Record<string, boolean>;
   extension?: BrowserUiSettings;
   simulation: {
@@ -27,7 +34,8 @@ export function resolveBrowserPresetSettings(
 ): BrowserPresetSettings {
   const value = mergePresetDefaults(defaults, overrides);
   const settings: BrowserPresetSettings = { simulation: {}, pending: [] };
-  // Installation management is consumed by the local setup host.
+  const setup = parseSetupManagement(value.management);
+  if (setup) settings.setup = setup;
   for (const key of Object.keys(value)) {
     if (!['simulation', 'services', 'extension', 'capabilities', 'management'].includes(key))
       settings.pending.push(key);

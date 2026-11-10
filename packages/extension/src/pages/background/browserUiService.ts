@@ -126,6 +126,7 @@ export async function handleBrowserUiService(
           ...(operations ? { operations } : {}),
           ...(logins ? { logins } : {}),
         },
+        setup: settings.setup,
         cacheScope: settings.cacheScope,
         appProfiles: parseAppProfileMenu(settings.appProfiles ?? []),
         browserControl: settings.browserControl,
