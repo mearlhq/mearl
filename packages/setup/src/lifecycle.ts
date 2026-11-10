@@ -526,10 +526,7 @@ async function executeLifecycle(
     !dependencies.prepareSkills &&
     (!options.targetLine || Number(options.targetLine.split('.')[0]) >= 3);
   const selectsInitialPreset =
-    preparesPreset &&
-    !options.skipSkill &&
-    !env.MEARL_AUTO_UPDATE_CLIENT_ROOT &&
-    !env.MEARL_AUTO_UPDATE_PROFILES;
+    preparesPreset && !env.MEARL_AUTO_UPDATE_CLIENT_ROOT && !env.MEARL_AUTO_UPDATE_PROFILES;
   let stagedPreset: StagedPresetInstallation | undefined;
   if (
     preparesPreset ||

@@ -1377,78 +1377,102 @@ it('installs exact beta runtime packages by default without selecting latest', a
   expect(commands.flat().some(value => String(value).endsWith('@latest'))).toBe(false);
 });
 
-it('adopts a browser preset after initializing the runtime and before any Skill installation', async () => {
-  setupRelease.SETUP_VERSION = '3.0.0-beta.5';
-  const deps = dependencies(new Map());
-  deps.detectPackage = vi.fn(() => detectedPackage('local'));
-  const status = { revision: 'a'.repeat(64), ready: false } as any;
-  const activate = vi.fn(async () => status);
-  deps.prepareBrowserPreset.mockImplementation(async () => {
-    deps.readManagement.mockResolvedValue({
-      setup: undefined,
-      source: undefined,
-      revision: status.revision,
+it.each([false, true])(
+  'adopts a browser preset after initializing the runtime (skipSkill=%s)',
+  async skipSkill => {
+    setupRelease.SETUP_VERSION = '3.0.0-beta.5';
+    const deps = dependencies(new Map());
+    deps.detectPackage = vi.fn(() => detectedPackage('local'));
+    const status = { revision: 'a'.repeat(64), ready: false } as any;
+    const activate = vi.fn(async () => status);
+    deps.prepareBrowserPreset.mockImplementation(async () => {
+      deps.readManagement.mockResolvedValue({
+        setup: undefined,
+        source: undefined,
+        revision: status.revision,
+      });
+      return { revision: status.revision, activate };
     });
-    return { revision: status.revision, activate };
-  });
-  const onPresetStatus = vi.fn();
-  expect(
-    await runMearlLifecycle(
-      { operation: 'install', defaultPresetSource: 'https://default.example.test/preset.json' },
-      { ...deps, onPresetStatus },
-    ),
-  ).toBe(true);
-  expect(deps.runCommand.mock.invocationCallOrder.at(-1)).toBeLessThan(
-    deps.prepareBrowserPreset.mock.invocationCallOrder[0],
-  );
-  expect(deps.installManagedPlugins).not.toHaveBeenCalled();
-  expect(onPresetStatus).toHaveBeenCalledWith(status);
-  expect(deps.preparePreset).toHaveBeenCalledOnce();
-});
+    const onPresetStatus = vi.fn();
+    expect(
+      await runMearlLifecycle(
+        {
+          operation: 'install',
+          defaultPresetSource: 'https://default.example.test/preset.json',
+          skipSkill,
+        },
+        { ...deps, onPresetStatus },
+      ),
+    ).toBe(true);
+    expect(deps.runCommand.mock.invocationCallOrder.at(-1)).toBeLessThan(
+      deps.prepareBrowserPreset.mock.invocationCallOrder[0],
+    );
+    expect(deps.installManagedPlugins).not.toHaveBeenCalled();
+    expect(onPresetStatus).toHaveBeenCalledWith(status);
+    expect(deps.preparePreset).toHaveBeenCalledOnce();
+    expect(activate).toHaveBeenCalledOnce();
+    if (skipSkill) expect(deps.runSkillOperation).not.toHaveBeenCalled();
+  },
+);
 
-it('uses the distribution default only when no browser selection was adopted', async () => {
-  setupRelease.SETUP_VERSION = '3.0.0-beta.5';
-  const deps = dependencies(new Map());
-  deps.detectPackage = vi.fn(() => detectedPackage('local'));
-  const activate = vi.fn(async () => ({ revision: 'a'.repeat(64), ready: true }) as any);
-  deps.preparePreset.mockResolvedValueOnce(undefined).mockImplementationOnce(async () => {
-    deps.readManagement.mockResolvedValue({
-      setup: undefined,
-      source: undefined,
-      revision: 'a'.repeat(64),
+it.each([false, true])(
+  'uses the distribution default only when no browser selection was adopted (skipSkill=%s)',
+  async skipSkill => {
+    setupRelease.SETUP_VERSION = '3.0.0-beta.5';
+    const deps = dependencies(new Map());
+    deps.detectPackage = vi.fn(() => detectedPackage('local'));
+    const activate = vi.fn(async () => ({ revision: 'a'.repeat(64), ready: true }) as any);
+    deps.preparePreset.mockResolvedValueOnce(undefined).mockImplementationOnce(async () => {
+      deps.readManagement.mockResolvedValue({
+        setup: undefined,
+        source: undefined,
+        revision: 'a'.repeat(64),
+      });
+      return { revision: 'a'.repeat(64), activate };
     });
-    return { revision: 'a'.repeat(64), activate };
-  });
-  expect(
-    await runMearlLifecycle(
-      { operation: 'install', defaultPresetSource: 'https://default.example.test/preset.json' },
-      deps,
-    ),
-  ).toBe(true);
-  expect(deps.preparePreset).toHaveBeenLastCalledWith(
-    expect.objectContaining({ fallbackSource: 'https://default.example.test/preset.json' }),
-  );
-  expect(deps.prepareBrowserPreset.mock.invocationCallOrder[0]).toBeLessThan(
-    deps.preparePreset.mock.invocationCallOrder[1],
-  );
-  expect(activate).toHaveBeenCalledOnce();
-});
+    expect(
+      await runMearlLifecycle(
+        {
+          operation: 'install',
+          defaultPresetSource: 'https://default.example.test/preset.json',
+          skipSkill,
+        },
+        deps,
+      ),
+    ).toBe(true);
+    expect(deps.preparePreset).toHaveBeenLastCalledWith(
+      expect.objectContaining({ fallbackSource: 'https://default.example.test/preset.json' }),
+    );
+    expect(deps.prepareBrowserPreset.mock.invocationCallOrder[0]).toBeLessThan(
+      deps.preparePreset.mock.invocationCallOrder[1],
+    );
+    expect(activate).toHaveBeenCalledOnce();
+    if (skipSkill) expect(deps.runSkillOperation).not.toHaveBeenCalled();
+  },
+);
 
-it('stops before fallback defaults or Skills if browser preset discovery fails', async () => {
-  setupRelease.SETUP_VERSION = '3.0.0-beta.5';
-  const deps = dependencies(new Map());
-  deps.detectPackage = vi.fn(() => detectedPackage('local'));
-  deps.prepareBrowserPreset.mockRejectedValueOnce(new Error('different presets'));
-  expect(
-    await runMearlLifecycle(
-      { operation: 'install', defaultPresetSource: 'https://default.example.test/preset.json' },
-      deps,
-    ),
-  ).toBe(false);
-  expect(deps.preparePreset).toHaveBeenCalledOnce();
-  expect(deps.installManagedPlugins).not.toHaveBeenCalled();
-  expect(deps.runSkillOperation).not.toHaveBeenCalled();
-});
+it.each([false, true])(
+  'stops before fallback defaults or Skills if browser preset discovery fails (skipSkill=%s)',
+  async skipSkill => {
+    setupRelease.SETUP_VERSION = '3.0.0-beta.5';
+    const deps = dependencies(new Map());
+    deps.detectPackage = vi.fn(() => detectedPackage('local'));
+    deps.prepareBrowserPreset.mockRejectedValueOnce(new Error('different presets'));
+    expect(
+      await runMearlLifecycle(
+        {
+          operation: 'install',
+          defaultPresetSource: 'https://default.example.test/preset.json',
+          skipSkill,
+        },
+        deps,
+      ),
+    ).toBe(false);
+    expect(deps.preparePreset).toHaveBeenCalledOnce();
+    expect(deps.installManagedPlugins).not.toHaveBeenCalled();
+    expect(deps.runSkillOperation).not.toHaveBeenCalled();
+  },
+);
 
 it('does not adopt a browser preset during an unattended runtime update', async () => {
   setupRelease.SETUP_VERSION = '3.0.0-beta.5';
@@ -1469,6 +1493,7 @@ it('does not adopt a browser preset during an unattended runtime update', async 
       operation: 'update',
       defaultPresetSource: 'https://default.example.test/preset.json',
       skipSkill: true,
+      env: { MEARL_AUTO_UPDATE_CLIENT_ROOT: '/runtime/client' },
     },
     deps,
   );
