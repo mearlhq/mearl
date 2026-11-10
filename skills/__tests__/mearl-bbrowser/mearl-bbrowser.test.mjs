@@ -192,6 +192,20 @@ describe('bbrowser plugin commands and browser execution', () => {
     expect(invoke.mock.calls.slice(1).every(([, , options]) => options.browser === 'fixed')).toBe(true);
   });
 
+  it('uses the toolbox host browser without discovering or overriding its routing', async () => {
+    const item = adapter(adapterDirectories().sources.at(-1).directory);
+    const invoke = vi.fn(async action => {
+      if (action === 'tab_list') return { tabs: [] };
+      if (action === 'tab_open') return { tabId: 12, url: 'https://example.test/' };
+      if (action === 'page_eval') return { result: { ok: true } };
+      throw new Error(`Unknown action: ${action}`);
+    });
+    const runtime = await loadPlugin(entry, { options: {}, invoke, progress: vi.fn() });
+    await expect(runtime.runToolbox({ command: 'execute', input: { tokens: ['run', item.file] } })).resolves.toEqual({ result: { ok: true } });
+    expect(invoke.mock.calls.map(([action]) => action)).toEqual(['tab_list', 'tab_open', 'page_eval']);
+    expect(invoke.mock.calls.every(([, , options]) => options.browser === undefined)).toBe(true);
+  });
+
   it('creates a control session once and returns it with adapter errors without retrying', async () => {
     const item = adapter(adapterDirectories().sources.at(-1).directory);
     const session = { sessionId: 's_fixed', browserId: 'browser', status: 'active' };

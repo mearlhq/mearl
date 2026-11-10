@@ -1,0 +1,51 @@
+* { box-sizing: border-box; }
+body { margin: 0; color: var(--mearl-text-primary); background: var(--mearl-bg-primary); font: .75rem/1.5 system-ui, sans-serif; }
+button, input, textarea { font: inherit; color: inherit; border: 1px solid var(--mearl-border); border-radius: 5px; background: var(--mearl-bg-primary); min-height: 30px; padding: 5px 8px; }
+button { position: relative; cursor: pointer; } button:hover { background: var(--mearl-bg-hover); } button:disabled { opacity: .5; cursor: default; }
+:focus-visible { outline: 2px solid var(--mearl-accent); outline-offset: -2px; }
+input:focus-visible, textarea:focus-visible { outline-width: 1px; outline-offset: -1px; }
+.primary { background: var(--mearl-action-primary); color: var(--mearl-action-primary-text); border-color: transparent; }
+.primary:hover { background: var(--mearl-action-primary-hover); }
+.shell { height: 100dvh; max-width: 1200px; margin: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.toolbar, .actions, .heading { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.search-field { position: relative; flex: 1; min-width: 140px; }
+.search-field input { padding-right: 64px; }
+.catalog-count { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); padding: 0 5px; border-radius: 3px; background: var(--mearl-bg-secondary); color: var(--mearl-text-secondary); font-variant-numeric: tabular-nums; }
+.workspace { display: grid; grid-template-columns: minmax(200px, 30%) minmax(0, 1fr); gap: 12px; flex: 1; min-height: 0; }
+.list, .detail { overflow: auto; min-width: 0; }
+.list { border-right: 1px solid var(--mearl-border); padding-right: 10px; }
+.group { margin: 12px 0 6px; color: var(--mearl-text-secondary); overflow-wrap: anywhere; }
+.list > section:first-child .group { margin-top: 0; }
+.adapter { display: block; width: 100%; text-align: left; margin: 4px 0; }
+.adapter[aria-pressed=true] { border-color: var(--mearl-accent); background: var(--mearl-bg-hover); }
+.adapter strong, .adapter small { display: block; overflow-wrap: anywhere; }
+.adapter .adapter-description { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+small, .muted { color: var(--mearl-text-secondary); }
+h2 { font-size: .875rem; margin: 0; overflow-wrap: anywhere; } p { margin: 8px 0; overflow-wrap: anywhere; }
+.badge { padding: 2px 6px; border-radius: 4px; background: var(--mearl-bg-secondary); color: var(--mearl-text-secondary); }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 10px; margin: 12px 0; }
+.fields .target-tab, .fields > label:has(textarea), .fields > small { grid-column: 1 / -1; }
+label { display: grid; gap: 4px; overflow-wrap: anywhere; } input, textarea { width: 100%; min-width: 0; } textarea { resize: vertical; }
+.detail { display: flex; flex-direction: column; gap: 10px; }
+.content { overflow: auto; min-height: 0; flex: 1; }
+.actions { border-top: 1px solid var(--mearl-border); padding-top: 10px; flex-shrink: 0; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--mearl-bg-secondary); border: 1px solid var(--mearl-border); padding: 10px; border-radius: 5px; margin: 6px 0; font: .75rem/1.5 ui-monospace, monospace; }
+.command-copy { display: block; width: 100%; margin: 6px 0; padding: 10px; text-align: left; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--mearl-bg-secondary); }
+.command-copy code { display: block; margin: 0; padding: 0; text-indent: 0; font: .75rem/1.5 ui-monospace, monospace; }
+.spinner { position: absolute; left: calc(50% - 6px); top: calc(50% - 6px); width: 12px; height: 12px; color: var(--mearl-text-primary); border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 50%; visibility: hidden; pointer-events: none; }
+button[aria-busy=true] { color: transparent; }
+.primary .spinner { color: var(--mearl-action-primary-text); }
+.spinner.spinning { visibility: visible; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner.spinning { animation: none; } }
+.empty { padding: 24px 12px; color: var(--mearl-text-secondary); text-align: center; }
+.detail > .empty { flex: 1; display: flex; align-items: center; justify-content: center; }
+.back { display: none; }
+@media (max-width: 600px) {
+  .fields { grid-template-columns: minmax(0, 1fr); }
+  .workspace { display: flex; flex-direction: column; }
+  .list { border: 0; padding: 0; flex: 1; }
+  .detail { flex: 1; min-height: 0; }
+  .workspace.selected .list, .workspace:not(.selected) .detail { display: none; }
+  .back { display: inline-block; }
+}

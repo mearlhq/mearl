@@ -30,14 +30,14 @@ export function resolveArguments(adapter, positional = [], named = {}) {
   return args;
 }
 
-export async function executeAdapter(adapter, args, { invoke, options = {}, tabId }) {
+export async function executeAdapter(adapter, args, { invoke, options = {}, tabId, browserBound = false }) {
   if (adapter.domain) domainMatches(`https://${adapter.domain}/`, adapter.domain);
   if (tabId !== undefined && (!Number.isSafeInteger(Number(tabId)) || Number(tabId) < 0 || String(tabId).trim() === '')) throw new Error('tab 必须是有效的 Mearl tabId');
   // Read both files before browser work so one invocation retains its accepted script contents.
   const script = readAdapter(adapter);
   let session = options.session;
   let browser = options.browser;
-  if (!browser && (!session || session === 'new')) {
+  if (!browserBound && !browser && (!session || session === 'new')) {
     const discovered = await invoke('browser_list', {}, { session: undefined });
     browser = discovered?.defaultBrowserId;
     if (!browser) throw new Error('未找到默认浏览器，请用 --browser 指定已连接的浏览器');

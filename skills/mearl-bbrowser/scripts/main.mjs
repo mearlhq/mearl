@@ -1,8 +1,15 @@
 import { adapterDirectories, findAdapter, listAdapters, updateAdapters } from './catalog.mjs';
 import { executeAdapter, resolveArguments } from './runtime.mjs';
+import { existsSync } from 'node:fs';
 
 export const name = 'bbrowser';
 export const description = '通过 Mearl 扩展或 CDP 运行 bb-browser 站点适配器';
+
+export const toolbox = {
+  version: 1, title: '站点适配器', description: '浏览、安装和试用 bb-browser 站点适配器', icon: 'globe',
+  locales: { en: { title: 'Site adapters', description: 'Browse, install and try bb-browser site adapters' } },
+  page: { type: 'sandbox', runtime: 'preact', entry: 'assets/toolbox/index.html', commands: ['site', 'catalog', 'execute'] },
+};
 
 const help = {
   usage: 'mearl bbrowser site <name> [args...] [--tab <tabId>]',
@@ -11,7 +18,10 @@ const help = {
 };
 
 export default function register(app) {
-  app.command('site [tokens...]', async input => {
+  app.toolboxCommand('catalog', () => ({
+    installed: existsSync(adapterDirectories().community), adapters: listAdapters(),
+  }), '读取工具箱站点列表与社区库安装状态');
+  const runSite = async (input, browserBound = false) => {
     const { tokens = [], tab, args = {}, ...named } = input;
     if (!Array.isArray(tokens) || tokens.some(value => typeof value !== 'string')) throw new Error('tokens 必须是字符串数组');
     if (!args || typeof args !== 'object' || Array.isArray(args)) throw new Error('args 必须是参数对象');
@@ -46,8 +56,10 @@ export default function register(app) {
     for (const key of Object.keys(named)) {
       if (Object.hasOwn(args, key)) throw new Error(`参数不能重复传入: ${key}`);
     }
-    return executeAdapter(adapter, resolveArguments(adapter, positional, { ...args, ...named }), { invoke: app.invoke, options: app.options, tabId: tab });
-  }, '兼容 bb-browser site：list / search / info / update / run；支持 tab 和适配器命名参数。宿主选项同名参数通过 payload 的 args 对象传入', [
+    return executeAdapter(adapter, resolveArguments(adapter, positional, { ...args, ...named }), { invoke: app.invoke, options: app.options, tabId: tab, browserBound });
+  };
+  app.toolboxCommand('execute', input => runSite(input, true), '在工具箱当前浏览器中执行适配器');
+  app.command('site [tokens...]', input => runSite(input), '兼容 bb-browser site：list / search / info / update / run；支持 tab 和适配器命名参数。宿主选项同名参数通过 payload 的 args 对象传入', [
     'site example-shop/whoami',
     'site info zhihu/hot',
     'site zhihu/hot 10',
