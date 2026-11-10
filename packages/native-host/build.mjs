@@ -61,6 +61,11 @@ const builds = await Promise.all([
   }),
   esbuild.build({
     ...sharedOptions,
+    entryPoints: [resolve(__dirname, 'src/external-page-host.ts')],
+    outfile: resolve(__dirname, 'dist/external-page-host.js'),
+  }),
+  esbuild.build({
+    ...sharedOptions,
     entryPoints: [resolve(__dirname, 'src/install.ts')],
     outfile: resolve(__dirname, 'dist/install.js'),
   }),

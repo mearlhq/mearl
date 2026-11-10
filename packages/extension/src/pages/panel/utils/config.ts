@@ -5,6 +5,11 @@
 import { DEFAULT_QUERY_PRESETS, type UrlQueryPreset } from './urlQueryPresets';
 import { toError } from './errors';
 import {
+  AGENT_ACCESS_PREFERENCE,
+  AGENT_ACCESS_PROVIDERS,
+  readAgentAccess,
+} from '../../../shared/agentAccess';
+import {
   getBrowserRequestUiState,
   ensureBrowserRequestUiState,
   subscribeBrowserRequestUi,
@@ -59,7 +64,9 @@ export const DEFAULT_CONFIG: ExtensionConfig = {
 /**
  * 获取扩展配置
  */
-export const getConfig = async ({ localOnly = false }: { localOnly?: boolean } = {}): Promise<ExtensionConfig> => {
+export const getConfig = async ({
+  localOnly = false,
+}: { localOnly?: boolean } = {}): Promise<ExtensionConfig> => {
   const requestUi = localOnly ? getBrowserRequestUiState() : await ensureBrowserRequestUiState();
   // 自动默认值不能作为 storage.get 的回退值，否则无法识别用户偏好是否存在。
   const defaults = {
@@ -80,27 +87,33 @@ export const getConfig = async ({ localOnly = false }: { localOnly?: boolean } =
   ]);
   // 首屏使用已安装默认值；后台刷新通过 storage.onChanged 更新已打开的页面。
   if (!localOnly) {
-    void Promise.resolve(chrome.runtime.sendMessage({ action: SERVICE_DEFAULTS_REFRESH_ACTION })).catch(
-      () => {},
-    );
+    void Promise.resolve(
+      chrome.runtime.sendMessage({ action: SERVICE_DEFAULTS_REFRESH_ACTION }),
+    ).catch(() => {});
   }
   const preference = requestUi.definition ? items[requestUi.definition.setting.key] : false;
   const services = resolveExternalServices(items, cache);
-  const metadataDefault = !!requestUi.definition && isValidServiceDefaultsCache(cache) && cache.services?.[requestUi.definition.setting.key] === true;
+  const metadataDefault =
+    !!requestUi.definition &&
+    isValidServiceDefaultsCache(cache) &&
+    cache.services?.[requestUi.definition.setting.key] === true;
   return {
     ...DEFAULT_CONFIG,
     ...items,
     ...services,
+    agentEnabled: await readAgentAccess(undefined, items.agentEnabled),
     requestMetadataEnabled:
-      !!requestUi.selected && (typeof preference === 'boolean'
-        ? preference
-        : metadataDefault),
+      !!requestUi.selected && (typeof preference === 'boolean' ? preference : metadataDefault),
   };
 };
 
 /** 仅保存用户修改的字段；外部服务偏好由后台按当前默认值归一化。 */
 export const updateConfig = async (config: Partial<ExtensionConfig>): Promise<void> => {
   const values = { ...config };
+  if (typeof values.agentEnabled === 'boolean') {
+    await chrome.storage.local.set({ [AGENT_ACCESS_PREFERENCE]: values.agentEnabled });
+    delete values.agentEnabled;
+  }
   if (typeof values.requestMetadataEnabled === 'boolean' && getBrowserRequestUiState().selected) {
     await updateBrowserRequestUiPreference(values.requestMetadataEnabled);
     delete values.requestMetadataEnabled;
@@ -140,6 +153,7 @@ export const onConfigChange = (
     const config = await getConfig();
     if (disposed || currentRevision !== revision) return;
     callback({
+      agentEnabled: config.agentEnabled,
       accountsEnabled: config.accountsEnabled,
       requestCasesEnabled: config.requestCasesEnabled,
       requestMetadataEnabled: config.requestMetadataEnabled,
@@ -148,6 +162,12 @@ export const onConfigChange = (
     });
   };
   const listener = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
+    if (
+      (areaName === 'local' &&
+        (changes[AGENT_ACCESS_PREFERENCE] || changes[AGENT_ACCESS_PROVIDERS])) ||
+      (areaName === 'sync' && changes.agentEnabled)
+    )
+      void refreshServices();
     if (areaName === 'session' && changes[SERVICE_DEFAULTS_CACHE_KEY]) {
       void refreshServices();
       return;
@@ -156,13 +176,19 @@ export const onConfigChange = (
     const configChanges: Partial<ExtensionConfig> = {};
     const keys = [...Object.keys(DEFAULT_CONFIG), 'cloudServerUrl'] as (keyof ExtensionConfig)[];
     for (const key of keys) {
-      if (EXTERNAL_SERVICE_KEYS.some(service => service === key) || !changes[key]) continue;
+      if (
+        key === 'agentEnabled' ||
+        EXTERNAL_SERVICE_KEYS.some(service => service === key) ||
+        !changes[key]
+      )
+        continue;
       Object.assign(configChanges, { [key]: changes[key].newValue ?? DEFAULT_CONFIG[key] });
     }
     if (Object.keys(configChanges).length) callback(configChanges);
     if (
       EXTERNAL_SERVICE_KEYS.some(key => changes[key]) ||
-      (getBrowserRequestUiState().definition && changes[getBrowserRequestUiState().definition!.setting.key])
+      (getBrowserRequestUiState().definition &&
+        changes[getBrowserRequestUiState().definition!.setting.key])
     )
       void refreshServices();
   };

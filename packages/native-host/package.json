@@ -14,6 +14,10 @@
       "default": "./dist/install.js"
     },
     "./runtime": "./dist/index.js",
+    "./external-page-host": {
+      "types": "./dist/external-page-host.d.ts",
+      "import": "./dist/external-page-host.js"
+    },
     "./capabilities": {
       "types": "./dist/node-capabilities.d.ts",
       "import": "./dist/node-capabilities.js"
@@ -31,6 +35,7 @@
     "dist/install.js",
     "dist/install.d.ts",
     "dist/node-capabilities.js",
+    "dist/external-page-host.js",
     "dist/**/*.d.ts",
     "dist/THIRD_PARTY_NOTICES.txt"
   ],

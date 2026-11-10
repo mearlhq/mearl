@@ -7,7 +7,6 @@ Each top-level directory is an independently discoverable Skill. Scripts and too
 | Skill | Plugin name | Function |
 | --- | --- | --- |
 | [mearl](mearl/SKILL.md) | — | Browser control entry point and on-demand operation references |
-| [mearl-ego](mearl-ego/SKILL.md) | — | Client simulation and debugging collaboration between Ego Space and the Mearl extension |
 | [format-converter](format-converter/SKILL.md) | convert | Local timestamps, Base64, images, and URL encoding/decoding |
 | [notes-memory](notes-memory/SKILL.md) | notes | Notes, memory across sessions, and image attachments |
 | [browser-tab-manager](browser-tab-manager/SKILL.md) | tabs | Tab summaries, smart grouping, and controlled tab cleanup |
@@ -34,7 +33,7 @@ Standard Skills installation and Mearl plugin registration are separate operatio
 
 These resources use the existing toolbox contract and require a compatible Mearl host. Node plugins and toolbox services require local components. Browser capability packages can load independently in the extension. TinyPNG uploads images to an external compression service as part of its existing functionality.
 
-Installation sources can specify a release tag to pin the Skill version. Register local script plugins with `setup plugin <actual Skill directory>`. The guidance-only `mearl-ego`, `mearl-skill-creator`, and `mearl-provider-creator` Skills install through standard Skills tools.
+Installation sources can specify a release tag to pin the Skill version. Register local script plugins with `setup plugin <actual Skill directory>`. The guidance-only `mearl-skill-creator` and `mearl-provider-creator` Skills install through standard Skills tools. EgoLite uses the independent `@mearl/provider-ego` and the general Mearl guide.
 
 ## Distribution through skills.sh
 

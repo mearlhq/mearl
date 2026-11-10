@@ -23,13 +23,20 @@ const commandOptions = { encoding: 'utf8', timeout: 300, maxBuffer: 8192 } as co
 const nativeProbe: BrowserIdentityProbe = {
   platform: process.platform,
   parentPid: process.ppid,
-  executable: pid => execFileSync('/bin/ps', ['-p', String(pid), '-o', 'comm='], commandOptions).trim(),
+  executable: pid =>
+    execFileSync('/bin/ps', ['-p', String(pid), '-o', 'comm='], commandOptions).trim(),
   bundleIdentifier: plist =>
-    execFileSync('/usr/libexec/PlistBuddy', ['-c', 'Print :CFBundleIdentifier', plist], commandOptions).trim(),
+    execFileSync(
+      '/usr/libexec/PlistBuddy',
+      ['-c', 'Print :CFBundleIdentifier', plist],
+      commandOptions,
+    ).trim(),
 };
 
 /** Inspect only the Native Messaging host's direct parent, never all running browsers. */
-export function detectNativeBrowserName(probe: BrowserIdentityProbe = nativeProbe): string | undefined {
+export function detectNativeBrowserBundleId(
+  probe: BrowserIdentityProbe = nativeProbe,
+): string | undefined {
   if (probe.platform !== 'darwin' || !Number.isSafeInteger(probe.parentPid) || probe.parentPid <= 1)
     return undefined;
   try {
@@ -39,11 +46,23 @@ export function detectNativeBrowserName(probe: BrowserIdentityProbe = nativeProb
     if (!executable.startsWith('/') || index < 0 || /[\r\n\0]/.test(executable)) return undefined;
     const plist = `${executable.slice(0, index + '.app'.length)}/Contents/Info.plist`;
     const identifier = probe.bundleIdentifier(plist);
-    return Object.hasOwn(MAC_BROWSER_NAMES, identifier) ? MAC_BROWSER_NAMES[identifier] : undefined;
+    return /^[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/.test(identifier) ? identifier : undefined;
   } catch {
     // Missing permissions, an unknown app or an exited parent must not break the handshake.
     return undefined;
   }
+}
+
+export function browserNameForBundle(identifier?: string): string | undefined {
+  return identifier && Object.hasOwn(MAC_BROWSER_NAMES, identifier)
+    ? MAC_BROWSER_NAMES[identifier]
+    : undefined;
+}
+
+export function detectNativeBrowserName(
+  probe: BrowserIdentityProbe = nativeProbe,
+): string | undefined {
+  return browserNameForBundle(detectNativeBrowserBundleId(probe));
 }
 
 /** Cache the bounded probe across extension reconnects; keep the reported name as fallback. */

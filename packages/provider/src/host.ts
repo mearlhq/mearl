@@ -1,4 +1,5 @@
 export {
+  INSTALLED_PROVIDERS_SUBDIR,
   listInstalledProviders,
   validateInstalledProviderManifest,
   registerProviderPackage,

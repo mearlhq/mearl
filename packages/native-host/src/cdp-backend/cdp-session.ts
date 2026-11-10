@@ -21,6 +21,11 @@ import { getCdpPageDialogs, monitorCdpPageDialogs } from './page-dialogs.js';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface PageSession {
+  /** External owners check their native task lease before host-side effects. */
+  assertHostControl?: () => Promise<void>;
+  hostSignal?: AbortSignal;
+  pendingHostRequests?: number;
+  onHostRequestActivity?: (active: boolean) => void;
   tabId: number;
   client: CdpClient | CdpChildSession;
   buffers: CdpBuffers;
@@ -84,7 +89,10 @@ export class CdpSession {
   private pageSessions = new Map<string, PageSession>(); // targetId → PageSession
   private pageSessionPromises = new Map<string, Promise<PageSession>>();
   private pageSessionInitializers = new Set<(session: PageSession) => Promise<void>>();
-  private pageInitialization = new WeakMap<PageSession, { monitor?: Promise<void>; buffers?: Promise<void>; ready: boolean; pending?: Promise<void> }>();
+  private pageInitialization = new WeakMap<
+    PageSession,
+    { monitor?: Promise<void>; buffers?: Promise<void>; ready: boolean; pending?: Promise<void> }
+  >();
   /** Virtual tabId counter → CDP targetId */
   private tabIdMap = new Map<number, string>();
   private nextTabId = 1000;
@@ -300,14 +308,28 @@ export class CdpSession {
     if (!this.isRemote()) {
       try {
         const info = await client.sendCommand('SystemInfo.getProcessInfo', {}, 2000);
-        const pid = info.processInfo?.find((entry: { type: string }) => entry.type === 'browser')?.id;
-        if (Number.isSafeInteger(pid) && pid > 0) this.runtimeBrowserOwner = { browser: client.identity, pid, processIdentity: processIdentity(pid) };
-      } catch { /* Remote or restricted CDP may expose no local browser process. */ }
+        const pid = info.processInfo?.find(
+          (entry: { type: string }) => entry.type === 'browser',
+        )?.id;
+        if (Number.isSafeInteger(pid) && pid > 0)
+          this.runtimeBrowserOwner = {
+            browser: client.identity,
+            pid,
+            processIdentity: processIdentity(pid),
+          };
+      } catch {
+        /* Remote or restricted CDP may expose no local browser process. */
+      }
     }
     try {
       const inventory = await client.sendCommand('Target.getTargets');
-      new NodePageRuntimeStore().reconcile(client.identity, new Set(inventory.targetInfos.map((target: { targetId: string }) => target.targetId)));
-    } catch (error) { console.warn('[cdp] Could not reconcile page runtime references', error); }
+      new NodePageRuntimeStore().reconcile(
+        client.identity,
+        new Set(inventory.targetInfos.map((target: { targetId: string }) => target.targetId)),
+      );
+    } catch (error) {
+      console.warn('[cdp] Could not reconcile page runtime references', error);
+    }
     this.browserClient = client;
     for (const listener of this.browserConnectedListeners) listener();
     client.on('Target.targetDestroyed', (params: any) => {
@@ -323,7 +345,11 @@ export class CdpSession {
         }
       }
       this.pageSessions.delete(params.targetId);
-      try { new NodePageRuntimeStore().release({ browser: client.identity, target: params.targetId }); } catch (error) { console.warn('[cdp] Could not release page runtime reference', error); }
+      try {
+        new NodePageRuntimeStore().release({ browser: client.identity, target: params.targetId });
+      } catch (error) {
+        console.warn('[cdp] Could not release page runtime reference', error);
+      }
     });
 
     return client;
@@ -368,7 +394,15 @@ export class CdpSession {
       client,
       buffers,
       targetId: target.id,
-      runtimeOwner: { ...(this.runtimeBrowserOwner ?? { browser: client instanceof CdpClient ? client.identity : (await this.getBrowserClient()).identity }), target: target.id },
+      runtimeOwner: {
+        ...(this.runtimeBrowserOwner ?? {
+          browser:
+            client instanceof CdpClient
+              ? client.identity
+              : (await this.getBrowserClient()).identity,
+        }),
+        target: target.id,
+      },
       url: target.url,
     };
 
@@ -390,11 +424,18 @@ export class CdpSession {
       stopDialogMonitor();
       this.pageSessions.delete(target.id);
       if (client instanceof CdpChildSession) {
-        await (await this.getBrowserClient()).sendCommand('Target.detachFromTarget', { sessionId: client.sessionId }, 5000).catch(() => {});
+        await (
+          await this.getBrowserClient()
+        )
+          .sendCommand('Target.detachFromTarget', { sessionId: client.sessionId }, 5000)
+          .catch(() => {});
       }
       client.close();
       if (error instanceof Error && error.message === 'CDP command timeout: Page.enable') {
-        throw new Error('Page monitoring could not start. A native dialog opened before attachment may block Chrome; close it manually, then retry.', { cause: error });
+        throw new Error(
+          'Page monitoring could not start. A native dialog opened before attachment may block Chrome; close it manually, then retry.',
+          { cause: error },
+        );
       }
       throw error;
     }
@@ -406,8 +447,12 @@ export class CdpSession {
     const dialogs = getCdpPageDialogs(session);
     const state = this.pageInitialization.get(session);
     if (!state || state.ready || dialogs.pending) return session;
-    try { if (state.monitor) await dialogs.command(() => state.monitor!); }
-    catch (error) { if (dialogs.pending) return session; throw error; }
+    try {
+      if (state.monitor) await dialogs.command(() => state.monitor!);
+    } catch (error) {
+      if (dialogs.pending) return session;
+      throw error;
+    }
     if (dialogs.pending) return session;
     if (!state.pending) {
       const initialize = async () => {
@@ -423,12 +468,16 @@ export class CdpSession {
         dialogs.assertCanDispatch();
         if (!dialogs.pending) state.ready = true;
       };
-      state.pending = dialogs.execute(initialize, false).finally(() => { state.pending = undefined; });
+      state.pending = dialogs.execute(initialize, false).finally(() => {
+        state.pending = undefined;
+      });
     }
-    try { await dialogs.command(() => state.pending!); }
-    catch (error) {
+    try {
+      await dialogs.command(() => state.pending!);
+    } catch (error) {
       if (!dialogs.pending) {
-        if (!dialogs.busy && (error as { code?: string })?.code === 'DIALOG_PENDING') return this.preparePageSession(session);
+        if (!dialogs.busy && (error as { code?: string })?.code === 'DIALOG_PENDING')
+          return this.preparePageSession(session);
         throw error;
       }
     }

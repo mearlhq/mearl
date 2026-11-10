@@ -8,8 +8,20 @@ import {
 
 vi.mock('../browserRequestUiState', async () => {
   const { requestUiFixture } = await import('../../../../test/fixtures/requestUi');
-  const state = { selected: { bundleId: 'metadata-fixture', revision: 'a'.repeat(64), definition: requestUiFixture }, definition: requestUiFixture };
-  return { getBrowserRequestUiState: () => state, ensureBrowserRequestUiState: async () => state, subscribeBrowserRequestUi: () => () => {}, updateBrowserRequestUiPreference: vi.fn() };
+  const state = {
+    selected: {
+      bundleId: 'metadata-fixture',
+      revision: 'a'.repeat(64),
+      definition: requestUiFixture,
+    },
+    definition: requestUiFixture,
+  };
+  return {
+    getBrowserRequestUiState: () => state,
+    ensureBrowserRequestUiState: async () => state,
+    subscribeBrowserRequestUi: () => () => {},
+    updateBrowserRequestUiPreference: vi.fn(),
+  };
 });
 
 let preferences: Record<string, unknown>;
@@ -43,7 +55,9 @@ describe('resolved extension config', () => {
     vi.mocked(chrome.runtime.sendMessage).mockImplementation(() => new Promise(() => {}));
     const config = await getConfig();
     expect(config.requestCasesEnabled).toBe(false);
-    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ action: SERVICE_DEFAULTS_REFRESH_ACTION });
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+      action: SERVICE_DEFAULTS_REFRESH_ACTION,
+    });
     expect(chrome.storage.sync.get).toHaveBeenCalledWith(
       expect.objectContaining({
         accountsEnabled: null,
@@ -61,7 +75,15 @@ describe('resolved extension config', () => {
   });
 
   it('reads fresh defaults and existing user preferences', async () => {
-    cache = {  services: { accountsEnabled: true, requestCasesEnabled: true, requestMetadataEnabled: true, requestImportEnabled: true, trackingMetadataEnabled: true }};
+    cache = {
+      services: {
+        accountsEnabled: true,
+        requestCasesEnabled: true,
+        requestMetadataEnabled: true,
+        requestImportEnabled: true,
+        trackingMetadataEnabled: true,
+      },
+    };
     preferences = { accountsEnabled: false, cloudServerUrl: 'wss://example.com' };
     expect(await getConfig()).toEqual(
       expect.objectContaining({
@@ -76,7 +98,15 @@ describe('resolved extension config', () => {
   });
 
   it('keeps cached modules enabled during bootstrap and subscription until the defaults refresh completes', async () => {
-    cache = {  services: { accountsEnabled: true, requestCasesEnabled: true, requestMetadataEnabled: true, requestImportEnabled: true, trackingMetadataEnabled: true }};
+    cache = {
+      services: {
+        accountsEnabled: true,
+        requestCasesEnabled: true,
+        requestMetadataEnabled: true,
+        requestImportEnabled: true,
+        trackingMetadataEnabled: true,
+      },
+    };
     vi.mocked(chrome.runtime.sendMessage).mockImplementation(() => new Promise(() => {}));
     expect((await getConfig()).accountsEnabled).toBe(true);
     const callback = vi.fn();
@@ -88,7 +118,7 @@ describe('resolved extension config', () => {
       await vi.waitFor(() => expect(callback).toHaveBeenCalledTimes(2));
       expect(callback.mock.calls.every(([config]) => config.accountsEnabled)).toBe(true);
 
-      cache = { };
+      cache = {};
       listener({ [SERVICE_DEFAULTS_CACHE_KEY]: { newValue: cache } }, 'session');
       await vi.waitFor(() =>
         expect(callback).toHaveBeenLastCalledWith(
@@ -113,10 +143,19 @@ describe('resolved extension config', () => {
     const callback = vi.fn();
     const unsubscribe = onConfigChange(callback);
     try {
-      cache = {  services: { accountsEnabled: true, requestCasesEnabled: true, requestMetadataEnabled: true, requestImportEnabled: true, trackingMetadataEnabled: true }};
+      cache = {
+        services: {
+          accountsEnabled: true,
+          requestCasesEnabled: true,
+          requestMetadataEnabled: true,
+          requestImportEnabled: true,
+          trackingMetadataEnabled: true,
+        },
+      };
       listener({ requestCasesEnabled: { oldValue: false } }, 'sync');
       await vi.waitFor(() =>
         expect(callback).toHaveBeenLastCalledWith({
+          agentEnabled: true,
           accountsEnabled: true,
           requestCasesEnabled: true,
           requestMetadataEnabled: true,
@@ -124,11 +163,12 @@ describe('resolved extension config', () => {
           trackingMetadataEnabled: true,
         }),
       );
-      cache = { };
+      cache = {};
       preferences.requestMetadataEnabled = true;
       listener({ [SERVICE_DEFAULTS_CACHE_KEY]: { newValue: cache } }, 'session');
       await vi.waitFor(() =>
         expect(callback).toHaveBeenLastCalledWith({
+          agentEnabled: true,
           accountsEnabled: false,
           requestCasesEnabled: false,
           requestMetadataEnabled: true,
@@ -165,12 +205,21 @@ describe('resolved extension config', () => {
   });
 
   it('picks up defaults published before a page subscribed', async () => {
-    cache = {  services: { accountsEnabled: true, requestCasesEnabled: true, requestMetadataEnabled: true, requestImportEnabled: true, trackingMetadataEnabled: true }};
+    cache = {
+      services: {
+        accountsEnabled: true,
+        requestCasesEnabled: true,
+        requestMetadataEnabled: true,
+        requestImportEnabled: true,
+        trackingMetadataEnabled: true,
+      },
+    };
     const callback = vi.fn();
     const unsubscribe = onConfigChange(callback);
     try {
       await vi.waitFor(() =>
         expect(callback).toHaveBeenCalledWith({
+          agentEnabled: true,
           accountsEnabled: true,
           requestCasesEnabled: true,
           requestMetadataEnabled: true,

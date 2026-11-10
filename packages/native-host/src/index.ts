@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 import { nativeCapabilityDirectory } from './page-runtime-store.js';
-import { createExtensionBrowserNameResolver } from './browser-identity.js';
+import {
+  createExtensionBrowserNameResolver,
+  detectNativeBrowserBundleId,
+  browserNameForBundle,
+} from './browser-identity.js';
+import { watchExtensionAgentPolicy } from './extension-agent-policy.js';
 import { createNativePresetAutoUpdater } from './preset-auto-update.js';
 import { nativeCapabilities } from './native-capability-services.js';
 import { PresetBrowserTransfer } from '@mearl/setup/preset';
@@ -38,6 +43,7 @@ import { CdpPluginPageHost } from './cdp-backend/plugin-pages.js';
 import { releaseCdpControl } from './cdp-backend/release-control.js';
 import {
   isAgentServiceAction,
+  requiresExtensionAgentAccess,
   isExtensionBrowserAction,
   isBrowserCommandAction,
   isToolboxServiceAction,
@@ -1319,9 +1325,34 @@ async function handleExtensionControlMessage(message: any): Promise<void> {
   throw new ExtensionRpcError('UNSUPPORTED_ACTION', `Unknown extension action: ${action}`);
 }
 
-const resolveExtensionBrowserName = createExtensionBrowserNameResolver();
+const nativeBrowserBundleId = isDaemonMode ? undefined : detectNativeBrowserBundleId();
+const resolveExtensionBrowserName = createExtensionBrowserNameResolver(() =>
+  browserNameForBundle(nativeBrowserBundleId),
+);
+let extensionAgentAllowed = false;
+let extensionBrowserRecord: Parameters<typeof registerBrowser>[0] | undefined;
+const extensionAgentPolicy = watchExtensionAgentPolicy(nativeBrowserBundleId, policy => {
+  extensionAgentAllowed = false;
+  unregisterBrowser();
+  sendToExtension({ type: 'agent_policy', policy });
+});
+
+function publishExtensionAccess(enabled: boolean) {
+  extensionAgentAllowed = enabled;
+  if (enabled && extensionBrowserRecord) registerBrowser(extensionBrowserRecord);
+  else unregisterBrowser();
+}
 
 function handleExtensionMessage(message: any): void {
+  if (message?.type === 'agent_access') {
+    if (
+      extensionAgentPolicy.current().available !== false &&
+      message.revision === extensionAgentPolicy.current().revision &&
+      typeof message.enabled === 'boolean'
+    )
+      publishExtensionAccess(message.enabled);
+    return;
+  }
   if (message && message.type === 'ping') {
     extensionRpcVersion = typeof message.rpcVersion === 'number' ? message.rpcVersion : null;
     if (message.version) {
@@ -1333,7 +1364,7 @@ function handleExtensionMessage(message: any): void {
     // Advertise this browser in the shared registry so clients can address it.
     // Older extensions omit browserId; fall back to a single shared identity so
     // they remain discoverable (one browser is the common case).
-    registerBrowser({
+    extensionBrowserRecord = {
       browserId: typeof message.browserId === 'string' ? message.browserId : 'default',
       socketPath: INSTANCE_SOCKET_PATH,
       browserName: resolveExtensionBrowserName(
@@ -1342,7 +1373,12 @@ function handleExtensionMessage(message: any): void {
       nativeHostVersion: NATIVE_HOST_VERSION,
       transport: 'extension',
       extensionVersion: extensionVersion ?? undefined,
-    });
+    };
+    publishExtensionAccess(
+      message.agentAccessProtocol !== 1 &&
+        extensionAgentPolicy.current().available !== false &&
+        extensionAgentPolicy.current().providerIds.length === 0,
+    );
     void presetBrowserTransfer
       .selectedRevision(nativeCapabilities.status().installationRevision)
       .catch(error => {
@@ -1357,6 +1393,7 @@ function handleExtensionMessage(message: any): void {
           rpcVersion: EXTENSION_RPC_VERSION,
           presetInstallationRevision,
           presetInstallationProtocol: PRESET_INSTALLATION_PROTOCOL,
+          agentPolicy: extensionAgentPolicy.current(),
         }),
       );
     nativeHostUpdateCoordinator.evaluate(message.version, message.checkForUpdates);
@@ -1366,7 +1403,7 @@ function handleExtensionMessage(message: any): void {
   // The extension reports window-focus changes so the client can default to the
   // browser the user is actually looking at.
   if (message && message.type === 'browser_focus') {
-    touchFocus();
+    if (extensionAgentAllowed) touchFocus();
     return;
   }
 
@@ -1445,6 +1482,8 @@ function sendRequestToExtension(
   trustedInternal = false,
   controlSource: ControlSource = 'local',
 ): Promise<any> {
+  if (!extensionAgentAllowed && requiresExtensionAgentAccess(action, data, trustedInternal))
+    return Promise.reject(new Error('Extension Agent access is disabled or awaiting coordination'));
   if (
     (trustedInternal || isHostToExtensionAction(action)) &&
     extensionRpcVersion !== EXTENSION_RPC_VERSION
@@ -2083,6 +2122,7 @@ function cleanupAndExit(code: number): void {
   cdpSession?.close();
   agentChatManager?.dispose();
   agentChatManager = null;
+  extensionAgentPolicy.close();
   unregisterBrowser();
   cdpBrowserPublished = false;
   // releaseLegacySocket only unlinks the legacy file if we actually own it, so

@@ -6,6 +6,7 @@ import { join } from 'node:path';
 const hooks = vi.hoisted(() => new Map<string, (...args: any[]) => any>());
 vi.mock('../../native-capability-services.js', () => ({
   nativeCapabilities: {
+    requireCustom: (name: string) => hooks.get(name),
     get: (name: string) => hooks.get(name),
     require: (name: string) => {
       const hook = hooks.get(name);
@@ -356,4 +357,70 @@ it('rejects settings from a child execution context before mutating the top prof
       ([method]) => method === 'Page.reload' || method === 'Page.addScriptToEvaluateOnNewDocument',
     ),
   ).toBe(false);
+});
+
+it('closes pending authorization on handoff and never delivers its result after resume', async () => {
+  const { session, sendCommand, listeners } = createSession();
+  let finish!: (value: Record<string, unknown>) => void;
+  const wait = vi.fn(
+    () =>
+      new Promise<Record<string, unknown>>(resolve => {
+        finish = resolve;
+      }),
+  );
+  const close = vi.fn(async () => {});
+  hooks.set('sample.authorization', () => ({
+    start: async () => ({ browserId: 'auth-fixture', qrSvg: '<svg/>' }),
+    wait,
+    close,
+  }));
+  hooks.set('app.profileCatalog', () => ({
+    namespace: 'fixture',
+    profiles: [
+      {
+        ...APP_PROFILES.wallet,
+        name: 'fixture/wallet',
+        actions: { ...APP_PROFILES.wallet.actions, behaviors: { getAuthCode: 'authCode' } },
+      },
+    ],
+    bindings: { wallet: 'fixture/wallet' },
+  }));
+  const lease = new AbortController();
+  session.hostSignal = lease.signal;
+  session.onHostRequestActivity = vi.fn();
+  session.assertHostControl = vi.fn(async () => {});
+  await cdpSetAppProfile(session, { enabled: true, profile: 'wallet', reload: false });
+  listeners.get('Runtime.bindingCalled')!({
+    name: '__mearlCdpAppProfileRelay',
+    executionContextId: 101,
+    payload: JSON.stringify({ type: 'authCode', requestId: 42, payload: { appId: 'fixture' } }),
+  });
+  await vi.waitFor(() => expect(wait).toHaveBeenCalledOnce());
+  expect(session.onHostRequestActivity).toHaveBeenLastCalledWith(true);
+  lease.abort();
+  await vi.waitFor(() => expect(close).toHaveBeenCalledWith('auth-fixture'));
+  session.hostSignal = new AbortController().signal;
+  sendCommand.mockClear();
+  finish({ authCode: 'must-not-be-delivered' });
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(session.onHostRequestActivity).toHaveBeenLastCalledWith(false);
+  expect(
+    sendCommand.mock.calls.some(([, params]) =>
+      String(params?.expression).includes('APP_BRIDGE_AUTH_CODE_RESPONSE'),
+    ),
+  ).toBe(false);
+  listeners.get('Runtime.bindingCalled')!({
+    name: '__mearlCdpAppProfileRelay',
+    executionContextId: 101,
+    payload: JSON.stringify({ type: 'authCode', requestId: 43, payload: { appId: 'fixture' } }),
+  });
+  await vi.waitFor(() => expect(wait).toHaveBeenCalledTimes(2));
+  finish({ authCode: 'new-approved-fixture' });
+  await vi.waitFor(() =>
+    expect(
+      sendCommand.mock.calls.some(([, params]) =>
+        String(params?.expression).includes('new-approved-fixture'),
+      ),
+    ).toBe(true),
+  );
 });

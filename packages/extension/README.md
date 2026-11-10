@@ -8,6 +8,10 @@ Mearl 的 Chrome 扩展，提供网页调试界面和面向 Agent 的浏览器�
 
 ## 浏览器兼容性
 
+Agent 服务先完成 Native Host 管理握手，再开放页面控制。已安装 Provider 可通过 `extensionAgentDefault.macBundleIds` 声明由它控制的浏览器；macOS 宿主按直接父进程的 Bundle ID 匹配，不使用网页 UA 或运行中的其他浏览器推断。命中后当前浏览器配置默认关闭扩展 Agent 接入，人工调试仍可使用。自动归属和开关偏好存于 `storage.local`，不会同步到其他配置。用户可在设置中明确启用；Provider 离线、卸载或握手失败不会自动夺回控制。识别能力暂限 macOS；其他平台保留原有默认值。
+
+归属变化由本机安装目录事件通知并合并处理，不轮询网页或进程。已有关闭偏好的配置启动时不为协调而连接宿主。升级时需一起更新扩展和 Native Host，并重新注册带该声明的 Provider。
+
 - 扩展需要 Chrome 120 或更高版本。
 - Chrome 120–140 可用快捷键打开 Agent 侧边栏，关闭时请使用 Chrome 侧边栏的关闭按钮。Chrome 141 起支持用快捷键关闭。
 - 设备外壳和带页面运行时的 App 配置需要 Chrome 125 或更高版本。

@@ -348,8 +348,18 @@ function listenForBridgeRequests(
     const contextId =
       typeof params.executionContextId === 'number' ? params.executionContextId : undefined;
     const authKey = `${contextId ?? 'main'}:${requestId}`;
-    const reply = (message: Record<string, unknown>) =>
-      postRuntimeMessage(client, contextId, { requestId, source: 'mearl-content', ...message });
+    // Pin the lease to this request; a later resume must not revive old work.
+    const hostSignal = session.hostSignal;
+    const reply = async (message: Record<string, unknown>) => {
+      hostSignal?.throwIfAborted();
+      await session.assertHostControl?.();
+      hostSignal?.throwIfAborted();
+      return postRuntimeMessage(client, contextId, {
+        requestId,
+        source: 'mearl-content',
+        ...message,
+      });
+    };
 
     if (request.type === 'authCodeCancel') {
       if (!pendingAuth.has(authKey)) return;
@@ -363,6 +373,11 @@ function listenForBridgeRequests(
     }
 
     void (async () => {
+      session.pendingHostRequests = (session.pendingHostRequests ?? 0) + 1;
+      if (session.pendingHostRequests === 1) session.onHostRequestActivity?.(true);
+      hostSignal?.throwIfAborted();
+      await session.assertHostControl?.();
+      hostSignal?.throwIfAborted();
       if (request.type === 'settings') {
         try {
           const top =
@@ -452,6 +467,11 @@ function listenForBridgeRequests(
         if (pendingAuth.has(authKey)) return;
         pendingAuth.add(authKey);
         let browserId = '';
+        const abort = () => {
+          cancelledAuth.add(authKey);
+          if (browserId) void closeAppAuthorization(browserId).catch(() => {});
+        };
+        hostSignal?.addEventListener('abort', abort, { once: true });
         try {
           let progressQueue: Promise<void> = Promise.resolve();
           const pairing = await startAppAuthorization(
@@ -469,6 +489,7 @@ function listenForBridgeRequests(
           );
           await progressQueue;
           browserId = pairing.browserId;
+          hostSignal?.throwIfAborted();
           if (cancelledAuth.has(authKey)) return;
           authSessions.set(authKey, browserId);
           await reply({ type: 'APP_BRIDGE_AUTH_CODE_PAIRING', result: { qrSvg: pairing.qrSvg } });
@@ -500,6 +521,7 @@ function listenForBridgeRequests(
             });
           }
         } finally {
+          hostSignal?.removeEventListener('abort', abort);
           authSessions.delete(authKey);
           cancelledAuth.delete(authKey);
           pendingAuth.delete(authKey);
@@ -624,7 +646,12 @@ function listenForBridgeRequests(
           });
         }
       }
-    })().catch(() => {});
+    })()
+      .catch(() => {})
+      .finally(() => {
+        session.pendingHostRequests = Math.max(0, (session.pendingHostRequests ?? 1) - 1);
+        if (!session.pendingHostRequests) session.onHostRequestActivity?.(false);
+      });
   });
 }
 

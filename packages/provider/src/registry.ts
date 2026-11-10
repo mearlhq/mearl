@@ -203,6 +203,8 @@ export function validateInstalledProviderManifest(
   if (!isProviderBrowserType(manifest.browserType)) {
     return 'browserType is invalid';
   }
+  if (!isExtensionAgentDefault(manifest.extensionAgentDefault))
+    return 'extensionAgentDefault is invalid';
   if (typeof manifest.packageName !== 'string' || !manifest.packageName.trim()) {
     return 'packageName is required';
   }
@@ -253,7 +255,10 @@ function isProviderBrowserType(value: unknown): value is ProviderPackageMetadata
   if (!value || typeof value !== 'object') return false;
   const browserType = value as Partial<ProviderPackageMetadata['browserType']>;
   if (typeof browserType.name !== 'string' || !browserType.name.trim()) return false;
-  if (browserType.controlSessionModes !== undefined && !isProviderControlSessionModes(browserType.controlSessionModes))
+  if (
+    browserType.controlSessionModes !== undefined &&
+    !isProviderControlSessionModes(browserType.controlSessionModes)
+  )
     return false;
   if (
     browserType.documentationUrl !== undefined &&
@@ -292,6 +297,17 @@ function isProviderObjectSchema(value: unknown): boolean {
   return isProviderInputSchema(value) && value.type === 'object';
 }
 
+function isExtensionAgentDefault(value: unknown): boolean {
+  if (value === undefined) return true;
+  const ids = (value as ProviderPackageMetadata['extensionAgentDefault'])?.macBundleIds;
+  return (
+    Array.isArray(ids) &&
+    ids.length > 0 &&
+    ids.length <= 20 &&
+    ids.every(id => typeof id === 'string' && /^[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/.test(id))
+  );
+}
+
 export function registerProviderPackage(packageRoot: string): InstalledProviderManifest {
   if (!isAbsolute(packageRoot)) throw new Error('Provider packageRoot must be an absolute path');
   let packageJson: ProviderPackageJson;
@@ -303,6 +319,8 @@ export function registerProviderPackage(packageRoot: string): InstalledProviderM
     });
   }
   const metadata = packageJson.mearl?.provider;
+  if (!isExtensionAgentDefault(metadata?.extensionAgentDefault))
+    throw new Error('Invalid Provider extensionAgentDefault.macBundleIds');
   if (
     typeof packageJson.name !== 'string' ||
     !packageJson.name.trim() ||
@@ -355,6 +373,9 @@ export function registerProviderPackage(packageRoot: string): InstalledProviderM
   }
 
   const manifest: InstalledProviderManifest = {
+    ...(metadata.extensionAgentDefault && {
+      extensionAgentDefault: metadata.extensionAgentDefault,
+    }),
     providerId: metadata.providerId,
     name: metadata.name,
     version: packageJson.version,

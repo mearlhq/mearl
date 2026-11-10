@@ -216,7 +216,9 @@ SDK 在服务启动和操作前确认 Mearl 控制宿主支持此模式；旧宿
 Extension 的环境增强，依次调用 `bind`、`invoke`、`release`。这条通道只允许设备、App、时区类增强，
 具体范围取决于 Extension 返回的能力；当前 Extension 实现仅开放时区。
 它沿用域授权和现有页面控制冲突检查，不登记自动化页面，不提供普通页面操作、任意代码执行或关闭权限。
-独立 Provider 包使用 `@mearl/provider-<id>` 命名。EgoLite 已有原生 Space 管理和人工交接，通过 [mearl-ego Skill](../../skills/mearl-ego/SKILL.md) 配合 Mearl 扩展进行端模拟与调试；该流程直接调用现有工具，不使用本节的 Provider 增强通道。
+独立 Provider 包使用 `@mearl/provider-<id>` 命名。EgoLite 的独立 `@mearl/provider-ego` 使用外部控制模式，经 Ego 原生通道管理 Space、页面和人工交接；设备和 App 模拟不依赖浏览器扩展。安装及能力限制以 Provider 自身说明为准。
+
+包元数据 `mearl.provider.extensionAgentDefault.macBundleIds` 可声明浏览器应用的精确 Bundle ID 列表，例如 `["com.example.browser"]`。支持该协议的 macOS Native Host 仅匹配启动它的浏览器；命中时扩展默认关闭 Agent 接入，用户的本地明确选择优先。声明随 Provider 注册保存，变更后需重新注册；它不依赖 Provider 进程在线，也不代表 Mearl 获得任何 Space 控制权。不要为通用 Chrome 等应用声明独占默认值，除非该 Provider 确实承担该浏览器所有 Agent 接入。
 
 实现必须提供只读的 `getEnhancementTarget({ browserId, tabId }, context)`：页面由用户控制时返回
 `{ tabId, ready: false }`；确认 Agent 可操作时返回

@@ -12,7 +12,6 @@
 | 把设计稿叠加到网页并做像素差异对比 | design-overlay |
 | 为网页提供持续双语阅读 | immersive-translate |
 | 运行 bb-browser 站点适配器 | mearl-bbrowser |
-| Ego / EgoLite 任务中配合扩展进行端模拟、接口与日志调试 | mearl-ego |
 | 开发或审查外部浏览器、真机 Provider | mearl-provider-creator |
 | 把网站操作沉淀为可复用 Skill、CLI 或工具箱 GUI | mearl-skill-creator |
 
@@ -42,7 +41,9 @@
 
 ## 开发与协作指引
 
-`mearl-ego`、`mearl-skill-creator` 与 `mearl-provider-creator` 是指引型 Skill，没有可注册的脚本入口；直接用标准 Skills 工具安装，不运行 `setup plugin`：
+EgoLite 使用独立 `@mearl/provider-ego`，具体流程见工具协作（`mearl guide cooperation`），不需要额外协作 Skill。
+
+`mearl-skill-creator` 与 `mearl-provider-creator` 是指引型 Skill，没有可注册的脚本入口；直接用标准 Skills 工具安装，不运行 `setup plugin`：
 
 ```bash
 npx skills add https://github.com/mearlhq/mearl --skill mearl-skill-creator --global

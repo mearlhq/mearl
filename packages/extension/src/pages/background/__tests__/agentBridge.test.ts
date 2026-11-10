@@ -278,6 +278,31 @@ describe('AgentBridge native handshake', () => {
     });
   });
 
+  it.each([
+    ['send_request', { url: 'https://example.test', transferId: 'native-transfer' }],
+    ['run_actions', { actions: [{ action: 'page_eval', data: { tabId: 1, expression: '1' } }] }],
+    ['__send_request_files', { operation: 'start', transferId: 'native-transfer' }],
+    ['__send_request_files', { operation: 'chunk', transferId: 'native-transfer' }],
+    ['__capture_download', { tabId: 1, trigger: { selector: 'button' } }],
+    ['__export_cookies', { domains: ['example.test'] }],
+    ['tab_list', {}],
+  ])('blocks trusted %s while Agent access is disabled', async (action, data) => {
+    bridge = new AgentBridge(new Map(), new Map(), () => false);
+    const internals = bridge as any;
+    const send = vi.spyOn(internals, 'sendToAgent').mockImplementation(() => {});
+    await internals.handleAgentMessage({
+      id: 'trusted-disabled',
+      action,
+      data,
+      trustedInternal: true,
+    });
+    expect(send).toHaveBeenCalledWith({
+      id: 'trusted-disabled',
+      success: false,
+      error: 'Agent service is disabled',
+    });
+  });
+
   it.each([undefined, EXTENSION_RPC_VERSION + 1])(
     'rejects incompatible host protocol %s before sending a service request',
     async rpcVersion => {
@@ -1101,5 +1126,71 @@ describe('AgentBridge native handshake', () => {
       data,
     });
     expect(httpHandlerMocks.handleSendRequest).toHaveBeenCalledExactlyOnceWith(data);
+  });
+  it('gates Agent access on policy and ignores a stale preference resolution', async () => {
+    let finishOld!: (enabled: boolean) => void;
+    const resolve = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<boolean>(done => {
+            finishOld = done;
+          }),
+      )
+      .mockResolvedValue(false);
+    const changed = vi.fn();
+    bridge = new AgentBridge(new Map(), new Map(), () => false, undefined, { resolve, changed });
+    bridge.start();
+    await vi.waitFor(() => expect(postMessage).toHaveBeenCalled());
+    expect(postMessage.mock.calls[0][0].agentAccessProtocol).toBe(1);
+    const receive = addMessageListener.mock.calls[0][0];
+    receive({ type: 'pong', agentPolicy: { revision: 0, providerIds: [] } });
+    expect(changed).toHaveBeenLastCalledWith(false);
+    receive({ type: 'agent_policy', policy: { revision: 1, providerIds: ['ego'] } });
+    await vi.waitFor(() =>
+      expect(postMessage).toHaveBeenCalledWith({
+        type: 'agent_access',
+        revision: 1,
+        enabled: false,
+      }),
+    );
+    finishOld(true);
+    await Promise.resolve();
+    expect(changed).not.toHaveBeenCalledWith(true);
+    expect(postMessage).not.toHaveBeenCalledWith({
+      type: 'agent_access',
+      revision: 0,
+      enabled: true,
+    });
+    await expect(
+      bridge.refreshAgentAccess({ revision: 2, providerIds: [], available: false }),
+    ).rejects.toThrow('coordination is unavailable');
+    expect(changed).toHaveBeenLastCalledWith(false);
+    addDisconnectListener.mock.calls[0][0]();
+    expect(changed).toHaveBeenLastCalledWith(false);
+  });
+
+  it('does not dispatch a request whose domain check finishes after access was revoked', async () => {
+    let permit!: (allowed: boolean) => void;
+    permissionMocks.isAgentDomainAuthorized.mockImplementationOnce(
+      () =>
+        new Promise<boolean>(resolve => {
+          permit = resolve;
+        }),
+    );
+    bridge = new AgentBridge(new Map(), new Map(), () => true, undefined, {
+      resolve: async () => false,
+      changed: vi.fn(),
+    });
+    const request = (bridge as any).handleAgentMessage({
+      id: 'pending-before-revoke',
+      action: 'send_request',
+      data: { tabId: 1, url: 'https://example.com/', method: 'GET' },
+    });
+    await vi.waitFor(() => expect(permit).toBeTypeOf('function'));
+    await bridge.refreshAgentAccess();
+    permit(true);
+    await request;
+    expect(httpHandlerMocks.handleSendRequest).not.toHaveBeenCalled();
   });
 });

@@ -4,18 +4,16 @@ Mearl 单独使用时沿用主 Skill 的页面操作流程。任务已有 Ego、
 
 ## EgoLite
 
-需要设备/App 模拟、接口或日志调试时，优先使用已安装的 `mearl-ego` Skill。该 Skill 通过 Ego 原生 API 管理 Space 与交接，通过已连接的 Mearl 扩展操作同一页面，无需额外 Provider 或插件注册。
+使用独立 `@mearl/provider-ego`，安装入口和支持范围以 Provider 自身 README 为准。本地源码构建后可用 `{{setup}} provider install '@mearl/provider-ego@/absolute/path/to/provider-ego'` 安装并注册；也可指定 GitHub Release 安装包地址。
 
-未安装协作 Skill 时遵循以下边界：
-
-- 先读取 `ego-browser skill`，沿用当前 Space；创建、关联、人工交接与 `finish({ keep })` 均按 Ego 当前指南执行。
-- Ego 浏览器需安装并连接 Mearl 扩展。用 `browser_list` 选择 `transport: "extension"` 的连接，记录完整 `browserId`。
-- 在 Ego Page 读取 `page.cdp("Page.getFrameTree")` 的主 frame ID，再用扩展 `tab_list` 与 `page_frames` 核对。只有 `isMainFrame: true` 的 `frameId` 唯一匹配时，才使用该扩展 `browserId + tabId`；URL、标题和其他工具的页面标识不能代替核验。
-- 每轮转入扩展写操作前，按 Ego 指南确认同一 Space 仍由 Agent 控制；用户接管、Space 失活或归属变化时两套工具均停止写入。扩展不会自动继承 Ego 的控制阻断，未知结果先观察，不换工具重放。
-- 设备或 App 模拟开启期间，导航、交互、快照与截图使用扩展 action；Ego 鼠标输入可能与触摸模拟冲突，原生导航或截图可能改变设备参数。撤销并确认模拟清除后，再恢复 Ego 原生页面交互。
-- 对应的端模拟须已安装并取得实际站点权限，以当前目标的帮助为准。桥对象存在不证明真实原生授权或支付能力；跨域 iframe 的原生 screen/DPR、媒体查询与 CSS 安全区也不保证与真机一致。
-- 普通打开后设置模拟并重载，不等于业务页首次访问即处于模拟环境。需要首屏模拟时先确认当前工具支持的准备流程。
-- 成功收尾遵守 Ego 的页面保留规则；保留结果页时保留用户需要的模拟状态。需要恢复时在结束前通过扩展显式恢复原配置；Mearl 会话释放不替代 Ego 收尾，也不保证清除模拟。
+- 无需浏览器扩展。已有扩展可关闭 Agent 服务，保留人工调试面板。Mearl 本地运行时仍负责 Provider 路由和已安装 App 资源解析。
+- 一个 Provider 浏览器对应一个 Ego Space。启动时传 `providerOptions.name`；已有任务传数字 `providerOptions.spaceId`。只关联 Agent 所有的 Space，不隐式认领用户 Space。
+- 使用 Provider 返回的完整 `browserId` 和页面 `tabId`，不需要 Agent 手工匹配扩展标签页。不传 Mearl `--session`。
+- Space 交接和完成使用 Provider 的 `mearl-ego` CLI；源码安装时执行 `node /absolute/path/to/provider-ego/dist/cli.js handoff <spaceId>`、`resume <spaceId>`、`finish <spaceId> --keep p1,p2`。这里的 `mearl-ego` 是命令，不是 Skill。仅在用户明确交还后 resume。
+- 所有页面操作经过 Ego 原生通道；用户接管、Space 失活时由 Ego 阻断，不改走扩展。连接断开或效果未知时不重放动作。
+- 设备和 App 分别通过 `set_device_emulation`、`set_app_profile` 设置。App 来自已安装目录，使用当前已解析版本；UA、声明式全局变量和页面桥通过原生 CDP 安装。导航、截图继续使用同一个 Provider。
+- 共享原生页面宿主提供设备外壳、根 WebView、网络控制和已安装 App 的协议/授权桥。真实授权仍需用户批准；接管会取消待授权会话，交还不恢复旧请求。不提供扩展专属请求/日志入口，其他参数限制以 Provider 指引为准。
+- `finish` 默认不保留 Agent 页面；需要保留结果时显式传 Ego Page label。`browser_release` 只解绑，不结束 Space、不清除模拟；需要普通页面时先清除模拟再 finish。
 
 ## agent-browser 等其他工具
 

@@ -238,7 +238,7 @@ describe('Options settings', () => {
   });
 
   it('disables the standalone floating entry control while Agent service is off', async () => {
-    vi.mocked(chrome.storage.sync.get).mockImplementationOnce((defaults, callback) =>
+    vi.mocked(chrome.storage.sync.get).mockImplementation((defaults, callback) =>
       callback({ ...(defaults as object), agentEnabled: false }),
     );
     render(<Options />);

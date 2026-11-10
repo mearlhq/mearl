@@ -116,6 +116,10 @@ pnpm build
 
 Load `packages/extension/dist_chrome` as an unpacked extension. Use `pnpm dev:website` to develop the website.
 
+Run `pnpm dev:link` to build the checkout and symlink local CLI packages and commands (including `mearl`, `mearl-setup`, Native Host and MCP) into the global directory selected by `npm prefix -g`. This supports macOS/Linux and replaces existing installations without backups; repeated runs preserve correct links. Use `pnpm dev:link --dry-run` to preview or `pnpm dev:link --skip-build` to reuse existing build outputs. Ensure this prefix's `bin` directory is on `PATH` ahead of other Mearl installations.
+
+Rebuild after source changes. This command does not install Skills, register Native Messaging hosts or restart running processes; load or reload the browser extension separately. Run `mearl-native-host --init` to register the local Native Host with browsers.
+
 The pre-commit hook checks and formats staged source files. Run `pnpm lint` and `pnpm format:check` to check manually. [Development guidelines](AGENTS.md) · [Release guide](docs/releases.en.md)
 
 | Directory | Responsibility |

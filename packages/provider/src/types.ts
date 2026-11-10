@@ -1,10 +1,18 @@
 import type { ProviderAction } from './actions.js';
-import type { BrowserCapabilities, BrowserControlSessionMode, ProviderEnhancementTarget } from '@mearl/browser-core';
+import type {
+  BrowserCapabilities,
+  BrowserControlSessionMode,
+  ProviderEnhancementTarget,
+} from '@mearl/browser-core';
 
 export { MEARL_PROVIDER_PROTOCOL_VERSION } from './protocol.js';
 
 export type { ProviderAction } from './actions.js';
-export type { BrowserEnhancementInvocation, ProviderEnhancementBinding, ProviderEnhancementTarget } from '@mearl/browser-core';
+export type {
+  BrowserEnhancementInvocation,
+  ProviderEnhancementBinding,
+  ProviderEnhancementTarget,
+} from '@mearl/browser-core';
 
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonValue[] | JsonObject;
@@ -165,12 +173,7 @@ export type ProviderBrowserStatus = 'connected' | 'pairing' | 'running_disconnec
 export type ProviderOwnership = 'owned' | 'attached';
 export type ProviderPersistence = 'ephemeral' | 'persistent';
 export type ProviderBrowserOperation =
-  | 'start'
-  | 'close'
-  | 'detach'
-  | 'deleteData'
-  | 'access'
-  | 'syncCookies';
+  'start' | 'close' | 'detach' | 'deleteData' | 'access' | 'syncCookies';
 
 export type ProviderBrowserControl =
   | {
@@ -216,6 +219,8 @@ export interface ProviderBrowser {
 }
 
 export interface InstalledProviderManifest extends ProviderDescriptor {
+  /** Default extension Agent access off in these natively identified browser apps. */
+  extensionAgentDefault?: { macBundleIds: string[] };
   protocolVersion: number;
   browserType: ProviderBrowserType;
   packageName: string;
@@ -224,6 +229,7 @@ export interface InstalledProviderManifest extends ProviderDescriptor {
 }
 
 export interface ProviderPackageMetadata {
+  extensionAgentDefault?: { macBundleIds: string[] };
   providerId: string;
   name: string;
   protocolVersion: number;
@@ -307,7 +313,8 @@ export interface BrowserProviderDefinition {
   ) => Promise<ProviderLaunchForm>;
   /** Reentrant read-only preflight: must reflect current control and identity without claiming a page. */
   getEnhancementTarget?: (
-    request: ProviderInstanceRequest & { tabId: number }, context: ProviderContext,
+    request: ProviderInstanceRequest & { tabId: number },
+    context: ProviderContext,
   ) => Promise<ProviderEnhancementTarget>;
   handleAction?: (context: ProviderActionContext) => Promise<unknown>;
 }
@@ -328,7 +335,10 @@ export interface ProviderRuntime {
     context?: ProviderContext,
   ): Promise<ProviderLaunchForm>;
   invokeAction(context: ProviderActionContext): Promise<unknown>;
-  getEnhancementTarget?(request: ProviderInstanceRequest & { tabId: number }, context?: ProviderContext): Promise<ProviderEnhancementTarget>;
+  getEnhancementTarget?(
+    request: ProviderInstanceRequest & { tabId: number },
+    context?: ProviderContext,
+  ): Promise<ProviderEnhancementTarget>;
 }
 
 export interface ProviderServerOptions {

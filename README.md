@@ -116,6 +116,10 @@ pnpm build
 
 扩展输出位于 `packages/extension/dist_chrome`，可作为已解压扩展加载。开发官网使用 `pnpm dev:website`。
 
+使用 `pnpm dev:link` 构建项目，并将带有 CLI 入口的本地包及命令（包括 `mearl`、`mearl-setup`、Native Host 和 MCP）软链到 `npm prefix -g` 对应的全局目录。该命令支持 macOS/Linux，会替换已有安装且不保留备份；重复运行会跳过正确的软链。使用 `pnpm dev:link --dry-run` 预览，或 `pnpm dev:link --skip-build` 复用已有构建产物。请确保该 prefix 的 `bin` 目录在 `PATH` 中，且优先于其他 Mearl 安装。
+
+源码修改后仍需重新构建。此命令不安装 Skills、不注册 Native Messaging Host，也不重启运行中的进程；浏览器扩展仍需手动加载或重载。本地 Native Host 需要接入浏览器时，运行 `mearl-native-host --init`。
+
 提交钩子会检查并格式化暂存的源码。可运行 `pnpm lint` 和 `pnpm format:check` 手动检查。[开发规范](AGENTS.md) · [发布流程](docs/releases.md)
 
 | 目录 | 职责 |

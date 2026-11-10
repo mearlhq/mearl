@@ -2,6 +2,22 @@
 
 import WebSocket, { type RawData } from 'ws';
 import { createHash } from 'node:crypto';
+import { EventEmitter } from 'node:events';
+
+/** External browser owners supply a control-checked native CDP channel. */
+export interface CdpTransport {
+  identity: string;
+  send(message: string): void;
+  subscribe(receive: (message: string) => void, closed: () => void): () => void;
+  close(): void;
+}
+interface CdpConnection {
+  url: string;
+  readyState: number;
+  on(event: string, listener: (...args: any[]) => void): unknown;
+  send(message: string, callback: (error?: Error) => void): void;
+  terminate(): void;
+}
 
 type EventCallback = (params: any) => void;
 
@@ -13,7 +29,9 @@ interface PendingRequest {
 }
 
 export class CdpChildSession {
-  getDefaultExecutionContexts(): ReadonlyMap<string, number> { return this.parent.getDefaultExecutionContexts(this.sessionId); }
+  getDefaultExecutionContexts(): ReadonlyMap<string, number> {
+    return this.parent.getDefaultExecutionContexts(this.sessionId);
+  }
   constructor(
     private readonly parent: CdpClient,
     readonly sessionId: string,
@@ -53,12 +71,53 @@ export class CdpClient {
   private defaultContexts = new Map<string, Map<string, number>>();
 
   /** Contexts emitted before a page subsystem starts listening remain available for reconnection. */
-  getDefaultExecutionContexts(sessionId = ''): ReadonlyMap<string, number> { return new Map(this.defaultContexts.get(sessionId)); }
+  getDefaultExecutionContexts(sessionId = ''): ReadonlyMap<string, number> {
+    return new Map(this.defaultContexts.get(sessionId));
+  }
 
-  private constructor(private readonly socket: WebSocket) {
+  private constructor(private readonly socket: CdpConnection) {
     socket.on('message', data => this.consumeMessage(data));
     socket.on('close', () => this.handleClosed());
     socket.on('error', () => this.handleClosed());
+  }
+
+  static fromTransport(transport: CdpTransport): CdpClient {
+    const events = new EventEmitter();
+    let closed = false;
+    let unsubscribe = () => {};
+    const socket: CdpConnection = {
+      url: transport.identity,
+      get readyState() {
+        return closed ? WebSocket.CLOSED : WebSocket.OPEN;
+      },
+      on: (event, listener) => events.on(event, listener),
+      send(message, callback) {
+        try {
+          transport.send(message);
+          callback();
+        } catch (error) {
+          callback(error instanceof Error ? error : new Error(String(error)));
+        }
+      },
+      terminate() {
+        if (!closed) {
+          closed = true;
+          unsubscribe();
+          transport.close();
+          events.emit('close');
+        }
+      },
+    };
+    const client = new CdpClient(socket);
+    unsubscribe = transport.subscribe(
+      message => events.emit('message', Buffer.from(message)),
+      () => {
+        closed = true;
+        unsubscribe();
+        events.emit('close');
+      },
+    );
+    return client;
   }
 
   static connect(wsUrl: string, handshakeTimeoutMs = 5000): Promise<CdpClient> {
@@ -210,13 +269,19 @@ export class CdpClient {
     if (msg.method === 'Runtime.executionContextsCleared') this.defaultContexts.delete(key);
     else if (msg.method === 'Runtime.executionContextCreated') {
       const context = msg.params?.context;
-      if (context?.auxData?.isDefault === true && typeof context.auxData.frameId === 'string' && typeof context.id === 'number') {
+      if (
+        context?.auxData?.isDefault === true &&
+        typeof context.auxData.frameId === 'string' &&
+        typeof context.id === 'number'
+      ) {
         if (!this.defaultContexts.has(key)) this.defaultContexts.set(key, new Map());
         this.defaultContexts.get(key)!.set(context.auxData.frameId, context.id);
       }
     } else if (msg.method === 'Runtime.executionContextDestroyed') {
-      for (const [frame, id] of this.defaultContexts.get(key) ?? []) if (id === msg.params?.executionContextId) this.defaultContexts.get(key)!.delete(frame);
-    } else if (msg.method === 'Target.detachedFromTarget') this.defaultContexts.delete(msg.params?.sessionId);
+      for (const [frame, id] of this.defaultContexts.get(key) ?? [])
+        if (id === msg.params?.executionContextId) this.defaultContexts.get(key)!.delete(frame);
+    } else if (msg.method === 'Target.detachedFromTarget')
+      this.defaultContexts.delete(msg.params?.sessionId);
     const handlers = msg.sessionId
       ? this.sessionEventHandlers.get(msg.sessionId)?.get(msg.method)
       : this.eventHandlers.get(msg.method);

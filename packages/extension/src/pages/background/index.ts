@@ -1,4 +1,9 @@
 import { handleRequestInspection, inspectBrowserRequest } from './requestInspection';
+import {
+  AGENT_ACCESS_PREFERENCE,
+  AGENT_ACCESS_PROVIDERS,
+  readAgentAccess,
+} from '../../shared/agentAccess';
 import { BROWSER_DOCUMENT_PROBE } from '../../shared/browserCapabilityMessages';
 import { cleanupBrowserEnhancements } from './browserEnhancements';
 import { cleanupEnvironmentRevisions } from './environmentRevisions';
@@ -287,7 +292,6 @@ import { cleanupClosedTabDeviceShell, getDeviceShellForTab } from './deviceShell
 // Agent Bridge 按需创建为单例；配置开启时 background 启动阶段会提前连接。
 let agentBridge: AgentBridge | null = null;
 let agentServiceEnabled = false;
-let agentServiceConfigRevision = 0;
 
 const assertAgentServiceEnabled = () => {
   if (!agentServiceEnabled) throw new Error('Agent service is disabled');
@@ -308,6 +312,12 @@ function ensureNativeBridge(reset = false): AgentBridge {
         devtoolsPagePorts,
         () => agentServiceEnabled,
         (data, transport) => installationService.native(data, transport),
+        {
+          resolve: readAgentAccess,
+          changed: enabled => {
+            agentServiceEnabled = enabled;
+          },
+        },
       );
       console.log('[Background] Agent Bridge instance created');
     } catch (error) {
@@ -332,21 +342,10 @@ function ensureAgentBridge(reset = false): AgentBridge {
 
 // ==================== Agent 自动建联 ====================
 
-// Background 启动时，如果 agentEnabled 为 true，直接建联，无需等待 panel 打开
-const initialAgentServiceConfigRevision = agentServiceConfigRevision;
-const agentServiceReady = chrome.storage.sync
-  .get({ agentEnabled: true })
-  .then(result => {
-    if (agentServiceConfigRevision !== initialAgentServiceConfigRevision) return;
-    agentServiceEnabled = result.agentEnabled !== false;
-    if (agentServiceEnabled) {
-      try {
-        ensureAgentBridge(false);
-        console.log('[Background] Agent Bridge auto-started on background init');
-      } catch (error) {
-        console.warn('[Background] Agent Bridge auto-start failed:', error);
-      }
-    }
+// Management connects first; page access remains closed until the policy handshake.
+const agentServiceReady = Promise.resolve()
+  .then(async () => {
+    if (await readAgentAccess()) ensureNativeBridge(false);
   })
   .catch(error => {
     console.warn('[Background] Failed to read Agent service config:', error);
@@ -677,6 +676,15 @@ void initEnvSwitchRules().catch(error =>
 // 监听 storage 变化，实时更新
 chrome.storage.onChanged.addListener((changes, area) => {
   if (
+    (area === 'local' && (changes[AGENT_ACCESS_PREFERENCE] || changes[AGENT_ACCESS_PROVIDERS])) ||
+    (area === 'sync' && changes.agentEnabled)
+  ) {
+    void (async () => {
+      if (agentBridge || (await readAgentAccess()))
+        await ensureNativeBridge(false).refreshAgentAccess();
+    })().catch(error => console.warn('[Background] Agent access refresh failed:', error));
+  }
+  if (
     (area === 'sync' && changes.trackingMetadataEnabled) ||
     (area === 'session' && changes[SERVICE_DEFAULTS_CACHE_KEY])
   ) {
@@ -685,25 +693,6 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'sync') {
     if (changes.sseMonitoringEnabled !== undefined) {
       void updateConfigRule();
-    }
-
-    // agentEnabled 变化时，自动启动或销毁 Agent Bridge
-    if (changes.agentEnabled !== undefined) {
-      const enabled = changes.agentEnabled.newValue !== false;
-      agentServiceConfigRevision += 1;
-      agentServiceEnabled = enabled;
-      if (enabled) {
-        try {
-          ensureAgentBridge(false);
-          console.log('[Background] Agent Bridge auto-started on config change');
-        } catch (error) {
-          console.warn('[Background] Agent Bridge auto-start on config change failed:', error);
-        }
-      } else if (agentBridge) {
-        agentBridge.destroy();
-        agentBridge = null;
-        console.log('[Background] Agent Bridge destroyed on config change');
-      }
     }
 
     // 与 sessionStorage 内容相关的配置变化时，回写所有已打开 Panel 的 tab

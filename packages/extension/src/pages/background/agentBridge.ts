@@ -262,6 +262,8 @@ export class AgentBridge {
   /** Stable identity for this browser installation, loaded from storage lazily. */
   private browserIdentity: { browserId: string; browserName: string } | null = null;
   private canHandleAgentActions: () => boolean;
+  private agentPolicy?: ExtensionAgentPolicy;
+  private agentAccessRevision = 0;
 
   constructor(
     devtoolsPorts: Map<number, chrome.runtime.Port>,
@@ -271,6 +273,10 @@ export class AgentBridge {
       data: any,
       transport: (request: any) => Promise<any>,
     ) => Promise<unknown>,
+    private readonly agentAccess?: {
+      resolve(providerIds?: string[]): Promise<boolean>;
+      changed(enabled: boolean): void;
+    },
   ) {
     this.devtoolsPorts = devtoolsPorts;
     this.devtoolsPagePorts = devtoolsPagePorts;
@@ -279,6 +285,31 @@ export class AgentBridge {
   }
 
   // Panel query (correlationId mechanism)
+
+  async refreshAgentAccess(policy?: unknown): Promise<void> {
+    if (!this.agentAccess) return;
+    this.agentAccess.changed(false);
+    this.activityLifetime.abort();
+    this.activityLifetime = new AbortController();
+    const revision = ++this.agentAccessRevision;
+    if (policy !== undefined) {
+      if (!isExtensionAgentPolicy(policy)) throw new Error('Invalid extension Agent policy');
+      this.agentPolicy = policy;
+    }
+    if (!this.currentConnectionGotPong) return;
+    if (!this.agentPolicy)
+      throw new Error('Update Native Host to coordinate extension Agent access');
+    if (this.agentPolicy.available === false)
+      throw new Error(
+        'Native Host Agent coordination is unavailable; reconnect after repairing the host',
+      );
+    const port = this.nativePort;
+    const enabled = await this.agentAccess.resolve(this.agentPolicy?.providerIds);
+    if (revision !== this.agentAccessRevision || port !== this.nativePort) return;
+    this.agentAccess.changed(enabled);
+    if (this.agentPolicy)
+      port?.postMessage({ type: 'agent_access', revision: this.agentPolicy.revision, enabled });
+  }
 
   private queryPanel(tabId: number, query: Record<string, any>, timeoutMs = 8000): Promise<any> {
     // Prefer panel port (handles all query types); fall back to devtools-page port which
@@ -495,6 +526,9 @@ export class AgentBridge {
   // Native Messaging
 
   private setupNativeMessaging(): void {
+    this.agentAccess?.changed(false);
+    this.agentAccessRevision++;
+    this.agentPolicy = undefined;
     const hostName = this.hostCandidates[this.hostCandidateIndex];
     this.currentConnectionGotPong = false;
     this.currentConnectionChecksForUpdates = false;
@@ -509,8 +543,10 @@ export class AgentBridge {
       this.activityLifetime = new AbortController();
       const activityLifetime = this.activityLifetime;
       this.nativePort = chrome.runtime.connectNative(hostName);
+      const connection = this.nativePort;
 
       this.nativePort.onMessage.addListener((message: any) => {
+        if (this.nativePort !== connection) return;
         if (message.type === 'pong') {
           console.log('[AgentBridge] Native host responded to ping, connection stable');
           this.currentConnectionGotPong = true;
@@ -523,7 +559,12 @@ export class AgentBridge {
           this.nativePresetInstallationProtocol = message.presetInstallationProtocol === 1 ? 1 : 0;
           this.nativeRpcVersion =
             typeof message.rpcVersion === 'number' ? message.rpcVersion : null;
-          this.resolveHandshake();
+          const resolveHandshake = this.resolveHandshake;
+          void this.refreshAgentAccess(message.agentPolicy)
+            .then(resolveHandshake)
+            .catch(error => {
+              console.warn('[AgentBridge] Agent policy negotiation failed:', error);
+            });
           if (
             typeof message.presetInstallationRevision === 'string' &&
             /^[a-f0-9]{64}$/.test(message.presetInstallationRevision)
@@ -539,6 +580,12 @@ export class AgentBridge {
         }
         if (message.type === 'control_sessions_changed') {
           chrome.runtime.sendMessage({ action: 'controlSessionsChanged' }).catch(() => {});
+          return;
+        }
+        if (message.type === 'agent_policy') {
+          void this.refreshAgentAccess(message.policy).catch(error =>
+            console.warn('[AgentBridge] Agent policy rejected:', error),
+          );
           return;
         }
         if (message.type === 'cloud_connector_status_changed') {
@@ -581,6 +628,10 @@ export class AgentBridge {
       });
 
       this.nativePort.onDisconnect.addListener(() => {
+        if (this.nativePort !== connection) return;
+        this.agentAccess?.changed(false);
+        this.agentAccessRevision++;
+        this.activityLifetime.abort();
         this.resolveHandshake();
         activityLifetime.abort();
         void releaseBackgroundPageActivities();
@@ -636,6 +687,7 @@ export class AgentBridge {
           if (this.nativePort !== port) return;
           port.postMessage({
             type: 'ping',
+            ...(this.agentAccess ? { agentAccessProtocol: 1 } : {}),
             timestamp: Date.now(),
             version: extensionVersion,
             rpcVersion: EXTENSION_RPC_VERSION,
@@ -650,6 +702,7 @@ export class AgentBridge {
           if (this.nativePort === port) {
             port.postMessage({
               type: 'ping',
+              ...(this.agentAccess ? { agentAccessProtocol: 1 } : {}),
               timestamp: Date.now(),
               version: extensionVersion,
               rpcVersion: EXTENSION_RPC_VERSION,
@@ -832,6 +885,7 @@ export class AgentBridge {
     ctx: AgentHandlerContext,
     controlSource: ControlSource,
   ): Promise<any> {
+    ctx.signal?.throwIfAborted();
     const shortcut = await extensionPageDialogShortcut(action, data);
     if (shortcut) return shortcut.data;
     const work = () => this.dispatchSingleActionRaw(action, data, ctx, controlSource);
@@ -846,6 +900,7 @@ export class AgentBridge {
     ctx: AgentHandlerContext,
     controlSource: ControlSource,
   ): Promise<any> {
+    ctx.signal?.throwIfAborted();
     switch (action) {
       case '__preset_installation':
         if (!this.installation) throw new Error('Preset installation view is unavailable');
@@ -1069,11 +1124,9 @@ export class AgentBridge {
   private async handleAgentMessage(message: MessageFromAgent): Promise<void> {
     const signal = this.activityLifetime.signal;
     try {
-      const enhancementRequiresAgent =
-        message.action === '__browser_enhancement' && message.data?.operation !== 'release';
       if (
         !this.canHandleAgentActions() &&
-        (message.trustedInternal !== true || enhancementRequiresAgent)
+        requiresExtensionAgentAccess(message.action, message.data, message.trustedInternal)
       ) {
         throw new Error('Agent service is disabled');
       }
@@ -1093,6 +1146,7 @@ export class AgentBridge {
           message.trustedInternal === true,
         );
       }
+      signal.throwIfAborted();
 
       const ctx: AgentHandlerContext = {
         queryPanel: this.queryPanel.bind(this),
@@ -1102,6 +1156,7 @@ export class AgentBridge {
 
       const targetTabId = actionData?.tabId;
       const execute = async () => {
+        signal.throwIfAborted();
         if (
           (AgentBridge.REQUEST_CAPTURING_ACTIONS.has(message.action) &&
             !(message.action === 'page_eval' && actionData?.executionWorld === 'isolated')) ||
@@ -1115,6 +1170,7 @@ export class AgentBridge {
           markTabControlled(targetTabId, controlSource).catch(() => {});
         }
 
+        signal.throwIfAborted();
         let responseData: any;
 
         if (message.action === 'run_actions') {
@@ -1474,3 +1530,8 @@ export class AgentBridge {
       .catch(() => {});
   }
 }
+import {
+  isExtensionAgentPolicy,
+  requiresExtensionAgentAccess,
+  type ExtensionAgentPolicy,
+} from '@mearl/browser-core';

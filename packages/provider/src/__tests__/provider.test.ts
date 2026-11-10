@@ -12,7 +12,12 @@ import {
   type BrowserProviderDefinition,
   type ProviderServer,
 } from '../index.js';
-import { listInstalledProviders, registerProviderPackage, uninstallProvider } from '../host.js';
+import {
+  listInstalledProviders,
+  registerProviderPackage,
+  uninstallProvider,
+  validateInstalledProviderManifest,
+} from '../host.js';
 import { listProviderBrowserRecords, providerBrowserKey } from '../registry.js';
 
 const installedIds: string[] = [];
@@ -454,7 +459,9 @@ describe('@mearl/provider', () => {
     expect(providerBrowserKey('example-cloud', 'managed:example-cloud:cloud main')).toBe(
       'provider:example-cloud:cloud%20main',
     );
-    expect(providerBrowserKey('example-cloud', 'session:s-123')).toBe('provider:example-cloud:session:s-123');
+    expect(providerBrowserKey('example-cloud', 'session:s-123')).toBe(
+      'provider:example-cloud:session:s-123',
+    );
   });
 
   it('configures a Provider over its socket without selecting a browser', async () => {
@@ -551,6 +558,7 @@ describe('@mearl/provider', () => {
             name: 'Fixture provider',
             protocolVersion: MEARL_PROVIDER_PROTOCOL_VERSION,
             entry: './runtime.js',
+            extensionAgentDefault: { macBundleIds: ['com.example.fixture'] },
             browserType: {
               name: 'Fixture browser',
               inputSchema: {
@@ -577,12 +585,19 @@ describe('@mearl/provider', () => {
       }),
     );
     installedIds.push(providerId);
-    registerProviderPackage(packageRoot);
+    const manifest = registerProviderPackage(packageRoot);
+    expect(
+      validateInstalledProviderManifest({
+        ...manifest,
+        extensionAgentDefault: { macBundleIds: ['*'] },
+      }),
+    ).toBe('extensionAgentDefault is invalid');
 
     expect(listInstalledProviders()).toContainEqual(
       expect.objectContaining({
         providerId,
         protocolVersion: MEARL_PROVIDER_PROTOCOL_VERSION,
+        extensionAgentDefault: { macBundleIds: ['com.example.fixture'] },
         browserType: {
           name: 'Fixture browser',
           inputSchema: {

@@ -8,9 +8,13 @@ Mearl 的 Native Messaging Host —— 桥接 Chrome 扩展与本地 socket 服�
 
 ## 动态能力
 
+独立浏览器 Provider 可通过 `@mearl/native-host/external-page-host` 的 `createExternalPageHost` 复用页面操作、设备外壳、根 WebView 与已安装 App 宿主服务。调用方提供已关联目标的扁平 CDP session ID、`CdpTransport` 和控制权检查；模块不发现浏览器、不认领标签页、不启动 Native Messaging。`invoke` 仅执行允许的页面动作。失去控制权时调用 `suspend()`，中止当前宿主授权租约；控制权恢复且检查通过后，下次调用建立新租约。`dispose()` 取消宿主请求并释放连接；需要恢复普通页面时先通过 `invoke` 清除 App 和设备模拟。传输必须在每次发送时执行浏览器原生控制校验。真实授权使用已安装能力的控制器，仍需用户批准。
+
 宿主提供浏览器控制、设备模拟、插件执行和默认埋点解析。Node 能力包通过声明的 hook 提供处理器，资源、激活与回滚合同见 [Node 能力包](../../docs/node-capabilities.md)。Setup 与网页安装桥共用 [安装宿主](../../docs/preset-installation.md) 的协调流程。
 
 ## 安装与注册
+
+核心构建完成后，可在仓库根目录运行 `node scripts/verify-extension-agent-coordination.mjs`，在临时 HOME 与 socket 目录验证真实 Native Messaging 握手、过期确认拒绝、浏览器配置隔离及关闭后的焦点事件。脚本不连接用户浏览器，结束后清理临时进程与文件。Provider 的原生应用匹配、事件合并与故障关闭另由单元测试覆盖。
 
 注册 Native Messaging Host manifest（让浏览器能够拉起本进程）：
 

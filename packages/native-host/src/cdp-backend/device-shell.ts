@@ -524,7 +524,8 @@ function installDeviceShell(
     const currentRoot = document.documentElement;
     if (currentRoot) document.replaceChild(shellRoot, currentRoot);
     else document.appendChild(shellRoot);
-    if (typeof browser.stop === 'function') browser.stop();
+    // The Fetch interceptor supplies an empty shell document. Stopping its
+    // parser here can leave embedded Chromium hosts waiting for their first paint.
     frame.src =
       (target.__mearlRootDocumentUrl__ as ((url: string) => string) | undefined)?.(businessUrl) ??
       businessUrl;
@@ -711,8 +712,7 @@ export async function sendCdpDeviceShellPageCommand(
     client: CdpDeviceShellCommandClient,
     command: string,
     commandParams: Record<string, any>,
-  ) =>
-    sendCdpPageCommand(session, client, command, commandParams, timeoutMs);
+  ) => sendCdpPageCommand(session, client, command, commandParams, timeoutMs);
   const state = deviceShellStates.get(session);
   if (!state) return send(session.client, method, params);
   const endpoint = await resolveCdpDeviceShellPageEndpoint(session);

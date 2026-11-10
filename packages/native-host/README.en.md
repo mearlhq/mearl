@@ -8,9 +8,13 @@ The extension starts this process through `chrome.runtime.connectNative()`. Host
 
 ## Dynamic capabilities
 
+Independent browser Providers can reuse page operations, device shells, root WebViews and installed App host services through `createExternalPageHost` from `@mearl/native-host/external-page-host`. Supply an attached target's flattened CDP session ID, a `CdpTransport`, and an ownership check. The module neither discovers browsers nor claims tabs or starts Native Messaging. `invoke` accepts only supported page actions. Call `suspend()` when control is lost to abort the current host authorization lease; a subsequent invocation renews it only after the control check succeeds. `dispose()` cancels host requests and releases the connection; clear App and device emulation through `invoke` first when a normal page is wanted. The transport must enforce native browser control on every send. Real authorization uses installed capability controllers and still requires user approval.
+
 Hosts provide browser control, device simulation, plugin execution, and default analytics parsing. Node capability packages supply declared hook handlers; see [Node capabilities](../../docs/node-capabilities.en.md) for resources, activation, and rollback. Setup and web installation share the [installation host](../../docs/preset-installation.en.md) coordinator.
 
 ## Installation and registration
+
+After building core, run `node scripts/verify-extension-agent-coordination.mjs` from the repository root to verify real Native Messaging handshakes, stale acknowledgement rejection, profile isolation, and focus events after access is disabled. It uses temporary HOME and socket directories, does not connect to user browsers, and cleans up its processes and files. Unit tests separately cover native application matching, event coalescing, and closing access on coordination failures.
 
 Register Native Messaging Host manifests so browsers can launch this process:
 

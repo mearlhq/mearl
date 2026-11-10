@@ -37,8 +37,8 @@ const findProfiles = 'mearl set_app_profile --help';
 const wechatMiniProgram = `npx @mearl/setup plugin install mearlhq/wechat-profile --github --skill wechat-miniprogram
 mearl wxa run ./dist`;
 const chineseBqb = 'https://github.com/F-loat/ChineseBQB-weapp';
-const egoSetup = `npx skills add mearlhq/mearl --skill mearl-ego --global
-ego-browser skill`;
+const egoSetup = `npx @mearl/setup provider install '@mearl/provider-ego@/absolute/path/to/provider-ego'
+mearl browser_launch --payload '{"provider":"ego","providerOptions":{"name":"My task"}}'`;
 const pluginSetup = `npx @mearl/setup plugin install mearlhq/mearl --github --skill notes-memory
 mearl notes --help
 mearl notes list`;
@@ -644,32 +644,56 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
   'ego-lite': {
     en: {
       title: 'Use Mearl with EgoLite',
-      lead: 'Use EgoLite to manage the browser task and take over for login or verification. Use Mearl on the same page for network and console debugging or device and App emulation.',
+      lead: 'Use the independent Ego Provider for Spaces, page operations, human handoff, and device or App emulation through the native Ego channel. No browser extension is required.',
       sections: [
         {
           id: 'setup',
-          title: 'Prepare the two tools',
-          text: 'Install and connect the Mearl extension in the Ego browser. Add the mearl-ego guidance Skill and read the current Ego browser guide. Ego keeps ownership of the Space and handoff. Mearl uses its existing extension connection.',
+          title: 'Install the independent Provider',
+          text: 'Register a built provider-ego directory with Mearl setup. Requires Node.js 22.23.4+, Mearl 3.0.5+ and ego-browser on PATH. The development package is not yet published to npm. No separate mearl-ego Skill is required. Source builds require a Native Host SDK archive exporting external-page-host; npm 3.0.5 does not include that API.',
           command: egoSetup,
+          links: [
+            {
+              label: 'Provider source and build instructions',
+              url: 'https://github.com/mearlhq/provider-ego',
+            },
+          ],
+        },
+        {
+          id: 'extension-agent',
+          title: 'Keep the extension optional',
+          text: 'The Provider works without the extension. On macOS, its EgoLite declaration defaults extension Agent access off for that browser profile, while manual debugging panels remain available. Update both the extension and Native Host to versions supporting coordination, then register the Provider again to activate this behavior.',
+          items: [
+            'You can explicitly enable or disable Agent access in extension settings. This preference stays local to the browser profile and does not sync to other browsers.',
+            'Provider outages or removal do not automatically re-enable extension Agent access. Access stays closed until the policy handshake completes; an older Native Host must be updated.',
+            'Coordination uses change notifications without periodic polling. Ego ownership checks run only while host requests are pending; each native page operation still checks control. Other platforms do not automatically identify EgoLite.',
+          ],
         },
         {
           id: 'identify',
-          title: 'Identify the same physical tab',
-          text: 'Read the main frame ID from the Ego Page with Page.getFrameTree. Compare it against page_frames for candidate tabs on the Mearl extension connection. Use the browserId and tabId for the unique match. An Ego Page label and a Mearl tabId belong to different tools.',
+          title: 'Use one Space per task',
+          text: 'Launch with providerOptions.name or attach an existing Agent Space with providerOptions.spaceId. Reuse the Provider browserId and tabId. Page mapping is handled by the Provider, without manual extension matching or Mearl --session.',
         },
         {
           id: 'control',
-          title: 'Use the right tool for each action',
-          text: 'Use Ego for ordinary navigation and human handoff. During device or App emulation, use Mearl for navigation, input, snapshots, and screenshots to preserve the active environment. When the user takes over in Ego, pause writes through both tools until control returns.',
+          title: 'Keep control in Ego',
+          text: 'Use the Provider CLI for handoff, resume and finish; resume only after the user explicitly returns control. Ego blocks native page operations during takeover. finish keeps no Agent pages by default; use --keep with Ego Page labels to retain results. browser_release only detaches the Provider and does not finish the Space or clear emulation.',
+          command: `node /absolute/path/to/provider-ego/dist/cli.js handoff <spaceId>
+node /absolute/path/to/provider-ego/dist/cli.js resume <spaceId>
+node /absolute/path/to/provider-ego/dist/cli.js finish <spaceId> --keep p1,p2`,
+        },
+        {
+          id: 'emulation',
+          title: 'Device shells, WebViews and App services',
+          text: 'Configure device and App emulation independently through set_device_emulation and set_app_profile. Enable deviceShell to use a device shell and root WebView. The shared native page host supplies installed App protocol and authorization services; real authorization requires user approval, and takeover cancels pending authorization. Retained pages depend on the Provider connection for emulation and host services. Clear emulation before finish when ordinary pages are needed. Extension-specific request/log entry points are not provided.',
           links: [
-            { label: 'EgoLite cooperation Skill', path: 'skills/mearl-ego/SKILL.md', shared: true },
+            { label: 'Provider contracts', path: 'packages/provider/README.en.md', shared: true },
             { label: 'Device and App emulation', page: 'emulation' },
           ],
         },
         {
           id: 'credits',
           title: 'Open source credits',
-          text: 'EgoLite is a separate open source browser from Citro Labs (MIT). Mearl works alongside it through the Mearl extension.',
+          text: 'EgoLite is a separate browser from Citro Labs; its public ego-browser runtime is MIT licensed. The Mearl Provider uses its native automation channel.',
           links: [
             { label: 'EgoLite upstream project', url: 'https://github.com/citrolabs/ego-lite' },
           ],
@@ -678,32 +702,53 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
     },
     'zh-CN': {
       title: '与 EgoLite 协作',
-      lead: '用 EgoLite 管理浏览器任务，遇到登录或验证时由人在 EgoLite 里接手。在同一个页面上，用 Mearl 排查请求和日志，或模拟设备与 App 环境。',
+      lead: '独立 Ego Provider 通过 Ego 原生通道管理 Space、页面操作、人工交接及设备/App 模拟，无需浏览器扩展。',
       sections: [
         {
           id: 'setup',
-          title: '准备两套工具',
-          text: '在 Ego 浏览器中安装并连接 Mearl 扩展，再安装 mearl-ego 指引 Skill，读取当前版本的 Ego 浏览器指南。Ego 管理 Space 和人工交接，Mearl 通过已有扩展连接工作。',
+          title: '安装独立 Provider',
+          text: '通过 Mearl setup 注册已构建的 provider-ego 本地目录。需要 Node.js 22.23.4+、Mearl 3.0.5+，且 ego-browser 可执行。开发包尚未发布到 npm，无需单独安装 mearl-ego Skill。源码构建需要包含 external-page-host 导出的 Native Host SDK 归档，npm 3.0.5 尚无此接口。',
           command: egoSetup,
+          links: [
+            { label: 'Provider 源码与构建说明', url: 'https://github.com/mearlhq/provider-ego' },
+          ],
+        },
+        {
+          id: 'extension-agent',
+          title: '扩展按需安装，Agent 默认关闭',
+          text: 'Provider 无需扩展即可工作。在 macOS 上，其 EgoLite 声明会让该浏览器配置的扩展 Agent 接入默认关闭，人工调试面板仍可使用。需将扩展和 Native Host 都更新到支持协调协议的版本，再重新注册 Provider 后生效。',
+          items: [
+            '可在扩展设置中明确开启或关闭 Agent 接入。偏好仅保存在当前浏览器配置中，不同步到其他浏览器。',
+            'Provider 离线或移除不会自动重新开启扩展 Agent。策略握手完成前保持关闭；旧版 Native Host 需要更新。',
+            '协调使用变更通知，不做定时轮询。Ego 控制权检查仅在有待完成的宿主请求时运行，每次原生页面操作仍校验控制权。其他平台暂不自动识别 EgoLite。',
+          ],
         },
         {
           id: 'identify',
-          title: '核对同一个物理标签页',
-          text: '在 Ego Page 通过 Page.getFrameTree 读取主 frame ID，再用 Mearl 扩展连接的 page_frames 核对候选标签页。唯一匹配后使用对应 browserId 和 tabId。Ego Page 标签和 Mearl tabId 是两套标识。',
+          title: '一个任务对应一个 Space',
+          text: '通过 providerOptions.name 创建任务，或用 providerOptions.spaceId 关联已有 Agent Space。复用 Provider 返回的 browserId 和 tabId；页面映射由 Provider 处理，无需手工匹配扩展标签页，不使用 Mearl --session。',
         },
         {
           id: 'control',
-          title: '按当前任务选择操作入口',
-          text: '普通导航和人工交接由 Ego 管理。设备或 App 模拟期间，通过 Mearl 导航、输入、取快照和截图，保持环境一致。用户在 Ego 接管时，两套工具都暂停写操作，交还后再继续。',
+          title: '由 Ego 统一控制权',
+          text: '使用 Provider CLI 交接、恢复和完成任务，仅在用户明确交还后恢复。接管期间 Ego 阻断原生页面操作。finish 默认不保留 Agent 页面；用 --keep 指定 Ego Page label 保留结果页。browser_release 只解绑 Provider，不结束 Space，也不清除模拟。',
+          command: `node /absolute/path/to/provider-ego/dist/cli.js handoff <spaceId>
+node /absolute/path/to/provider-ego/dist/cli.js resume <spaceId>
+node /absolute/path/to/provider-ego/dist/cli.js finish <spaceId> --keep p1,p2`,
+        },
+        {
+          id: 'emulation',
+          title: '设备外壳、WebView 与 App 服务',
+          text: '通过 set_device_emulation 和 set_app_profile 分别配置设备与 App 模拟，启用 deviceShell 可使用设备外壳和根 WebView。共享原生页面宿主提供已安装 App 的协议和授权服务；真实授权仍需用户批准，接管会取消待授权会话。保留页面的模拟与宿主服务依赖 Provider 连接，需要普通页面时应在 finish 前清除模拟。不提供扩展专属请求/日志入口。',
           links: [
-            { label: 'EgoLite 协作 Skill', path: 'skills/mearl-ego/SKILL.md', shared: true },
+            { label: 'Provider 接口', path: 'packages/provider/README.md', shared: true },
             { label: '设备与 App 模拟', page: 'emulation' },
           ],
         },
         {
           id: 'credits',
           title: '开源致谢',
-          text: 'EgoLite 是 Citro Labs 的独立开源浏览器（MIT）。Mearl 通过浏览器扩展与它协作。',
+          text: 'EgoLite 是 Citro Labs 的独立浏览器，其公开 ego-browser 运行时使用 MIT 许可证。Mearl Provider 使用其原生自动化通道。',
           links: [{ label: 'EgoLite 上游项目', url: 'https://github.com/citrolabs/ego-lite' }],
         },
       ],

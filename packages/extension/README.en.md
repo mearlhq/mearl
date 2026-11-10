@@ -8,6 +8,10 @@ Built on Manifest V3 with React 19, TypeScript, and Tailwind CSS (production ren
 
 ## Browser compatibility
 
+The Agent service completes the Native Host management handshake before enabling page control. Installed Providers can declare managed browser apps with `extensionAgentDefault.macBundleIds`. On macOS the host matches its direct parent's Bundle ID, without relying on page UAs or other running browsers. Matching profiles default to disabled extension Agent access while manual debugging remains available. Assignments and switch preferences use `storage.local`, so they do not sync to other profiles. Users can explicitly enable access in settings. Provider outages, removal and handshake failures never automatically reclaim control. Native identification currently supports macOS; other platforms keep their existing defaults.
+
+Coalesced installation-directory events update ownership without polling pages or processes. Profiles already configured as disabled do not connect to the host just for coordination at startup. Update the extension and Native Host together, then register the Provider again with its declaration.
+
 - The extension requires Chrome 120 or later.
 - On Chrome 120–140, use the shortcut to open the Agent side panel and Chrome's close button to close it. Chrome 141 and later support closing it with the shortcut.
 - Device Shell and app profiles with a page runtime require Chrome 125 or later.

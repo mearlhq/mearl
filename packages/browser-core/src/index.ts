@@ -99,3 +99,4 @@ export { MEARL_NATIVE_HOST_NAMES, type NativeHostIntegrationMode } from './nativ
 export * from './dataStructure.js';
 
 export * from './requestMetadata.js';
+export * from './extensionAgentAccess.js';
