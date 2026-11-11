@@ -51,6 +51,21 @@ function isOptionalString(value: unknown): boolean {
   return value === undefined || typeof value === 'string';
 }
 
+export function isOptionalProviderLocales(value: unknown, fields: readonly string[]): boolean {
+  if (value === undefined) return true;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  return Object.entries(value).every(
+    ([locale, messages]) =>
+      locale.trim() &&
+      messages &&
+      typeof messages === 'object' &&
+      !Array.isArray(messages) &&
+      Object.entries(messages).every(
+        ([field, text]) => fields.includes(field) && typeof text === 'string',
+      ),
+  );
+}
+
 function isOptionalFiniteNumber(value: unknown): boolean {
   return value === undefined || (typeof value === 'number' && Number.isFinite(value));
 }
@@ -65,6 +80,7 @@ export function isProviderInputSchema(value: unknown, depth = 0): value is Provi
   if (
     !isOptionalString(schema.title) ||
     !isOptionalString(schema.description) ||
+    !isOptionalProviderLocales(schema.locales, ['title', 'description', 'placeholder']) ||
     (schema.component !== undefined &&
       !['cookie-sync', 'switch'].includes(String(schema.component))) ||
     (schema.default !== undefined && !isJsonValue(schema.default)) ||
@@ -113,6 +129,7 @@ export function isProviderInputSchema(value: unknown, depth = 0): value is Provi
               typeof option.value === 'string' &&
               typeof option.label === 'string' &&
               isOptionalString(option.description) &&
+              isOptionalProviderLocales(option.locales, ['label', 'description']) &&
               (option.disabled === undefined || typeof option.disabled === 'boolean') &&
               (schema.enum === undefined || (schema.enum as string[]).includes(option.value)),
           ) &&
@@ -121,6 +138,7 @@ export function isProviderInputSchema(value: unknown, depth = 0): value is Provi
   } else if (schema.type === 'number') {
     const valid =
       (schema.integer === undefined || typeof schema.integer === 'boolean') &&
+      isOptionalString(schema.placeholder) &&
       isOptionalFiniteNumber(schema.minimum) &&
       isOptionalFiniteNumber(schema.maximum) &&
       (schema.minimum === undefined ||
@@ -340,7 +358,9 @@ export function validateProviderBrowser(browser: ProviderBrowser): void {
   }
   if (
     browser.pairing &&
-    (!isOptionalString(browser.pairing.code) || !isOptionalString(browser.pairing.label))
+    (!isOptionalString(browser.pairing.code) ||
+      !isOptionalString(browser.pairing.label) ||
+      !isOptionalProviderLocales(browser.pairing.locales, ['label']))
   ) {
     throw new Error(`Provider browser ${browser.browserId} has invalid pairing metadata`);
   }
@@ -407,7 +427,9 @@ export function validateProviderBrowser(browser: ProviderBrowser): void {
           !reference.kind.trim() ||
           typeof reference.id !== 'string' ||
           !reference.id.trim() ||
-          !isOptionalString(reference.label),
+          !isOptionalString(reference.label) ||
+          !isOptionalProviderLocales(reference.locales, ['label']) ||
+          (reference.summary !== undefined && typeof reference.summary !== 'boolean'),
       ) ||
       new Set(browser.references.map(reference => `${reference.kind}:${reference.id}`)).size !==
         browser.references.length)
@@ -457,6 +479,8 @@ function validateDefinition(definition: BrowserProviderDefinition): void {
   }
   if (!definition.browserType.name?.trim())
     throw new Error('provider browser type name is required');
+  if (!isOptionalProviderLocales(definition.browserType.locales, ['name']))
+    throw new Error('Provider browser type locales are invalid');
   if (
     definition.browserType.controlSessionModes !== undefined &&
     !isProviderControlSessionModes(definition.browserType.controlSessionModes)
@@ -500,6 +524,7 @@ export function validateProviderLaunchForm(form: ProviderLaunchForm): void {
     form.inputSchema.type !== 'object' ||
     !isOptionalString(form.variant) ||
     !isOptionalString(form.message) ||
+    !isOptionalProviderLocales(form.locales, ['message']) ||
     (form.blocked !== undefined && typeof form.blocked !== 'boolean') ||
     (form.values !== undefined &&
       (!form.values ||
@@ -525,7 +550,8 @@ export function validateProviderLaunchForm(form: ProviderLaunchForm): void {
             typeof variant.id !== 'string' ||
             !variant.id ||
             typeof variant.title !== 'string' ||
-            !isOptionalString(variant.description),
+            !isOptionalString(variant.description) ||
+            !isOptionalProviderLocales(variant.locales, ['title', 'description']),
         ) ||
         new Set(form.variants.map(variant => variant.id)).size !== form.variants.length ||
         !form.variants.some(variant => variant.id === form.variant)))

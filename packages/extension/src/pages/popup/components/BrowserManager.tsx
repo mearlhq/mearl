@@ -27,6 +27,7 @@ import type {
   BrowserProviderInputSchema,
   BrowserProviderObjectSchema,
   BrowserProviderLaunchForm,
+  BrowserProviderLocales,
 } from '@mearl/browser-core';
 import { clsx } from 'clsx';
 import { requestBrowserManager, type BrowserProviderSummary } from '../../../shared/browserManager';
@@ -37,7 +38,7 @@ import {
 } from '../../panel/components/NativeHostUpdateGuide';
 import { SearchableSelect } from '../../panel/components/SearchableSelect';
 import { useAccounts } from '../../panel/hooks/useAccounts';
-import { t } from '../../panel/utils/i18n';
+import { getCurrentLanguage, t } from '../../panel/utils/i18n';
 import { showToast } from '../../panel/utils/toast';
 import { generateQrCodeSvgMarkup } from '../../panel/utils/qrCode';
 import {
@@ -89,21 +90,19 @@ function isMissingProviderConfigurationError(cause: unknown): boolean {
   );
 }
 
-function referenceLabel(kind: string, fallback?: string): string {
-  switch (kind) {
-    case 'session':
-      return t('browserManagerSessionId');
-    case 'context':
-      return t('browserManagerContextId');
-    case 'context-name':
-      return t('browserManagerContextName');
-    case 'image':
-      return t('browserManagerImageId');
-    case 'profile':
-      return t('browserManagerProfile');
-    default:
-      return fallback || kind;
-  }
+function providerText<Field extends string>(
+  metadata: (BrowserProviderLocales<Field> & Partial<Record<Field, string>>) | null | undefined,
+  field: Field,
+): string | undefined {
+  if (!metadata?.locales) return metadata?.[field];
+  const locale = getCurrentLanguage().replaceAll('-', '_');
+  const language = locale.split('_')[0].toLowerCase();
+  return (
+    metadata.locales[locale]?.[field] ??
+    metadata.locales[locale.toLowerCase()]?.[field] ??
+    metadata.locales[language]?.[field] ??
+    metadata[field]
+  );
 }
 
 function statusText(status: BrowserInfo['status']): string {
@@ -208,7 +207,6 @@ function providerDetailItems(details: BrowserInfo['details']): ProviderDetailIte
 function BrowserDetails({ browser }: { browser: BrowserInfo }) {
   const managed = browser.type === 'managed' ? browser : null;
   const details = browser.details;
-  const reference = (kind: string) => browser.references?.find(item => item.kind === kind)?.id;
   const source = browser.source;
   const sourceText =
     source?.kind === 'remote'
@@ -224,17 +222,14 @@ function BrowserDetails({ browser }: { browser: BrowserInfo }) {
         : browser.transport === 'provider'
           ? t('browserManagerTransportProvider')
           : undefined;
-  const providerText = managed?.provider.name;
+  const providerName = managed?.provider.name;
   const createdAt = details?.createdAt ? new Date(details.createdAt).toLocaleString() : undefined;
   const copiedCookies = details?.copiedCookies
     ? `${details.copiedCookies.count} · ${details.copiedCookies.domains.join(', ')}`
     : undefined;
   const providerDetails = providerDetailItems(details);
   const providerReferences =
-    browser.references?.filter(
-      reference =>
-        !['session', 'context', 'context-name', 'image', 'pairing-code'].includes(reference.kind),
-    ) ?? [];
+    browser.references?.filter(reference => reference.id !== browser.pairing?.code) ?? [];
   const compactProviderReferences = providerReferences.filter(
     reference => reference.id.length <= 80,
   );
@@ -253,7 +248,7 @@ function BrowserDetails({ browser }: { browser: BrowserInfo }) {
           />
           <div className="min-w-0">
             <div className="text-xs font-medium text-text-primary">
-              {browser.pairing.label || t('browserManagerPairingScan')}
+              {providerText(browser.pairing, 'label') || t('browserManagerPairingScan')}
             </div>
             {browser.pairing.code && (
               <div className="mt-1 break-all font-mono text-2xs text-text-secondary">
@@ -274,7 +269,7 @@ function BrowserDetails({ browser }: { browser: BrowserInfo }) {
       />
       <BrowserDetailItem label={t('browserManagerSource')} value={sourceText} />
       <BrowserDetailItem label={t('browserManagerTransport')} value={transportText} />
-      <BrowserDetailItem label={t('browserManagerProvider')} value={providerText} />
+      <BrowserDetailItem label={t('browserManagerProvider')} value={providerName} />
       <BrowserDetailItem
         label={t('browserManagerProviderVersion')}
         value={managed?.provider.version}
@@ -288,11 +283,6 @@ function BrowserDetails({ browser }: { browser: BrowserInfo }) {
               : t('browserManagerNo')
             : undefined
         }
-      />
-      <BrowserDetailItem
-        label={t('browserManagerPairingCode')}
-        value={reference('pairing-code')}
-        mono={true}
       />
       <BrowserDetailItem
         label={t('browserManagerHeadless')}
@@ -309,26 +299,10 @@ function BrowserDetails({ browser }: { browser: BrowserInfo }) {
         value={details?.cdpPort === undefined ? undefined : String(details.cdpPort)}
         mono={true}
       />
-      <BrowserDetailItem
-        label={t('browserManagerSessionId')}
-        value={reference('session')}
-        mono={true}
-      />
-      <BrowserDetailItem
-        label={t('browserManagerImageId')}
-        value={reference('image')}
-        mono={true}
-      />
-      <BrowserDetailItem
-        label={t('browserManagerContextId')}
-        value={reference('context')}
-        mono={true}
-      />
-      <BrowserDetailItem label={t('browserManagerContextName')} value={reference('context-name')} />
       {compactProviderReferences.map(reference => (
         <BrowserDetailItem
           key={`${reference.kind}:${reference.id}`}
-          label={referenceLabel(reference.kind, reference.label)}
+          label={providerText(reference, 'label') || reference.kind}
           value={reference.id}
           mono
         />
@@ -350,7 +324,7 @@ function BrowserDetails({ browser }: { browser: BrowserInfo }) {
       {wideProviderReferences.map(reference => (
         <BrowserDetailItem
           key={`${reference.kind}:${reference.id}`}
-          label={referenceLabel(reference.kind, reference.label)}
+          label={providerText(reference, 'label') || reference.kind}
           value={reference.id}
           mono
           wide
@@ -392,9 +366,7 @@ function BrowserRow({ browser, busyAction, onAction, controlSessions }: BrowserR
   const canDetach = operations.includes('detach');
   const canSync = operations.includes('syncCookies');
   const canCopyAccess = operations.includes('access');
-  const summaryReference =
-    browser.references?.find(item => item.kind === 'session') ??
-    browser.references?.find(item => item.kind === 'pairing-code');
+  const summaryReference = browser.references?.find(item => item.summary);
   const summaryReferenceId = summaryReference?.id ?? browser.pairing?.code;
   const detailId = `browser-manager-details-${browser.browserId}`;
   const detailAction = expanded ? t('browserManagerHideDetails') : t('browserManagerShowDetails');
@@ -851,7 +823,8 @@ interface ProviderSwitchFieldProps {
 
 function ProviderSwitchField({ fieldKey, schema, value, onChange }: ProviderSwitchFieldProps) {
   const enabled = value === 'true';
-  const label = schema.title || fieldKey;
+  const label = providerText(schema, 'title') || fieldKey;
+  const description = providerText(schema, 'description');
   return (
     <div className="divide-y divide-border rounded border border-border bg-bg-primary px-2.5">
       <button
@@ -864,8 +837,8 @@ function ProviderSwitchField({ fieldKey, schema, value, onChange }: ProviderSwit
       >
         <span className="flex min-w-0 items-baseline gap-1.5">
           <span className="shrink-0 text-2xs font-medium text-text-primary">{label}</span>
-          {schema.description && (
-            <span className="truncate text-3xs text-text-secondary/70">{schema.description}</span>
+          {description && (
+            <span className="truncate text-3xs text-text-secondary/70">{description}</span>
           )}
         </span>
         <span
@@ -937,10 +910,12 @@ function ProviderFields({
         const FieldContainer =
           schema.type === 'string' && (schema.enum || schema.options) ? 'div' : 'label';
         const optional = !required.has(key) && !schema.formHideOptional;
+        const label = providerText(schema, 'title') || key;
+        const description = providerText(schema, 'description');
         return (
           <FieldContainer key={key} className={clsx('block min-w-0', widthClass)}>
             <span className="mb-1 flex items-baseline gap-1.5 text-3xs">
-              <span className="font-medium text-text-secondary">{schema.title || key}</span>
+              <span className="font-medium text-text-secondary">{label}</span>
               {required.has(key) && (
                 <span className="text-red-500">{t('browserManagerRequired')}</span>
               )}
@@ -959,26 +934,33 @@ function ProviderFields({
                   ...(optional && values[key]
                     ? [{ value: '', label: t('browserManagerOptional') }]
                     : []),
-                  ...(schema.options ?? schema.enum!.map(value => ({ value, label: value }))),
+                  ...(schema.options?.map(option => ({
+                    ...option,
+                    label: providerText(option, 'label') ?? option.label,
+                    description: providerText(option, 'description'),
+                  })) ?? schema.enum!.map(value => ({ value, label: value }))),
                 ]}
                 value={fieldLoading ? '' : (values[key] ?? '')}
                 onChange={value => onChange(key, value || undefined)}
                 disabled={fieldLoading}
-                placeholder={schema.placeholder ?? t('browserManagerSelectOption')}
+                placeholder={providerText(schema, 'placeholder') ?? t('browserManagerSelectOption')}
                 searchPlaceholder={t('browserManagerSearchOptions')}
                 noDataText={t('browserManagerNoOptions')}
                 searchable={Boolean(schema.options && schema.options.length > 5)}
                 minWidth=""
                 triggerClassName="flex w-full cursor-pointer items-center gap-1 rounded border border-border bg-bg-primary px-2 py-1.5 text-xs text-text-primary outline-none transition-colors hover:bg-bg-hover focus-visible:border-blue-500"
                 panelClassName="w-full"
-                ariaLabel={schema.title || key}
+                ariaLabel={label}
               />
             ) : schema.type === 'array' || schema.type === 'object' ? (
               <textarea
                 disabled={fieldLoading}
                 value={values[key] ?? ''}
                 onChange={event => onChange(key, event.target.value)}
-                placeholder={JSON.stringify(schema.type === 'array' ? [] : {})}
+                placeholder={
+                  providerText(schema, 'placeholder') ??
+                  JSON.stringify(schema.type === 'array' ? [] : {})
+                }
                 rows={3}
                 className="w-full rounded border border-border bg-bg-primary px-2 py-1.5 font-mono text-xs text-text-primary outline-none transition-colors placeholder:text-text-secondary/60 focus:border-blue-500"
               />
@@ -997,15 +979,13 @@ function ProviderFields({
                 max={schema.type === 'number' ? schema.maximum : undefined}
                 value={values[key] ?? ''}
                 onChange={event => onChange(key, event.target.value)}
-                placeholder={schema.type === 'string' ? schema.placeholder : undefined}
+                placeholder={providerText(schema, 'placeholder')}
                 autoComplete={schema.type === 'string' && schema.secret ? 'off' : undefined}
                 className="w-full rounded border border-border bg-bg-primary px-2 py-1.5 text-xs text-text-primary outline-none transition-colors placeholder:text-text-secondary/60 focus:border-blue-500"
               />
             )}
-            {schema.description && (
-              <span className="mt-1 block text-3xs text-text-secondary/70">
-                {schema.description}
-              </span>
+            {description && (
+              <span className="mt-1 block text-3xs text-text-secondary/70">{description}</span>
             )}
           </FieldContainer>
         );
@@ -1457,7 +1437,7 @@ function LaunchForm({
             { id: 'local' as const, label: t('browserManagerLocal') },
             ...externalProviders.map(provider => ({
               id: `provider:${provider.provider.id}` as const,
-              label: provider.browserType.name,
+              label: providerText(provider.browserType, 'name') ?? provider.browserType.name,
             })),
           ].map(item => (
             <button
@@ -1503,30 +1483,33 @@ function LaunchForm({
                     {t('browserManagerConnectionMode')}
                   </legend>
                   <div className="grid grid-cols-2 gap-2">
-                    {launchForm.variants.map(variant => (
-                      <label
-                        key={variant.id}
-                        className={clsx(
-                          'cursor-pointer rounded border p-2',
-                          variant.id === launchForm.variant
-                            ? 'border-blue-600 bg-blue-600/5'
-                            : 'border-border',
-                        )}
-                      >
-                        <span className="flex items-center gap-1.5 text-2xs text-text-primary">
-                          <input
-                            type="radio"
-                            name="providerLaunchVariant"
-                            checked={variant.id === launchForm.variant}
-                            onChange={() => selectLaunchVariant(variant.id)}
-                          />
-                          {variant.title}
-                        </span>
-                        {variant.description && (
-                          <p className="mt-1 text-3xs text-text-secondary">{variant.description}</p>
-                        )}
-                      </label>
-                    ))}
+                    {launchForm.variants.map(variant => {
+                      const description = providerText(variant, 'description');
+                      return (
+                        <label
+                          key={variant.id}
+                          className={clsx(
+                            'cursor-pointer rounded border p-2',
+                            variant.id === launchForm.variant
+                              ? 'border-blue-600 bg-blue-600/5'
+                              : 'border-border',
+                          )}
+                        >
+                          <span className="flex items-center gap-1.5 text-2xs text-text-primary">
+                            <input
+                              type="radio"
+                              name="providerLaunchVariant"
+                              checked={variant.id === launchForm.variant}
+                              onChange={() => selectLaunchVariant(variant.id)}
+                            />
+                            {providerText(variant, 'title')}
+                          </span>
+                          {description && (
+                            <p className="mt-1 text-3xs text-text-secondary">{description}</p>
+                          )}
+                        </label>
+                      );
+                    })}
                   </div>
                 </fieldset>
               )}
@@ -1538,7 +1521,7 @@ function LaunchForm({
                 >
                   {formLoading
                     ? t('browserManagerLoadingOptions')
-                    : (formError ?? launchForm?.message)}
+                    : (formError ?? providerText(launchForm, 'message'))}
                 </div>
                 <button
                   type="button"

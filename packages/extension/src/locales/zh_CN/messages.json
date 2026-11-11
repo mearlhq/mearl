@@ -1459,10 +1459,10 @@
     "message": "解除连接"
   },
   "browserManagerDetachConfirm": {
-    "message": "确认解除本机连接？云端 Session 会继续运行。"
+    "message": "确认解除本机连接？实例会继续运行。"
   },
   "browserManagerDetachDone": {
-    "message": "已解除连接，云端 Session 保持运行"
+    "message": "已解除本机连接"
   },
   "browserManagerCreate": {
     "message": "新增浏览器"
@@ -1472,12 +1472,6 @@
   },
   "browserManagerNamePlaceholder": {
     "message": "留空将自动生成"
-  },
-  "browserManagerSessionId": {
-    "message": "Session ID"
-  },
-  "browserManagerSessionIdPlaceholder": {
-    "message": "例如 s-xxxxxxxx"
   },
   "browserManagerOptional": {
     "message": "可选"
@@ -1595,15 +1589,6 @@
   },
   "browserManagerCdpPort": {
     "message": "CDP 端口"
-  },
-  "browserManagerContextId": {
-    "message": "Context ID"
-  },
-  "browserManagerContextName": {
-    "message": "Context 名称"
-  },
-  "browserManagerImageId": {
-    "message": "镜像 ID"
   },
   "browserManagerCreatedAt": {
     "message": "创建时间"

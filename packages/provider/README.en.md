@@ -71,6 +71,13 @@ Schemas support string, number, boolean, array, and recursive object. Provider c
 the CLI appends a plugin command summary automatically; do not duplicate that list in `browserType.help`.
 `local` is a reserved built-in ID.
 
+Providers can declare UI translations in `locales` on the browser type, form fields, options,
+launch variants, and dynamic form messages. For example, a field can set `title: "任务名称"`
+and `locales: { en: { title: "Task name" } }`. The extension tries the regional locale
+(such as `zh_CN`), then the base language (such as `zh`), then the default text.
+Browser references can declare detail labels with `label` and `locales`, and use `summary: true`
+to show the identifier in the collapsed row.
+
 ## Minimal external runtime
 
 ```ts

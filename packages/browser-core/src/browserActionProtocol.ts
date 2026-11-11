@@ -135,7 +135,12 @@ export type BrowserStatus = 'connected' | 'pairing' | 'running_disconnected' | '
 
 export type BrowserTransport = 'extension' | 'cdp' | 'provider';
 
-export interface BrowserPairingInfo {
+/** Localized overrides for Provider UI text, keyed by locale or language. */
+export interface BrowserProviderLocales<Field extends string> {
+  locales?: Record<string, Partial<Record<Field, string>>>;
+}
+
+export interface BrowserPairingInfo extends BrowserProviderLocales<'label'> {
   kind: 'qr';
   url: string;
   /** Optional human-readable or provider-specific pairing code. */
@@ -180,10 +185,12 @@ export type BrowserDetails = Record<string, BrowserJsonValue> & {
   copiedCookies?: { domains: string[]; count: number };
 };
 
-export interface BrowserReference {
+export interface BrowserReference extends BrowserProviderLocales<'label'> {
   kind: string;
   id: string;
   label?: string;
+  /** Show this identifier in the collapsed browser row. */
+  summary?: boolean;
 }
 
 export interface BrowserInfoBase {
@@ -363,7 +370,9 @@ export interface BrowserCloseParams {
   deleteProfile?: boolean;
 }
 
-interface BrowserProviderSchemaBase {
+interface BrowserProviderSchemaBase extends BrowserProviderLocales<
+  'title' | 'description' | 'placeholder'
+> {
   title?: string;
   description?: string;
   default?: BrowserJsonValue;
@@ -390,18 +399,14 @@ export type BrowserProviderInputSchema =
       maxLength?: number;
       pattern?: string;
       placeholder?: string;
-      options?: readonly {
-        value: string;
-        label: string;
-        description?: string;
-        disabled?: boolean;
-      }[];
+      options?: readonly BrowserProviderInputOption[];
     })
   | (BrowserProviderSchemaBase & {
       type: 'number';
       integer?: boolean;
       minimum?: number;
       maximum?: number;
+      placeholder?: string;
     })
   | (BrowserProviderSchemaBase & { type: 'boolean' })
   | (BrowserProviderSchemaBase & {
@@ -421,9 +426,18 @@ export interface BrowserProviderObjectSchema extends BrowserProviderSchemaBase {
   additionalProperties?: boolean;
 }
 
+export interface BrowserProviderInputOption extends BrowserProviderLocales<
+  'label' | 'description'
+> {
+  value: string;
+  label: string;
+  description?: string;
+  disabled?: boolean;
+}
+
 export interface BrowserProviderDefinition {
   provider: BrowserProviderIdentity;
-  browserType: {
+  browserType: BrowserProviderLocales<'name'> & {
     name: string;
     controlSessionModes?: readonly BrowserControlSessionMode[];
     documentationUrl?: string;
@@ -434,7 +448,9 @@ export interface BrowserProviderDefinition {
   };
 }
 
-export interface BrowserProviderLaunchFormVariant {
+export interface BrowserProviderLaunchFormVariant extends BrowserProviderLocales<
+  'title' | 'description'
+> {
   id: string;
   title: string;
   description?: string;
@@ -444,7 +460,7 @@ export interface BrowserProviderLaunchFormVariant {
   dynamicFields?: readonly string[];
 }
 
-export interface BrowserProviderLaunchForm {
+export interface BrowserProviderLaunchForm extends BrowserProviderLocales<'message'> {
   inputSchema: BrowserProviderObjectSchema;
   variants?: readonly BrowserProviderLaunchFormVariant[];
   variant?: string;

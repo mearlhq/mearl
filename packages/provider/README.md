@@ -71,6 +71,11 @@ Schema 支持 string、number、boolean、array 和递归 object；Provider 配�
 CLI 会在其后自动追加插件命令摘要，Provider 不需要在 `browserType.help` 中重复维护命令清单。
 `local` 是内置保留 ID。
 
+Provider 可在浏览器类型、表单字段、选项、连接方式和动态表单提示上通过 `locales` 声明
+多语言文案。例如，字段可设置 `title: "任务名称"` 和 `locales: { en: { title: "Task name" } }`。
+扩展依次按地区语言（如 `zh_CN`）、基础语言（如 `zh`）和字段默认值选择文案。
+实例引用可通过 `label` 和 `locales` 声明详情标签，通过 `summary: true` 在折叠行展示标识。
+
 ## 最小外部运行时
 
 ```ts

@@ -6,6 +6,7 @@ import { BrowserManager } from '../BrowserManager';
 const managerMocks = vi.hoisted(() => ({
   request: vi.fn(),
   toast: vi.fn(),
+  locale: 'en-US',
 }));
 
 const accountMocks = vi.hoisted(() => ({
@@ -27,6 +28,7 @@ vi.mock('../../../../shared/browserManager', async importOriginal => ({
 }));
 
 vi.mock('../../../panel/utils/i18n', () => ({
+  getCurrentLanguage: () => managerMocks.locale,
   t: (key: string) => key,
 }));
 
@@ -97,11 +99,11 @@ function managedFixture(input: Record<string, any>): Record<string, any> {
     persistence: persistent ? 'persistent' : 'ephemeral',
     operations,
     references: [
-      ...(cloudSessionId ? [{ kind: 'session', id: cloudSessionId }] : []),
+      ...(cloudSessionId ? [{ kind: 'session', id: cloudSessionId, summary: true }] : []),
       ...(cloudImageId ? [{ kind: 'image', id: cloudImageId }] : []),
       ...(cloudContextId ? [{ kind: 'context', id: cloudContextId }] : []),
       ...(cloudContextName ? [{ kind: 'context-name', id: cloudContextName }] : []),
-      ...(pairingCode ? [{ kind: 'pairing-code', id: pairingCode }] : []),
+      ...(pairingCode ? [{ kind: 'pairing-code', id: pairingCode, summary: true }] : []),
     ],
     details: {
       ...(headless !== undefined ? { headless } : {}),
@@ -366,6 +368,7 @@ describe('BrowserManager', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    managerMocks.locale = 'en-US';
     accountMocks.accounts = [];
     accountMocks.loading = false;
     accountMocks.error = '';
@@ -431,6 +434,55 @@ describe('BrowserManager', () => {
       variant: 'rent',
       values: { region: 'two' },
     });
+  });
+
+  it('localizes provider form metadata without changing query values', async () => {
+    managerMocks.locale = 'zh-CN';
+    const form = resourceForm();
+    const schema = form.inputSchema;
+    const region = schema.properties.region!;
+    await openDynamicProvider(() => ({
+      ...form,
+      locales: { zh: { message: '请选择资源' } },
+      variants: form.variants.map(variant => ({
+        ...variant,
+        locales: { zh: { title: variant.id === 'rent' ? '创建资源' : '接入资源' } },
+      })),
+      inputSchema: {
+        ...schema,
+        properties: {
+          ...schema.properties,
+          region: {
+            ...region,
+            locales: { zh: { title: '地区' } },
+            options: [
+              { ...region.options[0], locales: { zh_CN: { label: '地区一' } } },
+              ...region.options.slice(1),
+            ],
+          },
+          note: {
+            type: 'number',
+            title: 'Reference',
+            locales: { zh: { title: '编号', placeholder: '例如 123' } },
+          },
+        },
+      },
+    }));
+    expect(await screen.findByText('请选择资源')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: '创建资源' })).toBeChecked();
+    expect(screen.getByRole('button', { name: '地区' })).toHaveTextContent('地区一');
+    expect(screen.getByRole('spinbutton', { name: '编号' })).toHaveAttribute(
+      'placeholder',
+      '例如 123',
+    );
+    fireEvent.click(screen.getByRole('button', { name: '地区' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Second region' }));
+    expect(managerMocks.request).toHaveBeenLastCalledWith('launchForm', {
+      provider: 'resource-fixture',
+      variant: 'rent',
+      values: { region: 'two' },
+    });
+    await screen.findByText('请选择资源');
   });
 
   it('allows discovery while structured input is incomplete and retains explicitly cleared defaults', async () => {
@@ -768,7 +820,7 @@ describe('BrowserManager', () => {
           persistence: 'ephemeral',
           operations: [],
           references: [
-            { kind: 'pairing-code', id: 'pairing_fixture', label: 'Pairing code' },
+            { kind: 'reference', id: 'fixture-123', label: 'Reference number' },
             { kind: 'device', id: 'device-42', label: 'Device identifier' },
           ],
           details: { region: 'cn-east', settings: { network: 'wifi' }, battery: 0 },
@@ -777,7 +829,7 @@ describe('BrowserManager', () => {
     });
     render(<BrowserManager />);
     fireEvent.click(await screen.findByText('Custom device'));
-    expect(screen.getByText('browserManagerPairingCode')).toBeInTheDocument();
+    expect(screen.getByText('Reference number')).toBeInTheDocument();
     expect(screen.getByText('Device identifier')).toBeInTheDocument();
     expect(screen.getByText('cn-east')).toBeInTheDocument();
     expect(screen.getByText('{"network":"wifi"}')).toBeInTheDocument();

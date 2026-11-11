@@ -2,6 +2,10 @@ import type { ProviderAction } from './actions.js';
 import type {
   BrowserCapabilities,
   BrowserControlSessionMode,
+  BrowserPairingInfo,
+  BrowserReference,
+  BrowserProviderLocales,
+  BrowserProviderInputOption,
   ProviderEnhancementTarget,
   BrowserProviderOperation,
   BrowserControlParams,
@@ -36,12 +40,7 @@ export interface ProviderDownloadResult {
   owned?: boolean;
 }
 
-export interface ProviderPairingInfo {
-  kind: 'qr';
-  url: string;
-  code?: string;
-  label?: string;
-}
+export type ProviderPairingInfo = BrowserPairingInfo;
 
 export interface ProviderDescriptor {
   providerId: string;
@@ -58,7 +57,9 @@ export interface ProviderInputVisibility {
   empty: boolean;
 }
 
-interface ProviderSchemaBase {
+interface ProviderSchemaBase extends BrowserProviderLocales<
+  'title' | 'description' | 'placeholder'
+> {
   title?: string;
   description?: string;
   default?: JsonValue;
@@ -87,19 +88,14 @@ export interface ProviderStringSchema extends ProviderSchemaBase {
   options?: readonly ProviderInputOption[];
 }
 
-export interface ProviderInputOption {
-  value: string;
-  label: string;
-  description?: string;
-  disabled?: boolean;
-}
+export type ProviderInputOption = BrowserProviderInputOption;
 
 export interface ProviderLaunchFormRequest {
   variant?: string;
   values: JsonObject;
 }
 
-export interface ProviderLaunchFormVariant {
+export interface ProviderLaunchFormVariant extends BrowserProviderLocales<'title' | 'description'> {
   id: string;
   title: string;
   description?: string;
@@ -110,7 +106,7 @@ export interface ProviderLaunchFormVariant {
 }
 
 /** Read-only presentation data; values are fixed launch parameters, never credentials. */
-export interface ProviderLaunchForm {
+export interface ProviderLaunchForm extends BrowserProviderLocales<'message'> {
   inputSchema: ProviderObjectSchema;
   variants?: readonly ProviderLaunchFormVariant[];
   variant?: string;
@@ -126,6 +122,7 @@ export interface ProviderNumberSchema extends ProviderSchemaBase {
   integer?: boolean;
   minimum?: number;
   maximum?: number;
+  placeholder?: string;
 }
 
 export interface ProviderBooleanSchema extends ProviderSchemaBase {
@@ -159,7 +156,7 @@ export interface ProviderConfigurationDefinition {
   inputSchema: ProviderObjectSchema;
 }
 
-export interface ProviderBrowserType {
+export interface ProviderBrowserType extends BrowserProviderLocales<'name'> {
   name: string;
   /** Host must support every listed mode before launch. Omitted means Mearl only. */
   controlSessionModes?: readonly BrowserControlSessionMode[];
@@ -198,11 +195,7 @@ export type ProviderBrowserDetails = JsonObject & {
   copiedCookies?: { domains: string[]; count: number };
 };
 
-export interface ProviderBrowserReference {
-  kind: string;
-  id: string;
-  label?: string;
-}
+export type ProviderBrowserReference = BrowserReference;
 
 export interface ProviderBrowser {
   /** Stable within this provider. Mearl adds the Provider namespace globally. */
