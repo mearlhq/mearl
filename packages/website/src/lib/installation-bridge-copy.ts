@@ -9,6 +9,5 @@ export const installationBridgeCopy = {
   configurationUnavailable: '当前安装配置不可用，请刷新页面后重试。',
   opening: '正在打开 Mearl 安装视图…',
   opened: '已打开 Mearl，完成所需授权后即可使用。',
-  progress: '查看安装进度',
   openFailed: '暂时无法连接扩展，请确认扩展已启用后重试。',
 };

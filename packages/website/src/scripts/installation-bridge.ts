@@ -156,7 +156,6 @@ export function initInstallationBridge(): void {
         await requestInstallation('open', selected, catalogUrl.href);
         if (!disposed) {
           showStatus(t.opened);
-          install.textContent = t.progress;
         }
       } catch (error) {
         if (!disposed) {

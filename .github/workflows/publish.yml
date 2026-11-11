@@ -170,13 +170,15 @@ jobs:
 
   website:
     name: Refresh published release configuration
-    needs: publish
+    needs: [build, publish]
     if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
     permissions:
       contents: read
       pages: write
       id-token: write
     uses: ./.github/workflows/website.yml
+    with:
+      release-version: ${{ inputs.channel != 'beta' && needs.build.outputs.version || '' }}
     secrets: inherit
 
   chrome-webstore:

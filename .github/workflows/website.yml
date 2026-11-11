@@ -23,6 +23,11 @@ on:
       - 'vitest.shared.ts'
   workflow_dispatch:
   workflow_call:
+    inputs:
+      release-version:
+        type: string
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -46,7 +51,7 @@ jobs:
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm build:website
         env:
-          GH_TOKEN: ${{ github.token }}
+          MEARL_EXTENSION_RELEASE_VERSION: ${{ inputs.release-version }}
           MEARL_INSTALLATION_CONFIG: ${{ secrets.MEARL_INSTALLATION_CONFIG }}
       - run: pnpm --filter @mearl/website typecheck
       - run: pnpm --filter @mearl/website test

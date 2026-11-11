@@ -13,7 +13,7 @@ pnpm build:website
 
 The static output is `packages/website/dist/`. Astro uses the configured site URL path as its base. The default `installation.json` is `{"schemaVersion":1}`; without a guide configuration, the welcome page displays its local instructions.
 
-The build resolves the offline ZIP from GitHub Releases. It uses the latest stable ZIP when available and otherwise selects the newest published prerelease with a ZIP. The Chrome Web Store link is available even when the build cannot resolve a ZIP. For private repositories, use `GH_TOKEN` or sign in with `gh auth login` for local previews.
+Regular builds read the offline ZIP version and download URL directly from GitHub Pages `config.json`, without GitHub API or CLI authentication. The stable and patch release workflows supply the newly published version through `MEARL_EXTENSION_RELEASE_VERSION` to refresh the Pages configuration. Previews retain the Chrome Web Store link when configuration is unavailable; full builds fail rather than publish an empty update configuration.
 
 Reference pages compile the repository Markdown files listed in `src/lib/reference-docs.mjs`. Update the original English and Simplified Chinese files to change their site content. During compilation, links between selected files use the corresponding site routes. Other relative repository links lead to their source on GitHub.
 

@@ -13,7 +13,7 @@ pnpm build:website
 
 静态产物为 `packages/website/dist/`。Astro 使用配置站点 URL 的路径作为 base。默认 `installation.json` 为 `{"schemaVersion":1}`；没有引导配置时，欢迎页显示本地说明。
 
-构建时从 GitHub Releases 解析离线 ZIP。优先使用最新正式版的 ZIP，没有正式版 ZIP 时选用最新已发布的预发布 ZIP。无法获取离线 ZIP 时，安装页仍提供 Chrome 应用商店入口。私有仓库的本地预览可设置 `GH_TOKEN`，或通过 `gh auth login` 登录。
+普通构建直接读取 GitHub Pages 的 `config.json`，获取离线 ZIP 版本和下载地址，无需 GitHub API 或 CLI 认证。stable 和 patch 发布流程通过 `MEARL_EXTENSION_RELEASE_VERSION` 传入刚发布的版本，刷新 Pages 配置。预览无法获取配置时仍提供 Chrome 应用商店入口；完整构建会失败，避免发布空的更新配置。
 
 参考页面在构建时直接编译 `src/lib/reference-docs.mjs` 列出的仓库 Markdown。更新站内内容时，直接修改中英文原稿。编译会将已纳入站点的文档链接指向对应页面，其余仓库相对链接指向 GitHub 源文件。
 
