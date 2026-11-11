@@ -831,6 +831,7 @@
   "devicePreviewToolbar": { "message": "设备工具条" },
   "devicePreviewToolbarCollapse": { "message": "收起设备工具条" },
   "deviceSimulationEnableFromPage": { "message": "开启端模拟" },
+  "deviceSimulationDisableFromPage": { "message": "关闭端模拟" },
   "deviceSimulationNoApp": { "message": "无客户端" },
   "deviceSimulationDisable": { "message": "关闭设备模拟" },
   "devicePreviewCapturing": { "message": "采集中" },

@@ -463,22 +463,30 @@ export async function applyEmulationWithReload(
   tabId: number,
   config: ResolvedEmulationConfig,
   expectedUrl: string,
-  expectedUserAgent = config.userAgent,
+  {
+    expectedUserAgent = config.userAgent,
+    devicePrepared = false,
+    startWithDeviceShell = false,
+  } = {},
 ): Promise<boolean> {
   // 这条链跳得多且依赖易失的 session，失败时必须能看出是哪一步、差在哪个字段
   const trace = (step: string, detail?: unknown) =>
     console.info(`[emulation] tab ${tabId} ${step}`, JSON.stringify(detail ?? {}));
 
   for (let attempt = 0; attempt < EMULATION_APPLY_ATTEMPTS; attempt += 1) {
-    if (attempt === 0) {
-      await enableEmulationForTab(tabId, config);
-    } else {
+    if (attempt > 0) {
       // 同一个 session 上重试必须先 clear 再重设——参数不变时重复下发
       // setDeviceMetricsOverride 是 no-op
       await reapplyEmulationForTab(tabId, config);
+    } else if (!devicePrepared) {
+      await enableEmulationForTab(tabId, config);
     }
 
-    const settledBy = await navigateAndWait(tabId, expectedUrl, () => reloadTabInSession(tabId));
+    const settledBy = await navigateAndWait(tabId, expectedUrl, () =>
+      startWithDeviceShell && attempt === 0
+        ? reloadTabInSession(tabId, { startWithDeviceShell: true })
+        : reloadTabInSession(tabId),
+    );
     const state = await readEmulationRuntimeState(tabId);
     if (emulationStateMatches(state, config, expectedUserAgent)) {
       trace('verified', { attempt: attempt + 1, settledBy });

@@ -1,4 +1,11 @@
-vi.mock('../appProfileCatalog', () => ({ resolveAvailableAppProfile: async (...args: Parameters<typeof import('../../../../../app-profiles/src/__tests__/fixtures').resolveAppProfile>) => (await import('../../../../../app-profiles/src/__tests__/fixtures')).resolveAppProfile(...args) }));
+vi.mock('../appProfileCatalog', () => ({
+  resolveAvailableAppProfile: async (
+    ...args: Parameters<
+      typeof import('../../../../../app-profiles/src/__tests__/fixtures').resolveAppProfile
+    >
+  ) =>
+    (await import('../../../../../app-profiles/src/__tests__/fixtures')).resolveAppProfile(...args),
+}));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveEmulationConfig } from '@mearl/browser-core';
 import { resolveAppProfile } from '../../../../../app-profiles/src/__tests__/fixtures';
@@ -145,17 +152,28 @@ describe('quick device emulation', () => {
   it('disables the phone frame without removing system bars or reloading the WebView', async () => {
     const emulation = resolveEmulationConfig({ enabled: true, preset: 'iphone-17-pro' });
     const systemBars = getQuickDeviceChromeConfig('iphone-17-pro', 'portrait');
-    let config = { ...systemBars, phoneFrame: { width: emulation.width, height: emulation.height } };
+    let config = {
+      ...systemBars,
+      phoneFrame: { width: emulation.width, height: emulation.height },
+    };
     deviceShellRuleMocks.getDeviceShellForTab.mockImplementation(async () => ({
-      config, emulation, splitScreen: false,
+      config,
+      emulation,
+      splitScreen: false,
     }));
     deviceShellRuleMocks.applyDeviceShellForTab.mockImplementation(async (_tabId, next) => {
       config = next;
     });
     expect(await setQuickDevicePhoneFrame(7, false)).toMatchObject({
-      active: true, deviceShell: true, phoneFrame: false,
+      active: true,
+      deviceShell: true,
+      phoneFrame: false,
     });
-    expect(deviceShellRuleMocks.applyDeviceShellForTab).toHaveBeenCalledWith(7, systemBars, emulation);
+    expect(deviceShellRuleMocks.applyDeviceShellForTab).toHaveBeenCalledWith(
+      7,
+      systemBars,
+      emulation,
+    );
     expect(chrome.storage.local.set).toHaveBeenCalledWith({ quickDevicePhoneFrame: false });
     expect(debuggerManagerMocks.reloadTabInSession).not.toHaveBeenCalled();
     expect(deviceShellRuleMocks.clearDeviceShellForTab).not.toHaveBeenCalled();
@@ -212,6 +230,7 @@ describe('quick device emulation', () => {
         reload: false,
       },
       expect.any(Function),
+      { deviceOptions: undefined },
     );
     expect(getQuickDeviceEmulationState(7)).toMatchObject({
       active: true,
@@ -257,20 +276,7 @@ describe('quick device emulation', () => {
     });
   });
 
-  it('applies a fixed device viewport before enabling the App profile', async () => {
-    const order: string[] = [];
-    debuggerManagerMocks.enableEmulationForTab.mockImplementation(async () => {
-      order.push('device');
-    });
-    appProfileHandlerMocks.handleSetAppProfile.mockImplementation(async () => {
-      order.push('app');
-      return { enabled: true, reloaded: false };
-    });
-    deviceHandlerMocks.handleSetDeviceEmulation.mockImplementation(async () => {
-      order.push('reload');
-      return { enabled: true, reloaded: true };
-    });
-
+  it('compiles the App profile for the selected preset before applying the device once', async () => {
     await setQuickAppSimulation({
       tabId: 7,
       profile: 'shop',
@@ -282,37 +288,84 @@ describe('quick device emulation', () => {
       },
     });
 
-    expect(order).toEqual(['device', 'app', 'reload']);
-    expect(debuggerManagerMocks.enableEmulationForTab).toHaveBeenCalledWith(
-      7,
-      expect.objectContaining({
-        presetName: 'iphone-17-pro',
-        width: 402,
-        height: 874,
+    expect(appProfileHandlerMocks.handleSetAppProfile).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ profile: 'shop', reload: false }),
+      expect.any(Function),
+      { deviceOptions: { devicePreset: 'iphone-17-pro', orientation: 'portrait' } },
+    );
+    expect(debuggerManagerMocks.enableEmulationForTab).not.toHaveBeenCalled();
+    expect(deviceHandlerMocks.handleSetDeviceEmulation).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ preset: 'iphone-17-pro', orientation: 'portrait' }),
+      expect.any(Function),
+      expect.objectContaining({ preserveQuickDeviceOwnership: true }),
+    );
+    expect(appProfileHandlerMocks.handleSetAppProfile.mock.invocationCallOrder[0]).toBeLessThan(
+      deviceHandlerMocks.handleSetDeviceEmulation.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('restores the prior fixed device when the combined update fails', async () => {
+    const previousDevice = emulation('iphone-17-pro', 'portrait');
+    deviceStateMocks.getEmulationConfigForTab.mockReturnValue(previousDevice);
+    deviceHandlerMocks.handleSetDeviceEmulation.mockRejectedValueOnce(new Error('failed'));
+
+    await expect(
+      setQuickAppSimulation({
+        tabId: 7,
+        profile: 'shop',
+        deviceSelection: {
+          preset: 'pixel-11',
+          orientation: 'landscape',
+          fitToWindow: false,
+          deviceShell: true,
+        },
       }),
+    ).rejects.toThrow('failed');
+
+    expect(debuggerManagerMocks.enableEmulationForTab).toHaveBeenCalledExactlyOnceWith(
+      7,
+      previousDevice,
     );
   });
 
   it('switches the App with one reload and keeps an unchanged phone frame', async () => {
     const device = resolveEmulationConfig({ enabled: true, preset: 'iphone-17-pro' });
-    const selection = { preset: 'iphone-17-pro', orientation: 'portrait', fitToWindow: true, deviceShell: true } as const;
+    const selection = {
+      preset: 'iphone-17-pro',
+      orientation: 'portrait',
+      fitToWindow: true,
+      deviceShell: true,
+    } as const;
     deviceStateMocks.getEmulationConfigForTab.mockReturnValue(device);
     deviceStateMocks.getEmulationFitToWindowForTab.mockReturnValue(true);
     deviceShellRuleMocks.getDeviceShellForTab.mockResolvedValue({
-      config: { ...getQuickDeviceChromeConfig(selection.preset), phoneFrame: { width: device.width, height: device.height } },
+      config: {
+        ...getQuickDeviceChromeConfig(selection.preset),
+        phoneFrame: { width: device.width, height: device.height },
+      },
       emulation: device,
       splitScreen: false,
     });
     appProfileHandlerMocks.handleSetAppProfile.mockResolvedValue({ enabled: true, reloaded: true });
 
-    const result = await setQuickAppSimulation({ tabId: 7, profile: 'shop', deviceSelection: selection });
+    const result = await setQuickAppSimulation({
+      tabId: 7,
+      profile: 'shop',
+      deviceSelection: selection,
+    });
 
     expect(appProfileHandlerMocks.handleSetAppProfile).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({ tabId: 7, profile: 'shop', reload: true }), expect.any(Function),
+      expect.objectContaining({ tabId: 7, profile: 'shop', reload: true }),
+      expect.any(Function),
+      { deviceOptions: { devicePreset: 'iphone-17-pro', orientation: 'portrait' } },
     );
     expect(debuggerManagerMocks.enableEmulationForTab).not.toHaveBeenCalled();
     expect(deviceHandlerMocks.handleSetDeviceEmulation).not.toHaveBeenCalled();
-    expect(result).toMatchObject({ profile: 'shop', reloaded: true, device: { ...selection, active: true, phoneFrame: true } });
+    expect(result).toMatchObject({
+      profile: 'shop',
+      reloaded: true,
+      device: { ...selection, active: true, phoneFrame: true },
+    });
   });
 
   it('remembers the selected App profile after the client switch is disabled', async () => {
@@ -1105,21 +1158,45 @@ describe('quick device emulation', () => {
     expect(deviceStateMocks.setEmulationFitToWindowForTab).toHaveBeenCalledWith(7, true);
   });
   it('uses binding identity for a basic UA profile without reapplying it on device changes', async () => {
-    const { injected } = resolveAppProfile('reader', { devicePreset: 'iphone-17-pro', appVersion: '10.0.9' });
+    const { injected } = resolveAppProfile('reader', {
+      devicePreset: 'iphone-17-pro',
+      appVersion: '10.0.9',
+    });
     expect(injected.globals).toEqual({});
     profileRuleMocks.getAppProfileForTab.mockResolvedValue(injected);
-    deviceStateMocks.getEmulationConfigForTab.mockReturnValue(emulation('iphone-17-pro', 'portrait'));
+    deviceStateMocks.getEmulationConfigForTab.mockReturnValue(
+      emulation('iphone-17-pro', 'portrait'),
+    );
     await seedQuickDevice('iphone-17-pro', 'portrait');
-    await setQuickDeviceEmulation({ tabId: 7, preset: 'iphone-17-pro', orientation: 'portrait', fitToWindow: false, deviceShell: true });
+    await setQuickDeviceEmulation({
+      tabId: 7,
+      preset: 'iphone-17-pro',
+      orientation: 'portrait',
+      fitToWindow: false,
+      deviceShell: true,
+    });
     expect(appProfileHandlerMocks.handleSetAppProfile).not.toHaveBeenCalled();
   });
   it('returns the basic profile version from its binding when enabling the client', async () => {
-    const { injected } = resolveAppProfile('reader', { devicePreset: 'iphone-17-pro', appVersion: '10.0.9' });
+    const { injected } = resolveAppProfile('reader', {
+      devicePreset: 'iphone-17-pro',
+      appVersion: '10.0.9',
+    });
     profileRuleMocks.getAppProfileForTab.mockResolvedValue(injected);
-    deviceStateMocks.getEmulationConfigForTab.mockReturnValue(emulation('iphone-17-pro', 'portrait'));
-    const result = await setQuickAppSimulation({ tabId: 7, profile: 'reader', deviceSelection: { preset: 'iphone-17-pro', orientation: 'portrait', fitToWindow: false, deviceShell: true } });
+    deviceStateMocks.getEmulationConfigForTab.mockReturnValue(
+      emulation('iphone-17-pro', 'portrait'),
+    );
+    const result = await setQuickAppSimulation({
+      tabId: 7,
+      profile: 'reader',
+      deviceSelection: {
+        preset: 'iphone-17-pro',
+        orientation: 'portrait',
+        fitToWindow: false,
+        deviceShell: true,
+      },
+    });
     expect(result).toMatchObject({ enabled: true, profile: 'reader', appVersion: '10.0.9' });
     expect(appProfileHandlerMocks.handleSetAppProfile).toHaveBeenCalledTimes(1);
   });
-
 });

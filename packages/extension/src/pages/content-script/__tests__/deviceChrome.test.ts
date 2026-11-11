@@ -1,6 +1,10 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createQuickDeviceChromeManager, readPhoneFrameBootstrap, type QuickDeviceChromeManager } from '../deviceChrome';
+import {
+  createQuickDeviceChromeManager,
+  readPhoneFrameBootstrap,
+  type QuickDeviceChromeManager,
+} from '../deviceChrome';
 import { createDevicePreviewToolbar } from '../devicePreviewToolbar';
 
 const iosConfig = {
@@ -85,16 +89,26 @@ describe('Quick device chrome', () => {
     let resize: ResizeObserverCallback | undefined;
     let probe: Element | undefined;
     const disconnect = vi.fn();
-    const observer = { observe: (element: Element) => { probe = element; }, disconnect };
-    vi.stubGlobal('ResizeObserver', class {
-      constructor(callback: ResizeObserverCallback) {
-        resize = callback;
-        return observer;
-      }
-    });
-    const report = (width: number, height: number) => resize?.([
-      { target: probe, contentRect: { width, height } } as ResizeObserverEntry,
-    ], observer as unknown as ResizeObserver);
+    const observer = {
+      observe: (element: Element) => {
+        probe = element;
+      },
+      disconnect,
+    };
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: ResizeObserverCallback) {
+          resize = callback;
+          return observer;
+        }
+      },
+    );
+    const report = (width: number, height: number) =>
+      resize?.(
+        [{ target: probe, contentRect: { width, height } } as ResizeObserverEntry],
+        observer as unknown as ResizeObserver,
+      );
 
     try {
       manager.destroy();
@@ -295,8 +309,10 @@ describe('Quick device chrome', () => {
     vi.spyOn(document.documentElement, 'clientWidth', 'get').mockImplementation(() => width);
     vi.spyOn(document.documentElement, 'clientHeight', 'get').mockReturnValue(1200);
     manager.update({ ...iosConfig, phoneFrame: { width: 400, height: 800, maxScale: 0.5 } });
-    const scale = () => (layoutStyle()?.sheet?.cssRules[0] as CSSStyleRule)
-      .style.getPropertyValue('--mearl-phone-frame-scale');
+    const scale = () =>
+      (layoutStyle()?.sheet?.cssRules[0] as CSSStyleRule).style.getPropertyValue(
+        '--mearl-phone-frame-scale',
+      );
     expect(scale()).toBe('0.5');
 
     width = 168;
@@ -304,67 +320,79 @@ describe('Quick device chrome', () => {
     expect(scale()).toBe('0.3');
   });
 
-  it('applies the navigation layout and waits for the viewport to settle', async () => {
-    const config = { ...iosConfig, phoneFrame: { width: 400, height: 800 } };
-    const previewLayout = {
-      width: 400,
-      toolbarCollapsed: true,
-      panel: { wide: true, open: false },
-      viewport: { width: 1200, height: 848 },
-      toolbar: {
-        profile: { id: 'shop', label: '商店' },
-        preset: { id: 'iphone-17-pro', label: 'iPhone 17 Pro' },
-        orientation: 'portrait',
-      },
-    };
-    const bootstrap = readPhoneFrameBootstrap([
-      { name: 'mearl-document', description: 'fixture-token' },
-      { name: 'mearl-device-shell', description: btoa(JSON.stringify({ version: 1, config })) },
-      { name: 'mearl-device-shell', description: btoa(unescape(encodeURIComponent(JSON.stringify({ version: 1, config, previewLayout })))) },
-    ]);
-    expect(bootstrap).toEqual({ config, previewLayout });
-    const { element } = createDevicePreviewToolbar(bootstrap?.previewLayout.toolbar);
-    const selectedLabels = [...element.querySelectorAll('select')].map(select => select.selectedOptions[0]?.textContent);
-    expect(selectedLabels).toEqual(['商店', 'iPhone 17 Pro']);
-    let height = 844;
-    vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1200);
-    vi.spyOn(document.documentElement, 'clientHeight', 'get').mockImplementation(() => height);
-    const requestToken = vi.fn().mockResolvedValue('preview-token');
-    const loadLayout = vi.fn().mockResolvedValue({ width: 500, toolbarCollapsed: false });
-    manager.destroy();
-    manager = createQuickDeviceChromeManager({
-      previewPanel: {
-        label: 'Debug',
-        resizeLabel: 'Resize',
-        unavailableLabel: 'Unavailable',
-        retryLabel: 'Retry',
-        loadingLabel: 'Loading',
-        toolbarLabel: 'Device toolbar',
-        requestToken,
-        initialLayout: bootstrap?.previewLayout,
-        url: () => 'about:blank',
-        subscribeReady: () => () => {},
-        loadLayout,
-        saveWidth: vi.fn(),
-        saveToolbarCollapsed: vi.fn(),
-      },
-    });
-    manager.update(bootstrap!.config);
+  it.each(['mearl-document', 'mearl-device-shell-start'])(
+    'applies the %s layout and waits for the viewport to settle',
+    async marker => {
+      const config = { ...iosConfig, phoneFrame: { width: 400, height: 800 } };
+      const previewLayout = {
+        width: 400,
+        toolbarCollapsed: true,
+        panel: { wide: true, open: false },
+        viewport: { width: 1200, height: 848 },
+        toolbar: {
+          profile: { id: 'shop', label: '商店' },
+          preset: { id: 'iphone-17-pro', label: 'iPhone 17 Pro' },
+          orientation: 'portrait',
+        },
+      };
+      const bootstrap = readPhoneFrameBootstrap([
+        { name: marker, description: marker === 'mearl-document' ? 'fixture-token' : '' },
+        { name: 'mearl-device-shell', description: btoa(JSON.stringify({ version: 1, config })) },
+        {
+          name: 'mearl-device-shell',
+          description: btoa(
+            unescape(encodeURIComponent(JSON.stringify({ version: 1, config, previewLayout }))),
+          ),
+        },
+      ]);
+      expect(bootstrap).toEqual({ config, previewLayout });
+      const { element } = createDevicePreviewToolbar(bootstrap?.previewLayout.toolbar);
+      const selectedLabels = [...element.querySelectorAll('select')].map(
+        select => select.selectedOptions[0]?.textContent,
+      );
+      expect(selectedLabels).toEqual(['商店', 'iPhone 17 Pro']);
+      let height = 844;
+      vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1200);
+      vi.spyOn(document.documentElement, 'clientHeight', 'get').mockImplementation(() => height);
+      const requestToken = vi.fn().mockResolvedValue('preview-token');
+      const loadLayout = vi.fn().mockResolvedValue({ width: 500, toolbarCollapsed: false });
+      manager.destroy();
+      manager = createQuickDeviceChromeManager({
+        previewPanel: {
+          label: 'Debug',
+          resizeLabel: 'Resize',
+          unavailableLabel: 'Unavailable',
+          retryLabel: 'Retry',
+          loadingLabel: 'Loading',
+          toolbarLabel: 'Device toolbar',
+          requestToken,
+          initialLayout: bootstrap?.previewLayout,
+          url: () => 'about:blank',
+          subscribeReady: () => () => {},
+          loadLayout,
+          saveWidth: vi.fn(),
+          saveToolbarCollapsed: vi.fn(),
+        },
+      });
+      manager.update(bootstrap!.config);
 
-    const { style } = layoutStyle()!.sheet!.cssRules[0] as CSSStyleRule;
-    expect(style.getPropertyValue('--mearl-phone-frame-left')).toBe('50%');
-    expect(style.getPropertyValue('--mearl-phone-frame-top')).toBe('424px');
-    expect(style.getPropertyValue('--mearl-phone-frame-scale')).toBe('1');
-    expect(requestToken).not.toHaveBeenCalled();
-    expect(loadLayout).not.toHaveBeenCalled();
+      const { style } = layoutStyle()!.sheet!.cssRules[0] as CSSStyleRule;
+      expect(style.getPropertyValue('--mearl-phone-frame-left')).toBe('50%');
+      expect(style.getPropertyValue('--mearl-phone-frame-top')).toBe('424px');
+      expect(style.getPropertyValue('--mearl-phone-frame-scale')).toBe('1');
+      expect(requestToken).not.toHaveBeenCalled();
+      expect(loadLayout).not.toHaveBeenCalled();
 
-    height = 840;
-    window.dispatchEvent(new Event('resize'));
-    expect(style.getPropertyValue('--mearl-phone-frame-scale')).toBe('1');
-    expect(style.getPropertyValue('--mearl-phone-frame-top')).toBe('424px');
-    await vi.waitFor(() => expect(style.getPropertyValue('--mearl-phone-frame-scale')).toBe('0.99'));
-    expect(style.getPropertyValue('--mearl-phone-frame-top')).toBe('50%');
-  });
+      height = 840;
+      window.dispatchEvent(new Event('resize'));
+      expect(style.getPropertyValue('--mearl-phone-frame-scale')).toBe('1');
+      expect(style.getPropertyValue('--mearl-phone-frame-top')).toBe('424px');
+      await vi.waitFor(() =>
+        expect(style.getPropertyValue('--mearl-phone-frame-scale')).toBe('0.99'),
+      );
+      expect(style.getPropertyValue('--mearl-phone-frame-top')).toBe('50%');
+    },
+  );
 
   it('opens the preview panel only in wide windows and reuses it after collapsing', async () => {
     let width = 639;
@@ -393,8 +421,10 @@ describe('Quick device chrome', () => {
       .map(result => result.value as ShadowRoot)
       .find(root => root.querySelector('.debug-toggle'))!;
     const debugToggle = previewRoot.querySelector<HTMLButtonElement>('.debug-toggle')!;
-    const stageLeft = () => (layoutStyle()?.sheet?.cssRules[0] as CSSStyleRule)
-      .style.getPropertyValue('--mearl-phone-frame-left');
+    const stageLeft = () =>
+      (layoutStyle()?.sheet?.cssRules[0] as CSSStyleRule).style.getPropertyValue(
+        '--mearl-phone-frame-left',
+      );
     expect(stageLeft()).toBe('50%');
     expect(debugToggle.hidden).toBe(false);
     expect(requestToken).not.toHaveBeenCalled();
@@ -426,17 +456,27 @@ describe('Quick device chrome', () => {
     vi.useFakeTimers();
     try {
       vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1000);
-      vi.spyOn(HTMLIFrameElement.prototype, 'contentDocument', 'get').mockReturnValue(blank ? document : null);
+      vi.spyOn(HTMLIFrameElement.prototype, 'contentDocument', 'get').mockReturnValue(
+        blank ? document : null,
+      );
       vi.spyOn(document, 'URL', 'get').mockReturnValue('about:blank');
       const requestToken = vi.fn().mockResolvedValue('preview-token');
       const url = vi.fn().mockReturnValue('about:blank');
       manager.destroy();
       manager = createQuickDeviceChromeManager({
         previewPanel: {
-          label: 'Debug', resizeLabel: 'Resize', unavailableLabel: 'Unavailable', retryLabel: 'Retry',
-          loadingLabel: 'Loading', toolbarLabel: 'Device toolbar',
-          requestToken, url, subscribeReady: () => () => {},
-          loadLayout: async () => ({}), saveWidth: vi.fn(), saveToolbarCollapsed: vi.fn(),
+          label: 'Debug',
+          resizeLabel: 'Resize',
+          unavailableLabel: 'Unavailable',
+          retryLabel: 'Retry',
+          loadingLabel: 'Loading',
+          toolbarLabel: 'Device toolbar',
+          requestToken,
+          url,
+          subscribeReady: () => () => {},
+          loadLayout: async () => ({}),
+          saveWidth: vi.fn(),
+          saveToolbarCollapsed: vi.fn(),
         },
       });
       manager.update({ ...iosConfig, phoneFrame: { width: 402, height: 874 } });
@@ -452,20 +492,35 @@ describe('Quick device chrome', () => {
   it('lets the user recover a preview that failed before its iframe was ready', async () => {
     vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1000);
     const attachShadow = vi.spyOn(Element.prototype, 'attachShadow');
-    const requestToken = vi.fn().mockRejectedValueOnce(new Error('unavailable')).mockResolvedValue('preview-token');
+    const requestToken = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('unavailable'))
+      .mockResolvedValue('preview-token');
     const url = vi.fn().mockReturnValue('about:blank');
     let ready!: (viewer: string) => void;
     manager.destroy();
     manager = createQuickDeviceChromeManager({
       previewPanel: {
-        label: 'Debug', resizeLabel: 'Resize', unavailableLabel: 'Unavailable', retryLabel: 'Retry',
-        loadingLabel: 'Loading', toolbarLabel: 'Device toolbar', requestToken, url,
-        subscribeReady: listener => { ready = listener; return () => {}; },
-        loadLayout: async () => ({}), saveWidth: vi.fn(), saveToolbarCollapsed: vi.fn(),
+        label: 'Debug',
+        resizeLabel: 'Resize',
+        unavailableLabel: 'Unavailable',
+        retryLabel: 'Retry',
+        loadingLabel: 'Loading',
+        toolbarLabel: 'Device toolbar',
+        requestToken,
+        url,
+        subscribeReady: listener => {
+          ready = listener;
+          return () => {};
+        },
+        loadLayout: async () => ({}),
+        saveWidth: vi.fn(),
+        saveToolbarCollapsed: vi.fn(),
       },
     });
     manager.update({ ...iosConfig, phoneFrame: { width: 402, height: 874 } });
-    const root = attachShadow.mock.results.map(result => result.value as ShadowRoot)
+    const root = attachShadow.mock.results
+      .map(result => result.value as ShadowRoot)
       .find(shadow => shadow.querySelector('.debug-toggle'))!;
     const status = root.querySelector<HTMLElement>('.panel-status')!;
     const retry = root.querySelector<HTMLButtonElement>('.panel-retry')!;

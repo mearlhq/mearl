@@ -196,7 +196,8 @@ export async function setQuickAppSimulationWithAutoRuleSync(
         deviceSelection: params.deviceSelection ?? current.deviceSelection,
       };
     },
-    () => setQuickAppSimulation(params),
+    () =>
+      setQuickAppSimulation({ ...params, ...(params.profile && { startWithDeviceShell: true }) }),
   );
 }
 
@@ -234,8 +235,11 @@ const autoRuleMatchesTab = async (
   return Boolean(
     profile?.profile === rule.profile &&
     profile.platform === expectedPlatform &&
-    (profile.binding?.options.deviceModel ?? profile.globals.__DEVICE_MODEL__) === getQuickDevicePresetModel(rule.deviceSelection.preset) &&
-    (rule.appVersion === undefined || (profile.binding?.options.appVersion ?? profile.globals.__APP_VERSION__) === rule.appVersion) &&
+    (profile.binding?.options.deviceModel ?? profile.globals.__DEVICE_MODEL__) ===
+      getQuickDevicePresetModel(rule.deviceSelection.preset) &&
+    (rule.appVersion === undefined ||
+      (profile.binding?.options.appVersion ?? profile.globals.__APP_VERSION__) ===
+        rule.appVersion) &&
     device?.enabled &&
     device.preset === rule.deviceSelection.preset &&
     device.orientation === rule.deviceSelection.orientation &&

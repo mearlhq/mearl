@@ -2,8 +2,14 @@
 // 处理 Chrome Debugger API，实现请求拦截和响应修改
 
 import { ResponseOverride } from '../../shared/types';
-import { assertAppProfilePageRuntimeSupported, assertDeviceShellSupported } from '../../shared/chromiumVersion';
-import { installAppProfileDocumentEnvironment, resolveAppDeviceUserAgent } from '@mearl/app-profiles';
+import {
+  assertAppProfilePageRuntimeSupported,
+  assertDeviceShellSupported,
+} from '../../shared/chromiumVersion';
+import {
+  installAppProfileDocumentEnvironment,
+  resolveAppDeviceUserAgent,
+} from '@mearl/app-profiles';
 import { getEnvironmentRevision, markEnvironmentMutation } from './environmentRevisions';
 import { readPhysicalDeviceEnvironment } from './deviceEnvironmentObservation';
 import { isSubset } from '../../shared/isSubset';
@@ -69,11 +75,18 @@ async function sendEmulationCommands(
   const debuggee = typeof target === 'number' ? { tabId: target } : target;
   for (const { method, params, optional } of commands) {
     signal?.throwIfAborted();
-    const host = !('sessionId' in debuggee && debuggee.sessionId) && typeof debuggee.tabId === 'number'
-      ? await currentHostEnvironment(debuggee.tabId) : undefined;
-    if (host?.conflicted) throw new Error('ENVIRONMENT_STATE_CONFLICT: the physical host environment changed');
-    const effective = host && method === 'Emulation.setUserAgentOverride' ? host.identity
-      : host?.preserveInput && method === 'Emulation.setEmitTouchEventsForMouse' ? { enabled: false } : params;
+    const host =
+      !('sessionId' in debuggee && debuggee.sessionId) && typeof debuggee.tabId === 'number'
+        ? await currentHostEnvironment(debuggee.tabId)
+        : undefined;
+    if (host?.conflicted)
+      throw new Error('ENVIRONMENT_STATE_CONFLICT: the physical host environment changed');
+    const effective =
+      host && method === 'Emulation.setUserAgentOverride'
+        ? host.identity
+        : host?.preserveInput && method === 'Emulation.setEmitTouchEventsForMouse'
+          ? { enabled: false }
+          : params;
     signal?.throwIfAborted();
     try {
       await chrome.debugger.sendCommand(debuggee, method, effective);
@@ -88,7 +101,11 @@ async function sendEmulationCommands(
   }
 }
 
-async function buildTabEmulationCommands(tabId: number, config: EmulationConfig, resetViewport = false) {
+async function buildTabEmulationCommands(
+  tabId: number,
+  config: EmulationConfig,
+  resetViewport = false,
+) {
   if (!(await getDeviceShellForTab(tabId))?.config.phoneFrame) {
     return buildEnableEmulationCommands(config);
   }
@@ -101,14 +118,21 @@ async function buildTabEmulationCommands(tabId: number, config: EmulationConfig,
   ];
 }
 
-export async function updateDeviceFrameViewportForTab(tabId: number, config: EmulationConfig): Promise<void> {
+export async function updateDeviceFrameViewportForTab(
+  tabId: number,
+  config: EmulationConfig,
+): Promise<void> {
   await withDebuggerSession(tabId, 'device-frame-viewport', async () => {
     const commands = await buildTabEmulationCommands(tabId, config, true);
-    await sendEmulationCommands(tabId, commands.filter(({ method }) =>
-      method === 'Emulation.clearDeviceMetricsOverride' ||
-      method === 'Emulation.setDeviceMetricsOverride' ||
-      method === 'Emulation.setVisibleSize',
-    ));
+    await sendEmulationCommands(
+      tabId,
+      commands.filter(
+        ({ method }) =>
+          method === 'Emulation.clearDeviceMetricsOverride' ||
+          method === 'Emulation.setDeviceMetricsOverride' ||
+          method === 'Emulation.setVisibleSize',
+      ),
+    );
     setEmulationConfigForTab(tabId, config);
   });
 }
@@ -168,8 +192,13 @@ function notifyDebuggerStatusChanged(tabId: number, attached: boolean) {
 // session 生命周期分别维护，避免临时动作释放其他功能仍在使用的连接。
 interface TabState {
   hostEnvironment?: {
-    deviceRevision: number; appRevision: number;
-    identity: { userAgent: string; platform: string; userAgentMetadata: NonNullable<DeviceEnvironmentObservation['userAgentMetadata']> };
+    deviceRevision: number;
+    appRevision: number;
+    identity: {
+      userAgent: string;
+      platform: string;
+      userAgentMetadata: NonNullable<DeviceEnvironmentObservation['userAgentMetadata']>;
+    };
     preserveInput: boolean;
     conflicted?: true;
     observation?: DeviceEnvironmentObservation;
@@ -216,12 +245,24 @@ async function currentHostEnvironment(tabId: number) {
   const host = tabStates.get(tabId)?.hostEnvironment;
   if (!host) return undefined;
   try {
-    const [device, app] = await Promise.all([getEnvironmentRevision(tabId, 'device'), getEnvironmentRevision(tabId, 'app')]);
-    return tabStates.get(tabId)?.hostEnvironment === host && device === host.deviceRevision && app === host.appRevision ? host : undefined;
-  } catch { return undefined; }
+    const [device, app] = await Promise.all([
+      getEnvironmentRevision(tabId, 'device'),
+      getEnvironmentRevision(tabId, 'app'),
+    ]);
+    return tabStates.get(tabId)?.hostEnvironment === host &&
+      device === host.deviceRevision &&
+      app === host.appRevision
+      ? host
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
-export async function recordHostEnvironmentObservation(tabId: number, observation: DeviceEnvironmentObservation): Promise<void> {
+export async function recordHostEnvironmentObservation(
+  tabId: number,
+  observation: DeviceEnvironmentObservation,
+): Promise<void> {
   const host = await currentHostEnvironment(tabId);
   if (host && !host.conflicted) host.observation = structuredClone(observation);
 }
@@ -229,15 +270,21 @@ export async function recordHostEnvironmentObservation(tabId: number, observatio
 async function assertHostEnvironment(tabId: number, signal?: AbortSignal) {
   const host = await currentHostEnvironment(tabId);
   if (!host) return;
-  if (host.conflicted) throw new Error('ENVIRONMENT_STATE_CONFLICT: the physical host environment changed');
+  if (host.conflicted)
+    throw new Error('ENVIRONMENT_STATE_CONFLICT: the physical host environment changed');
   signal?.throwIfAborted();
   const observed = await readPhysicalDeviceEnvironment(tabId);
-  if (await currentHostEnvironment(tabId) !== host) throw new Error('ENVIRONMENT_STATE_CONFLICT: the host environment owner changed');
+  if ((await currentHostEnvironment(tabId)) !== host)
+    throw new Error('ENVIRONMENT_STATE_CONFLICT: the host environment owner changed');
   signal?.throwIfAborted();
   // Before the transaction commits, only its completed identity write is known. Once
   // committed, validate the whole observation before our own child-target writes start.
-  const expected = host.observation ?? { ...observed, userAgent: host.identity.userAgent,
-    platform: host.identity.platform, userAgentMetadata: host.identity.userAgentMetadata };
+  const expected = host.observation ?? {
+    ...observed,
+    userAgent: host.identity.userAgent,
+    platform: host.identity.platform,
+    userAgentMetadata: host.identity.userAgentMetadata,
+  };
   if (!deviceEnvironmentObservationsEqual(observed, expected)) {
     host.conflicted = true;
     throw new Error('ENVIRONMENT_STATE_CONFLICT: the physical host environment changed');
@@ -275,7 +322,11 @@ export function handleRootWebViewFrameEvent(
   return tabStates.get(tabId)?.rootWebViewNavigation?.handleFrameEvent(method, params);
 }
 
-export function allowLocalRootWebViewReload(tabId: number, frameId: string, url: string): (() => void) | undefined {
+export function allowLocalRootWebViewReload(
+  tabId: number,
+  frameId: string,
+  url: string,
+): (() => void) | undefined {
   return tabStates.get(tabId)?.rootWebViewNavigation?.allowLocalReload(frameId, url);
 }
 
@@ -360,12 +411,23 @@ function buildFetchPatterns(includeGeneric: boolean) {
   ];
   if (!includeGeneric) return [...protocolPatterns, ...documentPatterns];
   return [
-    ...protocolPatterns, ...documentPatterns,
-    ...['Script', 'Stylesheet'].flatMap(resourceType => ['Request', 'Response'].map(requestStage => ({ urlPattern: '*', resourceType, requestStage }))),
+    ...protocolPatterns,
+    ...documentPatterns,
+    ...['Script', 'Stylesheet'].flatMap(resourceType =>
+      ['Request', 'Response'].map(requestStage => ({
+        urlPattern: '*',
+        resourceType,
+        requestStage,
+      })),
+    ),
   ];
 }
 
-function configureWebViewFetch(tabId: number, sessionId: string, state: TabState): Promise<unknown> {
+function configureWebViewFetch(
+  tabId: number,
+  sessionId: string,
+  state: TabState,
+): Promise<unknown> {
   const target = { tabId, sessionId };
   if (state.modificationActive) {
     return chrome.debugger.sendCommand(target, 'Fetch.enable', {
@@ -381,15 +443,20 @@ function configureWebViewFetch(tabId: number, sessionId: string, state: TabState
 }
 
 async function updateWebViewFetch(tabId: number, state: TabState): Promise<void> {
-  await Promise.all(listBusinessWebViewSessions(tabId).map(async sessionId => {
-    try {
-      await configureWebViewFetch(tabId, sessionId, state);
-    } catch (error) {
-      if (listBusinessWebViewSessions(tabId).includes(sessionId) &&
+  await Promise.all(
+    listBusinessWebViewSessions(tabId).map(async sessionId => {
+      try {
+        await configureWebViewFetch(tabId, sessionId, state);
+      } catch (error) {
+        if (
+          listBusinessWebViewSessions(tabId).includes(sessionId) &&
           !/Session with given id not found/i.test(String(error)) &&
-          !isDebuggerSessionGoneError(error)) throw error;
-    }
-  }));
+          !isDebuggerSessionGoneError(error)
+        )
+          throw error;
+      }
+    }),
+  );
 }
 
 // 启用修改功能（Fetch 拦截 + 日志缓冲）
@@ -674,7 +741,8 @@ export function selectAppBridgeResponseOverride(
   const state = tabStates.get(tabId);
   if (!state?.modificationActive) return;
   const overrides = state.responseOverrides.get(apiName.toLowerCase());
-  if (overrides) return selectResponseOverride(overrides, request, state.responseOverrideCallCounts);
+  if (overrides)
+    return selectResponseOverride(overrides, request, state.responseOverrideCallCounts);
 }
 
 // ==================== 移动端模拟 ====================
@@ -835,9 +903,11 @@ export async function enableAppProfileDocumentBootstrapForTab(
         });
       }
     } catch (error) {
-      await chrome.debugger.sendCommand({ tabId }, 'Page.removeScriptToEvaluateOnNewDocument', {
-        identifier: result.identifier,
-      }).catch(() => {});
+      await chrome.debugger
+        .sendCommand({ tabId }, 'Page.removeScriptToEvaluateOnNewDocument', {
+          identifier: result.identifier,
+        })
+        .catch(() => {});
       throw error;
     }
     state.appProfileDocumentBootstrap = {
@@ -996,11 +1066,13 @@ export async function restorePhoneFrameSafeAreaForTab(tabId: number): Promise<vo
   // The top CDP session also applies its insets to same-process WebViews.
   await setInsets({ tabId });
   if (state.appProfileChildTargetEnvironment !== environment) return;
-  await Promise.all(Array.from(state.childDeviceScripts?.keys() ?? [], sessionId =>
-    setInsets({ tabId, sessionId }).catch(() => {
-      // A navigating frame may have detached. New frame targets receive insets during setup.
-    }),
-  ));
+  await Promise.all(
+    Array.from(state.childDeviceScripts?.keys() ?? [], sessionId =>
+      setInsets({ tabId, sessionId }).catch(() => {
+        // A navigating frame may have detached. New frame targets receive insets during setup.
+      }),
+    ),
+  );
 }
 
 /**
@@ -1151,10 +1223,14 @@ export async function clearDeviceShellWebViewEnvironmentForTab(tabId: number): P
   const scripts = state.childDeviceScripts;
   state.childDeviceScripts = undefined;
   await withDebuggerSession(tabId, 'device-shell-webview-environment', async () => {
-    await Promise.all(Array.from(scripts ?? [], ([sessionId, identifier]) => {
-      const target = { tabId, sessionId };
-      return chrome.debugger.sendCommand(target, 'Page.removeScriptToEvaluateOnNewDocument', { identifier }).catch(() => {});
-    }));
+    await Promise.all(
+      Array.from(scripts ?? [], ([sessionId, identifier]) => {
+        const target = { tabId, sessionId };
+        return chrome.debugger
+          .sendCommand(target, 'Page.removeScriptToEvaluateOnNewDocument', { identifier })
+          .catch(() => {});
+      }),
+    );
     await chrome.debugger.sendCommand({ tabId }, 'Network.setBypassServiceWorker', {
       bypass: Boolean(state.appProfileDocumentBootstrap),
     });
@@ -1181,15 +1257,21 @@ async function registerChildDeviceScript(
   target: chrome.debugger.Debuggee & { sessionId: string },
   source: string,
 ): Promise<void> {
-  const scripts = state.childDeviceScripts ??= new Map();
+  const scripts = (state.childDeviceScripts ??= new Map());
   const previous = scripts.get(target.sessionId);
-  const { identifier } = await chrome.debugger.sendCommand(target, 'Page.addScriptToEvaluateOnNewDocument', {
-    source,
-  }) as { identifier?: string };
+  const { identifier } = (await chrome.debugger.sendCommand(
+    target,
+    'Page.addScriptToEvaluateOnNewDocument',
+    {
+      source,
+    },
+  )) as { identifier?: string };
   if (!identifier) return;
   scripts.set(target.sessionId, identifier);
   if (previous) {
-    await chrome.debugger.sendCommand(target, 'Page.removeScriptToEvaluateOnNewDocument', { identifier: previous });
+    await chrome.debugger.sendCommand(target, 'Page.removeScriptToEvaluateOnNewDocument', {
+      identifier: previous,
+    });
   }
 }
 
@@ -1207,15 +1289,23 @@ export async function refreshChildDeviceScripts(tabId: number): Promise<void> {
   const state = tabStates.get(tabId);
   const environment = state?.appProfileChildTargetEnvironment;
   if (!state || !environment) return;
-  await Promise.all(Array.from(state.childDeviceScripts?.keys() ?? [], async sessionId => {
-    const target = { tabId, sessionId };
-    await chrome.debugger.sendCommand(target, 'Network.setUserAgentOverride', {
-      userAgent: environment.userAgent,
-      platform: environment.platform,
-    });
-    await chrome.debugger.sendCommand(target, 'Emulation.setSafeAreaInsetsOverride', safeAreaInsetsParams(environment.safeAreaInsets)).catch(() => {});
-    await registerChildDeviceScript(state, target, environment.source);
-  }));
+  await Promise.all(
+    Array.from(state.childDeviceScripts?.keys() ?? [], async sessionId => {
+      const target = { tabId, sessionId };
+      await chrome.debugger.sendCommand(target, 'Network.setUserAgentOverride', {
+        userAgent: environment.userAgent,
+        platform: environment.platform,
+      });
+      await chrome.debugger
+        .sendCommand(
+          target,
+          'Emulation.setSafeAreaInsetsOverride',
+          safeAreaInsetsParams(environment.safeAreaInsets),
+        )
+        .catch(() => {});
+      await registerChildDeviceScript(state, target, environment.source);
+    }),
+  );
 }
 
 /**
@@ -1257,14 +1347,20 @@ export async function handleAppProfileChildTargetEvent(
         if (targetType === 'iframe') {
           await chrome.debugger.sendCommand(target, 'Page.enable');
           signal.throwIfAborted();
-          const tree = (await chrome.debugger.sendCommand(target, 'Page.getFrameTree')) as {
-            frameTree?: WebViewFrameTree;
-          } | undefined;
+          const tree = (await chrome.debugger.sendCommand(target, 'Page.getFrameTree')) as
+            | {
+                frameTree?: WebViewFrameTree;
+              }
+            | undefined;
           signal.throwIfAborted();
           const frame = tree?.frameTree?.frame;
           frameName = frame?.name;
           // An auto-attached iframe can have an empty URL until Chrome resumes its renderer.
-          if (frameName === '__mearl_preview_panel__' || frame?.url?.startsWith('chrome-extension://')) return;
+          if (
+            frameName === '__mearl_preview_panel__' ||
+            frame?.url?.startsWith('chrome-extension://')
+          )
+            return;
           if (frameName !== '__mearl_root__' && frameName !== '__mearl_layer__') {
             return registerPageRuntime(signal);
           }
@@ -1326,7 +1422,10 @@ export async function handleAppProfileChildTargetEvent(
         if (targetType === 'iframe') {
           const identity = environment
             ? { userAgent: environment.userAgent, platform: environment.platform }
-            : persistedConfig && { userAgent: persistedConfig.userAgent, platform: persistedConfig.navigatorPlatform };
+            : persistedConfig && {
+                userAgent: persistedConfig.userAgent,
+                platform: persistedConfig.navigatorPlatform,
+              };
           if (identity) {
             await assertHostEnvironment(tabId, signal);
             // Each OOPIF owns its network identity. Omitting metadata clears desktop
@@ -1340,7 +1439,10 @@ export async function handleAppProfileChildTargetEvent(
           const commands = (
             inheritsDeviceViewport(environment.emulationConfig)
               ? buildEnableDeviceEnvironmentCommands(environment.emulationConfig)
-              : await buildTabEmulationCommands(tabId, environment.emulationConfig as EmulationConfig)
+              : await buildTabEmulationCommands(
+                  tabId,
+                  environment.emulationConfig as EmulationConfig,
+                )
           ).map(command => ({
             ...command,
             ...(command.method === 'Emulation.setUserAgentOverride'
@@ -1353,7 +1455,11 @@ export async function handleAppProfileChildTargetEvent(
               : {}),
           }));
           // Chromium permits touch on OOPIFs, but device metrics are top-level only.
-          await sendEmulationCommands(target, commands.filter(command => command.method === 'Emulation.setTouchEmulationEnabled'), signal);
+          await sendEmulationCommands(
+            target,
+            commands.filter(command => command.method === 'Emulation.setTouchEmulationEnabled'),
+            signal,
+          );
           await chrome.debugger
             .sendCommand(
               target,
@@ -1491,10 +1597,15 @@ async function withDebuggerSession<T>(
       return await run();
     } catch (error) {
       if (attempt >= 1 || !isDebuggerSessionGoneError(error)) {
-        console.warn('[debuggerManager] command failed', JSON.stringify({
-          tabId, consumer, generation: lease.generation,
-          error: error instanceof Error ? error.message : String(error),
-        }));
+        console.warn(
+          '[debuggerManager] command failed',
+          JSON.stringify({
+            tabId,
+            consumer,
+            generation: lease.generation,
+            error: error instanceof Error ? error.message : String(error),
+          }),
+        );
         throw error;
       }
       console.warn(
@@ -1525,23 +1636,51 @@ export async function enableEmulationForTab(tabId: number, config: EmulationConf
 }
 
 /** Commit shared UA/safe-area fields once after the App/device intents and document scripts agree. */
-export async function synchronizeAppDeviceIdentityForTab(tabId: number, baseline: DeviceEnvironmentObservation, options: { preserveHostPlatform?: boolean; preserveHostInput?: boolean } = {}): Promise<void> {
+export async function synchronizeAppDeviceIdentityForTab(
+  tabId: number,
+  baseline: DeviceEnvironmentObservation,
+  options: { preserveHostPlatform?: boolean; preserveHostInput?: boolean } = {},
+): Promise<void> {
   const device = getEmulationConfigForTab(tabId);
   const shell = await getDeviceShellForTab(tabId);
   const app = await getAppProfileForTab(tabId);
-  const { userAgent, userAgentMetadata } = resolveAppDeviceUserAgent(baseline, device, shell && app ? app.userAgent : undefined);
-  if (!userAgentMetadata) throw new Error('ENVIRONMENT_BASELINE_UNSUPPORTED: native Client Hints must be captured before an override');
-  const identity = { userAgent, platform: options.preserveHostPlatform ? baseline.platform : device?.platform ?? baseline.platform, userAgentMetadata };
+  const { userAgent, userAgentMetadata } = resolveAppDeviceUserAgent(
+    baseline,
+    device,
+    shell && app ? app.userAgent : undefined,
+  );
+  if (!userAgentMetadata)
+    throw new Error(
+      'ENVIRONMENT_BASELINE_UNSUPPORTED: native Client Hints must be captured before an override',
+    );
+  const identity = {
+    userAgent,
+    platform: options.preserveHostPlatform
+      ? baseline.platform
+      : (device?.platform ?? baseline.platform),
+    userAgentMetadata,
+  };
   await withDebuggerSession(tabId, 'app-device-identity', async () => {
     await markEnvironmentMutation(tabId, 'device');
     await chrome.debugger.sendCommand({ tabId }, 'Emulation.setUserAgentOverride', identity);
-    if (options.preserveHostInput) await chrome.debugger.sendCommand({ tabId }, 'Emulation.setEmitTouchEventsForMouse', { enabled: false });
-    await chrome.debugger.sendCommand({ tabId }, 'Emulation.setSafeAreaInsetsOverride',
-      safeAreaInsetsParams(device?.safeAreaInsets ?? baseline.safeAreaInsets));
-    ensureTabState(tabId).hostEnvironment = (device || app) && (options.preserveHostPlatform || options.preserveHostInput) ? {
-      deviceRevision: await getEnvironmentRevision(tabId, 'device'), appRevision: await getEnvironmentRevision(tabId, 'app'),
-      identity, preserveInput: Boolean(options.preserveHostInput),
-    } : undefined;
+    if (options.preserveHostInput)
+      await chrome.debugger.sendCommand({ tabId }, 'Emulation.setEmitTouchEventsForMouse', {
+        enabled: false,
+      });
+    await chrome.debugger.sendCommand(
+      { tabId },
+      'Emulation.setSafeAreaInsetsOverride',
+      safeAreaInsetsParams(device?.safeAreaInsets ?? baseline.safeAreaInsets),
+    );
+    ensureTabState(tabId).hostEnvironment =
+      (device || app) && (options.preserveHostPlatform || options.preserveHostInput)
+        ? {
+            deviceRevision: await getEnvironmentRevision(tabId, 'device'),
+            appRevision: await getEnvironmentRevision(tabId, 'app'),
+            identity,
+            preserveInput: Boolean(options.preserveHostInput),
+          }
+        : undefined;
   });
 }
 
@@ -1585,9 +1724,14 @@ async function ensureDeviceShellParentEnvironment(
   }
   if ((await getDeviceShellForTab(tabId))?.config.phoneFrame) {
     // The preview's iframe owns the preset dimensions. DevTools may size the outer viewport.
-    await sendEmulationCommands(tabId, commands.filter(({ method }) =>
-      method !== 'Emulation.setDeviceMetricsOverride' && method !== 'Emulation.setVisibleSize',
-    ), signal);
+    await sendEmulationCommands(
+      tabId,
+      commands.filter(
+        ({ method }) =>
+          method !== 'Emulation.setDeviceMetricsOverride' && method !== 'Emulation.setVisibleSize',
+      ),
+      signal,
+    );
     return;
   }
   if (!('width' in config)) {
@@ -1678,9 +1822,22 @@ export async function readEmulationRuntimeState(
  * 报 "not attached"，Emulation override 随之丢失）。Page.reload 是 session 内部的命令，
  * 不经由 tabs API 重新接管标签页，因此不会把自己所在的 session 弄掉。
  */
-export async function reloadTabInSession(tabId: number): Promise<void> {
+export async function reloadTabInSession(
+  tabId: number,
+  options: { startWithDeviceShell?: boolean } = {},
+): Promise<void> {
   await withDebuggerSession(tabId, 'emulation-reload', async () => {
-    await chrome.debugger.sendCommand({ tabId }, 'Page.reload', { ignoreCache: false });
+    const state = tabStates.get(tabId);
+    const cancel =
+      options.startWithDeviceShell && !state?.modificationActive
+        ? state?.rootWebViewNavigation?.prepareShellReload()
+        : undefined;
+    try {
+      await chrome.debugger.sendCommand({ tabId }, 'Page.reload', { ignoreCache: false });
+    } catch (error) {
+      cancel?.();
+      throw error;
+    }
   });
 }
 
@@ -1866,28 +2023,36 @@ export async function handleRequestPaused(tabId: number, params: any, sessionId?
   // Fetch continuations explicitly carry the same UA as the document-start profile.
   const userAgent = sessionId ? undefined : state?.appProfileUserAgent;
   const resumeHeaders =
-    responseStatusCode == null && !params.responseErrorReason && (userAgent || request.headers !== originalHeaders)
+    responseStatusCode == null &&
+    !params.responseErrorReason &&
+    (userAgent || request.headers !== originalHeaders)
       ? [
           ...Object.entries(request.headers ?? {})
             .filter(([name]) => !userAgent || name.toLowerCase() !== 'user-agent')
             .map(([name, value]) => ({ name, value: String(value) })),
-          ...(userAgent
-            ? [{ name: 'User-Agent', value: userAgent }]
-            : []),
+          ...(userAgent ? [{ name: 'User-Agent', value: userAgent }] : []),
         ]
       : undefined;
-  const resume = () => continueRequest(
-    requestTarget, requestId, resumeHeaders,
-    Boolean(sessionId && (responseStatusCode != null || params.responseErrorReason)),
-  );
-  if (!state || params.responseErrorReason ||
-      (sessionId && (!state.modificationActive || !listBusinessWebViewSessions(tabId).includes(sessionId)))) {
+  const resume = () =>
+    continueRequest(
+      requestTarget,
+      requestId,
+      resumeHeaders,
+      Boolean(sessionId && (responseStatusCode != null || params.responseErrorReason)),
+    );
+  if (
+    !state ||
+    params.responseErrorReason ||
+    (sessionId &&
+      (!state.modificationActive || !listBusinessWebViewSessions(tabId).includes(sessionId)))
+  ) {
     state?.requestStates.delete(requestKey);
     await resume();
     return;
   }
   const fulfill = async (response: WebViewDocumentResponse & { requestId: string }) => {
-    if (!sessionId && await state.rootWebViewNavigation?.fulfillResponse(params, response)) return;
+    if (!sessionId && (await state.rootWebViewNavigation?.fulfillResponse(params, response)))
+      return;
     await chrome.debugger.sendCommand(requestTarget, 'Fetch.fulfillRequest', response);
   };
 
@@ -1986,9 +2151,13 @@ export async function handleRequestPaused(tabId: number, params: any, sessionId?
     state.requestStates.delete(requestKey);
     if (globalTranslation !== 'none') {
       try {
-        const bodyResult = (await chrome.debugger.sendCommand(requestTarget, 'Fetch.getResponseBody', {
-          requestId,
-        })) as { body: string; base64Encoded: boolean };
+        const bodyResult = (await chrome.debugger.sendCommand(
+          requestTarget,
+          'Fetch.getResponseBody',
+          {
+            requestId,
+          },
+        )) as { body: string; base64Encoded: boolean };
 
         const bodyText = bodyResult.base64Encoded
           ? decodeURIComponent(escape(atob(bodyResult.body)))
@@ -2095,10 +2264,14 @@ async function continueRequest(
   response = false,
 ) {
   try {
-    await chrome.debugger.sendCommand(target, response ? 'Fetch.continueResponse' : 'Fetch.continueRequest', {
-      requestId,
-      ...(headers && { headers }),
-    });
+    await chrome.debugger.sendCommand(
+      target,
+      response ? 'Fetch.continueResponse' : 'Fetch.continueRequest',
+      {
+        requestId,
+        ...(headers && { headers }),
+      },
+    );
   } catch (error: any) {
     // 忽略常见的无害错误
     if (

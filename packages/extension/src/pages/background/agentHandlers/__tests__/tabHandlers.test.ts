@@ -1,4 +1,13 @@
-vi.mock('../../appProfileCatalog', () => ({ resolveAvailableAppProfile: async (...args: Parameters<typeof import('../../../../../../app-profiles/src/__tests__/fixtures').resolveAppProfile>) => (await import('../../../../../../app-profiles/src/__tests__/fixtures')).resolveAppProfile(...args) }));
+vi.mock('../../appProfileCatalog', () => ({
+  resolveAvailableAppProfile: async (
+    ...args: Parameters<
+      typeof import('../../../../../../app-profiles/src/__tests__/fixtures').resolveAppProfile
+    >
+  ) =>
+    (await import('../../../../../../app-profiles/src/__tests__/fixtures')).resolveAppProfile(
+      ...args,
+    ),
+}));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../backgroundPageActivity', () => ({
@@ -998,6 +1007,22 @@ describe('applyEmulationWithReload', () => {
       .mockResolvedValueOnce(inEffect);
 
     await expect(applyEmulationWithReload(1, config, 'https://example.test/')).resolves.toBe(true);
+    expect(vi.mocked(reloadTabInSession)).toHaveBeenCalledTimes(2);
+  });
+
+  it('reuses the device configuration prepared for the shell and reapplies it if verification fails', async () => {
+    vi.mocked(readEmulationRuntimeState)
+      .mockResolvedValueOnce(desktop)
+      .mockResolvedValueOnce(inEffect);
+
+    await expect(
+      applyEmulationWithReload(1, config, 'https://example.test/', {
+        devicePrepared: true,
+      }),
+    ).resolves.toBe(true);
+
+    expect(vi.mocked(enableEmulationForTab)).not.toHaveBeenCalled();
+    expect(vi.mocked(reapplyEmulationForTab)).toHaveBeenCalledExactlyOnceWith(1, config);
     expect(vi.mocked(reloadTabInSession)).toHaveBeenCalledTimes(2);
   });
 

@@ -87,6 +87,51 @@ describe('root WebView navigation', () => {
     navigation.dispose();
   });
 
+  it('commits the shell before requesting the page and promotes a cross-origin WebView redirect', async () => {
+    const { navigation, sendCommand } = fixture();
+    const url = 'https://login.example/start';
+    const frame = { id: 'main', url, mimeType: 'text/html' };
+    navigation.initialize({ frame });
+    expect(navigation.prepareShellReload()).toBeTypeOf('function');
+    expect(await navigation.handle(request('main', url))).toBe(true);
+    expect(sendCommand).toHaveBeenCalledExactlyOnceWith(
+      'Fetch.fulfillRequest',
+      expect.objectContaining({
+        responseCode: 200,
+        responseHeaders: expect.arrayContaining([{ name: 'Server-Timing', value: 'fixture' }]),
+      }),
+    );
+
+    navigation.handleFrameEvent('Page.frameNavigated', { frame });
+    navigation.handleFrameEvent('Page.frameAttached', { frameId: 'root', parentFrameId: 'main' });
+    expect(await navigation.handle(request('root', url))).toBe(false);
+    expect(await navigation.handle(request('root', 'https://login.example/redirected'))).toBe(
+      false,
+    );
+    const callback = request();
+    expect(await navigation.handle(callback)).toBe(true);
+    expect(sendCommand).toHaveBeenLastCalledWith('Page.navigate', { url: callback.request.url });
+    expect(sendCommand).not.toHaveBeenCalledWith('Fetch.getResponseBody', expect.anything());
+    navigation.dispose();
+  });
+
+  it('keeps callback URLs and form submissions on the original top-level request path', async () => {
+    const { navigation, sendCommand } = fixture();
+    const url = 'https://login.example/start';
+    const frame = { id: 'main', url, mimeType: 'text/html' };
+    navigation.initialize({ frame: { ...frame, url: url + '?code=once' } });
+    expect(navigation.prepareShellReload()).toBeUndefined();
+
+    navigation.initialize({ frame });
+    navigation.prepareShellReload();
+    const post = request('main', url);
+    post.request.method = 'POST';
+    expect(await navigation.handle(post)).toBe(false);
+    expect(await navigation.handle(request('main', url))).toBe(false);
+    expect(sendCommand).not.toHaveBeenCalled();
+    navigation.dispose();
+  });
+
   it.each([false, true])(
     'delivers a synthetic HTML response at the response/request stage (%s)',
     async requestStage => {
@@ -357,16 +402,22 @@ describe('root WebView navigation', () => {
   it('reports a same-shell root commit without reporting shell startup or nested frames', async () => {
     const { navigation, sendCommand } = fixture();
     await navigation.handle(response());
-    const commit = (frame: { id: string; url: string; urlFragment?: string; name?: string; parentId?: string }) =>
-      navigation.handleFrameEvent('Page.frameNavigated', { frame });
+    const commit = (frame: {
+      id: string;
+      url: string;
+      urlFragment?: string;
+      name?: string;
+      parentId?: string;
+    }) => navigation.handleFrameEvent('Page.frameNavigated', { frame });
     const origin = 'https://business.example';
     expect(commit({ id: 'main', url: origin + '/callback' })).toBeUndefined();
     const root = { id: 'new-root', parentId: 'main', name: '__mearl_root__' };
     expect(commit({ ...root, url: 'about:blank' })).toBeUndefined();
     expect(commit({ ...root, url: replayUrl(sendCommand) })).toBeUndefined();
     expect(commit({ ...root, url: origin + '/nested', parentId: 'new-root' })).toBeUndefined();
-    expect(commit({ ...root, url: origin + '/next?item=1', urlFragment: '#details' }))
-      .toBe(origin + '/next?item=1#details');
+    expect(commit({ ...root, url: origin + '/next?item=1', urlFragment: '#details' })).toBe(
+      origin + '/next?item=1#details',
+    );
     navigation.dispose();
   });
 

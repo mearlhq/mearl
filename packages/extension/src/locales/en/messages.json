@@ -838,6 +838,7 @@
   "devicePreviewToolbar": { "message": "Device toolbar" },
   "devicePreviewToolbarCollapse": { "message": "Collapse device toolbar" },
   "deviceSimulationEnableFromPage": { "message": "Enable app simulation" },
+  "deviceSimulationDisableFromPage": { "message": "Disable app simulation" },
   "deviceSimulationNoApp": { "message": "No app" },
   "deviceSimulationDisable": { "message": "Turn off device simulation" },
   "devicePreviewCapturing": { "message": "Capturing" },

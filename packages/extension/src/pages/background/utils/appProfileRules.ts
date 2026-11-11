@@ -17,7 +17,11 @@
 import type { InjectedAppProfileConfig, ResolvedEmulationConfig } from '@mearl/browser-core';
 import { markEnvironmentMutation } from '../environmentRevisions';
 import { updateAppProfileActionIcon } from './appProfileActionIcon';
-import { appProfileRuntimePins, captureAppProfileHostCapabilities, replaceAppProfileRuntimePins } from '../appProfileHostCapabilities';
+import {
+  appProfileRuntimePins,
+  captureAppProfileHostCapabilities,
+  replaceAppProfileRuntimePins,
+} from '../appProfileHostCapabilities';
 import { browserCapabilityRegistry } from '../browserCapabilityRegistry';
 
 export const APP_PROFILE_SERVER_TIMING_KEY = 'mearl-app-profile';
@@ -49,6 +53,11 @@ interface ApplyAppProfileOptions {
 
 /** tabId → 配置规则。Service Worker 重启后会从 session rules 重建。 */
 const appProfileTabs = new Map<number, AppProfileTabEntry>();
+const appProfileStateListeners = new Set<() => void>();
+
+export function onAppProfileStateChange(listener: () => void): void {
+  appProfileStateListeners.add(listener);
+}
 
 export async function getAppProfileBootstrapHeaderForTab(tabId: number) {
   await ensureHydrated();
@@ -151,7 +160,9 @@ async function ensureHydrated(): Promise<void> {
     if (typeof indexedDB !== 'undefined') {
       await browserCapabilityRegistry().synchronizePageRuntimePins(
         Object.fromEntries(
-          [...appProfileTabs.entries()].flatMap(([tabId, entry]) => Object.entries(appProfileRuntimePins(`tab:${tabId}`, entry.config))),
+          [...appProfileTabs.entries()].flatMap(([tabId, entry]) =>
+            Object.entries(appProfileRuntimePins(`tab:${tabId}`, entry.config)),
+          ),
         ),
       );
     }
@@ -256,7 +267,9 @@ export async function applyAppProfileForTab(
     const ruleId = allocateRuleId();
     const nextTabIds = [...new Set([...appProfileTabs.keys(), tabId])];
     const stripRule = buildStripRule(nextTabIds);
-    const changedRuntime = JSON.stringify(appProfileRuntimePins('tab', previous?.config)) !== JSON.stringify(appProfileRuntimePins('tab', config));
+    const changedRuntime =
+      JSON.stringify(appProfileRuntimePins('tab', previous?.config)) !==
+      JSON.stringify(appProfileRuntimePins('tab', config));
     if (changedRuntime)
       await browserCapabilityRegistry().pinPageRuntimes({
         ...replaceAppProfileRuntimePins(`tab:${tabId}`, previous?.config, config),
@@ -297,14 +310,24 @@ export async function applyAppProfileForTab(
       ownsDeviceEmulation: options.ownsDeviceEmulation === true,
       deviceEmulation: options.deviceEmulation,
     });
+    if (!previous) appProfileStateListeners.forEach(listener => listener());
     if (Boolean(previous?.config.settingsGroup) !== Boolean(config.settingsGroup)) {
-      void chrome.tabs.sendMessage(tabId, {
-        action: 'appProfileSettingsAvailability',
-        available: Boolean(config.settingsGroup),
-      }, { frameId: 0 }).catch(() => {});
+      void chrome.tabs
+        .sendMessage(
+          tabId,
+          {
+            action: 'appProfileSettingsAvailability',
+            available: Boolean(config.settingsGroup),
+          },
+          { frameId: 0 },
+        )
+        .catch(() => {});
     }
     if (changedRuntime)
-      await browserCapabilityRegistry().pinPageRuntimes({ ...replaceAppProfileRuntimePins(`rule:${tabId}`, previous?.config), [`rule:${tabId}`]: null });
+      await browserCapabilityRegistry().pinPageRuntimes({
+        ...replaceAppProfileRuntimePins(`rule:${tabId}`, previous?.config),
+        [`rule:${tabId}`]: null,
+      });
     await updateAppProfileActionIcon(tabId, config).catch(error => {
       console.warn('[AppProfile] Failed to update action icon:', error);
     });
@@ -331,14 +354,23 @@ async function removeAppProfileForTab(tabId: number, restoreActionIcon: boolean)
       ...(stripRule ? { addRules: [stripRule] } : {}),
     });
     appProfileTabs.delete(tabId);
+    appProfileStateListeners.forEach(listener => listener());
     if (Object.keys(appProfileRuntimePins(`tab:${tabId}`, entry.config)).length)
-      await browserCapabilityRegistry().pinPageRuntimes(replaceAppProfileRuntimePins(`tab:${tabId}`, entry.config));
+      await browserCapabilityRegistry().pinPageRuntimes(
+        replaceAppProfileRuntimePins(`tab:${tabId}`, entry.config),
+      );
     if (restoreActionIcon) {
       if (entry.config.settingsGroup) {
-        void chrome.tabs.sendMessage(tabId, {
-          action: 'appProfileSettingsAvailability',
-          available: false,
-        }, { frameId: 0 }).catch(() => {});
+        void chrome.tabs
+          .sendMessage(
+            tabId,
+            {
+              action: 'appProfileSettingsAvailability',
+              available: false,
+            },
+            { frameId: 0 },
+          )
+          .catch(() => {});
       }
       await updateAppProfileActionIcon(tabId).catch(error => {
         console.warn('[AppProfile] Failed to restore action icon:', error);

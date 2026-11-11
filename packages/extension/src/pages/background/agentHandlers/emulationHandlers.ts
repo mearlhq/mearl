@@ -53,6 +53,7 @@ interface SetDeviceEmulationHandlerOptions {
   /** Internal composition owns the final navigation after all components are prepared. */
   deferReload?: boolean;
   preservePreviewPanel?: boolean;
+  startWithDeviceShell?: boolean;
 }
 
 export async function handleSetDeviceEmulation(
@@ -101,7 +102,11 @@ export async function handleSetDeviceEmulation(
     data.splitScreen === true &&
     config.orientation === 'landscape';
   const shellConfig = deviceShell
-    ? await getPreferredDeviceChromeConfig(config, splitScreen, options.preserveQuickDeviceOwnership ? undefined : data.scale)
+    ? await getPreferredDeviceChromeConfig(
+        config,
+        splitScreen,
+        options.preserveQuickDeviceOwnership ? undefined : data.scale,
+      )
     : null;
   if (shellConfig) {
     if (splitScreen) {
@@ -131,24 +136,36 @@ export async function handleSetDeviceEmulation(
       currentDeviceShell?.splitScreen !== splitScreen ||
       Boolean(currentDeviceShell?.config.phoneFrame) !== Boolean(shellConfig?.phoneFrame) ||
       currentDeviceShell?.config.phoneFrame?.maxScale !== shellConfig?.phoneFrame?.maxScale);
-  const canKeepPreview = options.preservePreviewPanel && deviceShellConfigChanged &&
-    currentDeviceShell?.config.phoneFrame && shellConfig?.phoneFrame &&
+  const canKeepPreview =
+    options.preservePreviewPanel &&
+    deviceShellConfigChanged &&
+    currentDeviceShell?.config.phoneFrame &&
+    shellConfig?.phoneFrame &&
     currentDeviceShell.config.platform === shellConfig.platform &&
     currentDeviceShell.config.sideBarWidth === shellConfig.sideBarWidth;
-  const notifyChrome = () => chrome.tabs.sendMessage(tabId, {
-    action: QUICK_DEVICE_CHROME_UPDATE_ACTION,
-    config: shellConfig,
-  }).catch(() => {});
-  if (options.deferReload || (data.reload === false && !deviceShellChanged && !deviceShellConfigChanged)) {
-    await enableEmulationForTab(tabId, config);
-  } else if (canKeepPreview && await reloadContainerTopFrame(tabId, {
-    singleRoot: true,
-    beforeNavigate: async target => {
-      await refreshChildDeviceScripts(tabId);
-      await notifyChrome();
-      return allowLocalRootWebViewReload(tabId, target.frameId, target.url);
-    },
-  }).catch(() => undefined)) {
+  const notifyChrome = () =>
+    chrome.tabs
+      .sendMessage(tabId, {
+        action: QUICK_DEVICE_CHROME_UPDATE_ACTION,
+        config: shellConfig,
+      })
+      .catch(() => {});
+  if (
+    options.deferReload ||
+    (data.reload === false && !deviceShellChanged && !deviceShellConfigChanged)
+  ) {
+    if (!shellConfig) await enableEmulationForTab(tabId, config);
+  } else if (
+    canKeepPreview &&
+    (await reloadContainerTopFrame(tabId, {
+      singleRoot: true,
+      beforeNavigate: async target => {
+        await refreshChildDeviceScripts(tabId);
+        await notifyChrome();
+        return allowLocalRootWebViewReload(tabId, target.frameId, target.url);
+      },
+    }).catch(() => undefined))
+  ) {
     reloaded = true;
   } else {
     let expectedUrl = '';
@@ -158,9 +175,13 @@ export async function handleSetDeviceEmulation(
     } catch (error) {
       console.warn('[set_device_emulation] could not read tab url:', error);
     }
-    const applied = appProfile
-      ? await applyEmulationWithReload(tabId, config, expectedUrl, appProfile.userAgent)
-      : await applyEmulationWithReload(tabId, config, expectedUrl);
+    const applied = await applyEmulationWithReload(tabId, config, expectedUrl, {
+      expectedUserAgent: appProfile?.userAgent,
+      devicePrepared: Boolean(shellConfig),
+      ...(options.startWithDeviceShell &&
+        shellConfig &&
+        !currentDeviceShell && { startWithDeviceShell: true }),
+    });
     if (!applied) {
       throw new Error('Device emulation did not remain active after reload');
     }

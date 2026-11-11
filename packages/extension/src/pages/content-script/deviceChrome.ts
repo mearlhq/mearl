@@ -147,21 +147,38 @@ const STARTUP_VIEWPORT_HEIGHT_TOLERANCE = 12;
 
 type PreviewViewport = NonNullable<DevicePreviewLayout['viewport']>;
 
-export function readPhoneFrameBootstrap(timing: readonly Pick<PerformanceServerTiming, 'name' | 'description'>[] | undefined): {
-  config: QuickDeviceChromeConfig;
-  previewLayout: DevicePreviewLayout;
-} | undefined {
-  if (!timing?.some(entry => entry.name === 'mearl-document')) return;
+export function readPhoneFrameBootstrap(
+  timing: readonly Pick<PerformanceServerTiming, 'name' | 'description'>[] | undefined,
+):
+  | {
+      config: QuickDeviceChromeConfig;
+      previewLayout: DevicePreviewLayout;
+    }
+  | undefined {
+  if (
+    !timing?.some(
+      entry => entry.name === 'mearl-document' || entry.name === 'mearl-device-shell-start',
+    )
+  )
+    return;
   for (const entry of timing) {
     if (entry.name !== 'mearl-device-shell') continue;
     try {
       const bytes = Uint8Array.from(atob(entry.description), character => character.charCodeAt(0));
       const { version, config, previewLayout } = JSON.parse(new TextDecoder().decode(bytes));
       const frame = config?.phoneFrame;
-      if (version !== 1 || !frame || !previewLayout || typeof previewLayout !== 'object' ||
-          ![frame.width, frame.height, frame.maxScale ?? 1].every(value => Number.isFinite(value) && value > 0) ||
-          !['ios', 'android'].includes(config.platform) ||
-          !['none', 'dynamic-island', 'notch', 'side-camera'].includes(config.cutout)) continue;
+      if (
+        version !== 1 ||
+        !frame ||
+        !previewLayout ||
+        typeof previewLayout !== 'object' ||
+        ![frame.width, frame.height, frame.maxScale ?? 1].every(
+          value => Number.isFinite(value) && value > 0,
+        ) ||
+        !['ios', 'android'].includes(config.platform) ||
+        !['none', 'dynamic-island', 'notch', 'side-camera'].includes(config.cutout)
+      )
+        continue;
       return { config, previewLayout };
     } catch {
       // An invalid navigation header leaves initialization to the background response.
@@ -176,15 +193,26 @@ function readPreviewViewport(): PreviewViewport {
   };
 }
 
-function previewGeometry({ width, height }: PreviewViewport, open: boolean, requestedWidth?: number) {
+function previewGeometry(
+  { width, height }: PreviewViewport,
+  open: boolean,
+  requestedWidth?: number,
+) {
   const stacked = width < MIN_DOCKED_PREVIEW_WIDTH;
   const maxPanelWidth = width - MIN_PREVIEW_WIDTH;
   const defaultWidth = Math.round(width * 0.6);
-  const panelWidth = open && !stacked
-    ? Math.min(maxPanelWidth, Math.max(MIN_PANEL_WIDTH, requestedWidth ?? defaultWidth))
-    : 0;
+  const panelWidth =
+    open && !stacked
+      ? Math.min(maxPanelWidth, Math.max(MIN_PANEL_WIDTH, requestedWidth ?? defaultWidth))
+      : 0;
   const panelHeight = open && stacked ? Math.round(height * 0.45) : 0;
-  return { width: width - panelWidth, height: height - panelHeight, panelWidth, panelHeight, maxPanelWidth };
+  return {
+    width: width - panelWidth,
+    height: height - panelHeight,
+    panelWidth,
+    panelHeight,
+    maxPanelWidth,
+  };
 }
 
 function phoneFrameMarkup(width: number, height: number): string {
@@ -317,9 +345,10 @@ function createPreviewControls(
   let loadingTimer: number | undefined;
   let destroyed = false;
   let wide = viewport().width >= MIN_DOCKED_PREVIEW_WIDTH;
-  let open = initialLayout?.panel?.wide === wide && typeof initialLayout.panel.open === 'boolean'
-    ? initialLayout.panel.open
-    : wide;
+  let open =
+    initialLayout?.panel?.wide === wide && typeof initialLayout.panel.open === 'boolean'
+      ? initialLayout.panel.open
+      : wide;
   const showStatus = (label = '', isError = false) => {
     statusLabel.textContent = label;
     retryButton.hidden = !isError;
@@ -335,14 +364,17 @@ function createPreviewControls(
   const area = () => previewGeometry(viewport(), open, requestedWidth);
   toolbar.element.hidden = initialLayout?.toolbarCollapsed === true;
   if (!initialLayout) {
-    void options.loadLayout().then(({ width, toolbarCollapsed }) => {
-      if (destroyed) return;
-      const hideToolbar = !toolbarChanged && toolbarCollapsed === true;
-      const applyWidth = requestedWidth === undefined && validWidth(width);
-      if (hideToolbar) toolbar.element.hidden = true;
-      if (applyWidth) requestedWidth = width;
-      if (hideToolbar || applyWidth) onChange();
-    }).catch(() => {});
+    void options
+      .loadLayout()
+      .then(({ width, toolbarCollapsed }) => {
+        if (destroyed) return;
+        const hideToolbar = !toolbarChanged && toolbarCollapsed === true;
+        const applyWidth = requestedWidth === undefined && validWidth(width);
+        if (hideToolbar) toolbar.element.hidden = true;
+        if (applyWidth) requestedWidth = width;
+        if (hideToolbar || applyWidth) onChange();
+      })
+      .catch(() => {});
   }
 
   const resize = () => {
@@ -383,7 +415,10 @@ function createPreviewControls(
     if (drag?.pointerId !== event.pointerId) return;
     const { panelWidth, maxPanelWidth } = area();
     if (!panelWidth) return;
-    requestedWidth = Math.min(maxPanelWidth, Math.max(MIN_PANEL_WIDTH, Math.round(drag.width + drag.x - event.clientX)));
+    requestedWidth = Math.min(
+      maxPanelWidth,
+      Math.max(MIN_PANEL_WIDTH, Math.round(drag.width + drag.x - event.clientX)),
+    );
     onChange();
   });
   divider.addEventListener('lostpointercapture', () => {
@@ -393,11 +428,20 @@ function createPreviewControls(
   divider.addEventListener('keydown', event => {
     const { panelWidth, maxPanelWidth } = area();
     switch (event.key) {
-      case 'ArrowLeft': requestedWidth = Math.min(maxPanelWidth, panelWidth + 20); break;
-      case 'ArrowRight': requestedWidth = Math.max(MIN_PANEL_WIDTH, panelWidth - 20); break;
-      case 'Home': requestedWidth = MIN_PANEL_WIDTH; break;
-      case 'End': requestedWidth = maxPanelWidth; break;
-      default: return;
+      case 'ArrowLeft':
+        requestedWidth = Math.min(maxPanelWidth, panelWidth + 20);
+        break;
+      case 'ArrowRight':
+        requestedWidth = Math.max(MIN_PANEL_WIDTH, panelWidth - 20);
+        break;
+      case 'Home':
+        requestedWidth = MIN_PANEL_WIDTH;
+        break;
+      case 'End':
+        requestedWidth = maxPanelWidth;
+        break;
+      default:
+        return;
     }
     event.preventDefault();
     options.saveWidth(requestedWidth);
@@ -441,14 +485,20 @@ function createPreviewControls(
       }
     }, PANEL_READY_TIMEOUT_MS);
   };
-  const request = async (enable: boolean, { automaticRetry = false, retryCapture = false } = {}) => {
+  const request = async (
+    enable: boolean,
+    { automaticRetry = false, retryCapture = false } = {},
+  ) => {
     if (button.disabled) return;
     button.disabled = true;
     if (!automaticRetry) {
       window.clearTimeout(loadingTimer);
       showStatus(retryCapture ? options.loadingLabel : '');
       if (enable && !retryCapture) {
-        loadingTimer = window.setTimeout(() => showStatus(options.loadingLabel), PANEL_LOADING_DELAY_MS);
+        loadingTimer = window.setTimeout(
+          () => showStatus(options.loadingLabel),
+          PANEL_LOADING_DELAY_MS,
+        );
       }
     }
     if (!enable) removeFrame();
@@ -558,7 +608,9 @@ export function createQuickDeviceChromeManager(
   const sharedViewState = () => {
     const useFrameColors = config?.phoneFrame && appState === DEFAULT_DEVICE_CHROME_STATE;
     return {
-      statusBarBackground: useFrameColors ? 'var(--mearl-phone-system-background)' : appState.statusBarBackground,
+      statusBarBackground: useFrameColors
+        ? 'var(--mearl-phone-system-background)'
+        : appState.statusBarBackground,
       textColor: useFrameColors ? 'var(--mearl-phone-system-text)' : appState.textColor,
       bottomActionEnabled: Boolean(
         (profileSettings && options.showProfileSettings) ||
@@ -585,8 +637,10 @@ export function createQuickDeviceChromeManager(
 
   const viewport = (): PreviewViewport => {
     const actual = readPreviewViewport();
-    if (startupViewport?.width === actual.width &&
-        Math.abs(startupViewport.height - actual.height) <= STARTUP_VIEWPORT_HEIGHT_TOLERANCE) {
+    if (
+      startupViewport?.width === actual.width &&
+      Math.abs(startupViewport.height - actual.height) <= STARTUP_VIEWPORT_HEIGHT_TOLERANCE
+    ) {
       return startupViewport;
     }
     return actual;
@@ -597,16 +651,21 @@ export function createQuickDeviceChromeManager(
     const frame = config?.phoneFrame;
     const rule = layoutStyle?.sheet?.cssRules[0] as CSSStyleRule | undefined;
     if (!frame || !rule) return;
-    const { width, height, panelWidth, panelHeight } = previewControls?.area() ?? previewGeometry(viewport(), false);
+    const { width, height, panelWidth, panelHeight } =
+      previewControls?.area() ?? previewGeometry(viewport(), false);
     const toolbar = previewControls?.toolbar.element;
-    const toolbarMaxWidth = width - 2 * (width >= MIN_DEBUG_PREVIEW_WIDTH ? TOOLBAR_SIDE_GUTTER : PREVIEW_CONTROL_INSET);
+    const toolbarMaxWidth =
+      width - 2 * (width >= MIN_DEBUG_PREVIEW_WIDTH ? TOOLBAR_SIDE_GUTTER : PREVIEW_CONTROL_INSET);
     const compact = toolbarMaxWidth < 318;
     const toolbarSpace = toolbar && !toolbar.hidden ? (compact ? 72 : 42) : 0;
     const centerY = (height + toolbarSpace) / 2;
-    const scale = Math.min(frame.maxScale ?? 1, Math.max(0.01, Math.min(
-      (width - 48) / frame.width,
-      (height - 48 - toolbarSpace) / frame.height,
-    )));
+    const scale = Math.min(
+      frame.maxScale ?? 1,
+      Math.max(
+        0.01,
+        Math.min((width - 48) / frame.width, (height - 48 - toolbarSpace) / frame.height),
+      ),
+    );
     if (toolbar) {
       toolbar.classList.toggle('compact', compact);
       toolbar.style.left = `${width / 2}px`;
@@ -614,7 +673,10 @@ export function createQuickDeviceChromeManager(
       toolbar.style.maxWidth = `${toolbarMaxWidth}px`;
     }
     rule.style.setProperty('--mearl-phone-frame-left', panelWidth ? `${width / 2}px` : '50%');
-    rule.style.setProperty('--mearl-phone-frame-top', startupViewport || toolbarSpace || panelHeight ? `${centerY}px` : '50%');
+    rule.style.setProperty(
+      '--mearl-phone-frame-top',
+      startupViewport || toolbarSpace || panelHeight ? `${centerY}px` : '50%',
+    );
     rule.style.setProperty('--mearl-phone-frame-scale', String(scale));
   };
 
@@ -657,7 +719,12 @@ export function createQuickDeviceChromeManager(
     }
     if (config?.phoneFrame && options.previewPanel) {
       if (!previewControls) {
-        previewControls = createPreviewControls(options.previewPanel, resizePhoneFrame, viewport, initialPreviewLayout);
+        previewControls = createPreviewControls(
+          options.previewPanel,
+          resizePhoneFrame,
+          viewport,
+          initialPreviewLayout,
+        );
         initialPreviewLayout = undefined;
       }
       if (previewControls.host.parentNode !== document.documentElement) {
@@ -724,8 +791,7 @@ export function createQuickDeviceChromeManager(
           const bridgeConfig = appState.bridgeConfig;
           if (bridgeConfig?.settingsUi === 'runtime' && options.showBridgeConfig)
             options.showBridgeConfig(bridgeConfig);
-          else if (profileSettings && options.showProfileSettings)
-            options.showProfileSettings();
+          else if (profileSettings && options.showProfileSettings) options.showProfileSettings();
           else if (bridgeConfig) options.showBridgeConfig?.(bridgeConfig);
         },
         labels: options.labels
@@ -740,7 +806,8 @@ export function createQuickDeviceChromeManager(
         initialState: sharedViewState(),
       });
       const captureStyle = document.createElement('style');
-      captureStyle.textContent = ':host { display: var(--mearl-device-chrome-display, block) !important; }';
+      captureStyle.textContent =
+        ':host { display: var(--mearl-device-chrome-display, block) !important; }';
       currentHost.shadowRoot!.append(captureStyle);
       if (config.phoneFrame && options.onSafeAreaMismatch && typeof ResizeObserver === 'function') {
         const { top, right, bottom, left } = config.safeAreaInsets;

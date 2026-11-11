@@ -154,6 +154,7 @@ describe('quickSimulationAutoRules', () => {
       tabId: 7,
       profile: 'chat',
       deviceSelection: selection.deviceSelection,
+      startWithDeviceShell: true,
     });
     await expect(getQuickSimulationAutoRuleForTab(7)).resolves.toMatchObject({
       rule: { profile: 'chat' },
@@ -252,7 +253,9 @@ describe('quickSimulationAutoRules', () => {
 
     await setQuickDeviceSimulationWithAutoRuleSync({ tabId: 7, deviceSelection: null });
 
-    expect(quickSimulationMocks.clearQuickDeviceEmulation).toHaveBeenCalledWith(7, { clearUnownedDevice: true });
+    expect(quickSimulationMocks.clearQuickDeviceEmulation).toHaveBeenCalledWith(7, {
+      clearUnownedDevice: true,
+    });
   });
 
   it('restores the previous automatic rule when a synchronized manual update fails', async () => {
@@ -300,13 +303,18 @@ describe('quickSimulationAutoRules', () => {
   });
   it('keeps a matching basic UA profile across navigation without repeated reloads', async () => {
     await setQuickSimulationAutoRuleForTab(7, selection);
-    const { injected } = resolveAppProfile('reader', { devicePreset: 'iphone-17-pro', appVersion: selection.appVersion });
+    const { injected } = resolveAppProfile('reader', {
+      devicePreset: 'iphone-17-pro',
+      appVersion: selection.appVersion,
+    });
     expect(injected.globals).toEqual({});
     profileRuleMocks.getAppProfileForTab.mockResolvedValue(injected);
-    deviceStateMocks.getQuickDeviceSimulationState.mockReturnValue({ enabled: true, ...selection.deviceSelection });
+    deviceStateMocks.getQuickDeviceSimulationState.mockReturnValue({
+      enabled: true,
+      ...selection.deviceSelection,
+    });
     await applyQuickSimulationAutoRuleForTab(7);
     await applyQuickSimulationAutoRuleForTab(7, 'https://market.m.shop.com/next');
     expect(quickSimulationMocks.setQuickAppSimulation).not.toHaveBeenCalled();
   });
-
 });

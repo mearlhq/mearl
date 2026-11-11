@@ -74,6 +74,7 @@ describe('device emulation handler', () => {
       1,
       expect.objectContaining({ width: 393, presetName: 'iphone-15-pro' }),
       'https://example.test/',
+      { devicePrepared: false },
     );
     expect(profileRuleMocks.releaseAppProfileDeviceEmulationForTab).toHaveBeenCalledWith(
       1,
@@ -151,6 +152,12 @@ describe('device emulation handler', () => {
       expect.objectContaining({ presetName: 'iphone-17-pro' }),
       undefined,
     );
+    expect(tabMocks.applyEmulationWithReload).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ presetName: 'iphone-17-pro' }),
+      'https://example.test/',
+      { devicePrepared: true },
+    );
     expect(enabled).toMatchObject({ deviceShell: true, reloaded: true });
 
     vi.clearAllMocks();
@@ -215,7 +222,7 @@ describe('device emulation handler', () => {
       1,
       expect.objectContaining({ presetName: 'pixel-8' }),
       'https://example.test/',
-      profile.userAgent,
+      { expectedUserAgent: profile.userAgent, devicePrepared: false },
     );
     expect(debuggerMocks.prepareDeviceShellWebViewEnvironmentForTab).not.toHaveBeenCalled();
   });
@@ -247,17 +254,24 @@ describe('device emulation handler', () => {
 
   it('uses the saved frame preference for Agent and Quick Settings without exposing it to Agent', async () => {
     const data = { tabId: 1, enabled: true, preset: 'iphone-17-pro', deviceShell: true } as const;
-    chrome.storage.local.get = vi.fn().mockResolvedValueOnce({})
+    chrome.storage.local.get = vi
+      .fn()
+      .mockResolvedValueOnce({})
       .mockResolvedValueOnce({ quickDevicePhoneFrame: false });
     const response = await handleSetDeviceEmulation({ ...data, scale: 0.5 }, () => null);
-    expect(deviceShellRuleMocks.applyDeviceShellForTab.mock.lastCall?.[1].phoneFrame)
-      .toEqual({ width: 402, height: 874, maxScale: 0.5 });
+    expect(deviceShellRuleMocks.applyDeviceShellForTab.mock.lastCall?.[1].phoneFrame).toEqual({
+      width: 402,
+      height: 874,
+      maxScale: 0.5,
+    });
     expect(response.deviceShell).toBe(true);
     expect(response.viewport?.scale).toBe(0.5);
     expect(response).not.toHaveProperty('phoneFrame');
 
     await handleSetDeviceEmulation(data, () => null, { preserveQuickDeviceOwnership: true });
-    expect(deviceShellRuleMocks.applyDeviceShellForTab.mock.lastCall?.[1].phoneFrame).toBeUndefined();
+    expect(
+      deviceShellRuleMocks.applyDeviceShellForTab.mock.lastCall?.[1].phoneFrame,
+    ).toBeUndefined();
   });
 
   it('reloads only the business frame when a fixed preview rotates', async () => {
@@ -266,19 +280,31 @@ describe('device emulation handler', () => {
       emulation: { orientation: 'portrait' },
       splitScreen: false,
     });
-    containerMocks.reloadContainerTopFrame.mockImplementationOnce(async (_tabId, { beforeNavigate }) => {
-      const target = { frameId: 'root', url: 'https://example.test/' };
-      await beforeNavigate(target);
-      return target;
-    });
+    containerMocks.reloadContainerTopFrame.mockImplementationOnce(
+      async (_tabId, { beforeNavigate }) => {
+        const target = { frameId: 'root', url: 'https://example.test/' };
+        await beforeNavigate(target);
+        return target;
+      },
+    );
     await handleSetDeviceEmulation(
-      { tabId: 1, enabled: true, preset: 'iphone-17-pro', orientation: 'landscape', deviceShell: true },
+      {
+        tabId: 1,
+        enabled: true,
+        preset: 'iphone-17-pro',
+        orientation: 'landscape',
+        deviceShell: true,
+      },
       () => null,
       { preserveQuickDeviceOwnership: true, preservePreviewPanel: true },
     );
 
     expect(debuggerMocks.refreshChildDeviceScripts).toHaveBeenCalledWith(1);
-    expect(debuggerMocks.allowLocalRootWebViewReload).toHaveBeenCalledWith(1, 'root', 'https://example.test/');
+    expect(debuggerMocks.allowLocalRootWebViewReload).toHaveBeenCalledWith(
+      1,
+      'root',
+      'https://example.test/',
+    );
     expect(tabMocks.applyEmulationWithReload).not.toHaveBeenCalled();
   });
 
