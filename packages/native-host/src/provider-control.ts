@@ -288,7 +288,7 @@ export class ProviderControlService {
           this.request(browser, action, data, origin, host),
         );
       }
-      return manager.invoke(action, data, sessionId, undefined, origin);
+      return manager.invoke(action, data, sessionId, undefined, origin, deadline);
     });
   }
 

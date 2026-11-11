@@ -12,6 +12,33 @@ vi.mock('node:crypto', async importOriginal => {
 });
 
 describe('control sessions', () => {
+  it('releases the tab when its new control session cannot be returned before the deadline', async () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
+    const cleanup = vi.fn(async () => {});
+    const manager = new ControlSessionManager({
+      browserId: () => 'browser',
+      transport: () => 'cdp',
+      invoke: vi.fn(async () => {
+        clock.mockReturnValue(2000);
+        return { tabId: 1, opened: true, navigation: { status: 'pending' } };
+      }),
+      cleanup,
+      download: vi.fn(),
+      notify: vi.fn(),
+    });
+    try {
+      await expect(
+        manager.invoke('tab_open', { url: 'https://example.test/' }, 'new', 'cdp', 'local', 2000),
+      ).rejects.toThrow('deadline exceeded before returning the control session');
+      expect(cleanup).toHaveBeenCalledWith([1], 'cdp', true);
+      expect(manager.registry.list()).toEqual([]);
+      expect(manager.registry.blockedTabs()).toEqual([]);
+    } finally {
+      clock.mockRestore();
+      await manager.artifacts.dispose();
+    }
+  });
+
   it('resolves browser control by unique session or owned page without guessing between tasks', async () => {
     const manager = new ControlSessionManager({
       browserId: () => 'browser',
@@ -358,6 +385,53 @@ describe('control sessions', () => {
       expect(operation).not.toHaveBeenCalled();
     },
   );
+
+  it('rejects expired page requests before dispatch and keeps later requests ordered', async () => {
+    const registry = new ControlSessionRegistry(() => 'browser');
+    const active = Promise.withResolvers<void>();
+    const first = registry.run(undefined, 'page_eval', { tabId: 1 }, () => active.promise);
+    const expired = vi.fn(async () => {});
+    const live = vi.fn(async () => {});
+    const deadline = Date.now() + 1000;
+    const queued = registry.run(undefined, 'page_eval', { tabId: 1 }, expired, 'cdp', deadline);
+    const rejected = expect(queued).rejects.toThrow('deadline exceeded before dispatch');
+    const following = registry.run(undefined, 'page_eval', { tabId: 1 }, live);
+    vi.spyOn(Date, 'now').mockReturnValue(deadline);
+    try {
+      active.resolve();
+      await Promise.all([first, rejected, following]);
+      expect(expired).not.toHaveBeenCalled();
+      expect(live).toHaveBeenCalledOnce();
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it('starts closing with an in-flight request and cancels work queued behind it', async () => {
+    const registry = new ControlSessionRegistry(() => 'browser');
+    const active = Promise.withResolvers<void>();
+    const started = Promise.withResolvers<void>();
+    const first = registry.run(undefined, 'page_eval', { tabId: 1 }, () => {
+      started.resolve();
+      return active.promise;
+    });
+    await started.promise;
+    const dispatch = vi.fn(async () => {});
+    const queued = registry.run(undefined, 'tab_open', {}, dispatch);
+    const rejected = expect(queued).rejects.toThrow('browser is closing');
+    const close = vi.fn(async () => ({ closed: true }));
+    try {
+      await expect(registry.closeBrowser(close)).resolves.toEqual({ closed: true });
+      await rejected;
+      await expect(registry.run(undefined, 'page_eval', { tabId: 2 }, dispatch)).rejects.toThrow(
+        'BROWSER_CONTROL_RELEASING',
+      );
+      expect(dispatch).not.toHaveBeenCalled();
+    } finally {
+      active.resolve();
+      await first;
+    }
+  });
 
   it.each(['send_request'])('waits for unscoped %s before releasing the browser', async action => {
     const registry = new ControlSessionRegistry(() => 'browser');

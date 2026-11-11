@@ -18,13 +18,19 @@ import type { CdpSession, PageSession } from './cdp-session.js';
 import { ensureControlledIndicator } from './controlled-indicator.js';
 import { getCdpPageDialogs, pressCdpPageDialog, snapshotCdpPageDialog } from './page-dialogs.js';
 import { watchCdpWebMcp } from './webmcp-handlers.js';
+import { assertBrowserRequestDeadline } from '../control-session.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface BrowserAction {
   name: BrowserCommandAction;
   session: 'browser';
-  handler: (session: CdpSession, data: any, controlSource: ControlSource) => Promise<any>;
+  handler: (
+    session: CdpSession,
+    data: any,
+    controlSource: ControlSource,
+    deadline?: number,
+  ) => Promise<any>;
 }
 
 export interface PageAction {
@@ -72,7 +78,9 @@ export async function dispatchCdpAction(
   action: string,
   data: any,
   controlSource: ControlSource = 'local',
+  deadline?: number,
 ): Promise<any> {
+  assertBrowserRequestDeadline(deadline);
   validateRequiredActionTabId(action, data);
   const entry = actionMap.get(action);
   if (!entry) {
@@ -80,12 +88,13 @@ export async function dispatchCdpAction(
   }
 
   if (entry.session === 'browser') {
-    return entry.handler(cdpSession, data, controlSource);
+    return entry.handler(cdpSession, data, controlSource, deadline);
   }
 
   // page-level: resolve PageSession from tabId in data
   const tabId: number | undefined = typeof data?.tabId === 'number' ? data.tabId : undefined;
   const pageSession = await cdpSession.getPageSession(tabId);
+  assertBrowserRequestDeadline(deadline);
   if (action === 'page_snapshot') {
     const dialog = snapshotCdpPageDialog(pageSession, data);
     if (dialog) return dialog;
@@ -98,6 +107,7 @@ export async function dispatchCdpAction(
   const dialogs = getCdpPageDialogs(pageSession);
   return dialogs.execute(async () => {
     await dialogs.command(() => ensureControlledIndicator(pageSession, controlSource));
+    assertBrowserRequestDeadline(deadline);
     if (action === 'page_snapshot' || action === 'page_navigate') {
       const observation = watchCdpWebMcp(pageSession);
       const snapshot = action === 'page_snapshot';

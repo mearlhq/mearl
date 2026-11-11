@@ -15,7 +15,8 @@ import {
 } from '@mearl/browser-core';
 import type { TabMatchCandidate } from '@mearl/browser-core';
 import { isImplicitlySelectablePageUrl, type CdpSession, type PageSession } from './cdp-session.js';
-import { waitForPageLoad } from './cdp-utils.js';
+import { CdpPageLoadTimeoutError, waitForPageLoad } from './cdp-utils.js';
+import { assertBrowserRequestDeadline } from '../control-session.js';
 import { registerActions } from './action-registry.js';
 import { ensureControlledIndicator } from './controlled-indicator.js';
 import {
@@ -40,6 +41,9 @@ interface CdpTabActivationResult {
   windowState?: string;
   visibilityState?: string;
 }
+
+type TabNavigation =
+  { status: 'ready' | 'loading' | 'pending' } | { status: 'failed'; error: string };
 
 async function activateCdpTarget(
   browserClient: { sendCommand(method: string, params?: Record<string, unknown>): Promise<any> },
@@ -95,6 +99,7 @@ export async function cdpTabOpen(
   session: CdpSession,
   data: TabOpenParams,
   controlSource: ControlSource = 'local',
+  deadline?: number,
 ): Promise<any> {
   // group（标签页分组）仅扩展模式支持：CDP 没有 tab group API，此处忽略
   const { url, active = false, emulation, reuse = 'never', match, appProfile } = data;
@@ -158,6 +163,7 @@ export async function cdpTabOpen(
           'tab_open cannot apply pre-navigation emulation or appProfile to a reused tab.',
         );
       }
+      assertBrowserRequestDeadline(deadline);
       const activation = active
         ? await activateCdpTarget(browserClient, existing.targetId)
         : undefined;
@@ -188,6 +194,7 @@ export async function cdpTabOpen(
   }
 
   // 先建空白 tab 并下发 emulation，再导航到目标 URL，确保首个请求和首屏均为移动态。
+  assertBrowserRequestDeadline(deadline);
   const result = await browserClient.sendCommand('Target.createTarget', {
     url: 'about:blank',
     background: !active,
@@ -226,19 +233,42 @@ export async function cdpTabOpen(
   }
   if (resolvedProfile) await applyResolvedCdpAppProfile(pageSession, resolvedProfile);
 
-  // 导航到目标 URL（emulation 已生效，首个请求即移动态）
-  await pageSession.client.sendCommand('Page.navigate', { url });
-
-  if (emulation?.deviceShell) await waitForCdpDeviceShellLoad(pageSession);
-  else if (resolvedProfile) await waitForCdpAppProfileLoad(pageSession);
-  else await waitForPageLoad(pageSession, 30000);
+  try {
+    assertBrowserRequestDeadline(deadline);
+  } catch (error) {
+    // The caller will not receive this newly created blank tab.
+    await browserClient.sendCommand('Target.closeTarget', { targetId }, 1000).catch(() => {});
+    throw error;
+  }
+  const navigationDeadline = Math.min(Date.now() + 30_000, deadline ?? Infinity);
+  const remaining = () => Math.max(1, navigationDeadline - Date.now());
+  let navigation: TabNavigation = { status: 'ready' };
+  try {
+    const result = await pageSession.client.sendCommand('Page.navigate', { url }, remaining());
+    if (result.errorText) navigation = { status: 'failed', error: result.errorText };
+  } catch (error) {
+    if (!(error instanceof Error) || error.message !== 'CDP command timeout: Page.navigate')
+      throw error;
+    // Chrome may still commit the navigation after the acknowledgement times out.
+    navigation = { status: 'pending' };
+  }
+  if (navigation.status === 'ready') {
+    try {
+      if (emulation?.deviceShell) await waitForCdpDeviceShellLoad(pageSession);
+      else if (resolvedProfile) await waitForCdpAppProfileLoad(pageSession);
+      else await waitForPageLoad(pageSession, remaining(), { waitUntil: 'domcontentloaded' });
+    } catch (error) {
+      if (!(error instanceof CdpPageLoadTimeoutError)) throw error;
+      navigation = { status: 'loading' };
+    }
+  }
   const targetInfo = await browserClient
-    .sendCommand('Target.getTargetInfo', { targetId })
+    .sendCommand('Target.getTargetInfo', { targetId }, 1000)
     .then(result => result.targetInfo)
     .catch(() => null);
   const openedUrl = targetInfo?.url ?? url;
-  void webmcp.refreshCatalog();
-  if (activation) {
+  if (navigation.status === 'ready') void webmcp.refreshCatalog();
+  if (activation && navigation.status === 'ready') {
     const visibilityState = await readCdpVisibilityState(pageSession);
     if (visibilityState) activation.visibilityState = visibilityState;
   }
@@ -249,6 +279,7 @@ export async function cdpTabOpen(
     title: targetInfo?.title ?? '',
     opened: true,
     reused: false,
+    navigation: { requestedUrl: url, ...navigation },
     capture,
     ...webmcp.fields(openedUrl),
     ...(activation ? { activation } : {}),

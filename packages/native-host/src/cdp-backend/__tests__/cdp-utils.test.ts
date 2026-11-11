@@ -1,5 +1,81 @@
 import { describe, it, expect, vi } from 'vitest';
-import { buildMultipartFormBody, dispatchCdpClick, waitForPageLoad } from '../cdp-utils';
+import {
+  buildMultipartFormBody,
+  dispatchCdpClick,
+  dispatchCdpDrag,
+  waitForPageLoad,
+} from '../cdp-utils';
+import { getCdpPageDialogs } from '../page-dialogs';
+
+describe('dispatchCdpDrag', () => {
+  it.each(['mouse', 'touch'] as const)(
+    'skips overdue %s samples and still reaches the endpoint',
+    async pointer => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'performance'] });
+      try {
+        let pressed = false;
+        const moves: any[] = [];
+        const sendCommand = vi.fn(async (method: string, params: any) => {
+          if (method === 'Runtime.evaluate')
+            return { result: { value: { width: 800, height: 600 } } };
+          if (params.type === 'mousePressed' || params.type === 'touchStart') pressed = true;
+          if (pressed && (params.type === 'mouseMoved' || params.type === 'touchMove')) {
+            moves.push(params);
+            await new Promise(resolve => setTimeout(resolve, 5100));
+          }
+          return {};
+        });
+        const startedAt = performance.now();
+        const result = dispatchCdpDrag(
+          { client: { sendCommand } } as any,
+          { x: 400, y: 269 },
+          { x: 402, y: 269 },
+          pointer,
+          5000,
+        );
+        await vi.runAllTimersAsync();
+        await expect(result).resolves.toEqual({ steps: 2 });
+        expect(performance.now() - startedAt).toBeLessThan(11000);
+        expect(pointer === 'mouse' ? moves.at(-1) : moves.at(-1).touchPoints[0]).toMatchObject({
+          x: 402,
+          y: 269,
+        });
+        expect(sendCommand.mock.calls.at(-1)?.[1].type).toBe(
+          pointer === 'mouse' ? 'mouseReleased' : 'touchEnd',
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it.each(['mouse', 'touch'] as const)(
+    'releases %s input when the press acknowledgement times out',
+    async pointer => {
+      const press = pointer === 'mouse' ? 'mousePressed' : 'touchStart';
+      const sendCommand = vi.fn(async (method: string, params: any) => {
+        if (method === 'Runtime.evaluate')
+          return { result: { value: { width: 800, height: 600 } } };
+        if (params.type === press) throw new Error(`CDP command timeout: ${method}`);
+        return {};
+      });
+      await expect(
+        dispatchCdpDrag(
+          { client: { sendCommand } } as any,
+          { x: 400, y: 269 },
+          { x: 402, y: 269 },
+          pointer,
+          5000,
+        ),
+      ).rejects.toMatchObject({
+        pageActionFailureStage: 'dispatch-uncertain',
+      });
+      expect(sendCommand.mock.calls.at(-1)?.[1].type).toBe(
+        pointer === 'mouse' ? 'mouseReleased' : 'touchEnd',
+      );
+    },
+  );
+});
 
 describe('buildMultipartFormBody', () => {
   it('builds a multipart body with a boundary matching the content type', () => {
@@ -158,6 +234,26 @@ describe('dispatchCdpClick', () => {
 });
 
 describe('waitForPageLoad', () => {
+  it('stops polling when a dialog opens between readiness checks', async () => {
+    vi.useFakeTimers();
+    try {
+      const unsubscribe = vi.fn();
+      const sendCommand = vi.fn(async () => ({ result: { value: 'loading' } }));
+      const session = { client: { on: () => unsubscribe, sendCommand } } as any;
+      const wait = waitForPageLoad(session, 3000, { waitUntil: 'domcontentloaded' });
+      const rejected = expect(wait).rejects.toThrow('DIALOG_PENDING');
+      await vi.advanceTimersByTimeAsync(100);
+      getCdpPageDialogs(session).opened({ type: 'alert', message: 'Waiting' });
+      await vi.advanceTimersByTimeAsync(200);
+      await rejected;
+      expect(sendCommand).toHaveBeenCalledOnce();
+      expect(unsubscribe).toHaveBeenCalledOnce();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('waits for the load event without evaluating the renderer during a paused navigation', async () => {
     let loaded!: () => void;
     const dispose = vi.fn();

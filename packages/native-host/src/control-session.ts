@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import {
+  PageActionPreconditionError,
   validateActionBatch,
   type ControlSessionInfo,
   type BrowserReleaseParams,
@@ -7,13 +8,38 @@ import {
 
 const BROWSER_QUEUE = -1;
 
+export function assertBrowserRequestDeadline(deadline?: number): void {
+  if (deadline !== undefined && (!Number.isSafeInteger(deadline) || Date.now() >= deadline))
+    throw new PageActionPreconditionError('Browser request deadline exceeded before dispatch');
+}
+
+function independentOpenUrl(id: string | undefined, data: any): string | undefined {
+  if (
+    id ||
+    typeof data.url !== 'string' ||
+    data.closeExisting ||
+    data.active ||
+    data.match ||
+    data.emulation ||
+    data.appProfile
+  )
+    return undefined;
+  try {
+    return new URL(data.url).href;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Resource ownership survives individual CLI connections; queues serialize shared pages. */
 export class ControlSessionRegistry {
   private sessions = new Map<string, ControlSessionInfo>();
   private owners = new Map<number, string>();
   private queues = new Map<number, Promise<void>>();
+  private openingUrls = new Map<string, Promise<void>>();
   private pending = new Map<string | undefined, Set<Promise<unknown>>>();
   private browserReleasing = false;
+  private queuedOperations = new AbortController();
   private resuming = new Set<string>();
 
   constructor(private browserId: () => string) {}
@@ -109,13 +135,30 @@ export class ControlSessionRegistry {
     }
   }
 
+  async closeBrowser<T>(operation: () => Promise<T>): Promise<T> {
+    this.assertBrowserRelease();
+    if (this.browserReleasing) throw new Error('BROWSER_CONTROL_RELEASING');
+    this.browserReleasing = true;
+    this.queuedOperations.abort(new Error('BROWSER_CONTROL_RELEASING: browser is closing'));
+    try {
+      // Stopping a managed browser also ends its in-flight page commands.
+      return await operation();
+    } catch (error) {
+      this.queuedOperations = new AbortController();
+      this.browserReleasing = false;
+      throw error;
+    }
+  }
+
   async run<T>(
     id: string | undefined,
     action: string,
     data: any,
     operation: () => Promise<T>,
     transport: ControlSessionInfo['transport'] = 'extension',
+    deadline?: number,
   ): Promise<T> {
+    assertBrowserRequestDeadline(deadline);
     if (this.browserReleasing) throw new Error('BROWSER_CONTROL_RELEASING');
     const generation = id ? this.assertActive(id).generation : undefined;
     const tabs = new Set<number>();
@@ -132,6 +175,12 @@ export class ControlSessionRegistry {
       }
     }
     const opensPage = steps.some((step: any) => step.action === 'tab_open');
+    // Ordinary CDP opens can run on separate targets. Keep the same URL ordered
+    // for reuse, and keep the browser barrier for scoped or broader matches.
+    const openUrl =
+      transport === 'cdp' && action === 'tab_open' && tabs.size === 0
+        ? independentOpenUrl(id, data)
+        : undefined;
     const changesSharedSettings = steps.some(
       (step: any) =>
         ['set_rule', 'set_cookie'].includes(step.action) ||
@@ -177,14 +226,33 @@ export class ControlSessionRegistry {
       : [...tabs].map(tab => this.queues.get(tab)).filter(Boolean);
     if (!runtimeTransport && this.queues.has(BROWSER_QUEUE))
       predecessors.push(this.queues.get(BROWSER_QUEUE));
-    if (changesSharedSettings || action === 'page_download' || opensPage) {
-      predecessors.push(...this.queues.values());
+    if (openUrl) {
+      const previous = this.openingUrls.get(openUrl);
+      if (previous) predecessors.push(previous);
+      this.openingUrls.set(openUrl, tail);
+    } else if (changesSharedSettings || action === 'page_download' || opensPage) {
+      predecessors.push(...this.queues.values(), ...this.openingUrls.values());
       tabs.add(BROWSER_QUEUE);
     }
     if (!runtimeTransport) for (const tab of tabs) this.queues.set(tab, tail);
+    const signal = this.queuedOperations.signal;
+    const ready = Promise.all(predecessors);
     const execute = async () => {
       try {
-        await Promise.all(predecessors);
+        if (predecessors.length) {
+          await new Promise<void>((resolve, reject) => {
+            const abort = () => reject(signal.reason);
+            signal.addEventListener('abort', abort, { once: true });
+            void ready.then(() => {
+              signal.removeEventListener('abort', abort);
+              resolve();
+            });
+          });
+        } else {
+          await ready;
+        }
+        signal.throwIfAborted();
+        assertBrowserRequestDeadline(deadline);
         if (id) this.assertActive(id, generation);
         assertSharedResources();
         for (const tab of tabs) {
@@ -194,8 +262,12 @@ export class ControlSessionRegistry {
         }
         return await operation();
       } finally {
-        unlock();
-        for (const tab of tabs) if (this.queues.get(tab) === tail) this.queues.delete(tab);
+        // Cancelling a queued request must not let a successor pass an active predecessor.
+        void ready.then(() => {
+          unlock();
+          if (openUrl && this.openingUrls.get(openUrl) === tail) this.openingUrls.delete(openUrl);
+          for (const tab of tabs) if (this.queues.get(tab) === tail) this.queues.delete(tab);
+        });
       }
     };
     const promise = execute();

@@ -35,10 +35,11 @@ export async function cdpRunActions(
   session: CdpSession,
   data: RunActionsParams,
   controlSource: ControlSource = 'local',
+  deadline?: number,
 ): Promise<any> {
   return runActionBatch(data, async (action, payload) => ({
     success: true,
-    data: await dispatchCdpAction(session, action, payload, controlSource),
+    data: await dispatchCdpAction(session, action, payload, controlSource, deadline),
   }));
 }
 
@@ -52,23 +53,25 @@ export async function cdpObservedPageAction(
   action: PageActAction,
   data: any,
   controlSource: ControlSource = 'local',
+  deadline?: number,
 ): Promise<any> {
   const { actionData, observe, diagnostics } = splitObservedActionPayload(action, data);
   const { tabId } = actionData;
   const pageSession = await session.getPageSession(tabId);
   const dialogs = getCdpPageDialogs(pageSession);
   if (action === 'page_press' && actionData.dialogId !== undefined) {
-    return dispatchCdpAction(session, action, actionData, controlSource);
+    return dispatchCdpAction(session, action, actionData, controlSource, deadline);
   }
   // Keep the controlled favicon installation outside the action's diagnostic boundary.
   await dialogs.command(() => ensureControlledIndicator(pageSession, controlSource));
   if (observe === false) {
-    if (!diagnostics) return dispatchCdpAction(session, action, actionData, controlSource);
+    if (!diagnostics)
+      return dispatchCdpAction(session, action, actionData, controlSource, deadline);
     const cursor = captureCheckpoint(pageSession.buffers.capture);
     let actionResult: any;
     let actionFailure: ReturnType<typeof describePageActionFailure> | undefined;
     try {
-      actionResult = await dispatchCdpAction(session, action, actionData, controlSource);
+      actionResult = await dispatchCdpAction(session, action, actionData, controlSource, deadline);
     } catch (error) {
       actionFailure = describePageActionFailure(error);
     }
@@ -98,7 +101,7 @@ export async function cdpObservedPageAction(
         startCdpNavigationObserver(session, pageSession, options.urlBefore, options),
       executeAction: (name, params) => {
         if (diagnostics) diagnosticsCursor = captureCheckpoint(pageSession.buffers.capture);
-        return dispatchCdpAction(session, name, { ...params, tabId }, controlSource);
+        return dispatchCdpAction(session, name, { ...params, tabId }, controlSource, deadline);
       },
       finalizeObservation: observation => {
         if (observation.mode === 'delta') {

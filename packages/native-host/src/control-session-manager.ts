@@ -5,13 +5,18 @@ import {
   type ControlSessionInfo,
   type PageDownloadParams,
 } from '@mearl/browser-core';
-import { ControlSessionRegistry } from './control-session.js';
+import { assertBrowserRequestDeadline, ControlSessionRegistry } from './control-session.js';
 import { BrowserArtifactStore } from './browser-artifacts.js';
 
 interface Dependencies {
   browserId: () => string;
   transport: () => ControlSessionInfo['transport'];
-  invoke: (action: string, data: any, transport: ControlSessionInfo['transport']) => Promise<any>;
+  invoke: (
+    action: string,
+    data: any,
+    transport: ControlSessionInfo['transport'],
+    deadline?: number,
+  ) => Promise<any>;
   deactivate?: (tabs: number[], transport: ControlSessionInfo['transport']) => Promise<void>;
   cleanup: (
     tabs: number[],
@@ -117,6 +122,7 @@ export class ControlSessionManager {
     sessionId?: string,
     requestedTransport?: 'cdp',
     origin = 'local',
+    deadline?: number,
   ): Promise<any> {
     if (
       data &&
@@ -185,7 +191,14 @@ export class ControlSessionManager {
     if ((action === 'browser_release' || action === 'browser_close') && !sessionId) {
       return this.registry.releaseBrowser(() => this.dependencies.invoke(action, data, transport));
     }
+    const dispatch = (name: string, payload: any) => {
+      assertBrowserRequestDeadline(deadline);
+      return deadline === undefined
+        ? this.dependencies.invoke(name, payload, transport)
+        : this.dependencies.invoke(name, payload, transport, deadline);
+    };
     const performStep = async (name: string, payload: any, batch = false): Promise<any> => {
+      assertBrowserRequestDeadline(deadline);
       if (name === 'tab_open') {
         if (sessionId && payload.closeExisting) {
           await this.closeTabs(
@@ -212,25 +225,17 @@ export class ControlSessionManager {
       }
       if (batch) {
         if (transport === 'provider') {
-          const result = await this.dependencies.invoke(
-            name,
-            { ...payload, __mearlControlSource: origin },
-            transport,
-          );
+          const result = await dispatch(name, { ...payload, __mearlControlSource: origin });
           if (sessionId) this.registry.recordResult(sessionId, name, result, payload);
           if (result?.action?.success === false) return { ...result.action, success: false };
           if (result?.success === false) return { ...result, success: false };
           return { success: true, data: result };
         }
-        const result = await this.dependencies.invoke(
-          'run_actions',
-          {
-            tabId: payload.tabId,
-            actions: [{ action: name, data: payload }],
-            __mearlControlSource: origin,
-          },
-          transport,
-        );
+        const result = await dispatch('run_actions', {
+          tabId: payload.tabId,
+          actions: [{ action: name, data: payload }],
+          __mearlControlSource: origin,
+        });
         const outcome = result.results?.[0] ?? {
           success: false,
           error: result.error ?? 'Batch step returned no result',
@@ -241,11 +246,7 @@ export class ControlSessionManager {
           this.registry.recordResult(sessionId, name, outcome.data, payload);
         return outcome;
       }
-      const result = await this.dependencies.invoke(
-        name,
-        { ...payload, __mearlControlSource: origin },
-        transport,
-      );
+      const result = await dispatch(name, { ...payload, __mearlControlSource: origin });
       if (sessionId) this.registry.recordResult(sessionId, name, result, payload);
       return result;
     };
@@ -320,7 +321,11 @@ export class ControlSessionManager {
           return invokeStep(action, data);
         },
         transport,
+        deadline,
       );
+      if (created && deadline !== undefined && Date.now() >= deadline) {
+        throw new Error('Browser request deadline exceeded before returning the control session');
+      }
     } catch (error) {
       if (created && sessionId)
         await this.registry.release(sessionId, {}, async tabs => {

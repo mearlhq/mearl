@@ -12,8 +12,48 @@ import {
   cdpSetDeviceEmulation,
 } from '../interaction-handlers';
 import { getPageRefRegistry } from '../page-refs';
+import { cdpObservedPageAction } from '../composite-handlers';
 
 describe('native CDP interaction handlers', () => {
+  it('does not evaluate an observed action whose deadline expires during setup', async () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
+    const url = 'https://example.test/';
+    const expression = 'document.title = "late"';
+    const sendCommand = vi.fn(async (method: string) => {
+      if (method === 'Page.getFrameTree') clock.mockReturnValue(2000);
+      if (method === 'Runtime.evaluate')
+        return { result: { value: { version: 1, url, title: '' } } };
+      return {};
+    });
+    const cdp = {
+      getPageSession: async () => ({ tabId: 1, url, client: { sendCommand, on: () => () => {} } }),
+      getBrowserClient: async () => ({ sendCommand }),
+    } as any;
+    try {
+      await expect(
+        cdpObservedPageAction(
+          cdp,
+          'page_eval',
+          { tabId: 1, expression, observe: {} },
+          'local',
+          2000,
+        ),
+      ).resolves.toMatchObject({
+        action: {
+          success: false,
+          stage: 'precondition',
+          error: expect.stringContaining('deadline exceeded'),
+        },
+      });
+      expect(sendCommand).not.toHaveBeenCalledWith(
+        'Runtime.evaluate',
+        expect.objectContaining({ expression }),
+      );
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
   it('runs structured DOM inspection without an accessibility snapshot', async () => {
     const value = {
       selector: '.card',

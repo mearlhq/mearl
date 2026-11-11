@@ -14,8 +14,16 @@ import os from 'node:os';
 import path from 'node:path';
 import { CLIENT_VERSION } from './runtimePaths.js';
 import { StringDecoder } from 'node:string_decoder';
-import { assertProviderControlSessionMode, ensureProviderControlHost, listInstalledProviders } from '@mearl/provider/host';
-import { MEARL_PROVIDER_PROTOCOL_VERSION, assertProviderProtocolVersion, validateProviderLaunchForm } from '@mearl/provider';
+import {
+  assertProviderControlSessionMode,
+  ensureProviderControlHost,
+  listInstalledProviders,
+} from '@mearl/provider/host';
+import {
+  MEARL_PROVIDER_PROTOCOL_VERSION,
+  assertProviderProtocolVersion,
+  validateProviderLaunchForm,
+} from '@mearl/provider';
 import { readLiveProvider, ensureInstalledProvidersRunning } from '@mearl/provider/runtime';
 import { resolveFileRefs } from './fileRefs.js';
 import {
@@ -25,7 +33,11 @@ import {
   type LiveBrowser,
 } from './browserRegistry.js';
 import { resolveActionTimeoutSec } from './actionTimeouts.js';
-import { isBrowserCapabilityAction, parseBrowserListParams, type BrowserControlSessionMode } from '@mearl/browser-core';
+import {
+  isBrowserCapabilityAction,
+  parseBrowserListParams,
+  type BrowserControlSessionMode,
+} from '@mearl/browser-core';
 
 export { CLIENT_VERSION };
 const MAX_SOCKET_BUFFER_SIZE = 64 * 1024 * 1024;
@@ -56,6 +68,8 @@ export interface InvokeOptions {
   socketPath?: string;
   /** 超时时间（秒），默认 15 */
   timeoutSec?: number;
+  /** Absolute cutoff for sending this request, including any routing retries. */
+  deadline?: number;
   /** Force CDP transport instead of extension */
   transport?: 'cdp';
   /** Target a specific browser by id / name (see the browser registry). */
@@ -480,19 +494,38 @@ export function invoke(
     const discovery = parseBrowserListParams(resolvedData);
     if (discovery) {
       return (async () => {
-        if (transport || options.socketPath || controlSource !== 'local' || options.controlSessionId)
-          throw new Error('Provider discovery requires the local source without a transport, socket or session override');
-        const provider = listInstalledProviders().find(provider => provider.providerId === discovery.provider);
-        if (!provider?.browserType.dynamicLaunchForm) throw new Error(`Provider does not support dynamic launch forms: ${discovery.provider}`);
+        if (
+          transport ||
+          options.socketPath ||
+          controlSource !== 'local' ||
+          options.controlSessionId
+        )
+          throw new Error(
+            'Provider discovery requires the local source without a transport, socket or session override',
+          );
+        const provider = listInstalledProviders().find(
+          provider => provider.providerId === discovery.provider,
+        );
+        if (!provider?.browserType.dynamicLaunchForm)
+          throw new Error(`Provider does not support dynamic launch forms: ${discovery.provider}`);
         const warnings = await ensureInstalledProvidersRunning([discovery.provider]);
         if (warnings.length) throw new Error(warnings.join('; '));
         const live = readLiveProvider(discovery.provider);
         if (!live) throw new Error(`Provider did not start: ${discovery.provider}`);
         assertProviderProtocolVersion(live.providerProtocolVersion, discovery.provider);
-        const form = await invokeOnce('browser_providers', { operation: 'launch_form', ...discovery.launchForm }, timeoutSec, undefined, live.socketPath, 'local');
+        const form = await invokeOnce(
+          'browser_providers',
+          { operation: 'launch_form', ...discovery.launchForm },
+          timeoutSec,
+          undefined,
+          live.socketPath,
+          'local',
+        );
         validateProviderLaunchForm(form);
         return decorateBrowserListResult({
-          ...browserListFromProviderRecords(listLiveBrowsers().filter(browser => browser.provider?.id === discovery.provider)),
+          ...browserListFromProviderRecords(
+            listLiveBrowsers().filter(browser => browser.provider?.id === discovery.provider),
+          ),
           discovery: { provider: discovery.provider, launchForm: form },
         });
       })();
@@ -505,6 +538,7 @@ export function invoke(
       undefined,
       controlSource,
       options.socketPath,
+      options.deadline,
     ).then(result =>
       decorateBrowserListResult(transport === 'cdp' ? cdpOnlyBrowserList(result) : result),
     );
@@ -518,11 +552,16 @@ export function invoke(
     selector,
     controlSource,
     options.socketPath,
+    options.deadline,
   );
 }
 
 /** Infrastructure calls stay on this machine even when an Agent has selected an external browser. */
-export function invokeLocalHost(action: string, data: Record<string, any> = {}, options: Pick<InvokeOptions, 'timeoutSec' | 'socketPath'> = {}): Promise<any> {
+export function invokeLocalHost(
+  action: string,
+  data: Record<string, any> = {},
+  options: Pick<InvokeOptions, 'timeoutSec' | 'socketPath'> = {},
+): Promise<any> {
   const timeoutSec = options.timeoutSec ?? resolveActionTimeoutSec(action, data);
   const socketPath = options.socketPath ?? process.env.MEARL_SOCKET_PATH?.trim();
   const accepted = resolveFileRefs(data);
@@ -613,18 +652,24 @@ async function dispatchInvoke(
   selector: string | undefined,
   controlSource: CompatibleControlSource,
   socketPath?: string,
+  deadline?: number,
 ): Promise<any> {
+  const send = (path: string, target?: LiveBrowser) =>
+    invokeOnce(
+      action,
+      data,
+      timeoutSec,
+      transport,
+      path,
+      controlSource,
+      target?.transport === 'provider' ? target.browserId : undefined,
+      target?.capabilities?.controlSessionMode,
+      deadline,
+    );
   const configuredSocketPath = socketPath ?? process.env.MEARL_SOCKET_PATH?.trim();
   if (configuredSocketPath && (socketPath || !selector)) {
     try {
-      return await invokeOnce(
-        action,
-        data,
-        timeoutSec,
-        transport,
-        configuredSocketPath,
-        controlSource,
-      );
+      return await send(configuredSocketPath);
     } catch (error) {
       if (isConnError(error) || isSocketSandboxError(error)) {
         throw new Error(formatConnectError(error as NodeJS.ErrnoException, configuredSocketPath), {
@@ -644,14 +689,7 @@ async function dispatchInvoke(
     );
     if (registeredCdp) {
       try {
-        return await invokeOnce(
-          action,
-          data,
-          timeoutSec,
-          transport,
-          registeredCdp.socketPath,
-          controlSource,
-        );
+        return await send(registeredCdp.socketPath);
       } catch (error) {
         if (!isConnError(error)) throw error;
       }
@@ -709,16 +747,7 @@ async function dispatchInvoke(
       throw new Error(`Browser ${describeBrowser(match)} does not support ${action}`);
     }
     try {
-      return await invokeOnce(
-        action,
-        data,
-        timeoutSec,
-        transport,
-        match.socketPath,
-        controlSource,
-        match.transport === 'provider' ? match.browserId : undefined,
-        match.capabilities?.controlSessionMode,
-      );
+      return await send(match.socketPath, match);
     } catch (error) {
       if (isConnError(error) || isSocketSandboxError(error)) {
         throw new Error(formatConnectError(error as NodeJS.ErrnoException, match.socketPath), {
@@ -735,16 +764,7 @@ async function dispatchInvoke(
   if (candidates.length > 0) {
     const target = candidates[0]!;
     try {
-      return await invokeOnce(
-        action,
-        data,
-        timeoutSec,
-        transport,
-        target.socketPath,
-        controlSource,
-        target.transport === 'provider' ? target.browserId : undefined,
-        target.capabilities?.controlSessionMode,
-      );
+      return await send(target.socketPath, target);
     } catch (error) {
       if (isSocketSandboxError(error)) {
         throw new Error(formatConnectError(error as NodeJS.ErrnoException, target.socketPath), {
@@ -770,7 +790,16 @@ async function dispatchInvoke(
     }
   }
 
-  return invokeViaLegacy(action, data, timeoutSec, transport, controlSource, /* isRetry */ false);
+  return invokeViaLegacy(
+    action,
+    data,
+    timeoutSec,
+    transport,
+    controlSource,
+    false,
+    false,
+    deadline,
+  );
 }
 
 /** Legacy well-known socket, repairing a missing or stale endpoint and retrying once. */
@@ -782,10 +811,21 @@ async function invokeViaLegacy(
   controlSource: CompatibleControlSource,
   isRetry: boolean,
   localOnly = false,
+  deadline?: number,
 ): Promise<any> {
   const legacySocketIdentity = readOwnedLegacySocketIdentity();
   try {
-    return await invokeOnce(action, data, timeoutSec, transport, SOCKET_PATH, controlSource);
+    return await invokeOnce(
+      action,
+      data,
+      timeoutSec,
+      transport,
+      SOCKET_PATH,
+      controlSource,
+      undefined,
+      undefined,
+      deadline,
+    );
   } catch (error) {
     const err = error as NodeJS.ErrnoException;
     const shouldAttemptSpawn = err.code === 'ENOENT' || err.code === 'ECONNREFUSED';
@@ -812,6 +852,7 @@ async function invokeViaLegacy(
             controlSource,
             target.transport === 'provider' ? target.browserId : undefined,
             target.capabilities?.controlSessionMode,
+            deadline,
           );
         }
         return invokeViaLegacy(
@@ -822,6 +863,7 @@ async function invokeViaLegacy(
           controlSource,
           /* isRetry */ true,
           localOnly,
+          deadline,
         );
       }
     }
@@ -839,14 +881,17 @@ async function invokeOnce(
   controlSource: CompatibleControlSource,
   providerTarget?: string,
   controlSessionMode?: BrowserControlSessionMode,
+  requestDeadline?: number,
 ): Promise<any> {
+  if (requestDeadline !== undefined && Date.now() >= requestDeadline)
+    throw new Error('Browser request deadline exceeded before dispatch');
   if (providerTarget) {
     const host = await ensureProviderControlHost(Math.min(timeoutSec * 1000, 10_000));
     assertProviderControlSessionMode(host, controlSessionMode);
     socketPath = host.socketPath;
   }
   const id = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-  const deadline = Date.now() + Math.ceil(timeoutSec * 1000);
+  const deadline = Math.min(Date.now() + Math.ceil(timeoutSec * 1000), requestDeadline ?? Infinity);
 
   return new Promise((resolve, reject) => {
     if (process.platform !== 'win32' && fs.existsSync(socketPath) && process.getuid) {
@@ -874,11 +919,18 @@ async function invokeOnce(
       else resolve(result);
     };
 
-    const timer = setTimeout(() => {
-      settle(new Error(`请求超时，已等待 ${timeoutSec} 秒`));
-    }, timeoutSec * 1000);
+    const timer = setTimeout(
+      () => {
+        settle(new Error(`请求超时，已等待 ${timeoutSec} 秒`));
+      },
+      Math.max(0, Math.min(timeoutSec * 1000, deadline - Date.now())),
+    );
 
     socket.on('connect', () => {
+      if (Date.now() >= deadline) {
+        settle(new Error('Browser request deadline exceeded before dispatch'));
+        return;
+      }
       const message: Record<string, any> = {
         id,
         action,
@@ -886,12 +938,12 @@ async function invokeOnce(
         version: CLIENT_VERSION,
         protocolVersion: MEARL_PROVIDER_PROTOCOL_VERSION,
         controlSource: toControlSourceWireValue(controlSource),
+        deadline,
       };
       if ((data as any)[SESSION_OPTION]) message.controlSessionId = (data as any)[SESSION_OPTION];
       if (transport) message.transport = transport;
       if (providerTarget) {
         message.providerTarget = providerTarget;
-        message.deadline = deadline;
       }
       socket.write(JSON.stringify(message) + '\n');
     });

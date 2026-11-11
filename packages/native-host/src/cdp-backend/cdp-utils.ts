@@ -13,6 +13,7 @@ import {
   clickElementViaJS,
   getClickCoordsFromNode,
   PageActionDispatchUncertainError,
+  PageDialogInterruptedError,
   dispatchPairedPageInputCommands,
   PAGE_CLICK_INPUT_TIMEOUT_MS,
   type CookieCandidate,
@@ -145,11 +146,19 @@ export function buildMultipartFormBody(fields: Record<string, string>): {
 
 // ─── Page load waiter ─────────────────────────────────────────────────────────
 
+export class CdpPageLoadTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`Page load timeout after ${timeoutMs}ms`);
+  }
+}
+
 export async function waitForPageLoad(
   session: PageSession,
   timeoutMs: number,
-  options: { probeReadyState?: boolean } = {},
+  options: { probeReadyState?: boolean; waitUntil?: 'domcontentloaded' } = {},
 ): Promise<void> {
+  const domReady = options.waitUntil === 'domcontentloaded';
+  const isReady = (state: unknown) => state === 'complete' || (domReady && state === 'interactive');
   if (options.probeReadyState !== false && isCdpDeviceShellActive(session)) {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
@@ -157,38 +166,50 @@ export async function waitForPageLoad(
         expression: 'document.readyState',
         returnByValue: true,
       }).catch(() => null);
-      if (result?.result?.value === 'complete') return;
+      if (isReady(result?.result?.value)) return;
       await new Promise(resolve => setTimeout(resolve, 50));
     }
-    throw new Error(`Page load timeout after ${timeoutMs}ms`);
+    throw new CdpPageLoadTimeoutError(timeoutMs);
   }
   return new Promise((resolve, reject) => {
     let settled = false;
+    let probeTimer: ReturnType<typeof setTimeout> | undefined;
     let removeLoadListener = () => {};
     const finish = (error?: Error) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      clearTimeout(probeTimer);
       removeLoadListener();
       if (error) reject(error);
       else resolve();
     };
     const timer = setTimeout(() => {
-      finish(new Error(`Page load timeout after ${timeoutMs}ms`));
+      finish(new CdpPageLoadTimeoutError(timeoutMs));
     }, timeoutMs);
 
-    removeLoadListener = session.client.on('Page.loadEventFired', () => finish());
+    removeLoadListener = session.client.on(
+      domReady ? 'Page.domContentEventFired' : 'Page.loadEventFired',
+      () => finish(),
+    );
     if (options.probeReadyState === false) return;
-    sendCdpPageCommand(session, session.client, 'Runtime.evaluate', {
-        expression: 'document.readyState',
-        returnByValue: true,
-      })
-      .then(result => {
-        if (result.result?.value === 'complete') {
-          finish();
-        }
-      })
-      .catch(() => {});
+    const probe = async () => {
+      try {
+        const result = await sendCdpPageCommand(
+          session,
+          session.client,
+          'Runtime.evaluate',
+          { expression: 'document.readyState', returnByValue: true },
+          domReady ? 1000 : undefined,
+        );
+        if (isReady(result.result?.value)) finish();
+      } catch (error) {
+        if (error instanceof PageDialogInterruptedError) finish(error);
+      }
+      // Deferred scripts can delay DOMContentLoaded after the document becomes readable.
+      if (domReady && !settled) probeTimer = setTimeout(probe, 200);
+    };
+    void probe();
   });
 }
 
@@ -269,25 +290,39 @@ export async function dispatchCdpDrag(
     toCdpInputPoint(session, to.x, to.y),
   ]);
   const path = buildPageDragPath(start, end, durationMs);
-  const waitForNextPoint = async (): Promise<void> => {
-    if (path.intervalMs <= 0) return;
-    await new Promise(resolve => setTimeout(resolve, path.intervalMs));
+  let steps = 0;
+  const moveAlongPath = async (move: (point: PageDragPoint) => Promise<void>): Promise<void> => {
+    const startedAt = performance.now();
+    for (let index = 0; index < path.points.length; index += 1) {
+      // Input acknowledgements can take seconds even while the renderer remains responsive.
+      // Skip overdue samples so their latency does not multiply the gesture duration.
+      if (path.intervalMs > 0) {
+        const elapsed = performance.now() - startedAt;
+        index = Math.min(
+          path.points.length - 1,
+          Math.max(index, Math.floor(elapsed / path.intervalMs) - 1),
+        );
+        const remaining = (index + 1) * path.intervalMs - elapsed;
+        if (remaining > 0) await new Promise(resolve => setTimeout(resolve, remaining));
+      }
+      await move(path.points[index]!);
+      steps += 1;
+    }
   };
 
   if (pointerType === 'touch') {
-    await sendCdpInputCommand(session, 'Input.dispatchTouchEvent', {
-      type: 'touchStart',
-      touchPoints: [start],
-    });
     let primaryError: unknown;
     try {
-      for (const point of path.points) {
-        await waitForNextPoint();
+      await sendCdpInputCommand(session, 'Input.dispatchTouchEvent', {
+        type: 'touchStart',
+        touchPoints: [start],
+      });
+      await moveAlongPath(async point => {
         await sendCdpInputCommand(session, 'Input.dispatchTouchEvent', {
           type: 'touchMove',
           touchPoints: [point],
         });
-      }
+      });
     } catch (error) {
       primaryError = error;
       throw error;
@@ -299,7 +334,7 @@ export async function dispatchCdpDrag(
         if (primaryError === undefined) throw error;
       });
     }
-    return { steps: path.points.length };
+    return { steps };
   }
 
   await sendCdpInputCommand(session, 'Input.dispatchMouseEvent', {
@@ -307,27 +342,33 @@ export async function dispatchCdpDrag(
     x: start.x,
     y: start.y,
   });
-  await sendCdpInputCommand(session, 'Input.dispatchMouseEvent', {
-    type: 'mousePressed',
-    x: start.x,
-    y: start.y,
-    button: 'left',
-    buttons: 1,
-    clickCount: 1,
-  });
   let primaryError: unknown;
   let lastPoint = start;
   try {
-    for (const point of path.points) {
-      await waitForNextPoint();
-      await sendCdpInputCommand(session, 'Input.dispatchMouseEvent', {
-        type: 'mouseMoved',
-        x: point.x,
-        y: point.y,
-        button: 'left',
-        buttons: 1,
-      }, () => { lastPoint = point; });
-    }
+    await sendCdpInputCommand(session, 'Input.dispatchMouseEvent', {
+      type: 'mousePressed',
+      x: start.x,
+      y: start.y,
+      button: 'left',
+      buttons: 1,
+      clickCount: 1,
+    });
+    await moveAlongPath(async point => {
+      await sendCdpInputCommand(
+        session,
+        'Input.dispatchMouseEvent',
+        {
+          type: 'mouseMoved',
+          x: point.x,
+          y: point.y,
+          button: 'left',
+          buttons: 1,
+        },
+        () => {
+          lastPoint = point;
+        },
+      );
+    });
   } catch (error) {
     primaryError = error;
     throw error;
@@ -343,7 +384,7 @@ export async function dispatchCdpDrag(
       if (primaryError === undefined) throw error;
     });
   }
-  return { steps: path.points.length };
+  return { steps };
 }
 
 async function sendCdpInputCommand(
@@ -353,7 +394,14 @@ async function sendCdpInputCommand(
   onDispatch?: () => void,
 ): Promise<void> {
   try {
-    await sendCdpPageCommand(session, session.client, method, params, PAGE_CLICK_INPUT_TIMEOUT_MS, onDispatch);
+    await sendCdpPageCommand(
+      session,
+      session.client,
+      method,
+      params,
+      PAGE_CLICK_INPUT_TIMEOUT_MS,
+      onDispatch,
+    );
   } catch (error) {
     if (error instanceof Error && error.message === `CDP command timeout: ${method}`) {
       const eventType = typeof params.type === 'string' ? ` (${params.type})` : '';

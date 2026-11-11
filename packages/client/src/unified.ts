@@ -47,6 +47,8 @@ export interface UnifiedInvokeOptions {
 
 export interface UnifiedClientOptions {
   serverUrl?: string;
+  /** Absolute deadline shared by all requests from a script. */
+  requestDeadline?: number;
   connectTimeoutSec?: number;
   requestTimeoutSec?: number;
   heartbeatInterval?: number;
@@ -190,6 +192,7 @@ function errorMessage(error: unknown): string {
 }
 
 export class UnifiedClient {
+  private readonly requestDeadline?: number;
   private readonly controlSessions = new Map<string, ControlSessionTarget>();
   private readonly options: {
     serverUrl?: string;
@@ -214,6 +217,7 @@ export class UnifiedClient {
   private closing = false;
 
   constructor(options: UnifiedClientOptions = {}) {
+    this.requestDeadline = options.requestDeadline;
     this.options = {
       ...(options.serverUrl ? { serverUrl: options.serverUrl } : {}),
       connectTimeoutSec: options.connectTimeoutSec ?? DEFAULT_CONNECT_TIMEOUT,
@@ -270,8 +274,17 @@ export class UnifiedClient {
     options: UnifiedInvokeOptions = {},
   ): Promise<any> {
     const discovery = action === 'browser_list' ? parseBrowserListParams(data) : undefined;
-    if (discovery && (!options.local || options.connector || options.transport || options.session || options.controlSessionId))
-      throw new Error('Provider discovery requires explicit --local without connector, transport, socket or session overrides');
+    if (
+      discovery &&
+      (!options.local ||
+        options.connector ||
+        options.transport ||
+        options.session ||
+        options.controlSessionId)
+    )
+      throw new Error(
+        'Provider discovery requires explicit --local without connector, transport, socket or session overrides',
+      );
     if (action === 'plugin_state') {
       const { PluginStateClient } = await import('./plugins/clients/pluginState.js');
       const state = new PluginStateClient();
@@ -527,8 +540,12 @@ export class UnifiedClient {
     if (action === 'connector_list') return this.listConnectors(timeoutSec);
     if (action === 'browser_list') {
       if (parseBrowserListParams(data)) {
-        const result = await invokeLocalBrowser('browser_list', data, { timeoutSec, controlSource: 'local' });
-        if (!result?.discovery) throw new Error('Provider launch-form discovery is not supported by this host');
+        const result = await invokeLocalBrowser('browser_list', data, {
+          timeoutSec,
+          controlSource: 'local',
+        });
+        if (!result?.discovery)
+          throw new Error('Provider launch-form discovery is not supported by this host');
         return this.applyConfiguredDefault(this.decorateListing(result, { kind: 'local' }));
       }
       if (options.local || options.transport === 'cdp') {
@@ -944,6 +961,7 @@ export class UnifiedClient {
   ): Promise<any> {
     const result = await invokeLocalBrowser(action, data, {
       timeoutSec,
+      ...(this.requestDeadline === undefined ? {} : { deadline: this.requestDeadline }),
       ...(browser ? { browser } : {}),
       ...(transport ? { transport } : {}),
       ...(socketPath ? { socketPath } : {}),
@@ -1205,6 +1223,11 @@ export class UnifiedClient {
     await this.ensureConnected();
     const ws = this.ws;
     if (!ws || ws.readyState !== WebSocket.OPEN) throw new Error('Connection is not open');
+    if (this.requestDeadline !== undefined) {
+      const remainingSec = (this.requestDeadline - Date.now()) / 1000;
+      if (remainingSec <= 0) throw new Error('Browser request deadline exceeded before dispatch');
+      timeoutSec = Math.min(timeoutSec, remainingSec);
+    }
     const id = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     const message: CloudMessage = { id, action, data, timeoutSec };
     if (browser) message.browser = browser;

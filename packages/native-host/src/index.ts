@@ -111,6 +111,8 @@ import {
   type SandboxBrowserAccessCapability,
 } from './sandbox-browser-access.js';
 import { createBuiltinBrowserProviders } from './builtin-browser-providers.js';
+import { assertBrowserRequestDeadline } from './control-session.js';
+import { CLOSED_OWN_MANAGED_HOST } from './managed-browser.js';
 import { BrowserProviderCoordinator } from './browser-provider-coordinator.js';
 import { listProviderControlSessions, updateProviderControlSession } from './browser-provider.js';
 import {
@@ -674,11 +676,11 @@ function getControlSessionManager(): ControlSessionManager {
   return (controlSessionManager ??= new ControlSessionManager({
     browserId: () => controlBrowserId,
     transport: () => (extensionVersion !== null ? 'extension' : 'cdp'),
-    invoke: async (action, data, transport) => {
+    invoke: async (action, data, transport, deadline) => {
       const { __mearlControlSource: origin, ...payload } = data;
       return (
         await dispatchHostRequest(
-          { action, data: payload, controlSource: origin ?? 'local', transport },
+          { action, data: payload, controlSource: origin ?? 'local', transport, deadline },
           true,
         )
       ).data;
@@ -798,7 +800,7 @@ const nativeHostUpdateCoordinator = new NativeHostUpdateCoordinator({
   log,
   runUpdate: targetVersion => runNativeHostUpdate(targetVersion),
   requestRestart: () => {
-    restartAfterUpdate();
+    shutdownWithDeadline();
   },
 });
 
@@ -960,10 +962,44 @@ async function launchBrowser(data: any): Promise<any> {
   return getBrowserProviderCoordinator().launch(data);
 }
 
-async function closeBrowser(data: any): Promise<any> {
+async function closeBrowser(
+  data: any,
+  request?: { deadline?: number; controlSource: ControlSource },
+): Promise<any> {
   const selector = String(data?.browser ?? data?.browserId ?? data?.name ?? '').trim();
   if (!selector) throw new Error('browser is required');
-  return getBrowserProviderCoordinator().close(selector, data?.deleteProfile === true);
+  const deleteProfile = data?.deleteProfile === true;
+  const coordinator = getBrowserProviderCoordinator();
+  if (!request) return coordinator.close(selector, deleteProfile);
+  const { deadline, controlSource } = request;
+  return coordinator.close(selector, deleteProfile, (close, localBrowserId) => {
+    assertBrowserRequestDeadline(deadline);
+    const registry = getControlSessionManager().registry;
+    if (localBrowserId) {
+      if (isDaemonMode && localBrowserId === CDP_BROWSER_ID) return registry.closeBrowser(close);
+      const owner = listRegisteredBrowsers().find(
+        browser =>
+          browser.browserId === localBrowserId &&
+          browser.transport === 'cdp' &&
+          browser.pid !== process.pid,
+      );
+      if (!owner) return close();
+      return requestBrowserSocket(
+        owner.socketPath,
+        'browser_close',
+        { browser: localBrowserId, deleteProfile },
+        NATIVE_HOST_VERSION,
+        undefined,
+        localBrowserId,
+        undefined,
+        { deadline, controlSource },
+      );
+    }
+    return registry.releaseBrowser(() => {
+      assertBrowserRequestDeadline(deadline);
+      return close();
+    });
+  });
 }
 
 async function getManagedBrowserAccess(data: any): Promise<BrowserAccess> {
@@ -1574,6 +1610,7 @@ interface HostActionResult {
 /** Structured dispatch is shared by Socket requests and scoped browser operations. */
 async function dispatchHostRequest(request: any, managed = false): Promise<HostActionResult> {
   const { action, data = {} } = request;
+  assertBrowserRequestDeadline(request.deadline);
   const controlSource = normalizeControlSource(request.controlSource);
   if (action === '__provider_enhancement') {
     if (request.controlSessionId !== undefined)
@@ -1656,6 +1693,8 @@ async function dispatchHostRequest(request: any, managed = false): Promise<HostA
     sendToExtension({ type: 'control_sessions_changed' });
     return { data: { refreshed: true } };
   }
+  if (!managed && action === 'browser_close' && request.controlSessionId === undefined)
+    return { data: await closeBrowser(data, { deadline: request.deadline, controlSource }) };
   if (
     !managed &&
     (isBrowserCommandAction(action) ||
@@ -1668,6 +1707,7 @@ async function dispatchHostRequest(request: any, managed = false): Promise<HostA
         request.controlSessionId,
         request.transport,
         controlSource,
+        request.deadline,
       ),
     };
   }
@@ -1850,7 +1890,13 @@ async function dispatchHostRequest(request: any, managed = false): Promise<HostA
           'CDP mode: domain permission checks are not enforced — all actions run without domain authorization',
         );
       }
-      result = await handleViaCdp(action, data, toTimeoutMs(action, data), controlSource);
+      result = await handleViaCdp(
+        action,
+        data,
+        toTimeoutMs(action, data),
+        controlSource,
+        request.deadline,
+      );
     }
     trackAction(action, {
       success: true,
@@ -1893,7 +1939,21 @@ async function handleSocketRequest(socket: net.Socket, line: string): Promise<vo
       }
     }
     const encoded = JSON.stringify(response) + '\n';
-    if (result.closeConnection) socket.end(encoded);
+    if (result.data?.[CLOSED_OWN_MANAGED_HOST]) {
+      // A closing host owns the response socket until the receipt has been flushed.
+      let shuttingDown = false;
+      const shutdown = () => {
+        if (shuttingDown) return;
+        shuttingDown = true;
+        socket.off('close', shutdown);
+        shutdownWithDeadline();
+      };
+      if (socket.destroyed) shutdown();
+      else {
+        socket.once('close', shutdown);
+        socket.end(encoded, shutdown);
+      }
+    } else if (result.closeConnection) socket.end(encoded);
     else socket.write(encoded);
   } catch (error) {
     socket.write(
@@ -1927,6 +1987,7 @@ async function handleViaCdp(
   data: any,
   _timeoutMs: number,
   controlSource: ControlSource,
+  deadline?: number,
 ): Promise<any> {
   if (action !== 'page_runtime' && !getRegisteredActionNames().includes(action)) {
     throw new Error(`Action "${action}" is not supported in CDP mode`);
@@ -1952,10 +2013,10 @@ async function handleViaCdp(
   // Page interaction actions get built-in observation here; the extension
   // channel applies the equivalent wrapper in its own dispatch layer.
   if (shouldObservePageAction(action, data)) {
-    return cdpObservedPageAction(getCdpSession(), action, data, controlSource);
+    return cdpObservedPageAction(getCdpSession(), action, data, controlSource, deadline);
   }
 
-  return dispatchCdpAction(getCdpSession(), action, data, controlSource);
+  return dispatchCdpAction(getCdpSession(), action, data, controlSource, deadline);
 }
 
 /** Shared connection handler used by both the instance and legacy sockets. */
@@ -2147,9 +2208,8 @@ function cleanupAndExit(code: number): void {
   finish();
 }
 
-function restartAfterUpdate(): void {
-  // A persistent client socket must not keep an updated Host alive indefinitely;
-  // the Extension can reconnect only after the old Native Messaging process exits.
+function shutdownWithDeadline(): void {
+  // Persistent sockets must not keep a shutting-down host alive indefinitely.
   const forcedExit = setTimeout(() => process.exit(0), 2_000);
   forcedExit.unref();
   cleanupAndExit(0);

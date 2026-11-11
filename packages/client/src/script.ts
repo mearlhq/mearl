@@ -72,8 +72,10 @@ export async function executeScript(
   if (!Number.isSafeInteger(maxOutputBytes) || maxOutputBytes < 1 || maxOutputBytes > 1024 * 1024)
     throw new Error('maxOutputBytes must be an integer between 1 and 1048576');
 
+  const executionDeadline = Date.now() + Math.ceil(executionTimeoutSec * 1000);
   const client = new UnifiedClient({
     serverUrl: serverUrl ?? process.env.MEARL_SERVER_URL ?? loadCloudServerConfig()?.server,
+    requestDeadline: executionDeadline,
   });
   let session: ScriptExecutionResult['session'] =
     defaults.session && defaults.session !== 'new' ? { sessionId: defaults.session } : undefined;
@@ -148,7 +150,7 @@ export async function executeScript(
       const abort = () => stop({ code: 'SCRIPT_CANCELLED', message: 'Script execution cancelled' });
       const deadline = setTimeout(
         () => stop({ code: 'SCRIPT_TIMEOUT', message: 'Script execution deadline exceeded' }),
-        executionTimeoutSec * 1000,
+        Math.max(0, executionDeadline - Date.now()),
       );
       signal?.addEventListener('abort', abort, { once: true });
       if (signal?.aborted) abort();
@@ -286,8 +288,13 @@ export async function executeScript(
                 ...args[2],
               });
             const optionsOnly =
-              (OPTIONS_ONLY.has(method) && !(method === 'browserList' && args[0] &&
-                ('provider' in args[0] || 'launchForm' in args[0]))) || (method === 'browserRelease' && args.length < 2);
+              (OPTIONS_ONLY.has(method) &&
+                !(
+                  method === 'browserList' &&
+                  args[0] &&
+                  ('provider' in args[0] || 'launchForm' in args[0])
+                )) ||
+              (method === 'browserRelease' && args.length < 2);
             return invoke(
               METHOD_ACTIONS.get(method)!,
               optionsOnly ? {} : (args[0] ?? {}),

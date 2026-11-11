@@ -114,10 +114,21 @@ export class BrowserProviderCoordinator {
     });
   }
 
-  async close(selector: string, deleteProfile = false): Promise<unknown> {
+  async close(
+    selector: string,
+    deleteProfile = false,
+    withClose?: (close: () => Promise<unknown>, localBrowserId?: string) => Promise<unknown>,
+  ): Promise<unknown> {
     const match = await this.requireOne(selector);
-    if ('external' in match) return closeProviderBrowser(match.external, { deleteProfile });
-    return match.runtime.close({ browserId: match.browser.browserId, deleteData: deleteProfile });
+    if ('external' in match) {
+      const close = () => closeProviderBrowser(match.external, { deleteProfile });
+      return withClose ? withClose(close) : close();
+    }
+    const { browserId } = match.browser;
+    const close = () => match.runtime.close({ browserId, deleteData: deleteProfile });
+    const localBrowserId =
+      match.runtime.definition.descriptor.providerId === 'local' ? browserId : undefined;
+    return withClose ? withClose(close, localBrowserId) : close();
   }
 
   async start(selector: string): Promise<ManagedBrowserInfo> {

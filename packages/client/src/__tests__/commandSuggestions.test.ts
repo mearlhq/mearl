@@ -15,7 +15,9 @@ describe('command suggestions', () => {
   ])('recommends a suitable canonical invocation for %s', (input, action, payload) => {
     const suggestions = findCommandSuggestions([input, '--help'], COMMANDS);
     expect(suggestions.map(item => item.command.name)).toEqual([action]);
-    expect(formatCommandSuggestions('mearl', suggestions)[0]).toContain(`mearl ${action} --payload`);
+    expect(formatCommandSuggestions('mearl', suggestions)[0]).toContain(
+      `mearl ${action} --payload`,
+    );
     expect(formatCommandSuggestions('mearl', suggestions)[0]).toContain(payload);
     expect(COMMANDS.some(command => command.name === input)).toBe(false);
   });
@@ -55,7 +57,7 @@ describe('command suggestions', () => {
     expect(commandInput(['tab', 'new', '--help'])).toBe('tab new');
     expect(formatCommandSuggestions('mearl', suggestions)).toEqual([
       '  mearl tab_open --payload \'{"url":"https://example.com"}\'\n' +
-        '    打开或按 URL 规则复用 Tab，并等待新页面加载完成',
+        `    ${suggestions[0]!.command.description}`,
     ]);
   });
 });

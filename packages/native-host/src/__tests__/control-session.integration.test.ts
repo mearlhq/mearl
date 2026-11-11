@@ -7,11 +7,171 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
-import { resolveChromeExecutable } from '../managed-browser.js';
+import {
+  closeManagedBrowser,
+  launchManagedBrowser,
+  resolveChromeExecutable,
+} from '../managed-browser.js';
 import { fileURLToPath } from 'node:url';
 describe.skipIf(process.env.MEARL_RUN_CONTROL_INTEGRATION !== '1')(
   'compiled browser control lifecycle',
   () => {
+    it('opens independent CDP tabs in parallel and drops an open queued past the script deadline', async () => {
+      const { UnifiedClient } = await import('../../../client/dist/unified.js');
+      const { executeScript } = await import('../../../client/dist/script.js');
+      const client = new UnifiedClient();
+      const name = `navigation-integration-${process.pid}`;
+      const browser = `mearl:local:managed:${name}`;
+      const bothStarted = Promise.withResolvers<void>();
+      const held = new Map<string, import('node:http').ServerResponse>();
+      const requests: string[] = [];
+      const server = createServer((req, res) => {
+        const url = req.url ?? '/';
+        requests.push(url);
+        if (url.startsWith('/slow/')) {
+          held.set(url, res);
+          if (held.size === 2) bothStarted.resolve();
+          return;
+        }
+        if (url === '/stalled-script') {
+          res.writeHead(200, { 'content-type': 'text/javascript' });
+          res.flushHeaders();
+          return;
+        }
+        res.writeHead(200, { 'content-type': 'text/html' });
+        res.write('<title>Readable fixture</title><script defer src="/stalled-script"></script>');
+        setTimeout(() => res.end('<p>Readable body</p>'), 200);
+      });
+      try {
+        server.listen(0, '127.0.0.1');
+        await once(server, 'listening');
+        const base = `http://127.0.0.1:${(server.address() as import('node:net').AddressInfo).port}`;
+        await launchManagedBrowser(
+          { name, headless: true },
+          {
+            nativeHostScript: fileURLToPath(new URL('../../dist/index.js', import.meta.url)),
+            exportCookies: async () => [],
+            log: () => {},
+          },
+        );
+        const open = (path: string, timeoutSec = 10) =>
+          client.invoke('tab_open', { url: base + path, reuse: 'prefer' }, { browser, timeoutSec });
+        const fast = await open('/fast', 2);
+        assert.equal(fast.navigation.status, 'ready');
+        assert(requests.includes('/stalled-script'));
+        const slow = Promise.all([open('/slow/a'), open('/slow/b')]);
+        void slow.catch(() => {});
+        await Promise.race([
+          bothStarted.promise,
+          slow.then(() => assert.fail('Both navigations must start before either finishes')),
+        ]);
+        const [read, screenshot] = await Promise.all([
+          client.invoke(
+            'page_eval',
+            { tabId: fast.tabId, expression: 'document.title' },
+            { browser, timeoutSec: 2 },
+          ),
+          client.invoke('page_screenshot', { tabId: fast.tabId }, { browser, timeoutSec: 2 }),
+        ]);
+        assert.equal(read.result, 'Readable fixture');
+        assert(screenshot.data);
+        const script = await executeScript(
+          `await mearl.tabOpen({url:${JSON.stringify(base + '/slow/a')},reuse:"never"}, {timeoutSec:90});`,
+          { browser, executionTimeoutSec: 0.8 },
+        );
+        assert.equal(script.error?.code, 'SCRIPT_TIMEOUT');
+        assert(script.pendingActions.includes('tabOpen'));
+        for (const res of held.values()) {
+          res.writeHead(200, { 'content-type': 'text/html' });
+          res.end('<title>Slow fixture</title>');
+        }
+        const [first, second] = await slow;
+        assert.notEqual(first.tabId, second.tabId);
+        assert.equal((await open('/slow/a')).tabId, first.tabId);
+        assert.equal(requests.filter(url => url === '/slow/a').length, 1);
+      } finally {
+        client.disconnect();
+        await closeManagedBrowser(`managed:${name}`).catch(() => {});
+        server.closeAllConnections();
+        server.close();
+      }
+    }, 20_000);
+
+    it.each(['own host', 'another host'])(
+      'acknowledges close via %s while Chrome has work in flight',
+      async via => {
+        const client = new (await import('../../../client/dist/unified.js')).UnifiedClient();
+        const name = `close-integration-${process.pid}`;
+        const browser = `mearl:local:managed:${name}`;
+        const router = via === 'another host' ? `${name}-router` : undefined;
+        let releaseRequest = Promise.withResolvers<() => void>();
+        const server = createServer((req, res) => {
+          if (req.url === '/hold') {
+            releaseRequest.resolve(() => res.end('done'));
+            return;
+          }
+          res.setHeader('content-type', 'text/html');
+          res.end('<title>fixture</title>');
+        });
+        const launched: string[] = [];
+        const launch = async (name: string) => {
+          const result = await launchManagedBrowser(
+            { name, headless: true },
+            {
+              nativeHostScript: fileURLToPath(new URL('../../dist/index.js', import.meta.url)),
+              exportCookies: async () => [],
+              log: () => {},
+            },
+          );
+          launched.push(name);
+          return result;
+        };
+        try {
+          server.listen(0, '127.0.0.1');
+          await once(server, 'listening');
+          const { port } = server.address() as import('node:net').AddressInfo;
+          const { cdpPort } = await launch(name);
+          if (router) await launch(router);
+          const { tabId } = await client.invoke(
+            'tab_open',
+            { url: `http://127.0.0.1:${port}/` },
+            { browser },
+          );
+          const evaluate = (expression: string, timeoutSec = 5) =>
+            client.invoke('page_eval', { tabId, expression }, { browser, timeoutSec });
+          const first = evaluate('fetch("/hold").then(response => response.text())');
+          const releaseFirst = await releaseRequest.promise;
+          await assert.rejects(evaluate('document.title = "late write"', 0.25), /请求超时/);
+          releaseFirst();
+          assert.equal((await first).result, 'done');
+          assert.equal((await evaluate('document.title')).result, 'fixture');
+
+          releaseRequest = Promise.withResolvers<() => void>();
+          const interrupted = assert.rejects(
+            evaluate('fetch("/hold").then(response => response.text())', 10),
+          );
+          await releaseRequest.promise;
+          const receipt = await client.invoke(
+            'browser_close',
+            { browser },
+            {
+              browser: router ? `mearl:local:managed:${router}` : browser,
+              timeoutSec: 3,
+            },
+          );
+          assert.equal(receipt.closed, true);
+          await assert.rejects(fetch(`http://127.0.0.1:${cdpPort}/json/version`));
+          await interrupted;
+        } finally {
+          for (const instance of launched)
+            await closeManagedBrowser(`managed:${instance}`).catch(() => {});
+          server.closeAllConnections();
+          server.close();
+        }
+      },
+      20_000,
+    );
+
     it('downloads, transfers, uploads and hands control back in an isolated Chrome', async () => {
       const root = fileURLToPath(new URL('../../../../', import.meta.url));
       const { UnifiedClient } = await import(

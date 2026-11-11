@@ -44,6 +44,7 @@ const MANAGED_BROWSERS_SUBDIR = 'managed-browsers';
 const MANAGED_BROWSER_LOCKS_SUBDIR = 'managed-browser-locks';
 const MANAGED_PROFILES_SUBDIR = 'managed-profiles';
 const LAUNCH_TIMEOUT_MS = 15000;
+export const CLOSED_OWN_MANAGED_HOST = Symbol('closedOwnManagedHost');
 
 export type ManagedBrowserUserAgentMode = NonNullable<BuiltinBrowserLaunchOptions['userAgentMode']>;
 
@@ -238,6 +239,16 @@ interface ManagedBrowserState {
   running: boolean;
 }
 
+function hasLiveLifecycleLock(browserId: string): boolean {
+  try {
+    const token = readFileSync(keyedConfigFile(MANAGED_BROWSER_LOCKS_SUBDIR, browserId), 'utf-8');
+    const pid = Number(token.split(':', 1)[0]);
+    return Number.isSafeInteger(pid) && pid > 0 && isAlive(pid);
+  } catch {
+    return false;
+  }
+}
+
 function listRecords(): ManagedBrowserState[] {
   pruneOrphanLogs(keyedDir(MANAGED_BROWSERS_SUBDIR));
   const records: ManagedBrowserState[] = [];
@@ -249,6 +260,8 @@ function listRecords(): ManagedBrowserState[] {
     }
     const running = isManagedProcess(record.pid, record.userDataDir);
     if (!running) {
+      // Closing owns cleanup and may still need its host to send the receipt.
+      if (hasLiveLifecycleLock(record.browserId) || readRecord(file)?.pid !== record.pid) continue;
       signalProcess(record.hostPid, 'SIGTERM', `--browser-id ${record.browserId}`);
       pruneCdpSessionStorage(
         keyedConfigFile('plugin-pages', `${record.browserId}:${record.userDataDir}`),
@@ -319,13 +332,24 @@ function signalProcess(pid: number, signal: NodeJS.Signals, commandMarker: strin
   }
 }
 
-export async function stopProcess(pid: number, commandMarker: string): Promise<void> {
-  signalProcess(pid, 'SIGTERM', commandMarker);
-  const deadline = Date.now() + 3000;
-  while (Date.now() < deadline && isManagedProcess(pid, commandMarker)) {
+async function waitForProcessExit(
+  pid: number,
+  commandMarker: string,
+  timeout: number,
+): Promise<boolean> {
+  const deadline = Date.now() + timeout;
+  while (isManagedProcess(pid, commandMarker)) {
+    if (Date.now() >= deadline) return false;
     await new Promise(resolve => setTimeout(resolve, 50));
   }
-  if (isManagedProcess(pid, commandMarker)) signalProcess(pid, 'SIGKILL', commandMarker);
+  return true;
+}
+
+export async function stopProcess(pid: number, commandMarker: string): Promise<boolean> {
+  signalProcess(pid, 'SIGTERM', commandMarker);
+  if (await waitForProcessExit(pid, commandMarker, 3000)) return true;
+  signalProcess(pid, 'SIGKILL', commandMarker);
+  return waitForProcessExit(pid, commandMarker, 1000);
 }
 
 function profileDirectory(browserId: string, persistent: boolean): string {
@@ -393,7 +417,8 @@ export function acquireLaunchLock(browserId: string): () => void {
         // Another contender already recovered or replaced the stale lock.
       }
     }
-    if (!tryAcquire()) throw new Error(`Managed browser launch already in progress: ${browserId}`);
+    if (!tryAcquire())
+      throw new Error(`Managed browser lifecycle operation already in progress: ${browserId}`);
   }
 
   return () => {
@@ -533,32 +558,43 @@ export async function launchManagedBrowser(
 }
 
 export async function closeManagedBrowser(
-  selector: string,
+  browserId: string,
   options: { deleteProfile?: boolean } = {},
-): Promise<Record<string, any>> {
-  const record = findManagedRecord(selector);
-  if (!record) throw new Error(`Managed browser not found: ${selector}`);
+): Promise<{
+  browserId: string;
+  closed: true;
+  profileDeleted: boolean;
+  [CLOSED_OWN_MANAGED_HOST]: boolean;
+}> {
+  const unlock = acquireLaunchLock(browserId);
+  try {
+    const recordFile = keyedConfigFile(MANAGED_BROWSERS_SUBDIR, browserId);
+    const record = readRecord<ManagedBrowserRecord>(recordFile);
+    if (!record) throw new Error(`Managed browser not found: ${browserId}`);
 
-  const recordFile = keyedConfigFile(MANAGED_BROWSERS_SUBDIR, record.browserId);
-  await stopProcess(record.pid, record.userDataDir);
-  const closingOwnHost = record.hostPid === process.pid;
-  if (!closingOwnHost) await stopProcess(record.hostPid, `--browser-id ${record.browserId}`);
-  pruneCdpSessionStorage(
-    keyedConfigFile('plugin-pages', `${record.browserId}:${record.userDataDir}`),
-  );
-  removeRecord(keyedConfigFile('browsers', record.browserId));
+    if (!(await stopProcess(record.pid, record.userDataDir)))
+      throw new Error(`Managed browser did not exit: ${browserId}`);
+    const closingOwnHost = record.hostPid === process.pid;
+    if (!closingOwnHost && !(await stopProcess(record.hostPid, `--browser-id ${browserId}`)))
+      throw new Error(`Managed browser host did not exit: ${browserId}`);
+    pruneCdpSessionStorage(keyedConfigFile('plugin-pages', `${browserId}:${record.userDataDir}`));
+    removeRecord(keyedConfigFile('browsers', browserId));
 
-  const deleteProfile = options.deleteProfile === true || !record.persistent;
-  const stoppedRecord = stoppedPersistentBrowserRecord(record, deleteProfile);
-  if (stoppedRecord) {
-    writeRecord(recordFile, stoppedRecord);
-  } else {
-    removeRecord(recordFile);
-    rmSync(record.userDataDir, { recursive: true, force: true });
+    const deleteProfile = options.deleteProfile === true || !record.persistent;
+    const stoppedRecord = stoppedPersistentBrowserRecord(record, deleteProfile);
+    if (stoppedRecord) {
+      writeRecord(recordFile, stoppedRecord);
+    } else {
+      removeRecord(recordFile);
+      rmSync(record.userDataDir, { recursive: true, force: true });
+    }
+    return {
+      browserId,
+      closed: true,
+      profileDeleted: deleteProfile,
+      [CLOSED_OWN_MANAGED_HOST]: closingOwnHost,
+    };
+  } finally {
+    unlock();
   }
-  if (closingOwnHost) {
-    const timer = setTimeout(() => process.kill(process.pid, 'SIGTERM'), 250);
-    timer.unref();
-  }
-  return { browserId: record.browserId, closed: true, profileDeleted: deleteProfile };
 }

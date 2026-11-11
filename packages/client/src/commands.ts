@@ -546,7 +546,7 @@ export const COMMANDS = [
   // ── 标签页 ────────────────────────────────────────────────────────────────
   {
     name: 'tab_open',
-    description: '打开或按 URL 规则复用 Tab，并等待新页面加载完成',
+    description: '打开或按 URL 规则复用 Tab，并观察新页面的导航状态',
     aliases: ['tab_new', 'new_tab', 'tab_create', 'create_tab'],
     aliasExamples: {
       tab_activate: `tab_open --payload '{"url":"https://example.com","reuse":"require","active":true}'`,
@@ -621,6 +621,7 @@ export const COMMANDS = [
     ],
     result: [
       '返回 tabId、url、title、opened/reused；reused=true 的既有页面应保留。',
+      'CDP 新开页返回 navigation.status：ready 表示 DOM 可读，pending 表示尚未收到导航回执，loading 表示文档仍在加载，failed 附带浏览器错误。等待超时后仍可用返回的 tabId 检查页面。',
       'active=true 时 activation 包含 tabActive、windowFocused、windowState、visibilityState；emulation 返回实际生效配置。',
       'capture.cursor 是导航前诊断边界，可分别用于 get_logs/get_requests/get_events 的 after。',
     ],
