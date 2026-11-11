@@ -149,7 +149,7 @@ function normalizeCapabilityView(view: PopupView, captureEnabled = true): PopupV
   return view;
 }
 
-function initialPopupView(isSidePanel: boolean): PopupView {
+export function initialPopupView(isSidePanel: boolean): PopupView {
   if (isSidePanel) return 'formatter';
   const requestedView = new URLSearchParams(window.location.search).get('view');
   if (isPopupView(requestedView)) return requestedView;
@@ -252,6 +252,7 @@ export const Popup: FC<PopupProps> = ({ isSidePanel = false, bootstrapConfig, bo
     isInitialized: isInputInitialized,
     processInputText,
   } = useJsonInput({
+    enableAutoLoad: activeView === 'formatter',
     initialInput: bootstrapInput,
     onExpandedPathsRestore: setExpandedPaths,
   });
@@ -833,7 +834,7 @@ export const Popup: FC<PopupProps> = ({ isSidePanel = false, bootstrapConfig, bo
 
       {activeView === 'browsers' && (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <Suspense fallback={<PopupViewFallback />}>
+          <Suspense fallback={null}>
             <BrowserManager
               accountsEnabled={accountsEnabled}
               onBack={unpinnedBuiltIn ? returnToToolbox : undefined}

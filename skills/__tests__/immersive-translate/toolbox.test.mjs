@@ -28,6 +28,11 @@ beforeEach(()=>{
 afterEach(()=>{preact.render(null,document.getElementById('app'));delete window.mearl;vi.restoreAllMocks();});
 const mount=async()=>{await act(async()=>{new Function(source)();await Promise.resolve();});await vi.waitFor(()=>expect(bridge.invoke).toHaveBeenCalledWith('host.tab.active'));};
 const button=text=>[...document.querySelectorAll('button')].find(button=>button.textContent===text||button.getAttribute('aria-label')===text);
+it('starts the initial page query without waiting for passive effects',async()=>{
+  bridge.ui={...bridge.ui,useEffect:()=>{}};
+  await mount();
+  await vi.waitFor(()=>expect(button('翻译本页')?.disabled).toBe(false));
+});
 it('offers page translation before site activation and keeps restarts and stops scoped to the page',async()=>{
   await mount();await vi.waitFor(()=>expect(button('翻译本页')?.disabled).toBe(false));
   const actions=[...document.querySelectorAll('.site-actions button')];

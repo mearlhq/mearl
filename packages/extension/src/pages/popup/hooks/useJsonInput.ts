@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { preprocessData } from '../../../shared/dataPreprocessor';
 import { tryParseJsonString } from '../../panel/utils/helpers';
 import { t } from '../../panel/utils/i18n';
@@ -25,35 +25,35 @@ const createWelcomeJson = () =>
     2,
   );
 
-  // 去掉可能的 JSON 引号包裹
-  const unwrapJsonString = (text: string): string => {
-    try {
-      const parsed = JSON.parse(text);
-      if (typeof parsed === 'string') return parsed;
-    } catch {
-      // ignore
-    }
-    return text;
-  };
+// 去掉可能的 JSON 引号包裹
+const unwrapJsonString = (text: string): string => {
+  try {
+    const parsed = JSON.parse(text);
+    if (typeof parsed === 'string') return parsed;
+  } catch {
+    // ignore
+  }
+  return text;
+};
 
-  // 将原始文本规范化为 JsonTree 可直接解析的格式：
-  // tryParseJsonString 识别不到时，用 preprocessData 转换，结果为对象则序列化为 JSON 字符串
-  const normalizeForDisplay = (text: string): string => {
-    const { format } = tryParseJsonString(text);
-    if (format) return text;
-    const preprocessed = preprocessData(text);
-    if (typeof preprocessed === 'object' && preprocessed !== null) {
-      return JSON.stringify(preprocessed);
-    }
-    return text;
-  };
+// 将原始文本规范化为 JsonTree 可直接解析的格式：
+// tryParseJsonString 识别不到时，用 preprocessData 转换，结果为对象则序列化为 JSON 字符串
+const normalizeForDisplay = (text: string): string => {
+  const { format } = tryParseJsonString(text);
+  if (format) return text;
+  const preprocessed = preprocessData(text);
+  if (typeof preprocessed === 'object' && preprocessed !== null) {
+    return JSON.stringify(preprocessed);
+  }
+  return text;
+};
 
-  // 判断文本是否可解析（用于显示错误提示）
-  const canParse = (text: string): boolean => {
-    if (!text.trim()) return false;
-    const { format } = tryParseJsonString(normalizeForDisplay(text));
-    return !!format;
-  };
+// 判断文本是否可解析（用于显示错误提示）
+const canParse = (text: string): boolean => {
+  if (!text.trim()) return false;
+  const { format } = tryParseJsonString(normalizeForDisplay(text));
+  return !!format;
+};
 
 export interface JsonInputSnapshot {
   inputText?: string;
@@ -89,7 +89,9 @@ export async function loadJsonInput(): Promise<JsonInputSnapshot> {
       const inputText = normalizeForDisplay(unwrapJsonString(text));
       if (canParse(inputText)) return { inputText, isStandalonePage: false };
     }
-  } catch { /* The welcome input is available when clipboard access is denied. */ }
+  } catch {
+    /* The welcome input is available when clipboard access is denied. */
+  }
   return { isStandalonePage: false };
 }
 
@@ -102,10 +104,16 @@ interface UseJsonInputOptions {
 export const useJsonInput = (options: UseJsonInputOptions = {}) => {
   const { enableAutoLoad = true, initialInput, onExpandedPathsRestore } = options;
 
-  const [inputText, setInputText] = useState<string>(() => initialInput?.inputText ?? createWelcomeJson());
+  const [inputText, setInputText] = useState<string>(
+    () => initialInput?.inputText ?? createWelcomeJson(),
+  );
   const [parseError, setParseError] = useState<string>('');
-  const [isStandalonePage, setIsStandalonePage] = useState<boolean>(initialInput?.isStandalonePage ?? false);
-  const [isInitialized, setIsInitialized] = useState<boolean>(!enableAutoLoad || initialInput !== undefined);
+  const [isStandalonePage, setIsStandalonePage] = useState<boolean>(
+    initialInput?.isStandalonePage ?? false,
+  );
+  const [isInitialized, setIsInitialized] = useState<boolean>(initialInput !== undefined);
+  const loadRef = useRef<Promise<JsonInputSnapshot> | null>(null);
+  const loadedRef = useRef(initialInput !== undefined);
 
   const processInputText = (text: string) => {
     if (!text?.trim()) return;
@@ -120,16 +128,21 @@ export const useJsonInput = (options: UseJsonInputOptions = {}) => {
   };
 
   useEffect(() => {
-    if (!enableAutoLoad || initialInput) return;
+    if (!enableAutoLoad || initialInput || loadedRef.current) return;
     let disposed = false;
-    void loadJsonInput().then(snapshot => {
+    // Reuse an in-flight read when switching views so transferred data is consumed once.
+    loadRef.current ??= loadJsonInput();
+    void loadRef.current.then(snapshot => {
       if (disposed) return;
+      loadedRef.current = true;
       setInputText(snapshot.inputText ?? createWelcomeJson());
       setIsStandalonePage(snapshot.isStandalonePage);
       if (snapshot.expandedPaths) onExpandedPathsRestore?.(snapshot.expandedPaths);
       setIsInitialized(true);
     });
-    return () => { disposed = true; };
+    return () => {
+      disposed = true;
+    };
   }, [enableAutoLoad, initialInput, onExpandedPathsRestore]);
 
   return {

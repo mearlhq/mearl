@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   clipboardRead: vi.fn(),
   clipboardReadText: vi.fn(),
   loadBundle: vi.fn(),
+  removeCache: vi.fn(),
   getCurrentLanguage: vi.fn(() => 'zh_CN'),
   requestNativeHost: vi.fn(),
   requestToolbox: vi.fn(),
@@ -16,6 +17,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../../shared/toolboxPageBundle', () => ({
   loadToolboxPageBundle: mocks.loadBundle,
+  removeCachedToolboxTool: mocks.removeCache,
 }));
 vi.mock('../../popup/toolboxRequest', () => ({ requestToolbox: mocks.requestToolbox }));
 vi.mock('../../sidepanel/nativeHostRequest', () => ({
@@ -162,6 +164,19 @@ describe('SandboxToolPage', () => {
     vi.unstubAllGlobals();
   });
 
+  it('uses supplied HTML without reading the bundle again', async () => {
+    render(
+      <SandboxToolPage
+        title="Cached tool"
+        toolId="plugin:test"
+        page={{ type: 'sandbox', hash: 'a'.repeat(64), size: 1, chunks: 1 }}
+        initialHtml="<!doctype html><html><body>Cached</body></html>"
+      />,
+    );
+    await waitFor(() => expect(document.querySelector('iframe')).not.toBeNull());
+    expect(mocks.loadBundle).not.toHaveBeenCalled();
+  });
+
   it('shows host navigation actions before the fullscreen action', () => {
     render(
       <SandboxToolPage
@@ -216,6 +231,32 @@ describe('SandboxToolPage', () => {
     expect(screen.getByTitle('Another tool')).not.toBe(frame);
   });
 
+  it('starts the sandbox while HTML is pending and delivers HTML when it arrives', async () => {
+    let resolve!: (value: string) => void;
+    mocks.loadBundle.mockReturnValue(
+      new Promise<string>(done => {
+        resolve = done;
+      }),
+    );
+    render(
+      <SandboxToolPage
+        title="Pending tool"
+        toolId="plugin:test"
+        page={{ type: 'sandbox', hash: 'a'.repeat(64), size: 1, chunks: 1 }}
+      />,
+    );
+    const frame = screen.getByTitle('Pending tool') as HTMLIFrameElement;
+    const post = vi.spyOn(frame.contentWindow!, 'postMessage');
+    fireEvent.load(frame);
+    expect(post).not.toHaveBeenCalled();
+    await act(async () => resolve('<html>Ready</html>'));
+    expect(screen.getByTitle('Pending tool')).toBe(frame);
+    expect(post).toHaveBeenCalledWith(
+      { type: 'mearl-plugin-load', html: expect.stringContaining('<html>Ready</html>') },
+      '*',
+    );
+  });
+
   it('loads the registered bundle into a restricted iframe', async () => {
     render(
       <SandboxToolPage
@@ -237,6 +278,16 @@ describe('SandboxToolPage', () => {
   });
 
   it('checks for a Skill update and applies it after the user clicks the title bar button', async () => {
+    const reload = vi.spyOn(window.location, 'reload').mockImplementation(() => {});
+    let finishClear!: () => void;
+    mocks.removeCache
+      .mockRejectedValueOnce(new Error('storage unavailable'))
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>(resolve => {
+            finishClear = resolve;
+          }),
+      );
     mocks.requestNativeHost.mockImplementation(async action => {
       if (action === 'agent_skills_check_updates') {
         return { updates: [{ name: 'notebook-skill', scope: 'global' }] };
@@ -264,9 +315,24 @@ describe('SandboxToolPage', () => {
         name: 'notebook-skill',
         scope: 'global',
       });
-      expect(screen.getByRole('button', { name: 'toolboxSkillRefreshToApply' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'toolboxSkillRefreshToApply' })).toBeEnabled();
     });
     expect(mocks.showToast).toHaveBeenCalledWith('toolboxSkillRefreshToApply', 'success');
+    fireEvent.click(screen.getByRole('button', { name: 'toolboxSkillRefreshToApply' }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'toolboxSkillRefreshToApply' })).toBeEnabled(),
+    );
+    expect(mocks.showToast).toHaveBeenCalledWith('toolboxRefreshFailed', 'error');
+    expect(reload).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'toolboxSkillRefreshToApply' }));
+    expect(mocks.removeCache).toHaveBeenCalledWith('plugin:notebook');
+    expect(reload).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'toolboxSkillRefreshToApply' })).toBeDisabled();
+    await act(async () => {
+      finishClear();
+    });
+    expect(reload).toHaveBeenCalledOnce();
+    reload.mockRestore();
   });
 
   it('keeps the title bar unchanged when the installed Skill is current', async () => {

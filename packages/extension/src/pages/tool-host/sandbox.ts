@@ -21,8 +21,8 @@ const handleMessage = (event: MessageEvent) => {
   }
 
   if (message?.type === 'mearl-plugin-ready') {
-    if (event.source && event.source !== pluginFrame?.contentWindow) return;
-    window.parent.postMessage({ type: 'mearl-plugin-ready' }, '*');
+    if (!pluginFrame || event.source !== pluginFrame.contentWindow) return;
+    window.parent.postMessage({ type: message.type }, '*');
     return;
   }
 

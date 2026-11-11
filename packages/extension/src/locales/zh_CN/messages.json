@@ -1298,6 +1298,9 @@
   "toolboxRefresh": {
     "message": "刷新工具列表"
   },
+  "toolboxPageUpdateReady": {
+    "message": "有更新，点击刷新"
+  },
   "toolboxRefreshSuccess": {
     "message": "工具列表已刷新"
   },
@@ -1377,7 +1380,7 @@
     "message": "正在更新…"
   },
   "toolboxSkillRefreshToApply": {
-    "message": "更新完成，请刷新页面"
+    "message": "更新完成，点击刷新"
   },
   "toolboxSkillUpdateFailed": {
     "message": "Skill 更新失败：$1"

@@ -55,7 +55,7 @@ input, select { width: 100%; min-width: 0; height: 32px; padding: 0 10px; border
 .display-toggle button:hover:not(:disabled) { background: var(--hover); }
 .display-toggle .selected { background: var(--surface); color: var(--primary); }
 .engine-toggle { height: 32px; color: var(--text); background: var(--secondary); }
-.engine-toggle button { flex: 1; min-width: 0; padding: 0 6px; white-space: nowrap; }
+.engine-toggle button { flex: 1 1 auto; min-width: 0; padding: 0 6px; white-space: nowrap; }
 .progress-summary { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; font-variant-numeric: tabular-nums; }
 .progress-summary strong { font-size: 14px; font-weight: 600; }
 .separator { padding: 0 6px; }

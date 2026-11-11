@@ -1,7 +1,7 @@
 (async () => {
   const bridge = window.mearl;
   let context = await bridge.ready();
-  const { html, render, useState, useEffect, useRef } = bridge.ui;
+  const { html, render, useState, useEffect, useLayoutEffect, useRef } = bridge.ui;
   const dictionary = locale => String(locale).startsWith('zh') ? {
     auto:'本站自动翻译', language:'翻译为', model:'翻译模型', customModel:'自定义模型', effort:'思考级别', effortDefault:'跟随模型', effortNone:'不思考', effortMinimal:'极低', effortLow:'低（更快）', effortMedium:'中', effortHigh:'高', effortXhigh:'更高', effortMax:'最高',
     startPage:'翻译本页', stopPage:'停止本页翻译', start:'开启本站翻译', stop:'关闭本站并恢复原文', stopShort:'关闭本站翻译', restart:'重新翻译当前页', restartShort:'重新翻译', apply:'应用并重译',
@@ -41,7 +41,7 @@
       }).catch(() => { if (!cancelled) setModelsError(true); });
       return () => { cancelled=true; };
     }, [engine]);
-    useEffect(() => { let cancelled=false; const current=++epoch.current;
+    useLayoutEffect(() => { let cancelled=false; const current=++epoch.current;
       void (async () => {
         const active=await bridge.invoke('host.tab.active');
         const supported=active && /^https?:\/\//.test(active.url);

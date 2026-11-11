@@ -326,6 +326,44 @@ async function openDynamicProvider(
 }
 
 describe('BrowserManager', () => {
+  it.each([50, 350])(
+    'only shows one delayed initial loading indicator for a %ims request',
+    async delay => {
+      vi.useFakeTimers();
+      let resolveList!: (value: { browsers: [] }) => void;
+      managerMocks.request.mockImplementation((operation: string) =>
+        operation === 'list'
+          ? new Promise(resolve => {
+              resolveList = resolve;
+            })
+          : Promise.resolve({}),
+      );
+      const view = render(<BrowserManager />);
+      try {
+        expect(screen.queryByText('browserManagerLoading')).not.toBeInTheDocument();
+        await act(async () => {
+          vi.advanceTimersByTime(delay);
+        });
+        expect(Boolean(screen.queryByText('browserManagerLoading'))).toBe(delay >= 300);
+        expect(
+          screen
+            .getByRole('button', { name: 'browserManagerRefresh' })
+            .querySelector('.animate-spin'),
+        ).toBeNull();
+        await act(async () => {
+          resolveList({ browsers: [] });
+        });
+        await act(async () => {
+          vi.advanceTimersByTime(400);
+        });
+        expect(screen.queryByText('browserManagerLoading')).not.toBeInTheDocument();
+      } finally {
+        view.unmount();
+        vi.useRealTimers();
+      }
+    },
+  );
+
   beforeEach(() => {
     vi.clearAllMocks();
     accountMocks.accounts = [];
@@ -1172,7 +1210,9 @@ describe('BrowserManager', () => {
       if (operation === 'launch') {
         launchAttempts += 1;
         if (launchAttempts === 1) {
-          throw new Error('Example Cloud API key not found. Set EXAMPLE_CLOUD_KEY in ~/.mearl/.env.');
+          throw new Error(
+            'Example Cloud API key not found. Set EXAMPLE_CLOUD_KEY in ~/.mearl/.env.',
+          );
         }
         return {};
       }
@@ -1442,9 +1482,7 @@ describe('BrowserManager', () => {
     fireEvent.click(screen.getByRole('button', { name: 'browserManagerLaunch' }));
 
     await waitFor(() =>
-      expect(accountMocks.call).toHaveBeenCalledWith(
-        2215152400159, 'shop', undefined,
-      ),
+      expect(accountMocks.call).toHaveBeenCalledWith(2215152400159, 'shop', undefined),
     );
     expect(accountMocks.withAutoLogin).toHaveBeenCalled();
     await waitFor(() =>

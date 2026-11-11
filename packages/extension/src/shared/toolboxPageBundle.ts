@@ -1,4 +1,4 @@
-import type { ToolboxSandboxPage } from '@mearl/browser-core';
+import type { ToolboxSandboxPage, ToolboxToolOpenResult } from '@mearl/browser-core';
 import { requestToolbox } from '../pages/popup/toolboxRequest';
 
 interface CachedToolboxPage {
@@ -8,6 +8,62 @@ interface CachedToolboxPage {
 
 function cacheKey(toolId: string): string {
   return `toolbox-page:${toolId}`;
+}
+
+export interface CachedToolboxTool {
+  tool: ToolboxToolOpenResult;
+  html: string;
+}
+
+export function sameToolboxToolMetadata(
+  a: ToolboxToolOpenResult,
+  b: ToolboxToolOpenResult,
+): boolean {
+  // Chrome storage can reorder object keys, including nested page and locale metadata.
+  const serialize = (tool: ToolboxToolOpenResult) =>
+    JSON.stringify(tool, (_key, value) =>
+      value && typeof value === 'object' && !Array.isArray(value)
+        ? Object.fromEntries(
+            Object.keys(value)
+              .sort()
+              .map(key => [key, value[key]]),
+          )
+        : value,
+    );
+  return serialize(a) === serialize(b);
+}
+
+export async function readCachedToolboxTool(toolId: string): Promise<CachedToolboxTool | null> {
+  try {
+    const key = `toolbox-open:${toolId}`;
+    const stored = await chrome.storage.local.get([key, cacheKey(toolId)]);
+    const tool = stored[key] as ToolboxToolOpenResult | undefined;
+    const bundle = stored[cacheKey(toolId)] as CachedToolboxPage | undefined;
+    if (
+      tool?.page?.type !== 'sandbox' ||
+      typeof tool.title !== 'string' ||
+      !bundle ||
+      bundle.hash !== tool.page.hash ||
+      typeof bundle.html !== 'string' ||
+      new TextEncoder().encode(bundle.html).byteLength !== tool.page.size
+    )
+      return null;
+    return { tool, html: bundle.html };
+  } catch {
+    return null;
+  }
+}
+
+export async function cacheToolboxTool(toolId: string, tool: ToolboxToolOpenResult): Promise<void> {
+  try {
+    await chrome.storage.local.set({ [`toolbox-open:${toolId}`]: tool });
+  } catch {
+    // Cache persistence must not prevent opening a tool.
+  }
+}
+
+export async function removeCachedToolboxTool(toolId: string): Promise<void> {
+  await chrome.storage.local.remove([`toolbox-open:${toolId}`, cacheKey(toolId)]);
 }
 
 function decodeBase64(value: string): Uint8Array {
@@ -33,7 +89,8 @@ export async function loadToolboxPageBundle(
   page: ToolboxSandboxPage,
 ): Promise<string> {
   const key = cacheKey(toolId);
-  const cached = (await chrome.storage.local.get(key))[key] as CachedToolboxPage | undefined;
+  const stored = await chrome.storage.local.get(key).catch(() => ({}));
+  const cached = (stored as Record<string, CachedToolboxPage>)[key];
   if (cached && cached.hash === page.hash && typeof cached.html === 'string') {
     const bytes = new TextEncoder().encode(cached.html);
     if (bytes.byteLength === page.size) return cached.html;
@@ -62,6 +119,10 @@ export async function loadToolboxPageBundle(
     offset += chunk.byteLength;
   }
   const html = await verifiedHtml(content, page);
-  await chrome.storage.local.set({ [key]: { hash: page.hash, html } });
+  try {
+    await chrome.storage.local.set({ [key]: { hash: page.hash, html } });
+  } catch {
+    // The verified page remains usable when storage is full or unavailable.
+  }
   return html;
 }

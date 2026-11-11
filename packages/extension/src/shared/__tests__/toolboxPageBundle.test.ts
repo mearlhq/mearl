@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
-import { loadToolboxPageBundle } from '../toolboxPageBundle';
+import {
+  loadToolboxPageBundle,
+  readCachedToolboxTool,
+  sameToolboxToolMetadata,
+} from '../toolboxPageBundle';
 
 const mocks = vi.hoisted(() => ({ requestToolbox: vi.fn() }));
 
@@ -14,6 +18,23 @@ async function sha256(value: string): Promise<string> {
 }
 
 describe('toolbox page bundle', () => {
+  it('ignores reordered storage metadata but detects changed resources', () => {
+    const tool = {
+      title: 'Notes',
+      page: { type: 'sandbox' as const, hash: 'a'.repeat(64), size: 1, chunks: 1 },
+    };
+    const reordered = {
+      page: { chunks: 1, size: 1, hash: tool.page.hash, type: 'sandbox' as const },
+      title: 'Notes',
+    };
+    expect(sameToolboxToolMetadata(tool, reordered)).toBe(true);
+    expect(
+      sameToolboxToolMetadata(tool, {
+        ...reordered,
+        page: { ...reordered.page, hash: 'b'.repeat(64) },
+      }),
+    ).toBe(false);
+  });
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -67,5 +88,25 @@ describe('toolbox page bundle', () => {
       }),
     ).resolves.toBe(html);
     expect(mocks.requestToolbox).not.toHaveBeenCalled();
+  });
+
+  it('restores metadata only when its complete page bundle is cached', async () => {
+    const tool = {
+      title: 'Notes',
+      page: { type: 'sandbox', hash: 'a'.repeat(64), size: 1, chunks: 1 },
+    };
+    const metadata = { 'toolbox-open:plugin:notebook': tool };
+    (chrome.storage.local.get as Mock).mockResolvedValue(metadata);
+    expect(await readCachedToolboxTool('plugin:notebook')).toBeNull();
+    (chrome.storage.local.get as Mock).mockResolvedValue({
+      ...metadata,
+      'toolbox-page:plugin:notebook': { hash: tool.page.hash, html: 'x' },
+    });
+    expect(await readCachedToolboxTool('plugin:notebook')).toEqual({ tool, html: 'x' });
+    (chrome.storage.local.get as Mock).mockResolvedValue({
+      ...metadata,
+      'toolbox-page:plugin:notebook': { hash: 'b'.repeat(64), html: 'x' },
+    });
+    expect(await readCachedToolboxTool('plugin:notebook')).toBeNull();
   });
 });

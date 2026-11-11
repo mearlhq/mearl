@@ -1305,6 +1305,9 @@
   "toolboxRefresh": {
     "message": "Refresh tools"
   },
+  "toolboxPageUpdateReady": {
+    "message": "Update ready, click to reload"
+  },
   "toolboxRefreshSuccess": {
     "message": "Tool list refreshed"
   },
@@ -1384,7 +1387,7 @@
     "message": "Updating…"
   },
   "toolboxSkillRefreshToApply": {
-    "message": "Updated. Refresh this page to apply"
+    "message": "Updated. Click to refresh"
   },
   "toolboxSkillUpdateFailed": {
     "message": "Skill update failed: $1"

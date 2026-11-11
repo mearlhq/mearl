@@ -28,7 +28,7 @@ describe('toolbox UI runtime', () => {
     );
   });
 
-  it('leaves pages without a runtime unchanged and rejects unsupported runtimes', async () => {
+  it('preserves plain pages and rejects unsupported runtimes', async () => {
     const fetchRuntime = vi.fn();
     vi.stubGlobal('fetch', fetchRuntime);
     const { prepareToolboxPageHtml } = await import('../toolboxUiRuntime');
@@ -39,5 +39,26 @@ describe('toolbox UI runtime', () => {
       'Unsupported toolbox page runtime: vue',
     );
     expect(fetchRuntime).not.toHaveBeenCalled();
+  });
+
+  it('starts runtime loading early and reuses the in-flight fetch during preparation', async () => {
+    let resolveRuntime!: (value: { ok: boolean; text: () => Promise<string> }) => void;
+    const fetchRuntime = vi.fn(
+      () =>
+        new Promise(resolve => {
+          resolveRuntime = resolve;
+        }),
+    );
+    vi.stubGlobal('fetch', fetchRuntime);
+    const { preloadToolboxUiRuntime, prepareToolboxPageHtml } = await import('../toolboxUiRuntime');
+    preloadToolboxUiRuntime();
+    expect(fetchRuntime).toHaveBeenCalledOnce();
+    const prepared = prepareToolboxPageHtml(
+      '<head><script data-mearl-bridge></script></head>',
+      'preact',
+    );
+    resolveRuntime({ ok: true, text: async () => 'runtime()' });
+    await expect(prepared).resolves.toContain('runtime()');
+    expect(fetchRuntime).toHaveBeenCalledOnce();
   });
 });

@@ -1,4 +1,14 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import { preloadToolboxUiRuntime } from '../../../shared/toolboxUiRuntime';
 import {
   ArrowLeft,
   Bot,
@@ -22,6 +32,13 @@ import { t } from '../../panel/utils/i18n';
 import { showToast } from '../../panel/utils/toast';
 import { openToolboxToolTab } from '../../../shared/toolboxTab';
 import { localizeToolboxMetadata } from '../../../shared/toolboxLocale';
+import {
+  cacheToolboxTool,
+  loadToolboxPageBundle,
+  readCachedToolboxTool,
+  removeCachedToolboxTool,
+  sameToolboxToolMetadata,
+} from '../../../shared/toolboxPageBundle';
 import { ToolboxIcon, type ToolboxIconSource } from '../../../shared/toolboxIcons';
 import { requestToolbox, toolboxNativeHostUpdateInfo } from '../toolboxRequest';
 import { requestNativeHost } from '../../sidepanel/nativeHostRequest';
@@ -49,11 +66,11 @@ type ToolIcon = ToolboxIconSource;
 
 const LOADING_INDICATOR_DELAY_MS = 300;
 const TOOLBOX_SELECTION_STORAGE_KEY = 'mearl.popup.toolbox.activeTool';
-const SandboxToolPage = lazy(() =>
+const loadSandboxToolPage = () =>
   import('../../tool-host/SandboxToolPage').then(module => ({
     default: module.SandboxToolPage,
-  })),
-);
+  }));
+const SandboxToolPage = lazy(loadSandboxToolPage);
 
 interface ToolRowProps {
   description?: string;
@@ -93,6 +110,8 @@ type SelectedTool =
       id: string;
       title: string;
       tool: ToolboxToolOpenResult | null;
+      html?: string;
+      revision?: number;
     };
 
 export interface StoredToolboxSelection {
@@ -500,6 +519,11 @@ export function Toolbox({
   const pluginActionLockRef = useRef(false);
   const loadSequenceRef = useRef(0);
   const openSequenceRef = useRef(0);
+  const [pendingToolUpdate, setPendingToolUpdate] = useState<{
+    id: string;
+    tool: ToolboxToolOpenResult;
+    html: string;
+  } | null>(null);
   const loadingDelayRef = useRef<number | null>(null);
 
   const clearLoadingDelay = useCallback(() => {
@@ -585,13 +609,46 @@ export function Toolbox({
 
   const openPluginTool = useCallback(
     async (tool: Pick<ToolboxPluginTool, 'id' | 'title'>, preserveQuery = false) => {
+      preloadToolboxUiRuntime();
+      void loadSandboxToolPage().catch(() => {});
       const sequence = ++openSequenceRef.current;
+      setPendingToolUpdate(null);
       setError(null);
       if (!preserveQuery) setSelectedToolQuery({});
       setSelectedTool({ kind: 'plugin', id: tool.id, title: tool.title, tool: null });
+      const cached = await readCachedToolboxTool(tool.id);
+      if (openSequenceRef.current !== sequence) return;
+      const usableCache =
+        cached &&
+        cached.tool.displayMode !== 'tab' &&
+        !(cached.tool.displayMode === 'popup' && surface === 'tab')
+          ? cached
+          : null;
+      if (usableCache) {
+        setSelectedTool({
+          kind: 'plugin',
+          id: tool.id,
+          title: localizeToolboxMetadata(usableCache.tool).title,
+          tool: usableCache.tool,
+          html: usableCache.html,
+        });
+      }
       try {
         const result = await requestToolbox('toolbox_tool_open', { id: tool.id });
         if (openSequenceRef.current !== sequence) return;
+        if (usableCache) {
+          if (!sameToolboxToolMetadata(result, usableCache.tool)) {
+            const html =
+              result.page.hash === usableCache.tool.page.hash
+                ? usableCache.html
+                : await loadToolboxPageBundle(tool.id, result.page);
+            if (openSequenceRef.current !== sequence) return;
+            await cacheToolboxTool(tool.id, result);
+            if (openSequenceRef.current !== sequence) return;
+            setPendingToolUpdate({ id: tool.id, tool: result, html });
+          }
+          return;
+        }
         if (result.displayMode === 'popup' && surface === 'tab') {
           throw new Error(t('toolboxPopupOnly'));
         }
@@ -602,6 +659,7 @@ export function Toolbox({
           return;
         }
         const localizedResult = localizeToolboxMetadata(result);
+        void cacheToolboxTool(tool.id, result);
         setSelectedTool({
           kind: 'plugin',
           id: tool.id,
@@ -610,6 +668,7 @@ export function Toolbox({
         });
       } catch (openError) {
         if (openSequenceRef.current !== sequence) return;
+        if (usableCache) return;
         setSelectedTool(null);
         setError(openError instanceof Error ? openError.message : String(openError));
       }
@@ -618,7 +677,8 @@ export function Toolbox({
   );
 
   const restoredSelectionRef = useRef(false);
-  useEffect(() => {
+  // Start the cached tool read before the first paint.
+  useLayoutEffect(() => {
     if (restoredSelectionRef.current) return;
     restoredSelectionRef.current = true;
     if (initialSelection?.kind === 'plugin') {
@@ -634,11 +694,11 @@ export function Toolbox({
     setSelectedTool(null);
   };
 
-  const openSelectedToolInTab = async () => {
-    if (selectedTool?.kind !== 'plugin' || selectedTool.tool?.displayMode === 'popup') return;
+  const openSelectedToolInTab = async (tool = selectedTool) => {
+    if (tool?.kind !== 'plugin' || tool.tool?.displayMode === 'popup') return;
     setError(null);
     try {
-      await openToolboxToolTab(selectedTool.id, selectedToolQuery);
+      await openToolboxToolTab(tool.id, selectedToolQuery);
     } catch (openError) {
       setError(openError instanceof Error ? openError.message : String(openError));
     }
@@ -688,6 +748,7 @@ export function Toolbox({
         );
       } else {
         await requestToolbox('toolbox_plugin_uninstall', { id: tool.id });
+        await removeCachedToolboxTool(tool.id).catch(() => {});
       }
       const reloaded = await loadTools();
       if (action === 'update') {
@@ -891,11 +952,44 @@ export function Toolbox({
             }
           >
             <SandboxToolPage
-              key={selectedTool.id}
+              key={`${selectedTool.id}:${selectedTool.tool.page.hash}:${selectedTool.revision ?? 0}`}
               agent={selectedTool.tool.agent}
               skillUpdate={selectedTool.tool.skillUpdate}
               embedded
-              headerActions={toolSwitcher}
+              initialHtml={selectedTool.html}
+              headerActions={
+                <>
+                  {pendingToolUpdate?.id === selectedTool.id && (
+                    <button
+                      type="button"
+                      className="rounded p-1 text-text-secondary hover:bg-bg-hover hover:text-text-primary"
+                      title={t('toolboxPageUpdateReady')}
+                      aria-label={t('toolboxPageUpdateReady')}
+                      onClick={() => {
+                        const updated = pendingToolUpdate.tool;
+                        setPendingToolUpdate(null);
+                        if (updated.displayMode === 'tab') {
+                          void openSelectedToolInTab({ ...selectedTool, tool: updated });
+                        } else if (updated.displayMode === 'popup' && surface === 'tab') {
+                          setSelectedTool(null);
+                          setError(t('toolboxPopupOnly'));
+                        } else {
+                          setSelectedTool({
+                            ...selectedTool,
+                            title: localizeToolboxMetadata(updated).title,
+                            tool: updated,
+                            html: pendingToolUpdate.html,
+                            revision: (selectedTool.revision ?? 0) + 1,
+                          });
+                        }
+                      }}
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  {toolSwitcher}
+                </>
+              }
               onBack={directEntry ? undefined : closeSelectedTool}
               onOpenInTab={
                 selectedTool.tool.displayMode === 'popup'

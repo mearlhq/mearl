@@ -24,6 +24,11 @@ function inlineScript(source: string): string {
   return source.replace(/<\/script/gi, '<\\/script');
 }
 
+export function preloadToolboxUiRuntime(): void {
+  // Preparation reports errors and retries a failed speculative load.
+  void loadPreactRuntimeSource().catch(() => {});
+}
+
 export async function prepareToolboxPageHtml(html: string, runtime: unknown): Promise<string> {
   if (runtime === undefined) return html;
   if (runtime !== 'preact') {

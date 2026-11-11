@@ -28,13 +28,41 @@ describe('useJsonInput', () => {
       expect(result.current.isInitialized).toBe(true);
     });
   });
+
+  it('defers input until the formatter opens and reuses reads across view switches', async () => {
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useJsonInput({ enableAutoLoad: enabled }),
+      { initialProps: { enabled: false } },
+    );
+    expect(chrome.storage.local.get).not.toHaveBeenCalled();
+    expect(chrome.tabs.query).not.toHaveBeenCalled();
+    expect(result.current.isInitialized).toBe(false);
+    rerender({ enabled: true });
+    rerender({ enabled: false });
+    await act(async () => {
+      await resolveStorageGet({ jsonFormatterData: '{"saved":1}' });
+    });
+    rerender({ enabled: true });
+    await waitFor(() => expect(result.current.isInitialized).toBe(true));
+    expect(result.current.inputText).toContain('saved');
+    rerender({ enabled: false });
+    rerender({ enabled: true });
+    expect(chrome.storage.local.get).toHaveBeenCalledTimes(1);
+    expect(chrome.tabs.query).toHaveBeenCalledTimes(1);
+  });
 });
 
 it('renders prepared input and expansion paths without reloading or consuming another transfer', () => {
-  const snapshot = { inputText: 'https://example.com/prepared', isStandalonePage: true, expandedPaths: { root: true } };
+  const snapshot = {
+    inputText: 'https://example.com/prepared',
+    isStandalonePage: true,
+    expandedPaths: { root: true },
+  };
   const restore = vi.fn();
   vi.mocked(chrome.storage.local.get).mockClear();
-  const { result } = renderHook(() => useJsonInput({ initialInput: snapshot, onExpandedPathsRestore: restore }));
+  const { result } = renderHook(() =>
+    useJsonInput({ initialInput: snapshot, onExpandedPathsRestore: restore }),
+  );
   expect(result.current.inputText).toBe(snapshot.inputText);
   expect(result.current.isInitialized).toBe(true);
   expect(result.current.isStandalonePage).toBe(true);

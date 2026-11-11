@@ -2,6 +2,7 @@ import { invokeToolboxHostCapability } from './toolboxHostCapabilities';
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -19,7 +20,7 @@ import { showToast } from '../panel/utils/toast';
 import { requestToolbox } from '../popup/toolboxRequest';
 import { requestNativeHost } from '../sidepanel/nativeHostRequest';
 import { SidepanelChat, type AgentChatGuide } from '../sidepanel/SidepanelChat';
-import { loadToolboxPageBundle } from '../../shared/toolboxPageBundle';
+import { loadToolboxPageBundle, removeCachedToolboxTool } from '../../shared/toolboxPageBundle';
 import { prepareToolboxPageHtml } from '../../shared/toolboxUiRuntime';
 import { TOOLBOX_SANDBOX_PERMISSIONS } from './toolboxSandboxPermissions';
 
@@ -33,6 +34,7 @@ interface SandboxToolPageProps {
   headerActions?: ReactNode;
   onQueryChange?: (query: Record<string, string>) => void;
   page: ToolboxSandboxPage;
+  initialHtml?: string;
   query?: Record<string, string>;
   skillUpdate?: ToolboxSkillUpdate;
   title: string;
@@ -262,6 +264,7 @@ export function SandboxToolPage({
   headerActions,
   onQueryChange,
   page,
+  initialHtml,
   query,
   skillUpdate,
   title,
@@ -307,7 +310,7 @@ export function SandboxToolPage({
   const [theme, setTheme] = useState<'dark' | 'light'>(currentTheme);
   const locale = getCurrentLanguage();
   const [skillUpdateState, setSkillUpdateState] = useState<
-    'none' | 'available' | 'updating' | 'updated'
+    'none' | 'available' | 'updating' | 'updated' | 'refreshing'
   >('none');
 
   useEffect(() => {
@@ -335,6 +338,24 @@ export function SandboxToolPage({
       active = false;
     };
   }, [skillUpdate?.name, skillUpdate?.scope]);
+
+  const refreshUpdatedSkill = async () => {
+    if (skillUpdateState !== 'updated') return;
+    setSkillUpdateState('refreshing');
+    try {
+      await removeCachedToolboxTool(toolId);
+      window.location.reload();
+    } catch (refreshError) {
+      setSkillUpdateState('updated');
+      showToast(
+        t(
+          'toolboxRefreshFailed',
+          refreshError instanceof Error ? refreshError.message : String(refreshError),
+        ),
+        'error',
+      );
+    }
+  };
 
   const updateSkill = async () => {
     if (!skillUpdate || skillUpdateState !== 'available') return;
@@ -386,7 +407,7 @@ export function SandboxToolPage({
     };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     let active = true;
     setNeedsUserScripts(false);
     setAgentPanelVisible(false);
@@ -404,7 +425,7 @@ export function SandboxToolPage({
     const timer = window.setTimeout(() => setShowLoading(true), LOADING_INDICATOR_DELAY_MS);
     const load = async () => {
       try {
-        const content = await loadToolboxPageBundle(toolId, page);
+        const content = initialHtml ?? (await loadToolboxPageBundle(toolId, page));
         const preparedContent = await prepareToolboxPageHtml(content, page.runtime);
         if (active) setHtml(preparedContent);
       } catch (loadError) {
@@ -421,7 +442,7 @@ export function SandboxToolPage({
       portRef.current?.close();
       portRef.current = null;
     };
-  }, [defaultAgentPanelLayout, page, toolId]);
+  }, [defaultAgentPanelLayout, initialHtml, page, toolId]);
 
   useEffect(() => {
     if (!agentPanelVisible || agentPanelLayout !== 'drawer') return;
@@ -460,6 +481,11 @@ export function SandboxToolPage({
     if (!frameWindow || !html) return;
     frameWindow.postMessage({ type: 'mearl-plugin-load', html }, '*');
   }, [html]);
+
+  // The sandbox host and HTML load in parallel; either may become ready first.
+  useLayoutEffect(() => {
+    loadPage();
+  }, [loadPage, pageRevision]);
 
   const settleAgentTask = useCallback((taskId: string, result: EmbeddedAgentTaskResult) => {
     const request = pendingAgentTaskRequestsRef.current.get(taskId);
@@ -825,7 +851,7 @@ export function SandboxToolPage({
     );
   }, [agent, defaultAgentPanelLayout, theme, title, toolId]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const handlePageReady = (event: MessageEvent) => {
       if (event.source && event.source !== iframeRef.current?.contentWindow) return;
       if (event.data?.type === 'mearl-plugin-host-ready') loadPage();
@@ -843,7 +869,7 @@ export function SandboxToolPage({
         <header
           className={`flex shrink-0 items-center justify-between border-b border-border bg-toolbar py-1.5 text-text-primary ${embedded && !onBack ? 'px-3' : 'px-2'}`}
         >
-          <div className="flex min-w-0 flex-1 items-center gap-1">
+          <div className="flex min-h-5.5 min-w-0 flex-1 items-center gap-1">
             {onBack ? (
               <button
                 type="button"
@@ -861,11 +887,13 @@ export function SandboxToolPage({
             {skillUpdateState !== 'none' ? (
               <button
                 type="button"
-                disabled={skillUpdateState !== 'available'}
-                onClick={() => void updateSkill()}
-                className="flex h-7 shrink-0 items-center gap-1 rounded border border-blue-500/40 bg-blue-500/10 px-2 text-2xs font-medium text-blue-600 transition-colors hover:bg-blue-500/20 disabled:cursor-default disabled:opacity-60 dark:text-blue-400"
+                disabled={skillUpdateState !== 'available' && skillUpdateState !== 'updated'}
+                onClick={() =>
+                  void (skillUpdateState === 'updated' ? refreshUpdatedSkill() : updateSkill())
+                }
+                className="flex h-5.5 shrink-0 items-center gap-1 whitespace-nowrap rounded border border-blue-500/40 bg-blue-500/10 px-1.5 text-2xs leading-none font-medium text-blue-600 transition-colors hover:bg-blue-500/20 disabled:cursor-default disabled:opacity-60 dark:text-blue-400"
               >
-                {skillUpdateState === 'updating' ? (
+                {skillUpdateState === 'updating' || skillUpdateState === 'refreshing' ? (
                   <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
                 ) : null}
                 {skillUpdateState === 'available'
@@ -914,18 +942,6 @@ export function SandboxToolPage({
             {error}
           </p>
         </div>
-      ) : !html ? (
-        showLoading ? (
-          <div
-            role="status"
-            className="flex min-h-0 flex-1 items-center justify-center gap-2 bg-bg-primary text-xs text-text-secondary"
-          >
-            <LoaderCircle className="h-4 w-4 animate-spin" />
-            {t('toolboxToolOpening')}
-          </div>
-        ) : (
-          <div className="min-h-0 flex-1 bg-bg-primary" />
-        )
       ) : (
         <main className="@container relative min-h-0 flex-1 overflow-hidden">
           <iframe
@@ -943,6 +959,15 @@ export function SandboxToolPage({
               loadPage();
             }}
           />
+          {!html && showLoading && (
+            <div
+              role="status"
+              className="absolute inset-0 flex items-center justify-center gap-2 bg-bg-primary text-xs text-text-secondary"
+            >
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+              {t('toolboxToolOpening')}
+            </div>
+          )}
           {needsUserScripts ? (
             <div className="absolute inset-0 z-30 flex items-center justify-center bg-bg-primary p-4">
               <section

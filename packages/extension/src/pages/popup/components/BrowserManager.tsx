@@ -1767,6 +1767,15 @@ export function BrowserManager({
   const [browsers, setBrowsers] = useState<BrowserInfo[]>([]);
   const [providers, setProviders] = useState<BrowserProviderSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showLoading, setShowLoading] = useState(false);
+  useEffect(() => {
+    if (!loading) {
+      setShowLoading(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setShowLoading(true), 300);
+    return () => window.clearTimeout(timer);
+  }, [loading]);
   const [busyAction, setBusyAction] = useState<{
     browserId: string;
     action: BrowserRowAction | 'launch';
@@ -1962,7 +1971,12 @@ export function BrowserManager({
             title={t('browserManagerRefresh')}
             aria-label={t('browserManagerRefresh')}
           >
-            <RefreshCw className={clsx('h-3.5 w-3.5', loading && 'animate-spin')} />
+            <RefreshCw
+              className={clsx(
+                'h-3.5 w-3.5',
+                loading && showLoading && browsers.length > 0 && 'animate-spin',
+              )}
+            />
           </button>
           <button
             type="button"
@@ -2009,10 +2023,15 @@ export function BrowserManager({
             retry={retryNativeHost}
           />
         ) : loading && browsers.length === 0 ? (
-          <div className="flex h-full items-center justify-center gap-2 text-xs text-text-secondary">
-            <LoaderCircle className="h-4 w-4 animate-spin" />
-            {t('browserManagerLoading')}
-          </div>
+          showLoading ? (
+            <div
+              role="status"
+              className="flex h-full items-center justify-center gap-2 text-xs text-text-secondary"
+            >
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+              {t('browserManagerLoading')}
+            </div>
+          ) : null
         ) : browsers.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center text-center">
             <Laptop className="mb-1.5 h-6 w-6 text-text-secondary/40" />

@@ -12,6 +12,16 @@ const mocks = vi.hoisted(() => ({
   toast: vi.fn(),
   native: vi.fn(),
   catalog: vi.fn(),
+  cachedTool: vi.fn(),
+  loadBundle: vi.fn(),
+}));
+
+vi.mock('../../../../shared/toolboxPageBundle', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../../../shared/toolboxPageBundle')>()),
+  readCachedToolboxTool: mocks.cachedTool,
+  loadToolboxPageBundle: mocks.loadBundle,
+  cacheToolboxTool: vi.fn().mockResolvedValue(undefined),
+  removeCachedToolboxTool: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../hooks/useToolboxCatalog', () => ({ useToolboxCatalog: mocks.catalog }));
@@ -31,6 +41,7 @@ vi.mock('../../../../shared/toolboxTab', () => ({
 }));
 vi.mock('../../../tool-host/SandboxToolPage', () => ({
   SandboxToolPage: ({
+    initialHtml,
     embedded,
     headerActions,
     onBack,
@@ -39,6 +50,7 @@ vi.mock('../../../tool-host/SandboxToolPage', () => ({
     query,
     title,
   }: {
+    initialHtml?: string;
     embedded?: boolean;
     headerActions?: ReactNode;
     onBack?: () => void;
@@ -49,6 +61,7 @@ vi.mock('../../../tool-host/SandboxToolPage', () => ({
   }) => (
     <div
       data-testid="sandbox-tool"
+      data-html={initialHtml}
       data-embedded={String(embedded)}
       data-has-back={String(Boolean(onBack))}
       data-query={JSON.stringify(query)}
@@ -199,6 +212,8 @@ describe('Toolbox', () => {
   });
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.cachedTool.mockResolvedValue(null);
+    mocks.loadBundle.mockResolvedValue('updated');
     mocks.catalog.mockReturnValue({
       tools: parseToolboxCatalog(catalogFixture),
       loading: false,
@@ -694,6 +709,100 @@ describe('Toolbox', () => {
     expect(screen.getByRole('separator')).toHaveAttribute('aria-valuenow', '3');
   });
 
+  it('renders cached tools immediately and applies prepared updates only on click', async () => {
+    const cached = {
+      title: 'Cached Notes',
+      page: { type: 'sandbox', hash: 'b'.repeat(64), size: 1, chunks: 1 },
+    };
+    mocks.cachedTool.mockResolvedValue({ tool: cached, html: 'cached' });
+    const original = mocks.list.getMockImplementation()!;
+    let resolveOpen!: (value: unknown) => void;
+    mocks.list.mockImplementation((action: string) =>
+      action === 'toolbox_tool_open'
+        ? new Promise(resolve => {
+            resolveOpen = resolve;
+          })
+        : original(action),
+    );
+    render(<Toolbox />);
+    fireEvent.click(await screen.findByRole('button', { name: /Workspace Notes/ }));
+    expect(await screen.findByTestId('sandbox-tool')).toHaveTextContent('Cached Notes');
+    expect(screen.getByTestId('sandbox-tool')).toHaveAttribute('data-html', 'cached');
+    expect(screen.queryByRole('button', { name: 'toolboxPageUpdateReady' })).toBeNull();
+    await act(async () => resolveOpen(await original('toolbox_tool_open')));
+    const refresh = await screen.findByRole('button', { name: 'toolboxPageUpdateReady' });
+    expect(screen.getByTestId('sandbox-tool')).toHaveTextContent('Cached Notes');
+    expect(mocks.loadBundle).toHaveBeenCalledTimes(1);
+    fireEvent.click(refresh);
+    expect(screen.getByTestId('sandbox-tool')).toHaveTextContent('Workspace Notes');
+    expect(screen.getByTestId('sandbox-tool')).toHaveAttribute('data-html', 'updated');
+    expect(screen.queryByRole('button', { name: 'toolboxPageUpdateReady' })).toBeNull();
+  });
+
+  it('remounts the tool when applying a metadata-only update', async () => {
+    const result = await mocks.list.getMockImplementation()!('toolbox_tool_open');
+    mocks.cachedTool.mockResolvedValue({ tool: { ...result, title: 'Old title' }, html: 'cached' });
+    render(<Toolbox />);
+    fireEvent.click(await screen.findByRole('button', { name: /Workspace Notes/ }));
+    const refresh = await screen.findByRole('button', { name: 'toolboxPageUpdateReady' });
+    const previous = screen.getByTestId('sandbox-tool');
+    expect(mocks.loadBundle).not.toHaveBeenCalled();
+    fireEvent.click(refresh);
+    expect(screen.getByTestId('sandbox-tool')).not.toBe(previous);
+    expect(screen.getByTestId('sandbox-tool')).toHaveTextContent('Workspace Notes');
+  });
+
+  it('uses the updated display mode when a popup-only tool moves to a tab', async () => {
+    const original = mocks.list.getMockImplementation()!;
+    const result = await original('toolbox_tool_open');
+    mocks.cachedTool.mockResolvedValue({
+      tool: { ...result, displayMode: 'popup' },
+      html: 'cached',
+    });
+    mocks.list.mockImplementation(async (action: string) =>
+      action === 'toolbox_tool_open' ? { ...result, displayMode: 'tab' } : original(action),
+    );
+    render(<Toolbox />);
+    fireEvent.click(await screen.findByRole('button', { name: /Workspace Notes/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'toolboxPageUpdateReady' }));
+    await waitFor(() => expect(mocks.openPlugin).toHaveBeenCalledWith('plugin:notebook', {}));
+  });
+
+  it('keeps cached tools usable when the update check fails', async () => {
+    mocks.cachedTool.mockResolvedValue({
+      tool: {
+        title: 'Cached Notes',
+        page: { type: 'sandbox', hash: 'b'.repeat(64), size: 1, chunks: 1 },
+      },
+      html: 'cached',
+    });
+    const original = mocks.list.getMockImplementation()!;
+    mocks.list.mockImplementation(async (action: string) => {
+      if (action === 'toolbox_tool_open') throw new Error('Host offline');
+      return original(action);
+    });
+    render(<Toolbox />);
+    fireEvent.click(await screen.findByRole('button', { name: /Workspace Notes/ }));
+    expect(await screen.findByTestId('sandbox-tool')).toHaveTextContent('Cached Notes');
+    expect(screen.queryByText('Host offline')).toBeNull();
+  });
+
+  it('does not reload unchanged HTML or offer updates for reordered metadata', async () => {
+    const result = await mocks.list.getMockImplementation()!('toolbox_tool_open');
+    mocks.cachedTool.mockResolvedValue({
+      tool: { page: result.page, agent: result.agent, title: result.title },
+      html: 'cached',
+    });
+    render(<Toolbox />);
+    fireEvent.click(await screen.findByRole('button', { name: /Workspace Notes/ }));
+    await screen.findByTestId('sandbox-tool');
+    await waitFor(() =>
+      expect(mocks.list).toHaveBeenCalledWith('toolbox_tool_open', { id: 'plugin:notebook' }),
+    );
+    expect(mocks.loadBundle).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'toolboxPageUpdateReady' })).toBeNull();
+  });
+
   it('opens built-in and plugin tools inside the popup before offering a tab', async () => {
     const { container } = render(<Toolbox requestCasesEnabled />);
 
@@ -863,6 +972,7 @@ describe('Toolbox', () => {
     );
     render(<Toolbox requestCasesEnabled />);
     fireEvent.click(await screen.findByRole('button', { name: /Workspace Notes/ }));
+    await waitFor(() => expect(resolveOpen).toBeTypeOf('function'));
     fireEvent.keyDown(screen.getByRole('button', { name: 'toolboxSwitchTool' }), {
       key: 'ArrowDown',
     });
