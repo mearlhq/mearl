@@ -2,52 +2,58 @@
 
 [简体中文](README.md) | [English](README.en.md)
 
-在你日常使用的浏览器里，和 Agent 一起操作与调试网页。
+面向 Agent 的浏览器工作环境，在你选择的浏览器中执行任务、排查问题并验证结果。
 
-Mearl 复用浏览器已有的登录态，让 Agent 帮你验收功能、排查页面问题、导出报表。你也可以直接在 Chrome DevTools 面板里查看请求、设置 Mock、模拟设备环境。验证过的常用流程可以做成 Skill，供下次任务复用。
+Mearl 把页面操作、网络请求、日志和环境模拟连接起来，让 Agent 执行任务、排查问题并验证结果。按任务需要接入日常浏览器、CDP 浏览器或 Provider 提供的远端环境；将验证过的流程沉淀为 Skill，通过 Agent、CLI 或工具箱再次使用。人也可以通过扩展的 DevTools 面板参与调试。
 
 [产品官网](https://mearlhq.github.io/mearl/) · [Chrome 应用商店](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm) · [GitHub Releases](https://github.com/mearlhq/mearl/releases)
 
 ## 开始使用
 
-### 1. 安装浏览器扩展
+### 1. 安装本机环境
 
-从 [Chrome 应用商店](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm)安装扩展，或从 [GitHub Releases](https://github.com/mearlhq/mearl/releases) 下载 `mearl-chrome-v*.zip`，解压后在 `chrome://extensions/` 开启「开发者模式」，选择「加载已解压的扩展程序」。
-
-浏览器需要 **Chrome ≥ 120** 或支持相应扩展 API 的 Chromium 浏览器。[浏览器兼容性](packages/extension/README.md#浏览器兼容性)
-
-安装后即可使用 DevTools 调试面板。要让 Agent 操作浏览器，继续完成下面的配置。
-
-### 2. 连接 Agent
-
-本机组件需要 **Node.js ≥ 20.18.0**。你可以让 Agent 完成配置，也可以手动安装，选择一种方式即可。
-
-**交给 Agent 配置**：把下面这段复制给支持 Skill 的 Agent。
-
-```text
-请运行以下命令安装 Mearl Skill：
-npx --yes skills add mearlhq/mearl --skill mearl --global
-
-读取 Skill 并按指引配置本机环境，检查扩展与本机组件版本是否一致。
-需要我在 Chrome 中操作时，告诉我具体步骤。
-运行 mearl check 验证连接并报告结果。
-```
-
-**手动配置**：在终端运行安装器，安装 CLI、Native Host 和 Mearl Skill。
+需要 **Node.js ≥ 20.18.0**。先运行 setup，安装 CLI、Native Host 和 Mearl Skill，按提示选择 Agent 接入：
 
 ```bash
 npx @mearl/setup
 ```
 
-使用与本机组件同版的扩展。在 Mearl 弹窗的「设置 → 服务集成」中开启 **Agent 服务**，运行 `mearl check` 验证连接。[安装器文档](packages/setup/README.md)
+也可以把这段交给支持 Skill 的 Agent：
 
-使用 MCP 客户端时，在本机环境就绪后运行 `npx @mearl/setup --mcp` 完成接入。[MCP 文档](packages/mcp-server/README.md)
+```text
+请运行 npx @mearl/setup 安装 Mearl，读取安装后的 Mearl Skill。
+按任务需要配置浏览器连接，需要我操作时告诉我具体步骤。
+完成后运行 mearl check 和 mearl browser_list，报告目标浏览器是否已连接。
+```
 
-### 3. 执行第一个任务
+使用 MCP 客户端时，运行 `npx @mearl/setup --mcp` 完成接入。[安装器文档](packages/setup/README.md) · [MCP 文档](packages/mcp-server/README.md)
 
-在已接入 Mearl 的 Agent 中试一句。
+### 2. 选择浏览器接入方式
 
-> 用 Mearl 在我的浏览器里打开 https://example.com，告诉我页面标题，并截一张图。
+- **日常浏览器**：可选安装 Chrome 扩展，复用已有标签页和登录态，并使用工具箱与 DevTools。
+- **浏览器 / Electron · CDP**：接入已开放远程调试的浏览器或 Electron 客户端页面，无需安装 Mearl 扩展。
+- **远端浏览器或设备**：安装并配置对应 Provider，可用动作以该 Provider 声明为准。
+
+连接方式、权限和能力范围见 [CLI / SDK 文档](packages/client/README.md)。setup 准备本机工具；浏览器扩展安装和环境连接需按所选方式完成。
+
+#### 可选：安装日常浏览器扩展
+
+从 [Chrome 应用商店](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm)安装扩展，或从 [GitHub Releases](https://github.com/mearlhq/mearl/releases) 下载同版 `mearl-chrome-v*.zip`，解压后在 `chrome://extensions/` 开启「开发者模式」，选择「加载已解压的扩展程序」。
+
+扩展需要 **Chrome ≥ 120** 或支持相应扩展 API 的 Chromium 浏览器。在 Mearl 弹窗的「设置 → 服务集成」中开启 **Agent 服务**。[浏览器兼容性](packages/extension/README.md#浏览器兼容性)
+
+### 3. 确认连接并执行首个任务
+
+保持目标环境运行，确认列表中出现要使用的浏览器：
+
+```bash
+mearl check
+mearl browser_list
+```
+
+在已接入 Mearl 的 Agent 中试一句。连接多个环境时，附上目标 `browserId`：
+
+> 用 Mearl 在选中的浏览器里打开 https://example.com，告诉我页面标题，并截一张图。
 
 ## CLI 与 SDK
 

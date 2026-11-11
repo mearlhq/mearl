@@ -2,52 +2,58 @@
 
 [简体中文](README.md) | [English](README.en.md)
 
-Automate and debug with an agent in the browser you use every day.
+A browser work environment for AI agents: automate, debug, and verify in the browser of your choice.
 
-Mearl reuses your browser's existing sign-in so an agent can help you verify features, investigate page issues, and export reports. You can also inspect requests, configure mocks, and emulate device environments directly in its Chrome DevTools panel. Package verified workflows as Skills to reuse in future tasks.
+Mearl connects page actions, network requests, logs, and environment emulation so agents can complete tasks, investigate issues, and verify results. Connect your everyday browser, a browser through CDP, or a remote environment through a Provider. Package verified workflows as Skills to reuse through an agent, the CLI, or the Toolbox. People can also inspect and debug pages in the extension’s DevTools panel.
 
 [Product website](https://mearlhq.github.io/mearl/en.html) · [Chrome Web Store](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm) · [GitHub Releases](https://github.com/mearlhq/mearl/releases)
 
 ## Get started
 
-### 1. Install the browser extension
+### 1. Set up the local environment
 
-Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm), or download `mearl-chrome-v*.zip` from [GitHub Releases](https://github.com/mearlhq/mearl/releases), extract it, enable **Developer mode** at `chrome://extensions/`, and choose **Load unpacked**.
-
-Use **Chrome ≥ 120** or a Chromium browser with the required extension APIs. [Browser compatibility](packages/extension/README.en.md#browser-compatibility)
-
-The DevTools panel is ready to use after installation. To let an agent control the browser, continue with the setup below.
-
-### 2. Connect your agent
-
-Local components require **Node.js ≥ 20.18.0**. Choose either agent-assisted or manual setup.
-
-**Let your agent configure Mearl**: copy this prompt into an agent that supports Skills.
-
-```text
-Run this command to install the Mearl Skill:
-npx --yes skills add mearlhq/mearl --skill mearl --global
-
-Read the Skill and follow its local setup instructions. Check that the extension and local components have matching versions.
-Tell me the steps if you need my input in Chrome.
-Run mearl check to verify the connection and report the result.
-```
-
-**Configure manually**: run the installer in your terminal to install the CLI, Native Host, and Mearl Skill.
+Requires **Node.js ≥ 20.18.0**. Run setup to install the CLI, Native Host, and Mearl Skill. Select your agent integration when prompted:
 
 ```bash
 npx @mearl/setup
 ```
 
-Use the same extension version as the local components. In the Mearl popup, enable **Agent Service** under **Settings → Services**, then run `mearl check` to verify the connection. [Setup documentation](packages/setup/README.en.md)
+Or give this prompt to an agent that supports Skills:
 
-For MCP clients, run `npx @mearl/setup --mcp` after local setup to configure the integration. [MCP documentation](packages/mcp-server/README.en.md)
+```text
+Run npx @mearl/setup to install Mearl, then read the installed Mearl Skill.
+Configure a browser connection for the task. Tell me the steps if you need my input.
+Run mearl check and mearl browser_list, and report whether the intended browser is connected.
+```
 
-### 3. Run your first task
+For MCP clients, run `npx @mearl/setup --mcp` to configure the integration. [Setup documentation](packages/setup/README.en.md) · [MCP documentation](packages/mcp-server/README.en.md)
 
-Try this prompt in an agent connected to Mearl.
+### 2. Choose a browser connection
 
-> Use Mearl to open https://example.com in my browser, tell me the page title, and take a screenshot.
+- **Everyday browser**: optionally install the Chrome extension to reuse existing tabs and sign-in, and use the Toolbox and DevTools.
+- **Browser / Electron via CDP**: connect a browser or Electron client page with remote debugging enabled, without the Mearl extension.
+- **Remote browser or device**: install and configure the corresponding Provider. Available actions depend on its declared capabilities.
+
+See the [CLI / SDK documentation](packages/client/README.en.md) for connections, permissions, and supported capabilities. Setup prepares local tools; complete extension installation and environment connection for your selected route.
+
+#### Optional: install the everyday browser extension
+
+Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm), or download the matching `mearl-chrome-v*.zip` from [GitHub Releases](https://github.com/mearlhq/mearl/releases), extract it, enable **Developer mode** at `chrome://extensions/`, and choose **Load unpacked**.
+
+The extension requires **Chrome ≥ 120** or a Chromium browser with the required extension APIs. In the Mearl popup, enable **Agent Service** under **Settings → Services**. [Browser compatibility](packages/extension/README.en.md#browser-compatibility)
+
+### 3. Verify the connection and run your first task
+
+Keep your target environment running and confirm that the intended browser appears in the list:
+
+```bash
+mearl check
+mearl browser_list
+```
+
+Try this prompt in an agent connected to Mearl. Include the target `browserId` when multiple environments are connected:
+
+> Use Mearl to open https://example.com in the selected browser, tell me the page title, and take a screenshot.
 
 ## CLI and SDK
 

@@ -19,6 +19,8 @@ Reference pages compile the repository Markdown files listed in `src/lib/referen
 
 Lead with the reader's outcome, group the key capabilities or decisions that support it, then show examples and reference details. Keep the introductory page and the guides in that order in both languages.
 
+Position Mearl as a browser work environment for agents. Show a complete workflow: execute a task, inspect requests and logs, verify behavior under simulated conditions, and package the steps as a Skill. Label illustrative examples so they cannot be mistaken for actual runs. Installation follows setup → choose a browser connection → verify a task; the extension is optional for connecting an everyday browser. Describe capabilities within the limits of each connection and Provider.
+
 ## Deployment configuration
 
 Set `MEARL_INSTALLATION_CONFIG` to the installation catalog JSON when building the website. To read it from a local file, run:

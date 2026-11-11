@@ -16,7 +16,7 @@ const entryPoints = [
   { id: 'devtools', title: copy.devtoolsTitle, text: copy.devtoolsEntry },
   { id: 'toolbox', title: copy.toolsTitle, text: copy.toolsEntry },
 ];
-const topics = entryPoints.map(({ id, title }) => ({ id, label: title }));
+const topics = [{ id: 'quiet-defaults', label: copy.quietTitle }, ...entryPoints.map(({ id, title }) => ({ id, label: title }))];
 ---
 <DocsLayout title={`${t.chromeExtension} · Mearl`} description={t.extensionLead} {locale} page="extension" {topics}>
   <header class="docs-detail">
@@ -29,6 +29,10 @@ const topics = entryPoints.map(({ id, title }) => ({ id, label: title }));
       ))}
     </div>
   </header>
+  <section class="docs-section" id="quiet-defaults">
+    <h2>{copy.quietTitle}</h2>
+    <p>{copy.quietText}</p>
+  </section>
   <section class="docs-section" id="agent-chat">
     <h2>{copy.chatTitle}</h2>
     <p>{copy.chatText}</p>

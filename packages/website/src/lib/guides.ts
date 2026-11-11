@@ -49,6 +49,114 @@ mearl bbrowser site info bilibili/popular
 mearl bbrowser site bilibili/popular 10`;
 
 export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
+  introduction: {
+    'zh-CN': {
+      title: '产品介绍',
+      lead: 'Mearl 是面向 Agent 的浏览器工作环境：在你选择的浏览器中执行任务、排查问题、验证结果，并将流程沉淀为可复用的 Skill。',
+      sections: [
+        {
+          id: 'capabilities',
+          title: '从执行任务到验证结果',
+          text: 'Mearl 将页面操作、网络请求、日志和环境模拟放在同一套工作流程中。Agent 可以完成任务，也可以解释发生了什么；开发者可以通过 DevTools 面板参与调试。',
+          items: [
+            '执行：读取页面、填写表单、导出报表，完成日常网页任务。',
+            '观察：查看操作产生的请求、响应与日志，定位问题。',
+            '验证：模拟接口响应、设备和 App 环境，检查页面行为与任务结果。',
+            '复用：将验证过的操作保存为带参数的 Skill，再从 Agent、CLI 或工具箱运行。',
+          ],
+          links: [
+            { label: '网页自动化', page: 'browser-automation' },
+            { label: '网页调试', page: 'web-debugging' },
+          ],
+        },
+        {
+          id: 'browsers',
+          title: '选择任务需要的浏览器',
+          text: '需要复用登录态时，接入日常浏览器；需要独立测试环境时，选择单独的浏览器实例。浏览器扩展是其中一种接入方式。',
+          items: [
+            '扩展：连接 Chrome 配置中的标签页与登录态，同时提供工具箱和 DevTools 面板。',
+            'CDP：连接已开放远程调试的浏览器或 Electron 客户端页面，无需安装 Mearl 扩展。',
+            'Provider：接入其他本地或远端浏览器、设备，例如 EgoLite。可用能力以对应 Provider 为准。',
+          ],
+          links: [{ label: '浏览器连接与会话', page: 'browsers' }],
+        },
+        {
+          id: 'emulation',
+          title: '在浏览器里验证端内行为',
+          text: '结合设备、时区和端模拟配置，验证网页进入 App 后的布局、环境判断与原生交互。端模拟配置可以提供 App 身份标识、JSBridge 方法与容器行为；具体支持范围取决于所安装的配置。',
+          links: [{ label: '端模拟指南', page: 'emulation' }],
+        },
+        {
+          id: 'quiet-defaults',
+          title: '接入日常浏览器，默认减少打扰',
+          text: '扩展默认开启「免打扰」：Agent 请求激活页面时，保持页面在后台运行，不切换标签页或唤起窗口。你可以继续当前工作；需要 Agent 将页面带到前台时，在设置中关闭「免打扰」。此设置适用于扩展接入。',
+          links: [{ label: '扩展默认行为', page: 'extension' }],
+        },
+        {
+          id: 'start',
+          title: '从一个小任务开始',
+          text: '先运行 setup 准备本机工具和 Agent 接入，再选择浏览器连接方式。确认连接后，让 Agent 打开网页并返回标题和截图，随后再尝试请求检查、端模拟或保存 Skill。',
+          links: [
+            { label: '安装 Mearl', page: 'installation' },
+            { label: '快速上手', page: 'quick-start' },
+          ],
+        },
+      ],
+    },
+    en: {
+      title: 'Introduction',
+      lead: 'Mearl is a browser work environment for AI agents. Automate, debug, and verify in the browser of your choice, then turn proven workflows into reusable Skills.',
+      sections: [
+        {
+          id: 'capabilities',
+          title: 'From actions to verified results',
+          text: 'Mearl brings page actions, requests, logs, and environment emulation into one workflow. Agents can complete tasks and investigate what happened; developers can join the investigation through the DevTools panel.',
+          items: [
+            'Act: read pages, fill forms, and export reports for everyday tasks.',
+            'Observe: inspect the requests, responses, and logs produced by an action.',
+            'Verify: simulate responses, devices, and App environments to check page behavior and task results.',
+            'Reuse: save verified steps as a parameterized Skill and run it from an agent, the CLI, or the Toolbox.',
+          ],
+          links: [
+            { label: 'Page automation', page: 'browser-automation' },
+            { label: 'Web debugging', page: 'web-debugging' },
+          ],
+        },
+        {
+          id: 'browsers',
+          title: 'Choose the browser your task needs',
+          text: 'Connect your everyday browser to reuse its sign-in, or choose a separate instance for isolated testing. The extension is one of several connection options.',
+          items: [
+            'Extension: connect tabs and sign-in in a Chrome profile, with a Toolbox and DevTools panel.',
+            'CDP: connect a browser or Electron client page with remote debugging enabled, without the Mearl extension.',
+            'Provider: connect other local or remote browsers and devices, such as EgoLite. Available capabilities depend on the Provider.',
+          ],
+          links: [{ label: 'Connections and sessions', page: 'browsers' }],
+        },
+        {
+          id: 'emulation',
+          title: 'Verify App behavior in a browser',
+          text: 'Combine device, timezone, and App profiles to check layout, environment detection, and native interactions. Profiles can provide App identity signals, JSBridge methods, and container behavior. Coverage depends on the installed profile.',
+          links: [{ label: 'Emulation guide', page: 'emulation' }],
+        },
+        {
+          id: 'quiet-defaults',
+          title: 'Defaults that reduce interruptions',
+          text: 'The extension prevents foreground activation by default: when an agent requests activation, the page stays in the background without switching tabs or bringing a window forward. Continue your current work, or turn off this preference in settings when you want the agent to bring pages forward. This setting applies to extension connections.',
+          links: [{ label: 'Extension defaults', page: 'extension' }],
+        },
+        {
+          id: 'start',
+          title: 'Start with a small task',
+          text: 'Run setup to prepare local tools and agent integration, then choose a browser connection. Once connected, ask your agent to open a page and return its title and a screenshot. Continue with request inspection, emulation, or saving a Skill.',
+          links: [
+            { label: 'Install Mearl', page: 'installation' },
+            { label: 'Quick start', page: 'quick-start' },
+          ],
+        },
+      ],
+    },
+  },
   browsers: {
     en: {
       title: 'Browsers and control sessions',

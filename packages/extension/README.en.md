@@ -6,6 +6,10 @@ The Mearl Chrome extension provides a web debugging UI and browser control entry
 
 Built on Manifest V3 with React 19, TypeScript, and Tailwind CSS (production rendering uses Preact to reduce size). Alongside request inspection, mocks, and request rules, Native Messaging exposes browser capabilities to local and cloud AI agents through MCP and Skills.
 
+## Avoid foreground interruptions by default
+
+The extension prevents foreground activation by default: when an agent requests activation, the page stays in the background without switching tabs or bringing a window forward. Turn off this preference in settings when you want the agent to bring pages forward. This preference applies to extension connections and does not disable the Agent service.
+
 ## Browser compatibility
 
 The Agent service completes the Native Host management handshake before enabling page control. Installed Providers can declare managed browser apps with `extensionAgentDefault.macBundleIds`. On macOS the host matches its direct parent's Bundle ID, without relying on page UAs or other running browsers. Matching profiles default to disabled extension Agent access while manual debugging remains available. Assignments and switch preferences use `storage.local`, so they do not sync to other profiles. Users can explicitly enable access in settings. Provider outages, removal and handshake failures never automatically reclaim control. Native identification currently supports macOS; other platforms keep their existing defaults.

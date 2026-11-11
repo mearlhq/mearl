@@ -1,9 +1,9 @@
 ---
-import { ArrowRight, ArrowUpRight, Braces, Globe, PackageOpen, ScanSearch, Smartphone } from '@lucide/astro';
+import { ArrowRight, ArrowUpRight, Braces, Check, Globe, ScanSearch, Smartphone, FileSpreadsheet, Terminal } from '@lucide/astro';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import CodeBlock from './CodeBlock.astro';
 import GitHubIcon from './GitHubIcon.astro';
-import { repositoryUrl, setupCommand, siteBase, sitePath, type Guide, type Locale } from '../lib/site';
+import { repositoryUrl, setupCommand, sitePath, type Guide, type Locale } from '../lib/site';
 import { screenshots } from '../lib/screenshots';
 import { siteCopy } from '../lib/site-copy';
 import '../styles/home.css';
@@ -11,7 +11,6 @@ import '../styles/home.css';
 interface Props { locale: Locale }
 const { locale } = Astro.props;
 const t = siteCopy[locale];
-const orders = ['OR-1042', 'OR-1041', 'OR-1039'];
 const capabilityIcons = [Globe, ScanSearch, Smartphone, Braces];
 const useCaseLinks = [
   sitePath(locale, 'emulation') + '#verify',
@@ -23,6 +22,7 @@ const capabilityLinks: Array<Array<{ page: Guide; label: string; anchor?: string
   [
     { page: 'browser-automation', label: t.automation },
     { page: 'authenticated-requests', label: t.authenticatedRequests },
+    { page: 'ego-lite', label: 'EgoLite' },
   ],
   [
     { page: 'web-debugging', label: t.debugging },
@@ -33,7 +33,6 @@ const capabilityLinks: Array<Array<{ page: Guide; label: string; anchor?: string
   ],
   [
     { page: 'skill-plugins', label: t.reuseGuide, anchor: '#reuse-workflow' },
-    { page: 'ego-lite', label: 'EgoLite' },
     { page: 'bb-browser', label: t.bbAdapters },
   ],
 ];
@@ -52,55 +51,57 @@ const comparison = [
   <div class="product-home docs-article">
     <section class="product-hero" aria-labelledby="hero-title">
       <div class="product-hero-intro">
-        <span class="product-license">{t.openSource}</span>
+        <span class="product-license">{t.positioning}</span>
         <h1 id="hero-title">{t.headline[0]}<span>{t.headline[1]}</span></h1>
         <p>{t.heroLead}</p>
         <div class="product-actions">
           <a class="button button-primary" href={sitePath(locale, 'installation')}>{t.homeInstall}<ArrowRight size={15} aria-hidden="true" /></a>
           <a class="button button-secondary" href={repositoryUrl}><GitHubIcon />GitHub</a>
         </div>
+        <p class="product-connection-note">{t.connectionLead}</p>
       </div>
 
       <section class="product-demo" id="case" aria-labelledby="case-title">
-        <div class="product-demo-brand" aria-hidden="true">
-          <span>MEARL</span>
-          <img src={`${siteBase}icons/icon.svg`} alt="" width="164" height="164" />
-          <span>{t.debugging}</span>
-        </div>
         <div class="product-demo-stage">
           <div class="product-demo-title">
-            <span class="product-kicker">{t.casePreview}</span>
-            <h2 id="case-title">{t.caseTitle}</h2>
+            <h2 id="case-title">{t.demoTitle}</h2>
+            <span class="demo-preview-label">{t.casePreview}</span>
           </div>
-          <div class="product-demo-controls" role="group" aria-label={t.caseTitle}>
-            <input type="radio" name="order-response" id="demo-response" checked />
-            <label for="demo-response">{t.caseBefore}</label>
-            <input type="radio" name="order-response" id="demo-mock" />
-            <label for="demo-mock">{t.caseAfter}</label>
-          </div>
-          <div class="product-demo-frames">
-            <div class="product-demo-orders">
-              <div class="product-demo-pane-label"><Globe size={13} aria-hidden="true" />{t.caseBrowser}</div>
-              <div class="product-demo-pane-content">
-                <strong>{t.caseOrders}</strong>
-                <ul class="product-demo-response">
-                  {orders.map(order => <li><code>{order}</code></li>)}
-                </ul>
-                <div class="product-demo-mock product-demo-empty"><PackageOpen size={19} aria-hidden="true" />{t.caseEmpty}</div>
+          <fieldset class="demo-switcher">
+            <legend class="demo-sr-only">{t.demoTitle}</legend>
+            {t.demoTabs.map((label, index) => <label>
+              <input type="radio" name="demo-stage" value={index} checked={index === 1} />
+              <span><b>0{index + 1}</b>{label}</span>
+            </label>)}
+          </fieldset>
+          <div class="demo-task"><Terminal size={16} aria-hidden="true" /><p>{t.casePrompt}</p></div>
+          <div class="demo-scenes">
+            {t.demoScenes.map((scene, index) => (
+              <div class="demo-scene" data-scene={index}>
+                <div class="demo-browser">
+                  <div class="demo-page-content">
+                    <span class="demo-page-title"><Globe size={14} aria-hidden="true" />{t.demoPage}</span>
+                    <div class="demo-report"><span class="demo-report-icon"><FileSpreadsheet size={24} stroke-width={1.5} aria-hidden="true" /></span><div><strong>{t.demoItem}</strong><small>{t.demoItemDetail}</small></div></div>
+                    <div class="demo-artifact"><FileSpreadsheet size={14} aria-hidden="true" /><span>{scene.artifact}</span></div>
+                    <div class:list={['demo-feedback', { 'is-success': index > 0 }]}>
+                      <Check size={14} aria-hidden="true" />{scene.status}
+                    </div>
+                  </div>
+                </div>
+                <div class="demo-inspector">
+                  <span class="demo-inspector-label">{scene.label}</span>
+                  <h3>{scene.heading}</h3>
+                  <p>{scene.detail}</p>
+                  <pre><code>{scene.lines.join('\n')}</code></pre>
+                  <div class="demo-result"><span class="demo-result-dot"></span>{scene.result}</div>
+                </div>
               </div>
-            </div>
-            <div class="product-demo-request">
-              <div class="product-demo-pane-label"><img src={`${siteBase}icons/icon.svg`} alt="" width="14" height="14" />Mearl DevTools</div>
-              <div class="product-demo-pane-content">
-                <div class="product-demo-endpoint"><code>GET <b>/api/orders</b></code><code class="product-demo-status">200</code></div>
-                <pre aria-label={t.caseResponse}><code>{'{\n  "orders": '}<span class="product-demo-response">{'[{ "id": "OR-1042" }, …]'}</span><span class="product-demo-mock">[]</span>{',\n  "total": '}<span class="product-demo-response">3</span><span class="product-demo-mock">0</span>{'\n}'}</code></pre>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
         <div class="product-demo-note">
-          <p>{t.caseLead}</p>
-          <a href={sitePath(locale, 'web-debugging') + '#change'}>{t.caseGuide}<ArrowUpRight size={15} aria-hidden="true" /></a>
+          <span>{t.openSource}</span>
+          <a href={sitePath(locale, 'browser-automation')}>{t.automation}<ArrowUpRight size={15} aria-hidden="true" /></a>
         </div>
       </section>
     </section>
@@ -130,13 +131,17 @@ const comparison = [
     <section class="product-section product-comparison" id="app-comparison" aria-labelledby="comparison-title">
       <div class="product-comparison-copy">
         <span class="product-kicker"><Smartphone size={15} aria-hidden="true" />{t.emulation}</span>
-        <h2 id="comparison-title">{t.comparisonTitle}</h2>
+        <h2 id="comparison-title">{t.comparisonTitle}<span>{t.comparisonTitleEnd}</span></h2>
         <p>{t.comparisonLead}</p>
+        <ul class="product-emulation-features">
+          {t.comparisonFeatures.map(({ title, text }) => <li><strong>{title}</strong><span>{text}</span></li>)}
+        </ul>
         <div class="product-comparison-links">
           <a href={sitePath(locale, 'emulation') + '#app'}>{t.mobileGuide}<ArrowRight size={15} aria-hidden="true" /></a>
         </div>
       </div>
       <div class="product-comparison-stage">
+        <p class="product-comparison-example">{t.comparisonExample}</p>
         <div class="product-comparison-grid">
           {comparison.map(({ url: src, label, caption, width, height }) => (
             <figure class="product-comparison-view">

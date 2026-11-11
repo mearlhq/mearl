@@ -6,6 +6,10 @@ Mearl 的 Chrome 扩展，提供网页调试界面和面向 Agent 的浏览器�
 
 基于 Manifest V3，技术栈为 React 19 + TypeScript + Tailwind CSS（构建产物使用 Preact 以减小体积）。除了请求查看、Mock、请求规则等调试能力外，还通过 Native Messaging 把浏览器能力暴露给本地/云端 AI Agent（支持 MCP 与 Skills 两种集成模式）。
 
+## 默认不打扰
+
+扩展默认开启「免打扰」：Agent 请求激活页面时，保持页面在后台运行，不切换标签页或唤起窗口。需要 Agent 将页面带到前台时，可在设置中关闭「免打扰」。此偏好适用于扩展接入，不代表 Agent 服务关闭。
+
 ## 浏览器兼容性
 
 Agent 服务先完成 Native Host 管理握手，再开放页面控制。已安装 Provider 可通过 `extensionAgentDefault.macBundleIds` 声明由它控制的浏览器；macOS 宿主按直接父进程的 Bundle ID 匹配，不使用网页 UA 或运行中的其他浏览器推断。命中后当前浏览器配置默认关闭扩展 Agent 接入，人工调试仍可使用。自动归属和开关偏好存于 `storage.local`，不会同步到其他配置。用户可在设置中明确启用；Provider 离线、卸载或握手失败不会自动夺回控制。识别能力暂限 macOS；其他平台保留原有默认值。

@@ -38,7 +38,7 @@ const home = sitePath(locale);
     )}
     <ThemeBootstrap />
   </head>
-  <body class="docs-site">
+  <body class:list={['docs-site', { 'product-site': page === 'home' }]}>
     <a class="skip-link" href="#main">{t.skip}</a>
     <header class="site-header">
       <div class="docs-header">

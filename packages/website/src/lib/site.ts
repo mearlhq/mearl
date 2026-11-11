@@ -11,6 +11,7 @@ import { siteCopy } from './site-copy';
 
 export type Locale = 'en' | 'zh-CN';
 export const guidePages = [
+  'introduction',
   'installation',
   'quick-start',
   'browsers',
@@ -65,7 +66,7 @@ export function docsNavigation(locale: Locale) {
     {
       label: t.gettingStarted,
       links: [
-        { page: 'home', label: t.intro },
+        { page: 'introduction', label: t.intro },
         { page: 'installation', label: t.install },
         { page: 'quick-start', label: t.quickstart },
         { page: 'extension', label: t.chromeExtension },
