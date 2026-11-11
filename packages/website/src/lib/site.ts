@@ -53,10 +53,18 @@ export function docPath(locale: Locale, path: string, anchor = '') {
 export function referenceLinks(locale: Locale) {
   const t = siteCopy[locale];
   return [
-    { label: t.connections, page: 'browsers', href: sitePath(locale, 'browsers') },
+    { label: t.skillPlugins, page: 'skill-plugins', href: sitePath(locale, 'skill-plugins') },
+    {
+      label: t.providerDevelopment,
+      page: 'reference/providers',
+      href: sitePath(locale, 'reference/providers'),
+    },
+    {
+      label: t.appProfileDevelopment,
+      page: 'reference/app-profiles',
+      href: sitePath(locale, 'reference/app-profiles'),
+    },
     { label: t.cli, page: 'reference/cli-sdk', href: docPath(locale, referenceDocs['cli-sdk']) },
-    { label: t.mcp, page: 'reference/mcp', href: docPath(locale, referenceDocs.mcp) },
-    { label: t.skills, page: 'reference/skills', href: docPath(locale, referenceDocs.skills) },
   ] satisfies Array<{ label: string; page: Page; href: string }>;
 }
 
@@ -84,7 +92,8 @@ export function docsNavigation(locale: Locale) {
     {
       label: t.integrations,
       links: [
-        { page: 'skill-plugins', label: t.skillPlugins },
+        { page: 'reference/skills', label: t.skills },
+        { page: 'reference/mcp', label: t.mcp },
         { page: 'ego-lite', label: 'EgoLite' },
         { page: 'bb-browser', label: t.bbAdapters },
       ],

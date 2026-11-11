@@ -24,11 +24,13 @@ export const siteCopy = {
     integrations: 'Integrations',
     authenticatedRequests: 'Authenticated requests',
     emulation: 'Device & App emulation',
-    skillPlugins: 'Skill plugins',
-    bbAdapters: 'bb-browser adapters',
+    skillPlugins: 'Develop Skill plugins',
+    providerDevelopment: 'Develop Providers',
+    appProfileDevelopment: 'Develop App Profiles',
+    bbAdapters: 'bb-browser',
     cli: 'CLI & TypeScript SDK',
-    mcp: 'MCP server',
-    skills: 'Skill catalog',
+    mcp: 'MCP',
+    skills: 'Skills',
     releases: 'Releases',
     issues: 'Report an issue',
     onPage: 'On this page',
@@ -88,27 +90,36 @@ export const siteCopy = {
       },
     ],
     capabilityOverview: 'What you can do with Mearl',
-    capabilityGroups: [
-      {
-        title: 'Act in the browser your task needs',
-        text: 'Read pages, fill forms, and download reports. Connect your everyday browser to reuse its sign-in, or select another connected environment.',
+    designReview: 'Design Overlay',
+    capabilityGroups: {
+      connect: {
+        title: 'Connect browsers and devices',
+        text: 'Use the extension with everyday Chrome, CDP with a browser or Electron app, or a Provider with an external environment. Cloud requests can reach the browser host through a Connector.',
       },
-      {
-        title: 'Find out why a page went wrong',
-        text: 'Reproduce the issue and inspect the requests and logs from that attempt. Mock a response to test what the page displays.',
+      automate: {
+        title: 'Operate web pages',
+        text: 'Ask your agent to read pages, fill forms, transfer files, or take screenshots. Run the same browser actions from the CLI, TypeScript SDK, or MCP.',
       },
-      {
-        title: 'Test web pages inside apps',
-        text: 'Emulate the app’s browser environment to check which controls appear and how the page handles JSBridge responses.',
+      request: {
+        title: 'Call APIs with your browser sign-in',
+        text: 'Reuse a signed-in browser session to call a known HTTP endpoint, replay a request, or retrieve data for a report.',
       },
-      {
-        title: 'Run a proven workflow again',
-        text: 'Save a task such as exporting a report as a Skill with a date range input. Run it again from an agent or the Toolbox.',
+      debug: {
+        title: 'Debug pages and verify layouts',
+        text: 'Inspect requests, console logs, and tracking events. Mock responses to retest behavior, or overlay a design to compare pixels.',
       },
-    ],
+      emulate: {
+        title: 'Test apps and mini-programs',
+        text: 'Emulate a device, timezone, or App WebView to check JSBridge and container behavior. Run and debug local WeChat mini-programs.',
+      },
+      reuse: {
+        title: 'Reuse tools and workflows',
+        text: 'Install existing Skills and bb-browser adapters, or turn a proven workflow into a Skill you can run again from an agent, the CLI, or the Toolbox.',
+      },
+    },
     startInstall:
       'Run setup to prepare Mearl and connect your agent. Then choose a browser connection; the extension is optional for connecting your everyday browser.',
-    demoTitle: 'Export your weekly report',
+    demoTitle: 'Let your agent export the weekly report',
     demoTabs: ['Act', 'Inspect', 'Verify', 'Reuse'],
     demoPage: 'Reports',
     demoItem: 'Weekly report',
@@ -155,7 +166,6 @@ export const siteCopy = {
     casePreview: 'Illustrative workflow · not a live run',
     casePrompt:
       'Export last week’s report, check its dates and columns, and save the workflow as a Skill.',
-    caseGuide: 'See the debugging steps',
     reuseGuide: 'Turn a workflow into a Skill',
     installTitle: 'Install Mearl',
     installSummary:
@@ -182,6 +192,10 @@ export const siteCopy = {
       {
         title: 'External environment · Provider',
         text: 'Connect a local or remote browser or device through its Provider. Available actions depend on the Provider.',
+      },
+      {
+        title: 'Cloud access · Cloud Connector',
+        text: 'Relay requests through Cloud Server to the host that runs the browser. That host uses its configured browser connection.',
       },
     ],
     storeInstall: 'Chrome Web Store',
@@ -255,11 +269,13 @@ export const siteCopy = {
     integrations: '扩展与集成',
     authenticatedRequests: '带登录态的请求',
     emulation: '设备与 App 模拟',
-    skillPlugins: 'Skill 插件',
-    bbAdapters: 'bb-browser 站点适配器',
+    skillPlugins: 'Skill 插件开发',
+    providerDevelopment: 'Provider 开发',
+    appProfileDevelopment: 'App Profile 开发',
+    bbAdapters: 'bb-browser',
     cli: 'CLI 与 TypeScript SDK',
-    mcp: 'MCP 服务',
-    skills: 'Skill 目录',
+    mcp: 'MCP',
+    skills: 'Skills',
     releases: '版本发布',
     issues: '问题反馈',
     onPage: '本页内容',
@@ -309,27 +325,36 @@ export const siteCopy = {
       },
     ],
     capabilityOverview: '用 Mearl 可以做什么',
-    capabilityGroups: [
-      {
-        title: '在任务需要的浏览器里操作',
-        text: '读取页面、填写表单、下载报表。接入日常浏览器可复用登录态，也可以选择其他已连接的环境。',
+    designReview: '设计稿对比',
+    capabilityGroups: {
+      connect: {
+        title: '连接浏览器与设备',
+        text: '通过扩展接入日常 Chrome，用 CDP 连接浏览器或 Electron，或用 Provider 接入外部环境。云端请求可经 Connector 到达浏览器所在主机。',
       },
-      {
-        title: '定位网页故障',
-        text: '复现问题后查看这次操作的请求和日志，再模拟接口响应，验证页面如何处理。',
+      automate: {
+        title: '自动操作网页',
+        text: '让 Agent 读页面、填表、上传下载文件或截图，也可通过 CLI、TypeScript SDK 或 MCP 调用浏览器动作。',
       },
-      {
-        title: '验证网页在 App 里的表现',
-        text: '模拟 App 的浏览器环境，检查网页是否显示正确的入口、是否正确处理 JSBridge 返回的数据。',
+      request: {
+        title: '用浏览器登录态调用接口',
+        text: '复用浏览器里的登录态，直接调用已知 HTTP 接口，重放请求或读取报表数据。',
       },
-      {
-        title: '重复运行已验证的流程',
-        text: '把导报表等任务做成带日期参数的 Skill，下次可以从 Agent 或工具箱直接运行。',
+      debug: {
+        title: '调试网页与验收界面',
+        text: '查看请求、控制台日志和埋点，用 Mock 响应复测页面，或叠加设计稿对比像素差异。',
       },
-    ],
+      emulate: {
+        title: '验证 App 与小程序',
+        text: '模拟设备、时区和 App WebView，检查 JSBridge 与容器行为；也能运行和调试本地微信小程序。',
+      },
+      reuse: {
+        title: '复用工具与工作流',
+        text: '安装现成的 Skills 和 bb-browser 适配器，或把验证过的流程做成 Skill，从 Agent、CLI 或工具箱再次运行。',
+      },
+    },
     startInstall:
       '先运行 setup，准备 Mearl 环境并接入 Agent，再选择浏览器连接方式。需要接入日常浏览器时，可选安装扩展。',
-    demoTitle: '把每周导报表交给 Agent',
+    demoTitle: '让 Agent 导出每周报表',
     demoTabs: ['执行', '观察', '验证', '复用'],
     demoPage: '数据报表',
     demoItem: '每周数据汇总',
@@ -374,7 +399,6 @@ export const siteCopy = {
     ],
     casePreview: '工作流示意 · 非实时运行',
     casePrompt: '帮我导出上周的报表，核对日期和字段，再把这套流程保存为 Skill。',
-    caseGuide: '查看调试步骤',
     reuseGuide: '把常用流程做成 Skill',
     installTitle: '安装 Mearl',
     installSummary:
@@ -396,6 +420,10 @@ export const siteCopy = {
       {
         title: '外部环境 · Provider 接入',
         text: '通过对应 Provider 接入本地或远端浏览器、设备。可用动作取决于该 Provider 的支持范围。',
+      },
+      {
+        title: '云端调用 · Cloud Connector',
+        text: '通过 Cloud Server 将请求转发到浏览器所在主机，再使用该主机上配置好的浏览器连接。',
       },
     ],
     storeInstall: 'Chrome 应用商店',

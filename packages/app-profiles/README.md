@@ -4,6 +4,12 @@
 
 核心不内置具体客户端的端模拟配置。App UA、版本、桥对象、设置、scheme 路由、业务响应和容器实现均由安装的能力包提供；本包负责声明式端模拟配置校验、编译与设置覆盖。
 
+## 开发 App Profile
+
+用 [App Profile Creator](../../skills/mearl-profile-creator/SKILL.md) 根据已有配置、客户端行为样本或文档创建配置。通过[浏览器能力包](../../docs/browser-bundles.md)的 `contributions.appProfiles` 注册配置，再在测试浏览器打开新标签页验证首屏和桥接行为。
+
+## 编译端模拟配置
+
 ```ts
 import { resolveAppProfileDefinition, type AppProfile } from '@mearl/app-profiles';
 

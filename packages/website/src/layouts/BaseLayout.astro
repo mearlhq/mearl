@@ -1,5 +1,5 @@
 ---
-import { ArrowUpRight, Languages, Menu, Moon, Sun } from '@lucide/astro';
+import { ArrowUpRight, Languages, Menu, Moon, Puzzle, Sun } from '@lucide/astro';
 import GitHubIcon from '../components/GitHubIcon.astro';
 import CustomWebsiteBanner from '../components/CustomWebsiteBanner.astro';
 import ThemeBootstrap from '../components/ThemeBootstrap.astro';
@@ -44,6 +44,12 @@ const home = sitePath(locale);
       <div class="docs-header">
         <a class="brand" href={home}><img src={`${siteBase}icons/icon.svg`} alt="" width="26" height="26" /><span>Mearl</span></a>
         <span class="docs-version">{releaseLine}</span>
+        <div class="docs-tools">
+          <a class="docs-skills-link" href={sitePath(locale, 'reference/skills')} aria-current={page === 'reference/skills' ? 'page' : undefined}><Puzzle size={15} aria-hidden="true" />{t.skills}</a>
+          <a class="docs-language" href={localeLink} hreflang={otherLocale} lang={otherLocale} aria-label={t.language} data-locale-link={page.startsWith('reference/') ? 'page' : 'section'}><Languages size={16} aria-hidden="true" /><span>{t.language}</span></a>
+          <button class="theme-toggle" type="button" aria-label={t.dark} title={t.dark}><Moon class="theme-icon theme-icon-moon" aria-hidden="true" /><Sun class="theme-icon theme-icon-sun" aria-hidden="true" /></button>
+          <a class="docs-github" href={repositoryUrl} aria-label={t.source} title={t.source}><GitHubIcon /></a>
+        </div>
         <button class="nav-toggle" type="button" aria-label={t.openNav} aria-expanded="false" aria-controls="site-navigation"><Menu size={18} aria-hidden="true" /></button>
         <nav class="nav-links" id="site-navigation" aria-label={t.nav}>
           <div class="docs-mobile-nav">
@@ -59,11 +65,6 @@ const home = sitePath(locale);
             </div>
           </div>
         </nav>
-        <div class="docs-tools">
-          <a class="docs-language" href={localeLink} hreflang={otherLocale} lang={otherLocale} data-locale-link={page.startsWith('reference/') ? 'page' : 'section'}><Languages size={16} aria-hidden="true" />{t.language}</a>
-          <button class="theme-toggle" type="button" aria-label={t.dark} title={t.dark}><Moon class="theme-icon theme-icon-moon" aria-hidden="true" /><Sun class="theme-icon theme-icon-sun" aria-hidden="true" /></button>
-          <a class="docs-github" href={repositoryUrl} aria-label={t.source} title={t.source}><GitHubIcon /></a>
-        </div>
       </div>
     </header>
     <CustomWebsiteBanner {locale} />

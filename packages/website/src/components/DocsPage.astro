@@ -1,9 +1,8 @@
 ---
-import { ArrowRight, ArrowUpRight, Braces, Check, Globe, ScanSearch, Smartphone, FileSpreadsheet, Terminal } from '@lucide/astro';
+import { ArrowRight, ArrowUpRight, Braces, Cable, Check, Globe, Network, ScanSearch, Smartphone, FileSpreadsheet, Terminal } from '@lucide/astro';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import CodeBlock from './CodeBlock.astro';
-import GitHubIcon from './GitHubIcon.astro';
-import { repositoryUrl, setupCommand, sitePath, type Guide, type Locale } from '../lib/site';
+import { setupCommand, sitePath, type Locale, type Page } from '../lib/site';
 import { screenshots } from '../lib/screenshots';
 import { siteCopy } from '../lib/site-copy';
 import '../styles/home.css';
@@ -11,30 +10,41 @@ import '../styles/home.css';
 interface Props { locale: Locale }
 const { locale } = Astro.props;
 const t = siteCopy[locale];
-const capabilityIcons = [Globe, ScanSearch, Smartphone, Braces];
 const useCaseLinks = [
   sitePath(locale, 'emulation') + '#verify',
   sitePath(locale, 'web-debugging') + '#trace',
-  sitePath(locale, 'skill-plugins') + '#design-review',
+  sitePath(locale, 'reference/skills') + '#design-overlay',
   sitePath(locale, 'skill-plugins') + '#reuse-workflow',
 ];
-const capabilityLinks: Array<Array<{ page: Guide; label: string; anchor?: string }>> = [
-  [
-    { page: 'browser-automation', label: t.automation },
-    { page: 'authenticated-requests', label: t.authenticatedRequests },
+const capabilities: Array<{
+  key: keyof typeof t.capabilityGroups;
+  Icon: typeof Globe;
+  links: Array<{ page: Page; label: string; anchor?: string }>;
+}> = [
+  { key: 'connect', Icon: Cable, links: [
+    { page: 'browsers', label: t.connections },
     { page: 'ego-lite', label: 'EgoLite' },
-  ],
-  [
+  ] },
+  { key: 'automate', Icon: Globe, links: [
+    { page: 'browser-automation', label: t.automation },
+    { page: 'reference/cli-sdk', label: t.cli },
+    { page: 'reference/mcp', label: t.mcp },
+  ] },
+  { key: 'request', Icon: Network, links: [
+    { page: 'authenticated-requests', label: t.authenticatedRequests },
+  ] },
+  { key: 'debug', Icon: ScanSearch, links: [
     { page: 'web-debugging', label: t.debugging },
-  ],
-  [
+    { page: 'reference/skills', label: t.designReview, anchor: '#design-overlay' },
+  ] },
+  { key: 'emulate', Icon: Smartphone, links: [
     { page: 'emulation', label: t.mobileGuide, anchor: '#app' },
     { page: 'emulation', label: t.miniProgramGuide, anchor: '#wechat-miniprogram' },
-  ],
-  [
+  ] },
+  { key: 'reuse', Icon: Braces, links: [
     { page: 'skill-plugins', label: t.reuseGuide, anchor: '#reuse-workflow' },
     { page: 'bb-browser', label: t.bbAdapters },
-  ],
+  ] },
 ];
 const comparison = [
   {
@@ -56,7 +66,7 @@ const comparison = [
         <p>{t.heroLead}</p>
         <div class="product-actions">
           <a class="button button-primary" href={sitePath(locale, 'installation')}>{t.homeInstall}<ArrowRight size={15} aria-hidden="true" /></a>
-          <a class="button button-secondary" href={repositoryUrl}><GitHubIcon />GitHub</a>
+          <a class="button button-secondary" href={sitePath(locale, 'introduction')}>{t.intro}<ArrowRight size={15} aria-hidden="true" /></a>
         </div>
         <p class="product-connection-note">{t.connectionLead}</p>
       </div>
@@ -110,15 +120,15 @@ const comparison = [
       <span class="product-kicker">{t.overview}</span>
       <h2>{t.capabilityOverview}</h2>
       <ul class="product-capabilities" role="list">
-        {t.capabilityGroups.map(({ title, text }, index) => {
-          const Icon = capabilityIcons[index];
+        {capabilities.map(({ key, Icon, links }) => {
+          const { title, text } = t.capabilityGroups[key];
           return (
             <li>
               <div class="product-capability-icon"><Icon size={20} aria-hidden="true" /></div>
               <h3>{title}</h3>
               <p>{text}</p>
               <div class="product-links">
-                {capabilityLinks[index].map(({ page, label, anchor = '' }) => (
+                {links.map(({ page, label, anchor = '' }) => (
                   <a href={sitePath(locale, page) + anchor}>{label}<ArrowRight size={14} aria-hidden="true" /></a>
                 ))}
               </div>

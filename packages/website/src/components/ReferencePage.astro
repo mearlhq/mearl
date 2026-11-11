@@ -8,9 +8,11 @@ import { siteCopy } from '../lib/site-copy';
 
 interface Props { locale: Locale; reference: Reference }
 const { locale, reference } = Astro.props;
+const t = siteCopy[locale];
+const category = reference === 'skills' || reference === 'mcp' ? t.integrations : t.reference;
 const file = localizedDocFile(referenceDocs[reference], locale);
 const sources = import.meta.glob<MarkdownInstance<Record<string, unknown>>>([
-  '../../../../packages/{client,mcp-server,provider,preset,setup,extension}/README{,.en}.md',
+  '../../../../packages/{client,mcp-server,provider,app-profiles,preset,setup,extension}/README{,.en}.md',
   '../../../../skills/README{,.en}.md',
   '../../../../docs/capability-model{,.en}.md',
 ], { eager: true });
@@ -23,8 +25,8 @@ const topics = headings.filter(heading => heading.depth === 2).map(({ slug, text
 ---
 <DocsLayout title={`${title} · Mearl`} description={title} {locale} page={`reference/${reference}`} {topics}>
   <div class="docs-reference-source">
-    <span>{siteCopy[locale].reference}</span>
-    <a href={`${repositoryUrl}/blob/main/${file}`}>{siteCopy[locale].source}<ArrowUpRight size={13} aria-hidden="true" /></a>
+    <span>{category}</span>
+    <a href={`${repositoryUrl}/blob/main/${file}`}>{t.source}<ArrowUpRight size={13} aria-hidden="true" /></a>
   </div>
-  <div class="docs-markdown"><Content /></div>
+  <div class:list={['docs-markdown', { 'docs-skill-catalog': reference === 'skills' }]}><Content /></div>
 </DocsLayout>

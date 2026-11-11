@@ -8,7 +8,7 @@ type Reference = { label: string } & (
 interface Section {
   id: string;
   title: string;
-  text: string;
+  text: string | string[];
   items?: string[];
   steps?: string[];
   flow?: { caption: string; nodes: { title: string; text: string }[] };
@@ -41,9 +41,10 @@ mearl wxa run ./dist`;
 const chineseBqb = 'https://github.com/F-loat/ChineseBQB-weapp';
 const egoSetup = `npx @mearl/setup@latest provider install @mearl/provider-ego
 mearl browser_launch --payload '{"provider":"ego","providerOptions":{"name":"My task"}}'`;
-const pluginSetup = `npx @mearl/setup plugin install mearlhq/mearl --github --skill notes-memory
-mearl notes --help
-mearl notes list`;
+const skillCreatorInstall =
+  'npx skills add https://github.com/mearlhq/mearl --skill mearl-skill-creator --global';
+const registerReportPlugin = `npx @mearl/setup plugin ./skills/report-export
+mearl report-export --help`;
 const adapterSetup =
   'npx @mearl/setup plugin install mearlhq/mearl --github --skill mearl-bbrowser';
 const adapterCommands = `mearl bbrowser site search bilibili
@@ -54,107 +55,39 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
   introduction: {
     'zh-CN': {
       title: '产品介绍',
-      lead: 'Mearl 是面向 Agent 的浏览器工作环境：在你选择的浏览器中执行任务、排查问题、验证结果，并将流程沉淀为可复用的 Skill。',
+      lead: '面向 Agent 和开发者的浏览器工作环境。',
       sections: [
         {
+          id: 'overview',
+          title: 'Mearl 是什么',
+          text: [
+            'Mearl 把网页操作、调试和验证放在同一套工作流程里。Agent 可以接入已经登录的浏览器，在现有标签页里读取信息、填写表单、下载报表，也可以在独立浏览器中执行测试。开发者能回看一次操作产生的网络请求、响应和控制台日志，用 Mock 测试异常分支，或在支持的环境里模拟设备与 App WebView，验证网页在不同条件下的表现。需要人工登录或确认时，可以通过控制会话把操作交给人，完成后再由 Agent 继续。',
+            'Mearl 通过 Chrome 扩展或 CDP 连接浏览器，也能借助 Provider 接入其他浏览器和设备。这些能力可从 Agent、命令行或 TypeScript SDK 调用。验证过的流程还可以整理成带参数的 Skill，按需提供命令或工具箱界面，方便个人和团队重复使用。',
+          ],
+        },
+        {
           id: 'capabilities',
-          title: '从执行任务到验证结果',
-          text: 'Mearl 将页面操作、网络请求、日志和环境模拟放在同一套工作流程中。Agent 可以完成任务，也可以解释发生了什么；开发者可以通过 DevTools 面板参与调试。',
-          items: [
-            '执行：读取页面、填写表单、导出报表，完成日常网页任务。',
-            '观察：查看操作产生的请求、响应与日志，定位问题。',
-            '验证：模拟接口响应、设备和 App 环境，检查页面行为与任务结果。',
-            '复用：将验证过的操作保存为带参数的 Skill，再从 Agent、CLI 或工具箱运行。',
-          ],
-          links: [
-            { label: '网页自动化', page: 'browser-automation' },
-            { label: '网页调试', page: 'web-debugging' },
-          ],
-        },
-        {
-          id: 'browsers',
-          title: '选择任务需要的浏览器',
-          text: '需要复用登录态时，接入日常浏览器；需要独立测试环境时，选择单独的浏览器实例。浏览器扩展是其中一种接入方式。',
-          items: [
-            '扩展：连接 Chrome 配置中的标签页与登录态，同时提供工具箱和 DevTools 面板。',
-            'CDP：连接已开放远程调试的浏览器或 Electron 客户端页面，无需安装 Mearl 扩展。',
-            'Provider：接入其他本地或远端浏览器、设备，例如 EgoLite。可用能力以对应 Provider 为准。',
-          ],
-          links: [{ label: '浏览器连接与会话', page: 'browsers' }],
-        },
-        {
-          id: 'emulation',
-          title: '在浏览器里验证端内行为',
-          text: '结合设备、时区和端模拟配置，验证网页进入 App 后的布局、环境判断与原生交互。端模拟配置可以提供 App 身份标识、JSBridge 方法与容器行为；具体支持范围取决于所安装的配置。',
-          links: [{ label: '端模拟指南', page: 'emulation' }],
-        },
-        {
-          id: 'quiet-defaults',
-          title: '接入日常浏览器，默认减少打扰',
-          text: '扩展默认开启「免打扰」：Agent 请求激活页面时，保持页面在后台运行，不切换标签页或唤起窗口。你可以继续当前工作；需要 Agent 将页面带到前台时，在设置中关闭「免打扰」。此设置适用于扩展接入。',
-          links: [{ label: '扩展默认行为', page: 'extension' }],
-        },
-        {
-          id: 'start',
-          title: '从一个小任务开始',
-          text: '先运行 setup 准备本机工具和 Agent 接入，再选择浏览器连接方式。确认连接后，让 Agent 打开网页并返回标题和截图，随后再尝试请求检查、端模拟或保存 Skill。',
-          links: [
-            { label: '安装 Mearl', page: 'installation' },
-            { label: '快速上手', page: 'quick-start' },
-          ],
+          title: 'Mearl 如何工作',
+          text: '可用的操作和调试能力取决于浏览器的接入方式及已安装的配置。',
         },
       ],
     },
     en: {
       title: 'Introduction',
-      lead: 'Mearl is a browser work environment for AI agents. Automate, debug, and verify in the browser of your choice, then turn proven workflows into reusable Skills.',
+      lead: 'A browser work environment for AI agents and developers.',
       sections: [
         {
+          id: 'overview',
+          title: 'What Mearl is',
+          text: [
+            'Mearl brings page actions, debugging, and verification into one workflow. An agent can use a signed-in browser to read information, fill forms, and download reports in existing tabs, or use a separate browser to run tests. Developers can inspect the requests, responses, and console logs from an action, use mocked responses to test error paths, or emulate devices and App WebViews in supported environments to verify page behavior. When someone needs to sign in or confirm an action, a control session lets them take over and hand control back to the agent afterward.',
+            'Mearl connects to browsers through the Chrome extension or CDP and reaches other browsers and devices through Providers. These capabilities are available to agents and through the CLI or TypeScript SDK. Teams can package verified workflows as Skills with reusable inputs and add commands or a Toolbox interface as needed.',
+          ],
+        },
+        {
           id: 'capabilities',
-          title: 'From actions to verified results',
-          text: 'Mearl brings page actions, requests, logs, and environment emulation into one workflow. Agents can complete tasks and investigate what happened; developers can join the investigation through the DevTools panel.',
-          items: [
-            'Act: read pages, fill forms, and export reports for everyday tasks.',
-            'Observe: inspect the requests, responses, and logs produced by an action.',
-            'Verify: simulate responses, devices, and App environments to check page behavior and task results.',
-            'Reuse: save verified steps as a parameterized Skill and run it from an agent, the CLI, or the Toolbox.',
-          ],
-          links: [
-            { label: 'Page automation', page: 'browser-automation' },
-            { label: 'Web debugging', page: 'web-debugging' },
-          ],
-        },
-        {
-          id: 'browsers',
-          title: 'Choose the browser your task needs',
-          text: 'Connect your everyday browser to reuse its sign-in, or choose a separate instance for isolated testing. The extension is one of several connection options.',
-          items: [
-            'Extension: connect tabs and sign-in in a Chrome profile, with a Toolbox and DevTools panel.',
-            'CDP: connect a browser or Electron client page with remote debugging enabled, without the Mearl extension.',
-            'Provider: connect other local or remote browsers and devices, such as EgoLite. Available capabilities depend on the Provider.',
-          ],
-          links: [{ label: 'Connections and sessions', page: 'browsers' }],
-        },
-        {
-          id: 'emulation',
-          title: 'Verify App behavior in a browser',
-          text: 'Combine device, timezone, and App profiles to check layout, environment detection, and native interactions. Profiles can provide App identity signals, JSBridge methods, and container behavior. Coverage depends on the installed profile.',
-          links: [{ label: 'Emulation guide', page: 'emulation' }],
-        },
-        {
-          id: 'quiet-defaults',
-          title: 'Defaults that reduce interruptions',
-          text: 'The extension prevents foreground activation by default: when an agent requests activation, the page stays in the background without switching tabs or bringing a window forward. Continue your current work, or turn off this preference in settings when you want the agent to bring pages forward. This setting applies to extension connections.',
-          links: [{ label: 'Extension defaults', page: 'extension' }],
-        },
-        {
-          id: 'start',
-          title: 'Start with a small task',
-          text: 'Run setup to prepare local tools and agent integration, then choose a browser connection. Once connected, ask your agent to open a page and return its title and a screenshot. Continue with request inspection, emulation, or saving a Skill.',
-          links: [
-            { label: 'Install Mearl', page: 'installation' },
-            { label: 'Quick start', page: 'quick-start' },
-          ],
+          title: 'How Mearl works',
+          text: 'Available actions and debugging features depend on the browser connection and installed configuration.',
         },
       ],
     },
@@ -171,11 +104,14 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
           items: [
             'Chrome extension: use the current Chrome profile and its signed-in pages.',
             'CDP: connect directly to Chrome or launch a separate managed instance.',
-            'Cloud Connector: reach a browser on a remote host through a configured server.',
+            'Cloud access: Cloud Server relays requests through a Connector on the host that runs the browser. The host uses its configured browser connection.',
             'Browser Provider: connect another browser platform or device. Supported actions and lifecycle operations depend on the Provider.',
           ],
           command: chooseBrowser,
-          links: [{ label: 'Provider reference', path: 'packages/provider/README.md' }],
+          links: [
+            { label: 'Provider reference', path: 'packages/provider/README.md' },
+            { label: 'Cloud Connector setup', path: 'packages/cloud/cloud-connector/README.md' },
+          ],
         },
         {
           id: 'local-architecture',
@@ -222,11 +158,14 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
           items: [
             'Chrome 扩展用于当前 Chrome 配置和已有登录态的页面。',
             'CDP 可直接连接 Chrome，也可启动独立的托管实例。',
-            '云端 Connector 经配置好的服务访问远程主机上的浏览器。',
+            '云端调用经 Cloud Server 和 Connector 转发到浏览器所在主机，再通过该主机上的浏览器连接执行。',
             'Browser Provider 接入其他浏览器平台或设备，动作和生命周期操作由 Provider 声明。',
           ],
           command: chooseBrowser,
-          links: [{ label: 'Provider 文档', path: 'packages/provider/README.md' }],
+          links: [
+            { label: 'Provider 文档', path: 'packages/provider/README.md' },
+            { label: '云端 Connector 配置', path: 'packages/cloud/cloud-connector/README.md' },
+          ],
         },
         {
           id: 'local-architecture',
@@ -888,27 +827,55 @@ mearl browser_control --browser '<browserId>' --payload '{"operation":"finish","
   },
   'skill-plugins': {
     en: {
-      title: 'Extend Mearl with Skill plugins',
-      lead: 'Turn a workflow you have verified once into a Skill your team can run again from an agent, a command, or the Toolbox.',
+      title: 'Develop Mearl Skill plugins',
+      lead: 'Define a Skill, register its commands, and use Mearl Skill Creator to build and verify a reusable workflow.',
       sections: [
         {
-          id: 'reuse-workflow',
-          title: 'From a platform task to a reusable Skill',
-          text: 'Say you export a list of pending orders every week. First, ask the agent to filter and export the list in the browser where you are signed in. Verify the result, then package the workflow with inputs such as date range. If a suitable endpoint can be called reliably with the right permissions, have the Skill call it directly. Keep browser actions for steps that depend on the page.',
+          id: 'choose',
+          title: 'Skill and plugin structure',
+          text: 'A guidance Skill describes when and how an agent should use existing tools. Add a plugin when the Skill needs its own executable commands or Toolbox interface.',
+          items: [
+            'SKILL.md declares the name and description and explains when to use the Skill, its inputs and outputs, and how to verify the result.',
+            'Use scripts/main.mjs or scripts/main.py as the plugin entry point. The entry point exposes register(app), which declares commands through app.command().',
+            'Keep registration and help free of browser calls and business operations. Put those operations in command handlers with inputs and results that can be represented as JSON.',
+            'For a Toolbox interface, declare toolbox metadata and bundle its resources with the Skill. Share the business logic between the Toolbox and command handlers.',
+          ],
           links: [
-            { label: 'Send authenticated requests', page: 'authenticated-requests' },
             {
-              label: 'Design an API-backed Skill',
-              path: 'skills/mearl-skill-creator/references/api-skill-pattern.md',
+              label: 'Skill plugin specification',
+              path: 'skills/mearl-skill-creator/references/cli-plugin.md',
               shared: true,
             },
+            { label: 'Browse ready-to-use Skills', page: 'reference/skills' },
           ],
         },
         {
-          id: 'choose',
-          title: 'Decide what the Skill should provide',
-          text: 'A guidance Skill teaches an agent when and how to use existing tools. A Skill plugin also registers executable commands. An optional Toolbox page makes selected commands available in the browser UI. Examples include Notes, Format Converter, and Design Overlay.',
-          links: [{ label: 'Skill catalog', path: 'skills/README.md' }],
+          id: 'reuse-workflow',
+          title: 'Build a Skill with Mearl Skill Creator',
+          text: 'Install Mearl Skill Creator in an agent that can use Mearl. Give it the website, the task, and the expected result. To update a Skill, give it the existing Skill path and the behavior you want to change.',
+          command: skillCreatorInstall,
+          steps: [
+            'Describe the task. For example, use mearl-skill-creator to build a report-export Skill for https://example.com/reports that accepts a date range and returns a CSV.',
+            'Have the agent verify the workflow in the intended browser. Use an API for steps that can run through a verified endpoint and browser actions for steps that depend on the page.',
+            'Review the generated SKILL.md and any plugin code. Check that the workflow documents authentication, its inputs and outputs, and how to confirm success.',
+          ],
+          links: [
+            {
+              label: 'Mearl Skill Creator',
+              path: 'skills/mearl-skill-creator/SKILL.md',
+              shared: true,
+            },
+            {
+              label: 'API-backed Skill',
+              path: 'skills/mearl-skill-creator/references/api-skill-pattern.md',
+              shared: true,
+            },
+            {
+              label: 'Page-based Skill',
+              path: 'skills/mearl-skill-creator/references/page-skill-pattern.md',
+              shared: true,
+            },
+          ],
         },
         {
           id: 'plugin-architecture',
@@ -936,63 +903,75 @@ mearl browser_control --browser '<browserId>' --payload '{"operation":"finish","
         },
         {
           id: 'install',
-          title: 'Install and invoke a plugin',
-          text: 'Use setup plugin install to install a Skill and register its script in one step. For local development, register the Skill directory with setup plugin <path>. The registered name is shared by the CLI, SDK invokePlugin, and MCP plugin_invoke.',
-          command: pluginSetup,
-        },
-        {
-          id: 'design-review',
-          title: 'Compare a design with a live page',
-          text: 'Install the design-overlay Skill plugin. On the page you want to review, open Design Overlay from the Mearl Toolbox. Import a design, align it with the page, then compare pixels in the current viewport.',
-          command: 'npx @mearl/setup plugin install mearlhq/mearl --github --skill design-overlay',
+          title: 'Register and verify a local plugin',
+          text: 'Register the generated Skill directory and check the CLI help. Substitute your actual directory and registered plugin name for the example values. Verify the inputs and results on the intended browser, then use the same registered name with SDK invokePlugin or MCP plugin_invoke.',
+          command: registerReportPlugin,
           links: [
-            {
-              label: 'Design Overlay reference',
-              path: 'skills/design-overlay/SKILL.md',
-              shared: true,
-            },
+            { label: 'CLI and TypeScript SDK', page: 'reference/cli-sdk' },
+            { label: 'MCP', page: 'reference/mcp' },
           ],
         },
         {
-          id: 'create',
-          title: 'Choose the right extension point',
-          text: 'Use a Skill plugin for a reusable task or tool and a Provider to connect another browser or device. Use an App profile to emulate another client environment. Capability packages deliver these profiles and host implementations, while a Preset distributes a configured selection.',
+          id: 'distribute',
+          title: 'Distribute a Skill',
+          text: 'Publish the complete skills/<name> directory with its SKILL.md, scripts, and bundled assets. A standard Skills manager can discover the directory. For a Skill that includes a Mearl plugin, use setup plugin install to install the Skill and register its commands together. Use a Preset to distribute a set of Skills, Providers, and capability packages together.',
           links: [
-            {
-              label: 'Build a Skill plugin',
-              path: 'skills/mearl-skill-creator/references/cli-plugin.md',
-              shared: true,
-            },
-            { label: 'Extend device and App emulation', page: 'emulation' },
-            { label: 'Provider reference', path: 'packages/provider/README.md' },
-            { label: 'Capability model', path: 'docs/capability-model.md' },
-            { label: 'Preset reference', path: 'packages/preset/README.md' },
+            { label: 'Release guide', path: 'docs/releases.md' },
+            { label: 'Preset reference', page: 'reference/presets' },
           ],
         },
       ],
     },
     'zh-CN': {
-      title: '用 Skill 插件扩展 Mearl',
-      lead: '把验证过的工作流程做成团队可复用的 Skill，可通过 Agent、命令或工具箱使用。',
+      title: '开发 Mearl Skill 插件',
+      lead: '了解 Skill 的结构和插件命令规范，用 Mearl Skill Creator 创建并验证可复用的流程。',
       sections: [
         {
-          id: 'reuse-workflow',
-          title: '把日常平台操作沉淀成 Skill',
-          text: '比如每周要导出待处理订单，先让 Agent 在已登录的浏览器里筛选并导出，核对结果后再把日期范围等做成输入参数。有稳定、可授权调用的接口，就在 Skill 里直接调用；依赖页面的步骤则保留浏览器操作。',
+          id: 'choose',
+          title: 'Skill 与插件的结构',
+          text: '指引型 Skill 告诉 Agent 何时、如何调用已有工具。需要提供自己的可执行命令或工具箱界面时，可以为 Skill 添加插件。',
+          items: [
+            'SKILL.md 声明名称和描述，说明适用场景、输入输出和结果验证方式。',
+            '用 scripts/main.mjs 或 scripts/main.py 作为插件入口。入口提供 register(app)，通过 app.command() 声明命令。',
+            '注册和查看帮助时保持无副作用。浏览器调用和业务操作放在命令处理函数中，入参和返回值应能用 JSON 表示。',
+            '需要工具箱界面时，声明 toolbox 并随 Skill 打包资源。工具箱与命令处理函数复用业务逻辑。',
+          ],
           links: [
-            { label: '发送带登录态的请求', page: 'authenticated-requests' },
             {
-              label: '设计接口型 Skill',
-              path: 'skills/mearl-skill-creator/references/api-skill-pattern.md',
+              label: 'Skill 插件规范',
+              path: 'skills/mearl-skill-creator/references/cli-plugin.md',
               shared: true,
             },
+            { label: '浏览现成 Skills', page: 'reference/skills' },
           ],
         },
         {
-          id: 'choose',
-          title: '决定 Skill 提供什么',
-          text: '指引型 Skill 告诉 Agent 何时以及如何调用现有工具。Skill 插件还会注册可执行命令，可选的工具箱页面则把指定命令提供给浏览器用户。仓库中的示例包括记事本、格式转换和设计叠图。',
-          links: [{ label: 'Skill 目录', path: 'skills/README.md' }],
+          id: 'reuse-workflow',
+          title: '用 Mearl Skill Creator 创建 Skill',
+          text: '在已接入 Mearl 的 Agent 中安装 Creator。新建时提供网站、目标操作和预期结果。改造时提供现有 Skill 的路径和希望调整的行为。',
+          command: skillCreatorInstall,
+          steps: [
+            '说清任务。例如，用 mearl-skill-creator 把 https://example.com/reports 的报表导出做成 report-export Skill，输入日期范围，返回 CSV。',
+            '让 Agent 在目标浏览器中验证流程。能通过已验证的接口完成的步骤可直接调用接口，依赖页面的步骤使用浏览器操作。',
+            '检查生成的 SKILL.md 和插件代码，确认登录要求、输入输出及成功判定都已写清楚。',
+          ],
+          links: [
+            {
+              label: 'Mearl Skill Creator',
+              path: 'skills/mearl-skill-creator/SKILL.md',
+              shared: true,
+            },
+            {
+              label: '接口型 Skill',
+              path: 'skills/mearl-skill-creator/references/api-skill-pattern.md',
+              shared: true,
+            },
+            {
+              label: '页面型 Skill',
+              path: 'skills/mearl-skill-creator/references/page-skill-pattern.md',
+              shared: true,
+            },
+          ],
         },
         {
           id: 'plugin-architecture',
@@ -1011,33 +990,21 @@ mearl browser_control --browser '<browserId>' --payload '{"operation":"finish","
         },
         {
           id: 'install',
-          title: '安装并调用插件',
-          text: '用 setup plugin install 一次完成 Skill 安装和脚本注册。本地开发时可用 setup plugin <path> 注册 Skill 目录。注册名可用于 CLI、SDK 的 invokePlugin 和 MCP 的 plugin_invoke。',
-          command: pluginSetup,
-        },
-        {
-          id: 'design-review',
-          title: '用设计稿核对真实页面',
-          text: '安装 design-overlay Skill 插件。在要验收的网页上，从 Mearl 工具箱打开「设计稿对比」。导入设计稿、对齐页面，再比较当前视口中的像素差异。',
-          command: 'npx @mearl/setup plugin install mearlhq/mearl --github --skill design-overlay',
+          title: '注册并验证本地插件',
+          text: '注册生成的 Skill 目录，再查看 CLI 帮助。将示例替换为实际目录和注册名，在目标浏览器验证入参和结果。SDK 的 invokePlugin 与 MCP 的 plugin_invoke 使用同一个注册名。',
+          command: registerReportPlugin,
           links: [
-            { label: '设计稿对比使用说明', path: 'skills/design-overlay/SKILL.md', shared: true },
+            { label: 'CLI 与 TypeScript SDK', page: 'reference/cli-sdk' },
+            { label: 'MCP', page: 'reference/mcp' },
           ],
         },
         {
-          id: 'create',
-          title: '为需求选择扩展点',
-          text: '用 Skill 插件复用任务和工具，用 Provider 接入其他浏览器或设备，用端模拟配置还原其他客户端环境。能力包可分发这些配置和宿主实现，Preset 则把选定的能力和配置一起分发。',
+          id: 'distribute',
+          title: '分发 Skill',
+          text: '分发完整的 skills/<name> 目录，包含 SKILL.md、脚本和打包后的资源。标准 Skills 工具可以发现该目录。带 Mearl 插件的 Skill 用 setup plugin install 一次完成安装和命令注册。需要一起分发多项 Skills、Providers 和能力包时，可以用 Preset 组合安装。',
           links: [
-            {
-              label: '开发 Skill 插件',
-              path: 'skills/mearl-skill-creator/references/cli-plugin.md',
-              shared: true,
-            },
-            { label: '扩展端模拟', page: 'emulation' },
-            { label: 'Provider 文档', path: 'packages/provider/README.md' },
-            { label: '能力模型', path: 'docs/capability-model.md' },
-            { label: 'Preset 文档', path: 'packages/preset/README.md' },
+            { label: '发布说明', path: 'docs/releases.md' },
+            { label: 'Preset 参考', page: 'reference/presets' },
           ],
         },
       ],

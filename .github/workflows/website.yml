@@ -12,6 +12,7 @@ on:
       - 'packages/client/README*.md'
       - 'packages/mcp-server/README*.md'
       - 'packages/provider/README*.md'
+      - 'packages/app-profiles/README*.md'
       - 'packages/setup/README*.md'
       - 'skills/README*.md'
       - 'docs/capability-model*.md'

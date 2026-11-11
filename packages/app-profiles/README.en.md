@@ -4,6 +4,12 @@
 
 The core includes no built-in App profiles. Installed capability packages supply App UAs, versions, bridge objects, settings, scheme routes, business responses, and container implementations. This package validates and compiles declarative profiles and applies setting overrides.
 
+## Develop an App profile
+
+Use [App Profile Creator](../../skills/mearl-profile-creator/SKILL.md) to build a profile from an existing definition, a sample of client behavior, or documentation. Register it under `contributions.appProfiles` in a [browser capability package](../../docs/browser-bundles.en.md), then open a fresh tab in a test browser to verify the initial page and bridge behavior.
+
+## Compile a profile
+
 ```ts
 import { resolveAppProfileDefinition, type AppProfile } from '@mearl/app-profiles';
 

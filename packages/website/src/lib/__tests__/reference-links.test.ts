@@ -24,6 +24,21 @@ describe('compiled reference links', () => {
     expect(setProperty).toHaveBeenCalledWith(node, 'href', expected);
   });
 
+  it.each(['skills/README.md', 'skills/README.en.md'])(
+    'keeps Skill card anchors consistent in %s',
+    source => {
+      const setProperty = vi.fn();
+      const node = { properties: { href: 'design-overlay/SKILL.md' } };
+      visitor.visit(node, { fileURL: new URL(source, root), setProperty });
+      expect(setProperty).toHaveBeenCalledWith(node, 'id', 'design-overlay');
+      expect(setProperty).toHaveBeenCalledWith(
+        node,
+        'href',
+        'https://github.com/mearlhq/mearl/blob/main/skills/design-overlay/SKILL.md',
+      );
+    },
+  );
+
   it.each(['#setup', 'https://example.com/'])('preserves %s', href => {
     const setProperty = vi.fn();
     visitor.visit(

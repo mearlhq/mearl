@@ -5,6 +5,7 @@ export const referenceDocs = {
   mcp: 'packages/mcp-server/README.md',
   skills: 'skills/README.md',
   providers: 'packages/provider/README.md',
+  'app-profiles': 'packages/app-profiles/README.md',
   'capability-model': 'docs/capability-model.md',
   presets: 'packages/preset/README.md',
   setup: 'packages/setup/README.md',

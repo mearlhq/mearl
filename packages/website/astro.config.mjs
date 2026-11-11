@@ -1,8 +1,10 @@
 import { readFileSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'astro/config';
 import { satteri } from '@astrojs/markdown-satteri';
 import { INSTALLATION_CONFIG_MAX_BYTES } from '@mearl/preset/installation';
 import { parseInstallationConfig } from './src/lib/installation.mjs';
+import { localizedDocFile, referenceDocs } from './src/lib/reference-docs.mjs';
 import { referenceLinksPlugin } from './src/lib/reference-links.mjs';
 
 const site = JSON.parse(readFileSync(new URL('../preset/installation-site.json', import.meta.url), 'utf8')).url;
@@ -25,6 +27,15 @@ export default defineConfig({
   },
   build: { format: 'file', inlineStylesheets: 'always' },
   integrations: [{
+    name: 'mearl-reference-watch',
+    hooks: {
+      'astro:server:setup': ({ server }) => {
+        const repoRoot = new URL('../../', import.meta.url);
+        const sources = Object.values(referenceDocs).flatMap(file => [file, localizedDocFile(file, 'en')]);
+        server.watcher.add(sources.map(file => fileURLToPath(new URL(file, repoRoot))));
+      },
+    },
+  }, {
     name: 'mearl-installation-config',
     hooks: {
       'astro:build:done': ({ dir }) => {

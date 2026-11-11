@@ -4,6 +4,7 @@ import DocsLayout from '../layouts/DocsLayout.astro';
 import ArchitectureFlow from './ArchitectureFlow.astro';
 import CodeBlock from './CodeBlock.astro';
 import ExtensionInstallLinks from './ExtensionInstallLinks.astro';
+import ProductCapabilityMap from './ProductCapabilityMap.astro';
 import ProductScreenshot from './ProductScreenshot.astro';
 import QuickStart from './QuickStart.astro';
 import { guideContent } from '../lib/guides';
@@ -15,6 +16,8 @@ const { locale, page } = Astro.props;
 const t = siteCopy[locale];
 const install = page === 'installation';
 const quick = page === 'quick-start';
+const category = install || quick || page === 'introduction' ? t.gettingStarted
+  : page === 'skill-plugins' ? t.reference : t.workflows;
 const guide = install || quick ? undefined : guideContent[page][locale];
 const title = guide?.title ?? (install ? t.installTitle : t.quickTitle);
 const description = guide?.lead ?? (install ? t.installSummary : t.quickSummary);
@@ -33,7 +36,7 @@ const topics = guide?.sections.map(section => ({ id: section.id, label: section.
 ---
 <DocsLayout title={`${title} · Mearl`} {description} {locale} {page} {topics}>
   <header class="docs-detail">
-    <p class="docs-eyebrow"><span></span>{install || quick || page === 'introduction' ? t.gettingStarted : t.workflows}</p>
+    <p class="docs-eyebrow"><span></span>{category}</p>
     <h1>{title}</h1>
     <p class="docs-lead">{description}</p>
     {install && <div class="docs-guide-links">
@@ -62,7 +65,8 @@ const topics = guide?.sections.map(section => ({ id: section.id, label: section.
           })}
         </div>}
       </div>
-      <p>{section.text}</p>
+      {(Array.isArray(section.text) ? section.text : [section.text]).map(text => <p>{text}</p>)}
+      {page === 'introduction' && section.id === 'capabilities' && <ProductCapabilityMap {locale} />}
       {section.items && <ul class="docs-guide-list">{section.items.map(item => <li>{item}</li>)}</ul>}
       {section.flow && <ArchitectureFlow flow={section.flow} />}
       {section.steps && <ol class="docs-guide-list">{section.steps.map(step => <li>{step}</li>)}</ol>}
@@ -139,8 +143,11 @@ const topics = guide?.sections.map(section => ({ id: section.id, label: section.
       <section class="docs-section" id="next">
         <h2>{t.nextSteps}</h2>
         <div class="docs-guide-links">
+          <a href={sitePath(locale, 'browser-automation')}>{t.automation}<ArrowRight size={14} aria-hidden="true" /></a>
+          <a href={sitePath(locale, 'web-debugging')}>{t.debugging}<ArrowRight size={14} aria-hidden="true" /></a>
           <a href={sitePath(locale, 'authenticated-requests')}>{t.authenticatedRequests}<ArrowRight size={14} aria-hidden="true" /></a>
-          <a href={sitePath(locale, 'web-debugging') + '#trace'}>{t.caseGuide}<ArrowRight size={14} aria-hidden="true" /></a>
+          <a href={sitePath(locale, 'emulation')}>{t.emulation}<ArrowRight size={14} aria-hidden="true" /></a>
+          <a href={sitePath(locale, 'reference/skills')}>{t.skills}<ArrowRight size={14} aria-hidden="true" /></a>
           <a href={sitePath(locale, 'skill-plugins') + '#reuse-workflow'}>{t.reuseGuide}<ArrowRight size={14} aria-hidden="true" /></a>
         </div>
         <p class="docs-follow-up">{t.quickNote} <a href={docPath(locale, 'packages/client/README.md')}>{t.cli}</a> · <a href={docPath(locale, 'packages/mcp-server/README.md')}>{t.mcp}</a></p>

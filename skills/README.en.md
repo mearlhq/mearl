@@ -1,60 +1,61 @@
-# General-purpose Skills
+# Explore Mearl Skills
 
 [简体中文](README.md) | [English](README.en.md)
 
-Each top-level directory is an independently discoverable Skill. Scripts and toolbox assets ship with their Skill. Tests live in `__tests__/`, outside installation directories.
+Select a card title for instructions. To install a Skill, use the ID at the bottom of its card as the `--skill` value in the example below.
 
-| Skill | Plugin name | Function |
-| --- | --- | --- |
-| [mearl](mearl/SKILL.md) | — | Browser control entry point and on-demand operation references |
-| [format-converter](format-converter/SKILL.md) | convert | Local timestamps, Base64, images, and URL encoding/decoding |
-| [notes-memory](notes-memory/SKILL.md) | notes | Notes, memory across sessions, and image attachments |
-| [browser-tab-manager](browser-tab-manager/SKILL.md) | tabs | Tab summaries, smart grouping, and controlled tab cleanup |
-| [tinypng-compress](tinypng-compress/SKILL.md) | tinypng | TinyPNG image compression and toolbox |
-| [design-overlay](design-overlay/SKILL.md) | overlay | Design overlays, screenshots, and pixel comparisons |
-| [immersive-translate](immersive-translate/SKILL.md) | translate | Continuous bilingual reading through a local model or browser |
-| [mearl-bbrowser](mearl-bbrowser/SKILL.md) | bbrowser | Run community or custom bb-browser site adapters |
-| [mearl-profile-creator](mearl-profile-creator/SKILL.md) | — | Create, package, and validate App WebView profiles |
-| [mearl-provider-creator](mearl-provider-creator/SKILL.md) | — | Develop and validate external browser and device Providers |
-| [mearl-skill-creator](mearl-skill-creator/SKILL.md) | — | Explore websites and create or adapt Skills, CLIs, and toolbox GUIs |
+- [Format converter](format-converter/SKILL.md)
 
-Install with standard Skills tools, for example:
+  Convert timestamps and encode or decode Base64, images, and URLs locally.
 
-```bash
-npx skills add https://github.com/mearlhq/mearl --skill format-converter --global
-```
+  `format-converter`
 
-setup combines standard Skills installation and plugin registration:
+- [Notes](notes-memory/SKILL.md)
+
+  Keep notes with image attachments and give agents memory across sessions.
+
+  `notes-memory`
+
+- [Tab Manager](browser-tab-manager/SKILL.md)
+
+  Summarize and group tabs, and close tabs controlled by Mearl.
+
+  `browser-tab-manager`
+
+- [Image compression](tinypng-compress/SKILL.md)
+
+  Paste or drop PNG, JPEG, or WebP images into the Toolbox, then download the files compressed by TinyPNG.
+
+  `tinypng-compress`
+
+- [Design Overlay](design-overlay/SKILL.md)
+
+  Import a design in the Toolbox, align it with the live page, and capture a pixel comparison of the current viewport.
+
+  `design-overlay`
+
+- [Immersive translation](immersive-translate/SKILL.md)
+
+  Translate pages with a local model or the browser and read both languages as you browse.
+
+  `immersive-translate`
+
+## Install Skills
+
+Use Mearl setup to install a Skill and register its plugin. This example installs Format Converter:
 
 ```bash
 npx @mearl/setup plugin install https://github.com/mearlhq/mearl --github --skill format-converter --yes
 ```
 
-Standard Skills installation and Mearl plugin registration are separate operations. Do not assume the former executes install metadata in frontmatter. setup's plugin install reads the Skills installation results and then registers their plugins. Use `setup plugin "$SKILL_DIR"` to register a local entry point. Install a complete preset with `npx @mearl/setup preset apply <source>`; the preset configures the Skills manager and supports inherited overrides.
+The Toolbox and Node plugins require compatible local Mearl components. Image compression uploads images to TinyPNG. You can pin a Skill version by specifying a release tag in the installation source.
 
-These resources use the existing toolbox contract and require a compatible Mearl host. Node plugins and toolbox services require local components. Browser capability packages can load independently in the extension. TinyPNG uploads images to an external compression service as part of its existing functionality.
+## Find more Skills
 
-Installation sources can specify a release tag to pin the Skill version. Register local script plugins with `setup plugin <actual Skill directory>`. Install the guidance Skills `mearl-profile-creator`, `mearl-provider-creator`, and `mearl-skill-creator` through standard Skills tools. EgoLite uses the independent `@mearl/provider-ego` and the general Mearl guide.
-
-## Distribution through skills.sh
-
-Publish complete Skill directories to the public `mearlhq/mearl` GitHub repository, including scripts and generated assets. Standard `skills/<name>/SKILL.md` discovery requires no separate registry manifest or npm package for a Skill.
-
-Validate repository discovery, then install the main Skill:
+List the installable Skills in the repository:
 
 ```bash
 npx skills add mearlhq/mearl --list
-npx skills add mearlhq/mearl --skill mearl --global
 ```
-
-The [skills.sh FAQ](https://skills.sh/docs/faq) describes automatic leaderboard listing through installation telemetry. Listing is asynchronous; verify the directory entry instead of treating installation success as proof of listing. Public listing requires an anonymously accessible source repository. Creating a hosted Skills Pack is optional.
-
-Mearl plugin Skills use the combined installer so dependency preparation and registration run together:
-
-```bash
-npx @mearl/setup plugin install mearlhq/mearl --github --skill browser-tab-manager --yes
-```
-
-Publish the matching Mearl host and extension before advertising Skills that require their new capabilities. See the [release guide](../docs/releases.en.md).
 
 Install the WeChat mini-program Skill from [WeChat Profile](https://github.com/mearlhq/profile-wechat).
