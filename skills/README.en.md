@@ -14,6 +14,7 @@ Each top-level directory is an independently discoverable Skill. Scripts and too
 | [design-overlay](design-overlay/SKILL.md) | overlay | Design overlays, screenshots, and pixel comparisons |
 | [immersive-translate](immersive-translate/SKILL.md) | translate | Continuous bilingual reading through a local model or browser |
 | [mearl-bbrowser](mearl-bbrowser/SKILL.md) | bbrowser | Run community or custom bb-browser site adapters |
+| [mearl-profile-creator](mearl-profile-creator/SKILL.md) | — | Create, package, and validate App WebView profiles |
 | [mearl-provider-creator](mearl-provider-creator/SKILL.md) | — | Develop and validate external browser and device Providers |
 | [mearl-skill-creator](mearl-skill-creator/SKILL.md) | — | Explore websites and create or adapt Skills, CLIs, and toolbox GUIs |
 
@@ -33,7 +34,7 @@ Standard Skills installation and Mearl plugin registration are separate operatio
 
 These resources use the existing toolbox contract and require a compatible Mearl host. Node plugins and toolbox services require local components. Browser capability packages can load independently in the extension. TinyPNG uploads images to an external compression service as part of its existing functionality.
 
-Installation sources can specify a release tag to pin the Skill version. Register local script plugins with `setup plugin <actual Skill directory>`. The guidance-only `mearl-skill-creator` and `mearl-provider-creator` Skills install through standard Skills tools. EgoLite uses the independent `@mearl/provider-ego` and the general Mearl guide.
+Installation sources can specify a release tag to pin the Skill version. Register local script plugins with `setup plugin <actual Skill directory>`. Install the guidance Skills `mearl-profile-creator`, `mearl-provider-creator`, and `mearl-skill-creator` through standard Skills tools. EgoLite uses the independent `@mearl/provider-ego` and the general Mearl guide.
 
 ## Distribution through skills.sh
 

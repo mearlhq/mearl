@@ -34,6 +34,8 @@ mearl get_logs --payload '{"tabId":12345,"after":"<cursor>","level":"error"}'`;
 const signedRequest = `mearl send_request --browser '<browserId>' --payload '{"url":"https://api.example.com/me"}'`;
 const emulate = `mearl set_device_emulation --payload '{"tabId":12345,"enabled":true,"preset":"iphone-17-pro"}'`;
 const findProfiles = 'mearl set_app_profile --help';
+const profileCreatorInstall =
+  'npx skills add https://github.com/mearlhq/mearl --skill mearl-profile-creator --global';
 const wechatMiniProgram = `npx @mearl/setup plugin install mearlhq/profile-wechat --github --skill wechat-miniprogram
 mearl wxa run ./dist`;
 const chineseBqb = 'https://github.com/F-loat/ChineseBQB-weapp';
@@ -618,9 +620,20 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
         },
         {
           id: 'extend-apps',
-          title: 'Extend emulation with an App profile',
-          text: 'To support another App WebView, define its User-Agent, JSBridge behavior, and container settings in an App profile. A browser capability package registers the profile under contributions.appProfiles. After installation, use mearl get_capabilities on the target browser to find its ID and options.',
+          title: 'Create an App Profile',
+          text: 'Use the mearl-profile-creator Skill to build or update emulation for an App WebView. Give your agent an existing definition, a client behavior sample, or the relevant documentation, plus the behavior your H5 page needs.',
+          steps: [
+            'Define the User-Agent and version. Add a page runtime to implement JSBridge callbacks or container interactions when needed.',
+            'Build a browser capability package that lists the profile under contributions.appProfiles. Add an App ID mapping if a Preset will select the implementation.',
+            'Install the package in a test browser, find its ID with mearl get_capabilities, and open a fresh tab with the profile enabled to verify first-load behavior.',
+          ],
+          command: profileCreatorInstall,
           links: [
+            {
+              label: 'Profile Creator Skill',
+              path: 'skills/mearl-profile-creator/SKILL.md',
+              shared: true,
+            },
             { label: 'App profile reference', path: 'packages/app-profiles/README.md' },
             { label: 'Browser capability package manifest', path: 'docs/browser-bundles.md' },
           ],
@@ -726,9 +739,20 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
         },
         {
           id: 'extend-apps',
-          title: '添加新的端模拟环境',
-          text: '要模拟新的 App WebView，可以用端模拟配置定义 User-Agent、JSBridge 行为和容器设置，并在浏览器能力包的 contributions.appProfiles 中注册。安装后，通过 mearl get_capabilities 查询目标浏览器中的端模拟 ID 和选项。',
+          title: '创建 App Profile',
+          text: '使用 mearl-profile-creator Skill 新建或更新 App WebView 端模拟。提供已有配置、客户端行为样本或相关文档，并说明 H5 页面依赖哪些行为。',
+          steps: [
+            '定义 User-Agent 和版本。需要实现 JSBridge 回调或容器交互时，添加页面运行时。',
+            '构建浏览器能力包，在 contributions.appProfiles 中列出配置。由 Preset 选择实现时，添加 App ID 映射。',
+            '在测试浏览器安装能力包，用 mearl get_capabilities 查询 ID，再带配置打开新标签页，验证首屏行为。',
+          ],
+          command: profileCreatorInstall,
           links: [
+            {
+              label: 'Profile Creator Skill',
+              path: 'skills/mearl-profile-creator/SKILL.md',
+              shared: true,
+            },
             { label: '端模拟配置参考', path: 'packages/app-profiles/README.md' },
             { label: '浏览器能力包清单', path: 'docs/browser-bundles.md' },
           ],

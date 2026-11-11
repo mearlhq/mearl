@@ -14,6 +14,7 @@
 | [design-overlay](design-overlay/SKILL.md) | overlay | 设计稿叠加、截图和像素差异对比 |
 | [immersive-translate](immersive-translate/SKILL.md) | translate | 通过本机模型或浏览器提供持续双语阅读 |
 | [mearl-bbrowser](mearl-bbrowser/SKILL.md) | bbrowser | 执行社区或自定义 bb-browser 站点适配器 |
+| [mearl-profile-creator](mearl-profile-creator/SKILL.md) | — | 创建、打包和验证 App WebView 端模拟配置 |
 | [mearl-provider-creator](mearl-provider-creator/SKILL.md) | — | 开发和验证外部浏览器、设备 Provider |
 | [mearl-skill-creator](mearl-skill-creator/SKILL.md) | — | 探索网站并生成或改造 Skill、CLI 与工具箱 GUI |
 
@@ -33,7 +34,7 @@ npx @mearl/setup plugin install https://github.com/mearlhq/mearl --github --skil
 
 这些资源保留现有工具箱合同，需对应的 Mearl 宿主；Node 插件和工具箱服务需要本地组件。浏览器能力包可在扩展内独立加载。TinyPNG 会按原有功能上传图片到外部压缩服务。
 
-安装来源可指定发行标签，以固定 Skill 版本。本地脚本插件使用 `setup plugin <实际 Skill 目录>` 注册；`mearl-skill-creator` 和 `mearl-provider-creator` 是指引型 Skill，通过标准 Skills 工具安装。EgoLite 由独立 `@mearl/provider-ego` 接入，使用通用 Mearl 指引。
+安装来源可指定发行标签，以固定 Skill 版本。本地脚本插件使用 `setup plugin <实际 Skill 目录>` 注册。`mearl-profile-creator`、`mearl-provider-creator` 和 `mearl-skill-creator` 是指引型 Skill，通过标准 Skills 工具安装。EgoLite 由独立 `@mearl/provider-ego` 接入，使用通用 Mearl 指引。
 
 ## 通过 skills.sh 分发
 

@@ -12,6 +12,7 @@
 | 把设计稿叠加到网页并做像素差异对比 | design-overlay |
 | 为网页提供持续双语阅读 | immersive-translate |
 | 运行 bb-browser 站点适配器 | mearl-bbrowser |
+| 新建、修改或审查 App WebView 端模拟配置 | mearl-profile-creator |
 | 开发或审查外部浏览器、真机 Provider | mearl-provider-creator |
 | 把网站操作沉淀为可复用 Skill、CLI 或工具箱 GUI | mearl-skill-creator |
 
@@ -43,10 +44,10 @@
 
 EgoLite 使用独立 `@mearl/provider-ego`，具体流程见工具协作（`mearl guide cooperation`），不需要额外协作 Skill。
 
-`mearl-skill-creator` 与 `mearl-provider-creator` 是指引型 Skill，没有可注册的脚本入口；直接用标准 Skills 工具安装，不运行 `setup plugin`：
+`mearl-profile-creator`、`mearl-provider-creator` 和 `mearl-skill-creator` 是指引型 Skill。用标准 Skills 工具安装所需的 Skill。
 
 ```bash
-npx skills add https://github.com/mearlhq/mearl --skill mearl-skill-creator --global
+npx skills add https://github.com/mearlhq/mearl --skill mearl-profile-creator --global
 ```
 
 已有源码时也可将 Git 来源替换为实际 Skill 目录。安装前核对所选分支或标签确实包含目标 Skill；普通任务不主动安装开发指引。
