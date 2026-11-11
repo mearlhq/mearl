@@ -1194,6 +1194,9 @@
   "toolboxInstalling": {
     "message": "安装中"
   },
+  "toolboxInstallQueued": {
+    "message": "排队中"
+  },
   "toolboxUninstalling": {
     "message": "卸载中…"
   },

@@ -17,6 +17,8 @@ import { handleBrowserTracking } from './browserTracking';
 import { initializeBrowserPureCapabilities } from './browserPureCapabilities';
 import { handleBrowserUiService, initializeBrowserUiOperations } from './browserUiService';
 import { handleExtensionServiceRequest } from './extensionServiceHandler';
+import { createToolboxInstallQueue } from './toolboxInstallQueue';
+import { TOOLBOX_INSTALL_QUEUE_PORT } from '../../shared/toolboxInstallQueue';
 import {
   getAppProfileVariants,
   selectAppProfileVariant,
@@ -74,7 +76,11 @@ import {
   BROWSER_CAPABILITY_HOST_TARGET,
   BROWSER_CAPABILITY_OFFSCREEN_TARGET,
 } from '../../shared/browserCapabilityMessages';
-import { isExtensionUiServiceAction, isCloudConnectorAction } from '@mearl/browser-core';
+import {
+  getExtensionServiceTimeout,
+  isExtensionUiServiceAction,
+  isCloudConnectorAction,
+} from '@mearl/browser-core';
 import { isExtensionUiSender } from './extensionMessageTrust';
 import { handleStartHeatmap, handleStopHeatmap, reconcileHeatmapService } from './heatmapHandler';
 import { sendTabMessageToFrameIdsSafe, sendTabMessageToFramesSafe } from './frameMessaging';
@@ -2563,8 +2569,28 @@ async function injectConfigToSessionStorage(tabId: number) {
   });
 }
 
-// 监听来自 devtools panel 的长连接（用于接收实时消息）
+const connectToolboxInstallQueue = createToolboxInstallQueue(
+  async options => {
+    await agentServiceReady;
+    const action = 'agent_skills_install';
+    return ensureNativeBridge(false).requestNativeHost(
+      action,
+      options,
+      getExtensionServiceTimeout(action),
+    );
+  },
+  () => ensureNativeBridge(false).requestNativeHost('toolbox_tools_list'),
+);
+
 chrome.runtime.onConnect.addListener(port => {
+  if (port.name === TOOLBOX_INSTALL_QUEUE_PORT) {
+    if (port.sender && isExtensionUiSender(port.sender, chrome.runtime.id)) {
+      connectToolboxInstallQueue(port);
+    } else {
+      port.disconnect();
+    }
+    return;
+  }
   if (connectDevicePreviewPanel(port)) return;
   if (port.name === AGENT_SIDE_PANEL_PRESENCE_PORT) {
     let windowId: number | null = null;

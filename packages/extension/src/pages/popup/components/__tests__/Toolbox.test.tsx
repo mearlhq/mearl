@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { Toolbox } from '../Toolbox';
 import catalogFixture from '../../../../test/fixtures/toolboxCatalog';
 import { parseToolboxCatalog } from '../../../../shared/toolboxCatalog';
+import { createToolboxInstallQueue } from '../../../background/toolboxInstallQueue';
 
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
@@ -233,6 +234,43 @@ describe('Toolbox', () => {
           ? { updates: [{ name: 'notebook-skill', scope: 'global' }] }
           : { ok: true },
       );
+    const connectQueue = createToolboxInstallQueue(
+      options => mocks.native('agent_skills_install', options),
+      () => mocks.list('toolbox_tools_list'),
+    );
+    chrome.runtime.connect = vi.fn(() => {
+      let receiveJob: (message: unknown) => void;
+      let receiveEvent: (message: unknown) => void;
+      let disconnect: () => void;
+      let connected = true;
+      const backgroundPort = {
+        postMessage: message => queueMicrotask(() => connected && receiveEvent(message)),
+        onMessage: {
+          addListener: listener => {
+            receiveJob = message => listener(message, backgroundPort);
+          },
+        },
+        onDisconnect: {
+          addListener: listener => {
+            disconnect = () => listener(backgroundPort);
+          },
+        },
+      } as chrome.runtime.Port;
+      connectQueue(backgroundPort);
+      return {
+        postMessage: (message: unknown) => queueMicrotask(() => receiveJob(message)),
+        disconnect: () => {
+          connected = false;
+          disconnect();
+        },
+        onMessage: {
+          addListener: (listener: typeof receiveEvent) => {
+            receiveEvent = listener;
+          },
+        },
+        onDisconnect: { addListener: vi.fn() },
+      } as unknown as chrome.runtime.Port;
+    });
     mocks.openPlugin.mockResolvedValue(undefined);
     window.history.replaceState({}, '', '/');
     window.localStorage.clear();
@@ -594,10 +632,74 @@ describe('Toolbox', () => {
     const row = within(dialog).getByText('Image compression').closest('li')!;
     fireEvent.click(within(row).getByRole('button'));
     fireEvent.click(within(row).getByRole('button'));
-    expect(mocks.native).toHaveBeenCalledOnce();
+    await waitFor(() => expect(mocks.native).toHaveBeenCalledOnce());
     await act(async () => finish({ ok: true, output: 'installed' }));
     expect(mocks.toast).toHaveBeenCalledWith('toolboxInstallListFailed', 'error');
     expect(mocks.toast).not.toHaveBeenCalledWith('toolboxInstallSuccess', 'success');
+  });
+
+  it('queues a second tool and resumes it after the popup closes and the first install fails', async () => {
+    let failFirst!: (reason: Error) => void;
+    let finishSecond!: () => void;
+    let secondInstalled = false;
+    mocks.native
+      .mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            failFirst = reject;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            finishSecond = () => {
+              secondInstalled = true;
+              resolve({ ok: true, output: 'installed' });
+            };
+          }),
+      );
+    mocks.list.mockImplementation(async () => ({
+      tools: secondInstalled
+        ? [{ id: 'plugin:convert', plugin: 'convert', title: 'Format converter', order: 100 }]
+        : [],
+    }));
+    const popup = render(<Toolbox />);
+    const openCatalog = async () => {
+      await screen.findByText('toolboxNoInstalledTools');
+      fireEvent.click(screen.getByRole('button', { name: 'toolboxInstallTools' }));
+      const dialog = screen.getByRole('dialog', { name: 'toolboxInstallTools' });
+      return (title: string) =>
+        within(within(dialog).getByText(title).closest('li')!).getByRole('button');
+    };
+    const button = await openCatalog();
+    fireEvent.click(button('Image compression'));
+    await waitFor(() => expect(button('Image compression')).toHaveTextContent('toolboxInstalling'));
+    expect(button('Format converter')).toBeEnabled();
+    fireEvent.click(button('Format converter'));
+    await waitFor(() =>
+      expect(button('Format converter')).toHaveTextContent('toolboxInstallQueued'),
+    );
+    expect(button('Format converter')).toBeDisabled();
+    expect(mocks.native).toHaveBeenCalledOnce();
+
+    popup.unmount();
+    await act(async () => failFirst(new Error('Download failed')));
+    expect(mocks.native).toHaveBeenNthCalledWith(
+      2,
+      'agent_skills_install',
+      expect.objectContaining({ name: 'format-converter' }),
+    );
+
+    render(<Toolbox />);
+    await screen.findByText('toolboxNoInstalledTools');
+    await act(async () => finishSecond());
+    await screen.findByText('Format converter');
+    fireEvent.click(screen.getByRole('button', { name: 'toolboxInstallTools' }));
+    const dialog = screen.getByRole('dialog', { name: 'toolboxInstallTools' });
+    const reopenedButton = (title: string) =>
+      within(within(dialog).getByText(title).closest('li')!).getByRole('button');
+    expect(reopenedButton('Format converter')).toHaveTextContent('toolboxInstalled');
+    expect(reopenedButton('Image compression')).toBeEnabled();
   });
 
   it('lists tools from the fourth position and keeps all tools in the sort dialog', async () => {

@@ -1201,6 +1201,9 @@
   "toolboxInstalling": {
     "message": "Installing"
   },
+  "toolboxInstallQueued": {
+    "message": "Queued"
+  },
   "toolboxUninstalling": {
     "message": "Uninstalling…"
   },

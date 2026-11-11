@@ -27,7 +27,11 @@ import {
   Power,
   PowerOff,
 } from 'lucide-react';
-import { type ToolboxPluginTool, type ToolboxToolOpenResult } from '@mearl/browser-core';
+import {
+  ExtensionRpcError,
+  type ToolboxPluginTool,
+  type ToolboxToolOpenResult,
+} from '@mearl/browser-core';
 import { t } from '../../panel/utils/i18n';
 import { showToast } from '../../panel/utils/toast';
 import { openToolboxToolTab } from '../../../shared/toolboxTab';
@@ -52,7 +56,13 @@ import {
 } from '../toolboxOrder';
 import { ToolOrderList } from './ToolOrderList';
 import { useToolboxCatalog } from '../hooks/useToolboxCatalog';
-import { toolboxSkillSource, type ToolboxInstallableTool } from '../../../shared/toolboxCatalog';
+import type { ToolboxInstallableTool } from '../../../shared/toolboxCatalog';
+import {
+  TOOLBOX_INSTALL_QUEUE_PORT,
+  type ToolboxInstallJob,
+  type ToolboxInstallQueueEvent,
+  type ToolboxInstallQueueState,
+} from '../../../shared/toolboxInstallQueue';
 import { DeviceCaptureEntry } from './DeviceCaptureEntry';
 import { ToolSwitcher } from './ToolSwitcher';
 import { ContextMenu } from '../../panel/components/json-tree/ContextMenu';
@@ -347,15 +357,15 @@ function ToolRow({ description, icon, onClick, pluginActions, title }: ToolRowPr
 interface InstallableToolRowProps {
   tool: ToolboxInstallableTool;
   installed: boolean;
-  installing: boolean;
+  phase?: 'queued' | 'installing';
   disabled: boolean;
-  onInstall: (tool: ToolboxInstallableTool, title: string) => Promise<void>;
+  onInstall: (job: ToolboxInstallJob) => void;
 }
 
 function InstallableToolRow({
   tool,
   installed,
-  installing,
+  phase,
   disabled,
   onInstall,
 }: InstallableToolRowProps) {
@@ -378,21 +388,36 @@ function InstallableToolRow({
       </div>
       <button
         type="button"
-        disabled={installed || disabled}
-        onClick={() => void onInstall(tool, localized.title)}
+        disabled={installed || Boolean(phase) || disabled}
+        onClick={() =>
+          onInstall({
+            id: tool.id,
+            plugin: tool.plugin,
+            repository: tool.repository,
+            skill: tool.skill,
+            title: localized.title,
+          })
+        }
+        aria-busy={!installed && phase === 'installing'}
         aria-label={
           installed
             ? t('toolboxToolInstalled', localized.title)
-            : t('toolboxInstallTool', localized.title)
+            : phase
+              ? undefined
+              : t('toolboxInstallTool', localized.title)
         }
-        className={`flex h-6 min-w-12 shrink-0 cursor-pointer items-center justify-center gap-1 rounded px-2 text-xxs transition-colors disabled:cursor-default ${installed ? 'text-text-secondary/70' : 'border border-border text-text-secondary hover:bg-bg-hover hover:text-text-primary disabled:opacity-40'}`}
+        className={`flex h-6 min-w-12 shrink-0 cursor-pointer items-center justify-center gap-1 rounded px-2 text-xxs transition-colors disabled:cursor-default ${installed ? 'text-text-secondary/70' : 'border border-border text-text-secondary'} ${!phase && !installed ? 'enabled:hover:bg-bg-hover enabled:hover:text-text-primary disabled:opacity-40' : ''}`}
       >
-        {installing && <LoaderCircle className="w-3 h-3 animate-spin" aria-hidden="true" />}
+        {!installed && phase === 'installing' && (
+          <LoaderCircle className="w-3 h-3 animate-spin" aria-hidden="true" />
+        )}
         {installed
           ? t('toolboxInstalled')
-          : installing
+          : phase === 'installing'
             ? t('toolboxInstalling')
-            : t('toolboxInstall')}
+            : phase === 'queued'
+              ? t('toolboxInstallQueued')
+              : t('toolboxInstall')}
       </button>
     </li>
   );
@@ -491,8 +516,8 @@ export function Toolbox({
       tools: group.tools.filter(tool => tool.repository === repository),
     })),
   );
-  const [installingId, setInstallingId] = useState<string | null>(null);
-  const installLockRef = useRef<string | null>(null);
+  const [installQueue, setInstallQueue] = useState<ToolboxInstallQueueState | null>(null);
+  const installPortRef = useRef<chrome.runtime.Port | null>(null);
   const [nativeHostUpdate, setNativeHostUpdate] = useState<NativeHostUpdateInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [showLoading, setShowLoading] = useState(false);
@@ -518,6 +543,8 @@ export function Toolbox({
   } | null>(null);
   const pluginActionLockRef = useRef(false);
   const loadSequenceRef = useRef(0);
+  const loadingToolsRef = useRef(false);
+  const refreshAfterLoadRef = useRef(false);
   const openSequenceRef = useRef(0);
   const [pendingToolUpdate, setPendingToolUpdate] = useState<{
     id: string;
@@ -532,9 +559,19 @@ export function Toolbox({
     loadingDelayRef.current = null;
   }, []);
 
+  const acceptTools = useCallback(
+    (nextTools: ToolboxPluginTool[]) => {
+      setTools(nextTools);
+      setNativeHostUpdate(null);
+      onToolsChange?.(nextTools);
+    },
+    [onToolsChange],
+  );
+
   const loadTools = useCallback(
-    async (notify = false) => {
+    async function loadTools(notify = false) {
       const sequence = ++loadSequenceRef.current;
+      loadingToolsRef.current = true;
       clearLoadingDelay();
       setLoading(true);
       setShowLoading(false);
@@ -545,9 +582,7 @@ export function Toolbox({
       try {
         const result = await requestToolbox('toolbox_tools_list');
         if (loadSequenceRef.current !== sequence) return false;
-        setTools(result.tools);
-        setNativeHostUpdate(null);
-        onToolsChange?.(result.tools);
+        acceptTools(result.tools);
         if (notify) showToast(t('toolboxRefreshSuccess'), 'success');
         return result;
       } catch (loadError) {
@@ -560,24 +595,82 @@ export function Toolbox({
         return false;
       } finally {
         if (loadSequenceRef.current === sequence) {
+          loadingToolsRef.current = false;
           clearLoadingDelay();
           setShowLoading(false);
           setLoading(false);
           setToolsLoaded(true);
+          if (refreshAfterLoadRef.current) {
+            refreshAfterLoadRef.current = false;
+            void loadTools();
+          }
         }
       }
     },
-    [clearLoadingDelay, onToolsChange],
+    [acceptTools, clearLoadingDelay],
   );
 
+  const connectInstallQueue = useCallback(() => {
+    if (installPortRef.current) return installPortRef.current;
+    const port = chrome.runtime.connect({ name: TOOLBOX_INSTALL_QUEUE_PORT });
+    installPortRef.current = port;
+    port.onMessage.addListener(async (event: ToolboxInstallQueueEvent) => {
+      if (event.type === 'queue') {
+        setInstallQueue(event);
+        return;
+      }
+      if (event.type === 'installed') {
+        if (loadingToolsRef.current) {
+          refreshAfterLoadRef.current = true;
+        } else {
+          setError(null);
+          acceptTools(event.tools);
+        }
+        const listed = event.tools.some(
+          tool => tool.id === event.job.id || tool.plugin === event.job.plugin,
+        );
+        showToast(
+          listed ? t('toolboxInstallSuccess', event.job.title) : t('toolboxInstallListFailed'),
+          listed ? 'success' : 'error',
+        );
+        return;
+      }
+      const cause = event.code
+        ? new ExtensionRpcError(event.code, event.error)
+        : new Error(event.error);
+      const update = await toolboxNativeHostUpdateInfo(cause);
+      if (installPortRef.current !== port) return;
+      if (update) setNativeHostUpdate(update);
+      else if (event.stage === 'list') showToast(t('toolboxInstallListFailed'), 'error');
+      else showToast(t('toolboxInstallFailed', cause.message), 'error');
+    });
+    port.onDisconnect.addListener(() => {
+      if (installPortRef.current !== port) return;
+      installPortRef.current = null;
+      setInstallQueue(null);
+    });
+    return port;
+  }, [acceptTools]);
+
   useEffect(() => {
+    connectInstallQueue();
     void loadTools();
     return () => {
+      const port = installPortRef.current;
+      installPortRef.current = null;
+      port?.disconnect();
       loadSequenceRef.current += 1;
       openSequenceRef.current += 1;
       clearLoadingDelay();
     };
-  }, [clearLoadingDelay, loadTools]);
+  }, [clearLoadingDelay, connectInstallQueue, loadTools]);
+
+  useEffect(() => {
+    if (installDialogOpen && !installPortRef.current) {
+      connectInstallQueue();
+      void loadTools();
+    }
+  }, [connectInstallQueue, installDialogOpen, loadTools]);
 
   const selectedToolIcon =
     selectedTool?.kind === 'plugin'
@@ -783,35 +876,15 @@ export function Toolbox({
     }
   };
 
-  const installTool = async (tool: ToolboxInstallableTool, title: string) => {
-    const { id, repository, skill } = tool;
-    if (installLockRef.current || loading || nativeHostUpdate) return;
-    installLockRef.current = id;
-    setInstallingId(id);
+  const installTool = (job: ToolboxInstallJob) => {
+    if (loading || nativeHostUpdate) return;
     try {
-      await requestNativeHost('agent_skills_install', {
-        providerId: 'codex',
-        source: toolboxSkillSource(repository),
-        name: skill,
-        scope: 'global',
-      });
-      const reloaded = await loadTools();
-      const listed = reloaded && reloaded.tools.some(candidate => candidate.id === id);
-      showToast(
-        listed ? t('toolboxInstallSuccess', title) : t('toolboxInstallListFailed'),
-        listed ? 'success' : 'error',
-      );
+      connectInstallQueue().postMessage(job);
     } catch (cause) {
-      const update = await toolboxNativeHostUpdateInfo(cause);
-      if (update) setNativeHostUpdate(update);
-      else
-        showToast(
-          t('toolboxInstallFailed', cause instanceof Error ? cause.message : String(cause)),
-          'error',
-        );
-    } finally {
-      installLockRef.current = null;
-      setInstallingId(null);
+      showToast(
+        t('toolboxInstallFailed', cause instanceof Error ? cause.message : String(cause)),
+        'error',
+      );
     }
   };
 
@@ -1208,13 +1281,14 @@ export function Toolbox({
                         installed={tools.some(
                           candidate => candidate.id === tool.id || candidate.plugin === tool.plugin,
                         )}
-                        installing={installingId === tool.id}
-                        disabled={
-                          Boolean(installingId) ||
-                          loading ||
-                          Boolean(nativeHostUpdate) ||
-                          pendingPriority
+                        phase={
+                          installQueue?.installing === tool.id
+                            ? 'installing'
+                            : installQueue?.queued.includes(tool.id)
+                              ? 'queued'
+                              : undefined
                         }
+                        disabled={loading || Boolean(nativeHostUpdate) || pendingPriority}
                         onInstall={installTool}
                       />
                     ))}
