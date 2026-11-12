@@ -327,6 +327,43 @@ export interface BrowserArtifact {
   browserId?: string;
 }
 
+export interface PageRecordingOptions {
+  maxWidth?: number;
+  maxHeight?: number;
+  frameRate?: number;
+  audio?: boolean;
+}
+
+export type PageRecordParams =
+  | ({ operation: 'start'; tabId: number } & PageRecordingOptions)
+  | { operation: 'stop' | 'status'; recordingId: string };
+
+export type PageRecordingStopReason = 'requested' | 'duration_limit';
+
+export type PageRecordingStatus =
+  | { state: 'recording' }
+  | { state: 'finalizing'; stopReason: PageRecordingStopReason }
+  | { state: 'ready'; stopReason: PageRecordingStopReason; recording: BrowserArtifact }
+  | { state: 'interrupted'; error: string };
+
+export type PageRecordResult =
+  | {
+      operation: 'start';
+      tabId: number;
+      browserId: string;
+      recordingId: string;
+      maxDurationMs: number;
+    }
+  | { operation: 'stop'; tabId: number; recordingId: string; recording: BrowserArtifact }
+  | ({
+      operation: 'status';
+      tabId: number;
+      browserId: string;
+      recordingId: string;
+      startedAt: number;
+      autoStopAt: number;
+    } & PageRecordingStatus);
+
 export interface PageDownloadParams {
   tabId: number;
   trigger: Omit<PageClickParams, 'tabId'>;
@@ -961,6 +998,7 @@ export interface BrowserActionMap {
     response: { session: ControlSessionInfo } | ExternalBrowserControlResult;
   };
   page_download: { request: PageDownloadParams; response: PageDownloadResult };
+  page_record: { request: PageRecordParams; response: PageRecordResult };
   browser_launch: { request: BrowserLaunchParams; response: ManagedBrowserInfo };
   browser_close: { request: BrowserCloseParams; response: unknown };
   page_screenshot: { request: PageScreenshotParams; response: unknown };
@@ -1001,7 +1039,12 @@ export type BrowserActionResponse<A extends BrowserAction> = BrowserActionMap[A]
 export type BrowserCommandAction = Exclude<BrowserAction, 'browser_select_browser'>;
 export type ExtensionBrowserAction = Exclude<
   BrowserCommandAction,
-  'browser_list' | 'browser_launch' | 'browser_close' | 'browser_control' | 'page_download'
+  | 'browser_list'
+  | 'browser_launch'
+  | 'browser_close'
+  | 'browser_control'
+  | 'page_download'
+  | 'page_record'
 >;
 
 export const TAB_ID_REQUIRED_ACTIONS = [
@@ -1105,6 +1148,7 @@ export const BROWSER_ACTIONS = {
   browser_release: true,
   browser_control: true,
   page_download: true,
+  page_record: true,
   browser_launch: true,
   browser_close: true,
   page_screenshot: true,
@@ -1152,6 +1196,7 @@ export const BROWSER_COMMAND_ACTIONS = {
   browser_release: true,
   browser_control: true,
   page_download: true,
+  page_record: true,
   browser_launch: true,
   browser_close: true,
   page_screenshot: true,

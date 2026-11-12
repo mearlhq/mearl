@@ -19,6 +19,7 @@ import { handlePluginPageRuntime } from './pluginPageHost';
 import { synchronizeBrowserPreset } from './browserPresetSync';
 import { installProfileFromSetup } from './profileInstallation';
 import { capturePageDownload } from './agentHandlers/downloadHandlers';
+import { handlePageRecording, hasPageRecording } from './agentHandlers/recordingHandlers';
 import { executePageUserScript } from './pageUserScripts';
 import {
   callExtensionWebMcp,
@@ -1080,6 +1081,21 @@ export class AgentBridge {
             ),
           );
         });
+      case '__page_record':
+        return handlePageRecording(
+          data,
+          urls => {
+            const domains = new Set<string>();
+            for (const url of urls) {
+              const domain = agentAuthorizationDomain(url);
+              if (domain) domains.add(domain);
+            }
+            return this.assertAgentDomainsAuthorized('page_record', domains);
+          },
+          ctx.signal,
+        );
+      case '__page_record_status':
+        return { active: hasPageRecording(data.recordingId) };
       case 'browser_release':
         return handleBrowserRelease();
       case 'request_permission':

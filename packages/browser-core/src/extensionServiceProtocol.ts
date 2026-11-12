@@ -10,6 +10,7 @@ import type {
   BrowserReleaseParams,
   BrowserReleaseResult,
   PageDownloadParams,
+  PageRecordingOptions,
 } from './browserActionProtocol.js';
 import { isAgentServiceAction, type AgentServiceActionMap } from './agentServiceProtocol.js';
 import type {
@@ -180,6 +181,23 @@ export interface HostToExtensionActionMap {
   };
   __export_cookies: { request: { domains: string[] }; response: { cookies: unknown[] } };
   __capture_download: { request: PageDownloadParams; response: unknown };
+  __page_record: {
+    request:
+      | {
+          operation: 'start';
+          recordingId: string;
+          tabId: number;
+          options: Required<PageRecordingOptions>;
+          deadline: number;
+        }
+      | { operation: 'stop' | 'close'; recordingId: string }
+      | { operation: 'read'; recordingId: string; size: number };
+    response: { data: string; base64Encoded?: boolean; eof: boolean } | undefined;
+  };
+  __page_record_status: {
+    request: { recordingId: string };
+    response: { active: boolean };
+  };
   __control_cleanup: {
     request: BrowserReleaseParams & { tabIds: number[]; returningToAgent?: boolean };
     response: BrowserReleaseResult;
@@ -217,6 +235,8 @@ export const HOST_TO_EXTENSION_ACTIONS = {
   __preset_browser: true,
   __export_cookies: true,
   __capture_download: true,
+  __page_record: true,
+  __page_record_status: true,
   __control_cleanup: true,
   __control_deactivate: true,
   __send_request_files: true,

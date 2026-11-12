@@ -481,6 +481,10 @@ export function pageDownload(params: Protocol.PageDownloadParams, options?: Unif
   return invoke('page_download', params, options);
 }
 
+export function pageRecord(params: Protocol.PageRecordParams, options?: UnifiedInvokeOptions) {
+  return invoke('page_record', params, options);
+}
+
 export async function saveArtifact(
   artifact: Protocol.BrowserArtifact & { browserId?: string },
   outputPath: string,

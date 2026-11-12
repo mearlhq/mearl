@@ -1015,8 +1015,11 @@ export class UnifiedClient {
         },
       };
     }
-    if (typeof result?.browserId === 'string' && action.startsWith('__artifact_')) {
-      return {
+    if (
+      typeof result?.browserId === 'string' &&
+      (action.startsWith('__artifact_') || action === 'page_record')
+    ) {
+      result = {
         ...result,
         browserId: encodeBrowserTarget({
           browser: result.browserId,
@@ -1024,13 +1027,15 @@ export class UnifiedClient {
         }),
       };
     }
-    if (result?.download?.browserId)
+    const artifactKey = action === 'page_record' ? 'recording' : 'download';
+    const artifact = result?.[artifactKey];
+    if (artifact?.browserId)
       result = {
         ...result,
-        download: {
-          ...result.download,
+        [artifactKey]: {
+          ...artifact,
           browserId: encodeBrowserTarget({
-            browser: result.download.browserId,
+            browser: artifact.browserId,
             ...(source.connectorId ? { connector: source.connectorId } : {}),
           }),
         },

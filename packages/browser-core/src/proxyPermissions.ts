@@ -114,6 +114,9 @@ export const ACTIONS_SKIP_DOMAIN_CHECK = new Set([
   'browser_release',
   '__control_cleanup',
   '__control_deactivate',
+  // The recording handler authorizes the recorded tab and its navigation history.
+  '__page_record',
+  '__page_record_status',
   '__toolbox_open',
   '__extension_reload',
   '__preset_browser',

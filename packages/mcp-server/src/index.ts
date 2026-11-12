@@ -59,6 +59,7 @@ const MCP_TOOL_ACTIONS = {
   browser_release: 'browser_release',
   browser_control: 'browser_control',
   browser_page_download: 'page_download',
+  browser_page_record: 'page_record',
   browser_tab_open: 'tab_open',
   browser_tab_close: 'tab_close',
   browser_tab_list: 'tab_list',
@@ -632,6 +633,29 @@ async function main() {
           outputPath: { type: 'string' },
         },
         required: ['tabId', 'trigger'],
+      },
+    },
+    {
+      name: 'browser_page_record',
+      description:
+        '录制本机 Chrome 153+ 的标签页。start 指定 tabId，status 和 stop 使用返回的 browserId 和 recordingId。status 查询录制、封装、就绪或中断状态。60 秒后自动停止。stop 可用 outputPath 将 MP4 保存到 MCP 宿主。',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          operation: { type: 'string', enum: ['start', 'status', 'stop'] },
+          browser: {
+            type: 'string',
+            description: '目标浏览器。status 和 stop 时传入 start 返回的 browserId',
+          },
+          tabId: { type: 'integer', minimum: 0 },
+          recordingId: { type: 'string' },
+          maxWidth: { type: 'integer', minimum: 1, maximum: 1920 },
+          maxHeight: { type: 'integer', minimum: 1, maximum: 1080 },
+          frameRate: { type: 'integer', minimum: 1, maximum: 60 },
+          audio: { type: 'boolean' },
+          outputPath: { type: 'string' },
+        },
+        required: ['operation'],
       },
     },
 
@@ -2417,6 +2441,8 @@ async function main() {
         result = await invokePluginTool(args, client.invokePlugin);
       } else {
         const { session, outputPath, ...payload } = (args ?? {}) as Record<string, any>;
+        if (name === 'browser_page_record' && outputPath && payload.operation !== 'stop')
+          throw new Error('outputPath requires operation "stop"');
         if (name === 'browser_set_mock' && payload.payloadFile) {
           if (!existsSync(payload.payloadFile))
             throw new Error(`Payload file not found: ${payload.payloadFile}`);
@@ -2434,14 +2460,17 @@ async function main() {
           }
           delete payload.payloadFile;
         }
-        const browser = name === 'browser_get_capabilities' ? payload.browser : undefined;
-        if (name === 'browser_get_capabilities') delete payload.browser;
+        const acceptsBrowser =
+          name === 'browser_get_capabilities' || name === 'browser_page_record';
+        const browser = acceptsBrowser ? payload.browser : undefined;
+        if (acceptsBrowser) delete payload.browser;
         result = await client.invoke(MCP_TOOL_ACTIONS[name as McpBrowserToolName], payload, {
           ...(session ? { session } : {}),
           ...(browser ? { browser } : {}),
         });
-        if (name === 'browser_page_download' && outputPath) {
-          await client.saveArtifact(result.download, outputPath, session ? { session } : {});
+        if ((name === 'browser_page_download' || name === 'browser_page_record') && outputPath) {
+          const artifact = name === 'browser_page_download' ? result.download : result.recording;
+          await client.saveArtifact(artifact, outputPath, session ? { session } : {});
           result = { ...result, outputPath };
         }
         if (name === 'browser_page_screenshot') {

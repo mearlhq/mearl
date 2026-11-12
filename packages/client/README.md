@@ -58,6 +58,12 @@ mearl send_request --payload '{"url":"https://api.example.com/upload","method":"
 # 截图并保存（tabId 来自 tab_open 或 tab_list）
 mearl page_screenshot --payload '{"tabId":12345}' --output ./screenshot.png
 
+# 录制 Chrome 标签页（本机 Chrome 153+）
+mearl page_record --payload '{"operation":"start","tabId":12345}'
+# 操作页面后，使用开始时返回的 browserId 和 recordingId
+mearl page_record --browser '<browserId>' --payload '{"operation":"status","recordingId":"<recordingId>"}'
+mearl page_record --browser '<browserId>' --payload '{"operation":"stop","recordingId":"<recordingId>"}' --output ./repro.mp4
+
 # 从文件读取大体积参数（mock-data.json 需包含 tabId）
 mearl set_mock --payload-file ./mock-data.json
 

@@ -40,6 +40,7 @@ export function resolveActionTimeoutSec(
   }
   if (action === 'page_download')
     return Math.max(fallback, Math.ceil((Number(data.timeout ?? 30000) + 10000) / 1000));
+  if (action === 'page_record' && data.operation === 'stop') return Math.max(fallback, 60);
   if (action === 'page_wait') {
     const waitMs = data.time ?? data.timeout ?? 10000;
     return Math.max(fallback, Math.ceil((Number(waitMs) + 5000) / 1000));

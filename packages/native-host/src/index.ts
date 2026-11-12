@@ -55,6 +55,7 @@ import {
   type HostToExtensionActionMap,
   normalizeControlSource,
   shouldObservePageAction,
+  startCdpRecording,
   validateRequiredActionTabId,
   type AgentServiceAction,
   type AgentServiceHandlerMap,
@@ -747,6 +748,80 @@ function getControlSessionManager(): ControlSessionManager {
           normalizeControlSource(origin),
         ),
       );
+    },
+    openRecording: async (transport, tabId, recordingId, options) => {
+      if (transport === 'extension') {
+        const startTimeoutMs = 10_000;
+        await sendRequestToExtension(
+          '__page_record',
+          {
+            operation: 'start',
+            recordingId,
+            tabId,
+            options,
+            deadline: Date.now() + startTimeoutMs,
+          },
+          startTimeoutMs,
+          true,
+        );
+        return {
+          isAlive: async () => {
+            if (extensionVersion === null) return false;
+            try {
+              const { active } = await sendRequestToExtension(
+                '__page_record_status',
+                { recordingId },
+                3000,
+                true,
+              );
+              return active === true;
+            } catch (error) {
+              if (error instanceof Error && error.message.includes('Unknown action'))
+                throw new Error('Update the Mearl extension to query recording status');
+              throw error;
+            }
+          },
+          stop: () =>
+            sendRequestToExtension(
+              '__page_record',
+              { operation: 'stop', recordingId },
+              15_000,
+              true,
+            ),
+          read: size =>
+            sendRequestToExtension(
+              '__page_record',
+              { operation: 'read', recordingId, size },
+              10_000,
+              true,
+            ),
+          close: () =>
+            sendRequestToExtension(
+              '__page_record',
+              { operation: 'close', recordingId },
+              10_000,
+              true,
+            ),
+        };
+      }
+      const cdp = getCdpSession();
+      const page = await cdp.getPageSession(tabId);
+      const { client } = page;
+      const send = (method: string, params?: Record<string, unknown>) =>
+        client.sendCommand(method, params, 10_000);
+      try {
+        const stream = await startCdpRecording(send, options);
+        return { ...stream, isAlive: () => cdp.listOpenPageSessions().includes(page) };
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message === 'CDP command timeout: Page.startScreenRecording'
+        ) {
+          const stopped = await send('Page.stopScreenRecording').catch(() => undefined);
+          if (stopped?.stream) await send('IO.close', { handle: stopped.stream }).catch(() => {});
+        }
+        throw error;
+      }
     },
     notify: () => {
       if (extensionVersion !== null) sendToExtension({ type: 'control_sessions_changed' });

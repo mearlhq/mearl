@@ -14,6 +14,7 @@ export function requiresExtensionAgentAccess(
   if (!trustedInternal) return true;
   if (!action.startsWith('__') && action !== 'get_browser_info') return true;
   if (action === '__capture_download' || action === '__export_cookies') return true;
+  if (action === '__page_record') return data?.operation === 'start';
   if (action === '__send_request_files') return data?.operation !== 'abort';
   if (action === '__browser_enhancement') return data?.operation !== 'release';
   return false;

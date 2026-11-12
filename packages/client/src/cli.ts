@@ -43,7 +43,7 @@ const CATEGORIES: { title: string; names: string[] }[] = [
   { title: '标签页', names: ['tab_open', 'tab_list', 'tab_group', 'tab_close'] },
   {
     title: '页面感知',
-    names: ['page_snapshot', 'page_inspect', 'page_screenshot', 'page_frames'],
+    names: ['page_snapshot', 'page_inspect', 'page_screenshot', 'page_record', 'page_frames'],
   },
   {
     title: '页面操作',
@@ -834,6 +834,8 @@ export async function runMearlCli(args: string[], options: MearlCliOptions = {})
     requestTimeoutSec: parsed.timeoutSec,
   });
   try {
+    if (parsed.action === 'page_record' && parsed.outputPath && parsed.payload.operation !== 'stop')
+      throw new Error('page_record --output requires operation "stop"');
     const result = await client.invoke(parsed.action, parsed.payload, {
       timeoutSec: parsed.timeoutSec,
       ...(parsed.browser ? { browser: parsed.browser } : {}),
@@ -842,14 +844,18 @@ export async function runMearlCli(args: string[], options: MearlCliOptions = {})
       ...(parsed.local ? { local: true } : {}),
       ...(parsed.forceCdp ? { transport: 'cdp' } : {}),
     });
-    if (parsed.outputPath && parsed.action === 'page_download') {
-      await client.saveArtifact(result.download, resolve(parsed.outputPath), {
+    if (
+      parsed.outputPath &&
+      (parsed.action === 'page_download' || parsed.action === 'page_record')
+    ) {
+      const artifact = parsed.action === 'page_download' ? result.download : result.recording;
+      await client.saveArtifact(artifact, resolve(parsed.outputPath), {
         ...(parsed.session ? { session: parsed.session } : {}),
       });
       process.stdout.write(
         JSON.stringify({ ...result, outputPath: resolve(parsed.outputPath) }) + '\n',
       );
-      if (!parsed.session)
+      if (!parsed.session && parsed.action === 'page_download')
         await client.invoke(
           '__artifact_remove',
           { artifactId: result.download.artifactId },

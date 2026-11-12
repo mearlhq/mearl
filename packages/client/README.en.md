@@ -58,6 +58,12 @@ mearl send_request --payload '{"url":"https://api.example.com/upload","method":"
 # Save a screenshot; tabId comes from tab_open or tab_list
 mearl page_screenshot --payload '{"tabId":12345}' --output ./screenshot.png
 
+# Record a Chrome tab (local Chrome 153+)
+mearl page_record --payload '{"operation":"start","tabId":12345}'
+# After interacting with the page, use the browserId and recordingId returned by start
+mearl page_record --browser '<browserId>' --payload '{"operation":"status","recordingId":"<recordingId>"}'
+mearl page_record --browser '<browserId>' --payload '{"operation":"stop","recordingId":"<recordingId>"}' --output ./repro.mp4
+
 # Read large parameters from a file; mock-data.json must include tabId
 mearl set_mock --payload-file ./mock-data.json
 

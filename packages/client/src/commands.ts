@@ -137,6 +137,35 @@ export const COMMANDS = [
       '共享 CDP 浏览器保持原下载目录；Chrome 未返回文件路径时明确报错。超时不能直接重复点击。',
     ],
   },
+  {
+    name: 'page_record',
+    description: '开始、查询或停止 Chrome 标签页录制，导出 MP4',
+    outputFlag: true,
+    params: [
+      {
+        name: 'operation',
+        type: '"start" | "status" | "stop"',
+        required: true,
+        description: '开始、查询或停止录制',
+      },
+      { name: 'tabId', type: 'number', description: 'start 时指定目标标签页' },
+      { name: 'recordingId', type: 'string', description: 'status 或 stop 时传入 start 返回的 ID' },
+      { name: 'maxWidth', type: 'number', description: '最大宽度，默认 1280，上限 1920' },
+      { name: 'maxHeight', type: 'number', description: '最大高度，默认 720，上限 1080' },
+      { name: 'frameRate', type: 'number', description: '帧率上限，默认 30，最高 60' },
+      { name: 'audio', type: 'boolean', description: '是否录制标签页音频，默认 false' },
+    ],
+    examples: [
+      `page_record --payload '{"operation":"start","tabId":12345}'`,
+      `page_record --browser '<browserId>' --payload '{"operation":"status","recordingId":"<recordingId>"}'`,
+      `page_record --browser '<browserId>' --payload '{"operation":"stop","recordingId":"<recordingId>"}' --output ./repro.mp4`,
+    ],
+    notes: [
+      '支持本机 Chrome 153+。查询或停止时使用开始返回的 browserId，并沿用原控制会话与连接方式。',
+      '60 秒后自动停止。stop 返回文件产物，支持用 --output 保存到调用方机器。',
+      'status 返回 recording、finalizing、ready 或 interrupted。达到时长上限会标记 duration_limit。结束后状态保留 5 分钟，释放所属控制会话时清理。',
+    ],
+  },
   // ── API 调试 ──────────────────────────────────────────────────────────────
   {
     name: 'tab_checkpoint',

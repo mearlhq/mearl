@@ -7,6 +7,7 @@ import {
 } from '@mearl/browser-core';
 import { assertBrowserRequestDeadline, ControlSessionRegistry } from './control-session.js';
 import { BrowserArtifactStore } from './browser-artifacts.js';
+import { PageRecordings, type OpenRecording } from './page-recordings.js';
 
 interface Dependencies {
   browserId: () => string;
@@ -36,11 +37,13 @@ interface Dependencies {
     directory?: string;
   }>;
   notify: () => void;
+  openRecording?: OpenRecording;
 }
 
 export class ControlSessionManager {
   readonly registry: ControlSessionRegistry;
   readonly artifacts = new BrowserArtifactStore();
+  private recordings?: PageRecordings;
   private activityQueues = new Map<string, Promise<unknown>>();
 
   private async withActivity<T>(id: string, operation: () => Promise<T>): Promise<T> {
@@ -56,6 +59,12 @@ export class ControlSessionManager {
 
   constructor(private dependencies: Dependencies) {
     this.registry = new ControlSessionRegistry(dependencies.browserId);
+    if (dependencies.openRecording)
+      this.recordings = new PageRecordings(
+        this.artifacts,
+        dependencies.openRecording,
+        dependencies.browserId,
+      );
   }
 
   private async closeTabs(
@@ -103,16 +112,16 @@ export class ControlSessionManager {
         : current.status === 'user'
           ? current
           : this.registry.handoff(id, reason);
-    this.dependencies.notify();
     if (operation === 'handoff') {
       await this.withActivity(id, async () => {
-        await this.dependencies.deactivate?.(
-          this.registry.info(id).tabs.map(tab => tab.tabId),
-          current.transport,
-        );
+        const tabIds = this.registry.info(id).tabs.map(tab => tab.tabId);
+        await this.recordings?.discard(current.transport, { tabIds });
+        this.dependencies.notify();
+        await this.dependencies.deactivate?.(tabIds, current.transport);
       });
       return this.registry.info(id);
     }
+    this.dependencies.notify();
     return info;
   }
 
@@ -173,6 +182,8 @@ export class ControlSessionManager {
     if (action === 'browser_release' && sessionId) {
       const params = data as BrowserReleaseParams;
       await this.registry.release(sessionId, params, async (tabs, close) => {
+        await this.recordings?.discard(transport, { sessionId });
+        await this.recordings?.discard(transport, { tabIds: tabs });
         await this.dependencies.cleanup(tabs, transport, params.preserveEnvironment !== false);
         await this.closeTabs(close, transport, sessionId!);
         await this.artifacts.release(sessionId!, params.keepArtifactIds);
@@ -189,7 +200,34 @@ export class ControlSessionManager {
     if (action === 'browser_release' || action === 'browser_close')
       this.registry.assertBrowserRelease();
     if ((action === 'browser_release' || action === 'browser_close') && !sessionId) {
-      return this.registry.releaseBrowser(() => this.dependencies.invoke(action, data, transport));
+      return this.registry.releaseBrowser(async () => {
+        await this.recordings?.discard('extension', {});
+        await this.recordings?.discard('cdp', {});
+        return this.dependencies.invoke(action, data, transport);
+      });
+    }
+    let recording: ReturnType<PageRecordings['resolve']> | undefined;
+    if (action === 'page_record') {
+      if (origin !== 'local' || !this.recordings)
+        throw new Error('Page recording is available on local Chrome connections');
+      if (data.operation === 'stop' || data.operation === 'status') {
+        recording = this.recordings.resolve(data.recordingId, sessionId, transport);
+        if (data.operation === 'status') {
+          // A status query must be able to observe a stop that's draining the same tab.
+          assertBrowserRequestDeadline(deadline);
+          const status = await this.recordings.status(recording);
+          return sessionId ? { ...status, session: this.registry.state(sessionId) } : status;
+        }
+        data = { ...data, tabId: recording.tabId };
+      } else if (
+        data.operation !== 'start' ||
+        !Number.isSafeInteger(data.tabId) ||
+        data.tabId < 0
+      ) {
+        throw new Error(
+          'page_record requires start with a tabId, or status/stop with a recordingId',
+        );
+      }
     }
     const dispatch = (name: string, payload: any) => {
       assertBrowserRequestDeadline(deadline);
@@ -247,6 +285,8 @@ export class ControlSessionManager {
         return outcome;
       }
       const result = await dispatch(name, { ...payload, __mearlControlSource: origin });
+      if (name === 'tab_close' && typeof payload.tabId === 'number')
+        await this.recordings?.discard(transport, { tabIds: [payload.tabId] });
       if (sessionId) this.registry.recordResult(sessionId, name, result, payload);
       return result;
     };
@@ -312,6 +352,18 @@ export class ControlSessionManager {
                 if (downloaded.directory) await rmdir(downloaded.directory).catch(() => {});
               }
             }
+          }
+          if (action === 'page_record') {
+            const recordings = this.recordings!;
+            if (recording)
+              return recordings.stop(recordings.resolve(recording.id, sessionId, transport));
+            const start = () => recordings.start(data.tabId, transport, sessionId, data, deadline);
+            return sessionId
+              ? this.withActivity(sessionId, () => {
+                  this.registry.assertStep(sessionId, info!.generation);
+                  return start();
+                })
+              : start();
           }
           if (action === 'run_actions' && sessionId) {
             return runActionBatch(data, (name, payload) => invokeStep(name, payload, true), {
