@@ -30,17 +30,11 @@ npx @mearl/setup
 
 ### 2. 选择浏览器接入方式
 
-- **日常浏览器**：可选安装 Chrome 扩展，复用已有标签页和登录态，并使用工具箱与 DevTools。
+- **日常浏览器**：可选安装 [Chrome 扩展](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm)，复用已有标签页和登录态，并使用工具箱与 DevTools。
 - **浏览器 / Electron · CDP**：接入已开放远程调试的浏览器或 Electron 客户端页面，无需安装 Mearl 扩展。
 - **远端浏览器或设备**：安装并配置对应 Provider，可用动作以该 Provider 声明为准。
 
 连接方式、权限和能力范围见 [CLI / SDK 文档](packages/client/README.md)。setup 准备本机工具；浏览器扩展安装和环境连接需按所选方式完成。
-
-#### 可选：安装日常浏览器扩展
-
-从 [Chrome 应用商店](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm)安装扩展，或从 [GitHub Releases](https://github.com/mearlhq/mearl/releases) 下载同版 `mearl-chrome-v*.zip`，解压后在 `chrome://extensions/` 开启「开发者模式」，选择「加载已解压的扩展程序」。
-
-扩展需要 **Chrome ≥ 120** 或支持相应扩展 API 的 Chromium 浏览器。在 Mearl 弹窗的「设置 → 服务集成」中开启 **Agent 服务**。[浏览器兼容性](packages/extension/README.md#浏览器兼容性)
 
 ### 3. 确认连接并执行首个任务
 

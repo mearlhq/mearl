@@ -30,17 +30,11 @@ For MCP clients, run `npx @mearl/setup --mcp` to configure the integration. [Set
 
 ### 2. Choose a browser connection
 
-- **Everyday browser**: optionally install the Chrome extension to reuse existing tabs and sign-in, and use the Toolbox and DevTools.
+- **Everyday browser**: optionally install the [Chrome extension](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm) to reuse open tabs and signed-in sessions and access the Toolbox and DevTools.
 - **Browser / Electron via CDP**: connect a browser or Electron client page with remote debugging enabled, without the Mearl extension.
 - **Remote browser or device**: install and configure the corresponding Provider. Available actions depend on its declared capabilities.
 
 See the [CLI / SDK documentation](packages/client/README.en.md) for connections, permissions, and supported capabilities. Setup prepares local tools; complete extension installation and environment connection for your selected route.
-
-#### Optional: install the everyday browser extension
-
-Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm), or download the matching `mearl-chrome-v*.zip` from [GitHub Releases](https://github.com/mearlhq/mearl/releases), extract it, enable **Developer mode** at `chrome://extensions/`, and choose **Load unpacked**.
-
-The extension requires **Chrome ≥ 120** or a Chromium browser with the required extension APIs. In the Mearl popup, enable **Agent Service** under **Settings → Services**. [Browser compatibility](packages/extension/README.en.md#browser-compatibility)
 
 ### 3. Verify the connection and run your first task
 
