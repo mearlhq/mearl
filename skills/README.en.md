@@ -22,6 +22,12 @@ Select a card title for instructions. To install a Skill, use the ID at the bott
 
   `browser-tab-manager`
 
+- [Web Terminal](web-terminal/SKILL.md)
+
+  Use `mearl terminal` to read browser terminals, send control keys, and get script exit codes from supported terminals.
+
+  `web-terminal`
+
 - [Image compression](tinypng-compress/SKILL.md)
 
   Paste or drop PNG, JPEG, or WebP images into the Toolbox, then download the files compressed by TinyPNG.
@@ -49,6 +55,18 @@ npx @mearl/setup plugin install mearlhq/mearl --github --skill format-converter 
 ```
 
 The Toolbox and Node plugins require compatible local Mearl components. Image compression uploads images to TinyPNG. You can pin a Skill version by specifying a release tag in the installation source.
+
+## Use a web terminal
+
+Open the terminal page in a connected browser. After installation, use `mearl tab_list` to find the tab ID, then discover terminal panes on the page and in iframes.
+
+```bash
+npx @mearl/setup plugin install mearlhq/mearl --github --skill web-terminal --yes
+mearl tab_list
+mearl terminal discover 12345
+```
+
+Replace `12345` with the tab ID. `discover` reports whether each pane supports reading, input, and command execution. Use `--paneId` to select a pane when several are present.
 
 ## Find more Skills
 

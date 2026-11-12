@@ -22,6 +22,12 @@
 
   `browser-tab-manager`
 
+- [Web 终端](web-terminal/SKILL.md)
+
+  用 `mearl terminal` 读取浏览器里的终端、发送控制键，并在支持的终端获取脚本退出码。
+
+  `web-terminal`
+
 - [图片压缩](tinypng-compress/SKILL.md)
 
   在工具箱粘贴或拖入 PNG、JPEG 或 WebP 图片，通过 TinyPNG 压缩后下载。
@@ -49,6 +55,18 @@ npx @mearl/setup plugin install mearlhq/mearl --github --skill format-converter 
 ```
 
 工具箱和 Node 插件需要兼容的 Mearl 本地组件。图片压缩会把图片上传到 TinyPNG。安装来源可指定发行标签，以固定 Skill 版本。
+
+## 使用 Web 终端
+
+在已连接的浏览器里打开终端页面。安装后，用 `mearl tab_list` 找到标签页 ID，再发现页面及 iframe 中的终端面板。
+
+```bash
+npx @mearl/setup plugin install mearlhq/mearl --github --skill web-terminal --yes
+mearl tab_list
+mearl terminal discover 12345
+```
+
+`12345` 换成实际标签页 ID。`discover` 返回每个面板的读取、输入和执行能力。多面板时用 `--paneId` 指定要操作的面板。
 
 ## 查找其他 Skills
 

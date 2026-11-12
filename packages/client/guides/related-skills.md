@@ -8,6 +8,7 @@
 | 时间戳、Base64、图片编码、URL 编解码 | format-converter |
 | 记录或检索笔记与跨会话记忆 | notes-memory |
 | 管理已有浏览器标签分组、关闭受控标签页 | browser-tab-manager |
+| 读取 Web 终端、发送控制键或获取脚本退出码 | web-terminal |
 | 用户明确要求使用 TinyPNG 压缩图片 | tinypng-compress |
 | 把设计稿叠加到网页并做像素差异对比 | design-overlay |
 | 为网页提供持续双语阅读 | immersive-translate |
@@ -23,6 +24,16 @@
 ```
 
 已可用的专用 Skill 按其说明执行。用户明确要求使用表中某项专用能力、且执行任务需要该插件时，可在缺失时按需安装并继续。普通网页操作使用通用流程。
+
+## 操作 Web 终端
+
+任务需要读取或操作已打开的 Web 终端时，先用 `mearl --help` 查看已注册插件中是否有 `terminal`。缺失时用安装器安装 `web-terminal` 并注册 CLI：
+
+```bash
+{{setup}} plugin install mearlhq/mearl --github --skill web-terminal --yes
+```
+
+已有包含此 Skill 的本地源码时，可以直接注册其 `skills/web-terminal` 目录。安装后用 `mearl terminal discover <tabId>` 找到页面或 iframe 中的面板，用 `mearl terminal --help` 查看命令。
 
 ## 运行本地微信小程序
 

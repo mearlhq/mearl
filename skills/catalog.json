@@ -3,5 +3,6 @@
   "format-converter",
   "mearl",
   "notes-memory",
-  "tinypng-compress"
+  "tinypng-compress",
+  "web-terminal"
 ]

@@ -56,5 +56,5 @@ App 可用性以当前目标的 `set_app_profile --help` 或 `get_capabilities` 
 - [接口与埋点调试](./api-request-debugging.md)：请求、日志、权限、Mock。
 - [浏览器管理](./api-browser-setup.md)：目标、会话、远端与 Provider。
 - [工具协作](./browser-tool-cooperation.md)：与 Ego、agent-browser 配合。
-- [专用 Skill 使用与安装](./related-skills.md)：如何选用和按需安装本地微信小程序等专用能力，以及在哪里查找扩展开发指引。
+- [专用 Skill 使用与安装](./related-skills.md)：Web 终端、本地微信小程序等专用能力的入口与按需安装方法。
 - [连接排查](./troubleshooting.md)：连接失败与环境管理。
