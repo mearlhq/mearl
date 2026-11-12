@@ -1,16 +1,10 @@
 #!/usr/bin/env node
 import { nativeCapabilityDirectory } from './page-runtime-store.js';
-import {
-  createExtensionBrowserNameResolver,
-  detectNativeBrowserBundleId,
-  browserNameForBundle,
-} from './browser-identity.js';
-import { watchExtensionAgentPolicy } from './extension-agent-policy.js';
 import { createNativePresetAutoUpdater } from './preset-auto-update.js';
 import { nativeCapabilities } from './native-capability-services.js';
 import { PresetBrowserTransfer } from '@mearl/setup/preset';
 import { PresetComponentInstaller } from './preset-components.js';
-import { NativePresetInstallation, PRESET_INSTALLATION_PROTOCOL } from './preset-installation.js';
+import { NativePresetInstallation } from './preset-installation.js';
 import { PluginPageResults } from './plugin-page-results.js';
 import {
   callPluginPageService,
@@ -18,71 +12,45 @@ import {
   callPluginModelService,
 } from './plugin-host-services.js';
 import { listInstalledAppProfiles } from './app-profile-catalog.js';
-import { invokePageEvalWithArgs } from '@mearl/client/plugin';
-import { clearCdpPageMocks } from './cdp-backend/mock-handlers.js';
 import { ControlSessionManager } from './control-session-manager.js';
 import { BrowserEnhancementGateway } from './browser-enhancement-gateway.js';
 import { requestBrowserSocket } from './browser-socket-request.js';
 import { providerRequestTimeoutMs } from './provider-request-timeout.js';
 import { readProviderControlHost } from '@mearl/provider/host';
-import { captureCdpDownload } from './cdp-backend/download-handlers.js';
-import { clearPageRefsForNavigation } from './cdp-backend/page-refs.js';
-import { releaseControlledIndicator } from './cdp-backend/controlled-indicator.js';
 
 import net from 'node:net';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { keyedConfigFile, keyedDir, pruneOrphanLogs } from '@mearl/daemon-core';
+import { keyedDir, pruneOrphanLogs } from '@mearl/daemon-core';
 import { ensureInstalledProvidersRunning } from '@mearl/provider/runtime';
 import { Utf8LineBuffer } from './socketLines.js';
-import { createToolboxExtensionInvoker, extensionResponseError } from './toolbox-permissions.js';
-import { CdpSession } from './cdp-backend/cdp-session.js';
-import { CdpPluginPageHost } from './cdp-backend/plugin-pages.js';
-import { releaseCdpControl } from './cdp-backend/release-control.js';
 import {
   isAgentServiceAction,
-  requiresExtensionAgentAccess,
   isExtensionBrowserAction,
   isBrowserCommandAction,
   isToolboxServiceAction,
-  EXTENSION_RPC_VERSION,
   ExtensionRpcError,
-  extensionRpcErrorCode,
-  isExtensionUiServiceAction,
-  isHostToExtensionAction,
   type HostToExtensionActionMap,
   normalizeControlSource,
-  shouldObservePageAction,
-  startCdpRecording,
   validateRequiredActionTabId,
   type AgentServiceAction,
   type AgentServiceHandlerMap,
   type AgentServiceRequest,
   type AgentServiceResponse,
   type AgentChatRunOptions,
+  type BrowserTransport,
+  type BrowserReleaseFailure,
   type ControlSource,
-  type SendRequestParams,
-  type RunActionsParams,
 } from '@mearl/browser-core';
-import { cdpObservedPageAction } from './cdp-backend/composite-handlers.js';
-import {
-  hasRunActionsSendRequestFiles,
-  hasSendRequestFiles,
-  sendRequestWithTransferredFiles,
-  sendRunActionsWithTransferredFiles,
-} from './extension-file-transfer.js';
 import {
   initCloudConnector,
   startCloudConnector,
   stopCloudConnector,
   listCloudConnectors,
 } from './cloud-connector.js';
-// Importing handlers.js triggers side-effect registration of all CDP actions.
-import { dispatchCdpAction, getRegisteredActionNames } from './cdp-backend/handlers.js';
-import { cdpExportCookies } from './cdp-backend/cookie-transfer.js';
-import { ensureDiscoverableCdpBrowser, listBrowserInventory } from './browser-inventory.js';
+import { listBrowserInventory } from './browser-inventory.js';
 import { classifyAnalyticsError, setAnalyticsClientId, trackAction } from './analytics.js';
 import { AgentChatManager, type AgentProviderLoader } from './agent/manager.js';
 import { ManagedAgentPrograms } from './agent/managed-programs.js';
@@ -92,16 +60,9 @@ import { pickWorkspaceDirectory } from './agent/workspace-directory.js';
 import {
   initBrowserRegistry,
   listRegisteredBrowsers,
-  registerBrowser,
-  retireUnreachableBrowserRecord,
-  touchFocus,
-  unregisterBrowser,
   pruneDeadBrowsers,
 } from './browser-registry.js';
-import {
-  createExtensionRequestMessage,
-  isPrivateExtensionAction,
-} from './internal-extension-actions.js';
+import { isPrivateExtensionAction } from './internal-extension-actions.js';
 import { NATIVE_HOST_VERSION } from './version.js';
 import { NativeHostUpdateCoordinator, runNativeHostUpdate } from './host-updater.js';
 import { updateSetupManagedExtension } from './extension-updater.js';
@@ -111,7 +72,10 @@ import {
   resolveSandboxBrowserAccessCapability,
   type SandboxBrowserAccessCapability,
 } from './sandbox-browser-access.js';
-import { createBuiltinBrowserProviders } from './builtin-browser-providers.js';
+import { CdpBrowserProvider } from './builtin-providers/cdp.js';
+import { ExtensionBrowserProvider } from './builtin-providers/extension.js';
+import { createLocalBrowserProvider } from './builtin-providers/local.js';
+import type { HostBrowserProvider } from './builtin-providers/host-browser-provider.js';
 import { assertBrowserRequestDeadline } from './control-session.js';
 import { CLOSED_OWN_MANAGED_HOST } from './managed-browser.js';
 import { BrowserProviderCoordinator } from './browser-provider-coordinator.js';
@@ -240,13 +204,8 @@ if (runtimeArgs.help) {
 const isDaemonMode = runtimeArgs.daemon;
 const discoverCdp = runtimeArgs.discoverCdp;
 const skipBrowserRegistration = runtimeArgs.skipBrowserRegistration;
-const CDP_ENDPOINT_FILE = runtimeArgs.cdpEndpointFile;
-const CDP_PORT = runtimeArgs.cdpPort;
-const CDP_USER_DATA_DIR = runtimeArgs.cdpUserDataDir;
 const BROWSER_HEADLESS = runtimeArgs.browserHeadless;
-const CDP_BROWSER_ID = runtimeArgs.browserId;
-const CDP_BROWSER_NAME = runtimeArgs.browserName;
-const CDP_ENDPOINT_SOURCE = cliArgs.some(argument =>
+const cdpEndpointSource = cliArgs.some(argument =>
   ['--cdp-port', '--cdp-user-data-dir', '--cdp-endpoint-file'].some(
     option => argument === option || argument.startsWith(`${option}=`),
   ),
@@ -254,43 +213,10 @@ const CDP_ENDPOINT_SOURCE = cliArgs.some(argument =>
   ? 'command-line'
   : 'built-in default';
 
-function describeCdpEndpoint(): string {
-  return CDP_ENDPOINT_FILE
-    ? `endpoint-file (source=${CDP_ENDPOINT_SOURCE})`
-    : `127.0.0.1:${CDP_PORT} (source=${CDP_ENDPOINT_SOURCE})`;
-}
-
-function oneLineError(value: string): string {
-  return value
-    .replace(/[\r\n]+/g, ' ')
-    .trim()
-    .slice(0, 500);
-}
-
 function socketPathFor(suffix: string): string {
   return process.platform === 'win32'
     ? `\\\\.\\pipe\\mearl-agent${suffix}`
     : path.join(os.tmpdir(), `mearl-agent${suffix}.sock`);
-}
-
-function canConnectInstanceSocket(socketPath: string): Promise<boolean> {
-  return new Promise(resolve => {
-    const socket = net.createConnection(socketPath);
-    let settled = false;
-    const timer = setTimeout(() => finish(true), 300);
-    timer.unref();
-    const finish = (reachable: boolean): void => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      socket.destroy();
-      resolve(reachable);
-    };
-    socket.once('connect', () => finish(true));
-    socket.once('error', (error: NodeJS.ErrnoException) =>
-      finish(error.code !== 'ENOENT' && error.code !== 'ECONNREFUSED'),
-    );
-  });
 }
 
 /**
@@ -307,20 +233,12 @@ const LEGACY_SOCKET_PATH = socketPathFor('');
 const INSTANCE_SOCKET_PATH = socketPathFor(`-${process.pid}`);
 
 const LOG_FILE = path.join(os.tmpdir(), 'mearl-native-host.log');
-const DEFAULT_TIMEOUT_MS = 15000;
 const INVENTORY_IDLE_EXIT_MS = 1000;
 const DISCOVERY_REQUEST_IDLE_EXIT_MS = 5000;
 const MAX_SOCKET_BUFFER_SIZE = 64 * 1024 * 1024;
 
-/** Extension version reported via the ping handshake. `null` until the first ping is received. */
-let extensionVersion: string | null = null;
-let extensionRpcVersion: number | null = null;
-
 /** Ensure the version-mismatch warning is sent to clients at most once per native-host process. */
 let versionWarningEmitted = false;
-
-/** Ensure the CDP permission notice is logged at most once per native-host process. */
-let cdpPermissionNoticeLogged = false;
 
 const EXTENSION_INSTALL_URL =
   'https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm';
@@ -344,9 +262,7 @@ function extractChromeVersion(input: string): string | null {
 const pluginPageResults = new PluginPageResults();
 
 function createNativePluginContext(interactive: boolean, pluginScope?: string) {
-  const send = (action: string, payload: any, timeoutMs: number, trusted?: boolean) =>
-    sendRequestToExtension(action, payload, timeoutMs, trusted, 'local');
-  const invokeExtension = interactive ? createToolboxExtensionInvoker(send) : send;
+  const invokeBrowser = extensionProvider.createPluginInvoker(interactive);
   return {
     source: 'toolbox' as const,
     runModel: (
@@ -388,53 +304,17 @@ function createNativePluginContext(interactive: boolean, pluginScope?: string) {
           interactive,
         );
       }
-      if (pluginAction === 'page_eval' && payload.args !== undefined)
-        return invokePageEvalWithArgs(
-          request =>
-            invokeExtension('page_eval', request, toTimeoutMs('page_eval', request), false),
-          payload as any,
-        );
       if (pluginAction === 'agent_chat_run')
         return getAgentChatManager().runTask(payload as AgentChatRunOptions);
-      const transfer = (action: string, data: any, timeoutMs: number) =>
-        invokeExtension(action, data, timeoutMs, true);
-      if (pluginAction === 'send_request' && hasSendRequestFiles(payload)) {
-        return sendRequestWithTransferredFiles(payload as SendRequestParams, transfer);
-      }
-      if (pluginAction === 'run_actions' && hasRunActionsSendRequestFiles(payload)) {
-        return sendRunActionsWithTransferredFiles(payload as RunActionsParams, transfer, data =>
-          toTimeoutMs('run_actions', data),
-        );
-      }
-      const timeoutMs =
-        options.timeoutSec === undefined
-          ? toTimeoutMs(pluginAction, payload)
-          : options.timeoutSec * 1000;
-      if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 3600000)
-        throw new Error('Invalid plugin request timeout');
-      return invokeExtension(pluginAction, payload, timeoutMs, false);
+      return invokeBrowser(pluginAction, payload, options.timeoutSec);
     },
   };
 }
 
-async function fetchCdpBrowserVersion(): Promise<string | null> {
-  try {
-    const browser = await getCdpSession().getBrowserClient();
-    const result = (await browser.sendCommand('Browser.getVersion', {}, 5000)) as {
-      product?: string;
-    };
-    return result.product ?? null;
-  } catch {
-    return null;
-  }
-}
-
 async function getCurrentBrowserUserAgent(): Promise<string> {
-  if (extensionVersion !== null) {
+  if (extensionProvider.connected) {
     try {
-      const result = (await sendRequestToExtension('get_browser_info', {}, 3000, true)) as {
-        userAgent?: string | null;
-      };
+      const result = await extensionProvider.browserInfo();
       if (result.userAgent?.trim()) return result.userAgent;
     } catch {
       // Fall back to the CDP transport when the extension cannot report browser information.
@@ -442,10 +322,7 @@ async function getCurrentBrowserUserAgent(): Promise<string> {
   }
 
   try {
-    const browser = await getCdpSession().getBrowserClient();
-    const result = (await browser.sendCommand('Browser.getVersion', {}, 5000)) as {
-      userAgent?: string;
-    };
+    const result = await cdpProvider.browserInfo();
     if (result.userAgent?.trim()) return result.userAgent;
   } catch {
     // Surface one provider-neutral error below.
@@ -485,19 +362,14 @@ async function collectVersions(includeInstallationInfo = false): Promise<Version
   const browserAccess = resolveBrowserAccessCapability();
   const info: VersionInfo = {
     nativeHost: NATIVE_HOST_VERSION,
-    extension: extensionVersion,
+    extension: extensionProvider.version,
     browser: null,
     ...(browserAccess ? { browserAccess } : {}),
   };
 
-  if (extensionVersion !== null) {
+  if (extensionProvider.connected) {
     try {
-      const browserInfo = (await sendRequestToExtension('get_browser_info', {}, 3000, true)) as {
-        userAgent?: string | null;
-        extensionId?: string;
-        extensionVersion?: string;
-        setupManagedPath?: string | null;
-      };
+      const browserInfo = await extensionProvider.browserInfo();
       if (browserInfo?.userAgent) info.browser = extractChromeVersion(browserInfo.userAgent);
       if (browserInfo?.extensionVersion) info.extension = browserInfo.extensionVersion;
       if (includeInstallationInfo) {
@@ -515,8 +387,12 @@ async function collectVersions(includeInstallationInfo = false): Promise<Version
   }
 
   if (!info.browser) {
-    const cdpBrowser = await fetchCdpBrowserVersion();
-    if (cdpBrowser) info.browser = extractChromeVersion(cdpBrowser);
+    try {
+      const { product } = await cdpProvider.browserInfo();
+      if (product) info.browser = extractChromeVersion(product);
+    } catch {
+      // The browser can be disconnected while the host is still available.
+    }
   }
 
   return info;
@@ -526,7 +402,7 @@ function buildVersionWarning(clientVersion: string | undefined): string | null {
   const versions = [
     clientVersion ? { name: 'client', version: clientVersion } : null,
     { name: 'native-host', version: NATIVE_HOST_VERSION },
-    extensionVersion ? { name: 'extension', version: extensionVersion } : null,
+    extensionProvider.version ? { name: 'extension', version: extensionProvider.version } : null,
   ].filter(Boolean) as Array<{ name: string; version: string }>;
 
   const uniqueMajorMinor = new Set(versions.map(v => majorMinor(v.version)));
@@ -543,23 +419,11 @@ function buildVersionWarning(clientVersion: string | undefined): string | null {
   ].join('\n');
 }
 
-const pendingRequests = new Map<
-  string,
-  {
-    resolve: (data: any) => void;
-    reject: (err: Error) => void;
-    timer: ReturnType<typeof setTimeout>;
-  }
->();
-let nativeMessageBuffer = Buffer.alloc(0);
 /** Server bound to this process's unique instance socket (primary endpoint). */
 let socketServer: ReturnType<typeof net.createServer> | null = null;
 /** Server bound to the legacy well-known socket, when we managed to acquire it. */
 let legacyServer: ReturnType<typeof net.createServer> | null = null;
 let inventoryExitTimer: ReturnType<typeof setTimeout> | null = null;
-let cdpRegistrationTimer: ReturnType<typeof setInterval> | null = null;
-let cdpBrowserPublished = false;
-
 function cancelInventoryExit(): void {
   if (!inventoryExitTimer) return;
   clearTimeout(inventoryExitTimer);
@@ -572,73 +436,15 @@ function scheduleInventoryExit(delayMs = INVENTORY_IDLE_EXIT_MS): void {
   inventoryExitTimer.unref();
 }
 
-/** Lazily created CDP session (one per native-host process) */
-let cdpSession: CdpSession | null = null;
-let cdpAutoReconnectEnabled = true;
-const cdpStateKey = `${CDP_BROWSER_ID}:${CDP_USER_DATA_DIR ?? CDP_ENDPOINT_FILE ?? CDP_PORT}`;
-
-function getCdpSession(): CdpSession {
-  cdpAutoReconnectEnabled = true;
-  if (!cdpSession) {
-    cdpSession = CDP_ENDPOINT_FILE
-      ? new CdpSession({
-          targetRegistryFile: keyedConfigFile('cdp-targets', cdpStateKey),
-          endpointResolver: async () => {
-            const endpoint = fs.readFileSync(CDP_ENDPOINT_FILE, 'utf8').trim();
-            const url = new URL(endpoint);
-            if (url.protocol !== 'ws:' && url.protocol !== 'wss:') {
-              throw new Error(`Unsupported CDP WebSocket protocol: ${url.protocol}`);
-            }
-            return url.toString();
-          },
-        })
-      : new CdpSession({
-          port: CDP_PORT,
-          userDataDir: CDP_USER_DATA_DIR,
-          targetRegistryFile: keyedConfigFile('cdp-targets', cdpStateKey),
-        });
-    cdpSession.onBrowserConnected(() => {
-      getCdpPageHost();
-    });
-  }
-  return cdpSession;
-}
-
-let controlBrowserId = isDaemonMode ? CDP_BROWSER_ID : 'default';
-let cdpPageHost: CdpPluginPageHost | undefined;
-function getCdpPageHost(): CdpPluginPageHost {
-  return (cdpPageHost ??= new CdpPluginPageHost(
-    getCdpSession(),
-    (action, data) =>
-      callPluginPageService(
-        String(data.plugin ?? ''),
-        data.input as Record<string, unknown>,
-        () => async (action, payload) => {
-          return (
-            await dispatchHostRequest(
-              { action, data: payload ?? {}, transport: 'cdp', controlSource: 'local' },
-              true,
-            )
-          ).data;
-        },
-        action === 'plugin_page_event',
-        false,
-        'cdp',
-      ),
-    {
-      browserId: cdpStateKey,
-    },
-  ));
-}
 let controlSessionManager: ControlSessionManager | undefined;
 let browserEnhancementGateway: BrowserEnhancementGateway | undefined;
 function getBrowserEnhancementGateway(): BrowserEnhancementGateway {
   return (browserEnhancementGateway ??= new BrowserEnhancementGateway({
     browsers: listRegisteredBrowsers,
     controlHost: readProviderControlHost,
-    available: () => extensionVersion !== null && extensionRpcVersion === EXTENSION_RPC_VERSION,
+    available: () => extensionProvider.protocolReady,
     tabs: async deadline => {
-      const result = await sendRequestToExtension(
+      const result = await extensionProvider.request(
         'tab_list',
         {},
         providerRequestTimeoutMs('tab_list', {}, deadline),
@@ -660,7 +466,7 @@ function getBrowserEnhancementGateway(): BrowserEnhancementGateway {
     run: (action, data, work) =>
       getControlSessionManager().registry.run(undefined, action, data, work, 'extension'),
     invoke: (request, deadline) =>
-      sendRequestToExtension(
+      extensionProvider.request(
         '__browser_enhancement',
         { ...request, deadline },
         providerRequestTimeoutMs(
@@ -675,8 +481,8 @@ function getBrowserEnhancementGateway(): BrowserEnhancementGateway {
 
 function getControlSessionManager(): ControlSessionManager {
   return (controlSessionManager ??= new ControlSessionManager({
-    browserId: () => controlBrowserId,
-    transport: () => (extensionVersion !== null ? 'extension' : 'cdp'),
+    browserId: () => (isDaemonMode ? cdpProvider : extensionProvider).browserId,
+    transport: defaultBrowserTransport,
     invoke: async (action, data, transport, deadline) => {
       const { __mearlControlSource: origin, ...payload } = data;
       return (
@@ -686,145 +492,15 @@ function getControlSessionManager(): ControlSessionManager {
         )
       ).data;
     },
-    deactivate: async (tabs, transport) => {
-      if (transport === 'extension') {
-        await sendRequestToExtension('__control_deactivate', { tabIds: tabs }, 30000, true);
-      }
-    },
-    cleanup: async (tabs, transport, preserveEnvironment, returningToAgent) => {
-      if (transport === 'extension') {
-        const result = await sendRequestToExtension(
-          '__control_cleanup',
-          { tabIds: tabs, preserveEnvironment, ...(returningToAgent ? { returningToAgent } : {}) },
-          30000,
-          true,
-        );
-        if (result.released === false)
-          throw new Error('Session cleanup failed: ' + JSON.stringify(result.failures));
-      } else {
-        for (const tabId of tabs) {
-          if (!cdpSession?.listRegisteredTabIds().includes(tabId)) continue;
-          const page = await cdpSession.getPageSession(tabId);
-          clearPageRefsForNavigation(page);
-          await releaseControlledIndicator(page);
-          if (!preserveEnvironment) {
-            clearCdpPageMocks(page);
-            await dispatchCdpAction(
-              getCdpSession(),
-              'set_app_profile',
-              { tabId, enabled: false, networkControl: null },
-              'local',
-            );
-            await dispatchCdpAction(
-              getCdpSession(),
-              'set_device_emulation',
-              { tabId, enabled: false },
-              'local',
-            );
-            await dispatchCdpAction(
-              getCdpSession(),
-              'set_timezone',
-              { tabId, timezone: '' },
-              'local',
-            );
-          }
-        }
-      }
-    },
-    download: async (data, transport, origin) => {
-      if (transport === 'extension')
-        return sendRequestToExtension(
-          '__capture_download',
-          data,
-          Number(data.timeout ?? 30000) + 10000,
-          true,
-          normalizeControlSource(origin),
-        );
-      return captureCdpDownload(getCdpSession(), data, CDP_BROWSER_ID.startsWith('managed:'), () =>
-        handleViaCdp(
-          'page_click',
-          { ...data.trigger, tabId: data.tabId },
-          30000,
-          normalizeControlSource(origin),
-        ),
-      );
-    },
-    openRecording: async (transport, tabId, recordingId, options) => {
-      if (transport === 'extension') {
-        const startTimeoutMs = 10_000;
-        await sendRequestToExtension(
-          '__page_record',
-          {
-            operation: 'start',
-            recordingId,
-            tabId,
-            options,
-            deadline: Date.now() + startTimeoutMs,
-          },
-          startTimeoutMs,
-          true,
-        );
-        return {
-          isAlive: async () => {
-            if (extensionVersion === null) return false;
-            try {
-              const { active } = await sendRequestToExtension(
-                '__page_record_status',
-                { recordingId },
-                3000,
-                true,
-              );
-              return active === true;
-            } catch (error) {
-              if (error instanceof Error && error.message.includes('Unknown action'))
-                throw new Error('Update the Mearl extension to query recording status');
-              throw error;
-            }
-          },
-          stop: () =>
-            sendRequestToExtension(
-              '__page_record',
-              { operation: 'stop', recordingId },
-              15_000,
-              true,
-            ),
-          read: size =>
-            sendRequestToExtension(
-              '__page_record',
-              { operation: 'read', recordingId, size },
-              10_000,
-              true,
-            ),
-          close: () =>
-            sendRequestToExtension(
-              '__page_record',
-              { operation: 'close', recordingId },
-              10_000,
-              true,
-            ),
-        };
-      }
-      const cdp = getCdpSession();
-      const page = await cdp.getPageSession(tabId);
-      const { client } = page;
-      const send = (method: string, params?: Record<string, unknown>) =>
-        client.sendCommand(method, params, 10_000);
-      try {
-        const stream = await startCdpRecording(send, options);
-        return { ...stream, isAlive: () => cdp.listOpenPageSessions().includes(page) };
-      } catch (error) {
-        if (
-          error instanceof Error &&
-          error.message === 'CDP command timeout: Page.startScreenRecording'
-        ) {
-          const stopped = await send('Page.stopScreenRecording').catch(() => undefined);
-          if (stopped?.stream) await send('IO.close', { handle: stopped.stream }).catch(() => {});
-        }
-        throw error;
-      }
-    },
+    deactivate: async (tabs, transport) => browserProvider(transport).deactivate?.(tabs),
+    cleanup: (tabs, transport, preserveEnvironment, returningToAgent) =>
+      browserProvider(transport).cleanup(tabs, preserveEnvironment, returningToAgent),
+    download: (data, transport, origin) =>
+      browserProvider(transport).download(data, normalizeControlSource(origin)),
+    openRecording: (transport, tabId, recordingId, options) =>
+      browserProvider(transport).openRecording(tabId, recordingId, options),
     notify: () => {
-      if (extensionVersion !== null) sendToExtension({ type: 'control_sessions_changed' });
+      if (extensionProvider.connected) extensionProvider.send({ type: 'control_sessions_changed' });
     },
   }));
 }
@@ -838,22 +514,12 @@ function log(...args: any[]): void {
   }
 }
 
-function sendToExtension(message: Record<string, any>): void {
-  const json = JSON.stringify(message);
-  const length = Buffer.byteLength(json, 'utf-8');
-  const header = Buffer.alloc(4);
-  header.writeUInt32LE(length, 0);
-
-  process.stdout.write(header);
-  process.stdout.write(json);
-}
-
 const presetBrowserTransfer = new PresetBrowserTransfer();
 let presetBrowserSync: Promise<unknown> = Promise.resolve();
 function requestPresetBrowser(
   data: HostToExtensionActionMap['__preset_browser']['request'],
 ): Promise<HostToExtensionActionMap['__preset_browser']['response']> {
-  if (extensionVersion === null)
+  if (!extensionProvider.connected)
     return Promise.resolve({
       installationRevision: null,
       browserRevision: null,
@@ -862,10 +528,10 @@ function requestPresetBrowser(
       error: 'EXTENSION_NOT_CONNECTED',
     });
   if (data.operation === 'status')
-    return sendRequestToExtension('__preset_browser', data, 15000, true);
+    return extensionProvider.request('__preset_browser', data, 15000, true);
   const next = presetBrowserSync
     .catch(() => {})
-    .then(() => sendRequestToExtension('__preset_browser', data, 120000, true));
+    .then(() => extensionProvider.request('__preset_browser', data, 120000, true));
   presetBrowserSync = next;
   return next;
 }
@@ -904,7 +570,7 @@ const invokePresetHost: NonNullable<
 };
 const presetInstallation = new NativePresetInstallation({
   request: (data, timeoutMs) =>
-    sendRequestToExtension('__preset_installation', data, timeoutMs, true),
+    extensionProvider.request('__preset_installation', data, timeoutMs, true),
   invoke: invokePresetHost,
 });
 
@@ -922,7 +588,7 @@ function getAgentChatManager(): AgentChatManager {
         },
       ],
       event => {
-        sendToExtension({ type: 'agent_chat_event', data: event });
+        extensionProvider.send({ type: 'agent_chat_event', data: event });
       },
       {
         installedProviders: () => {
@@ -1009,25 +675,14 @@ let browserProviderCoordinator: BrowserProviderCoordinator | null = null;
 
 function getBrowserProviderCoordinator(): BrowserProviderCoordinator {
   if (browserProviderCoordinator) return browserProviderCoordinator;
-  const runtimes = createBuiltinBrowserProviders({
+  const exportCookies = (domains: string[]) => browserProvider().exportCookies(domains);
+  const local = createLocalBrowserProvider({
     nativeHostScript: fileURLToPath(import.meta.url),
-    exportCookies: async domains => {
-      if (extensionVersion !== null) {
-        const result = await sendRequestToExtension('__export_cookies', { domains }, 20000, true);
-        return result.cookies ?? [];
-      }
-      return cdpExportCookies(getCdpSession(), domains);
-    },
+    exportCookies,
     log,
   });
-  browserProviderCoordinator = new BrowserProviderCoordinator(runtimes, {
-    exportCookies: async domains => {
-      if (extensionVersion !== null) {
-        const result = await sendRequestToExtension('__export_cookies', { domains }, 20000, true);
-        return result.cookies ?? [];
-      }
-      return cdpExportCookies(getCdpSession(), domains);
-    },
+  browserProviderCoordinator = new BrowserProviderCoordinator([local], {
+    exportCookies,
     getBrowserUserAgent: getCurrentBrowserUserAgent,
   });
   return browserProviderCoordinator;
@@ -1051,7 +706,8 @@ async function closeBrowser(
     assertBrowserRequestDeadline(deadline);
     const registry = getControlSessionManager().registry;
     if (localBrowserId) {
-      if (isDaemonMode && localBrowserId === CDP_BROWSER_ID) return registry.closeBrowser(close);
+      if (isDaemonMode && localBrowserId === cdpProvider.browserId)
+        return registry.closeBrowser(close);
       const owner = listRegisteredBrowsers().find(
         browser =>
           browser.browserId === localBrowserId &&
@@ -1088,20 +744,12 @@ function appendWarnings<T extends { warnings?: string[] }>(result: T, warnings: 
   return { ...result, ...(merged.length > 0 ? { warnings: merged } : {}) };
 }
 
-async function handleExtensionControlMessage(message: any): Promise<void> {
+async function handleExtensionControlMessage(
+  message: any,
+  sendToExtension: (message: Record<string, any>) => void,
+): Promise<void> {
   const { id, action, data = {} } = message;
-  if (isExtensionUiServiceAction(action) && message.rpcVersion !== EXTENSION_RPC_VERSION) {
-    throw new ExtensionRpcError(
-      'PROTOCOL_MISMATCH',
-      'Update the Mearl extension and local service, then reconnect.',
-    );
-  }
   if (action === 'preset_installation') {
-    if (message.rpcVersion !== EXTENSION_RPC_VERSION)
-      throw new ExtensionRpcError(
-        'PROTOCOL_MISMATCH',
-        'Update the Mearl extension and local service, then reconnect.',
-      );
     sendToExtension({ id, success: true, data: await presetInstallation.handle(data) });
     return;
   }
@@ -1436,245 +1084,53 @@ async function handleExtensionControlMessage(message: any): Promise<void> {
   throw new ExtensionRpcError('UNSUPPORTED_ACTION', `Unknown extension action: ${action}`);
 }
 
-const nativeBrowserBundleId = isDaemonMode ? undefined : detectNativeBrowserBundleId();
-const resolveExtensionBrowserName = createExtensionBrowserNameResolver(() =>
-  browserNameForBundle(nativeBrowserBundleId),
-);
-let extensionAgentAllowed = false;
-let extensionBrowserRecord: Parameters<typeof registerBrowser>[0] | undefined;
-const extensionAgentPolicy = watchExtensionAgentPolicy(nativeBrowserBundleId, policy => {
-  extensionAgentAllowed = false;
-  unregisterBrowser();
-  sendToExtension({ type: 'agent_policy', policy });
+const extensionProvider = new ExtensionBrowserProvider({
+  socketPath: INSTANCE_SOCKET_PATH,
+  daemon: isDaemonMode,
+  log,
+  onDisconnect: cleanupAndExit,
+  onRequest: handleExtensionControlMessage,
+  onPing: message => {
+    setAnalyticsClientId(message.analyticsClientId);
+    nativeHostUpdateCoordinator.evaluate(message.version, message.checkForUpdates);
+  },
+  getPresetInstallationRevision: () =>
+    presetBrowserTransfer.selectedRevision(nativeCapabilities.status().installationRevision),
 });
 
-function publishExtensionAccess(enabled: boolean) {
-  extensionAgentAllowed = enabled;
-  if (enabled && extensionBrowserRecord) registerBrowser(extensionBrowserRecord);
-  else unregisterBrowser();
+const cdpProvider = new CdpBrowserProvider({
+  args: runtimeArgs,
+  socketPath: INSTANCE_SOCKET_PATH,
+  endpointSource: cdpEndpointSource,
+  log,
+  onPublish: cancelInventoryExit,
+  onDiscoveryDisconnect: scheduleInventoryExit,
+  pluginService: (action, data) =>
+    callPluginPageService(
+      String(data.plugin ?? ''),
+      data.input as Record<string, unknown>,
+      () => async (action, payload) => {
+        return (
+          await dispatchHostRequest(
+            { action, data: payload ?? {}, transport: 'cdp', controlSource: 'local' },
+            true,
+          )
+        ).data;
+      },
+      action === 'plugin_page_event',
+      false,
+      'cdp',
+    ),
+});
+
+function defaultBrowserTransport(): 'extension' | 'cdp' {
+  return extensionProvider.connected ? 'extension' : 'cdp';
 }
 
-function handleExtensionMessage(message: any): void {
-  if (message?.type === 'agent_access') {
-    if (
-      extensionAgentPolicy.current().available !== false &&
-      message.revision === extensionAgentPolicy.current().revision &&
-      typeof message.enabled === 'boolean'
-    )
-      publishExtensionAccess(message.enabled);
-    return;
-  }
-  if (message && message.type === 'ping') {
-    extensionRpcVersion = typeof message.rpcVersion === 'number' ? message.rpcVersion : null;
-    if (message.version) {
-      extensionVersion = message.version;
-      log(`Extension version: ${extensionVersion}, Native Host version: ${NATIVE_HOST_VERSION}`);
-    }
-    setAnalyticsClientId(message.analyticsClientId);
-    controlBrowserId = typeof message.browserId === 'string' ? message.browserId : 'default';
-    // Advertise this browser in the shared registry so clients can address it.
-    // Older extensions omit browserId; fall back to a single shared identity so
-    // they remain discoverable (one browser is the common case).
-    extensionBrowserRecord = {
-      browserId: typeof message.browserId === 'string' ? message.browserId : 'default',
-      socketPath: INSTANCE_SOCKET_PATH,
-      browserName: resolveExtensionBrowserName(
-        typeof message.browserName === 'string' ? message.browserName : 'Browser',
-      ),
-      nativeHostVersion: NATIVE_HOST_VERSION,
-      transport: 'extension',
-      extensionVersion: extensionVersion ?? undefined,
-    };
-    publishExtensionAccess(
-      message.agentAccessProtocol !== 1 &&
-        extensionAgentPolicy.current().available !== false &&
-        extensionAgentPolicy.current().providerIds.length === 0,
-    );
-    void presetBrowserTransfer
-      .selectedRevision(nativeCapabilities.status().installationRevision)
-      .catch(error => {
-        log('Preset browser selection unavailable:', String(error));
-        return null;
-      })
-      .then(presetInstallationRevision =>
-        sendToExtension({
-          type: 'pong',
-          timestamp: Date.now(),
-          version: NATIVE_HOST_VERSION,
-          rpcVersion: EXTENSION_RPC_VERSION,
-          presetInstallationRevision,
-          presetInstallationProtocol: PRESET_INSTALLATION_PROTOCOL,
-          agentPolicy: extensionAgentPolicy.current(),
-        }),
-      );
-    nativeHostUpdateCoordinator.evaluate(message.version, message.checkForUpdates);
-    return;
-  }
-
-  // The extension reports window-focus changes so the client can default to the
-  // browser the user is actually looking at.
-  if (message && message.type === 'browser_focus') {
-    if (extensionAgentAllowed) touchFocus();
-    return;
-  }
-
-  if (!message || typeof message !== 'object' || !message.id) {
-    return;
-  }
-
-  const pending = pendingRequests.get(message.id);
-  if (!pending) {
-    if (message.action) {
-      handleExtensionControlMessage(message).catch(error => {
-        sendToExtension({
-          id: message.id,
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-          code: extensionRpcErrorCode(error),
-        });
-      });
-    }
-    return;
-  }
-
-  clearTimeout(pending.timer);
-  pendingRequests.delete(message.id);
-
-  if (message.success) {
-    pending.resolve(message.data);
-  } else {
-    pending.reject(extensionResponseError(message));
-  }
-}
-
-function processNativeMessages(): void {
-  while (nativeMessageBuffer.length >= 4) {
-    const length = nativeMessageBuffer.readUInt32LE(0);
-    if (nativeMessageBuffer.length < 4 + length) {
-      return;
-    }
-
-    const jsonBytes = nativeMessageBuffer.subarray(4, 4 + length);
-    nativeMessageBuffer = nativeMessageBuffer.subarray(4 + length);
-
-    try {
-      const message = JSON.parse(jsonBytes.toString('utf-8'));
-      handleExtensionMessage(message);
-    } catch (error) {
-      log('Failed to parse extension message:', String(error));
-    }
-  }
-}
-
-function setupNativeMessageInput(): void {
-  process.stdin.on('readable', () => {
-    let chunk: Buffer | null;
-    while ((chunk = process.stdin.read()) !== null) {
-      nativeMessageBuffer = Buffer.concat([nativeMessageBuffer, chunk]);
-      processNativeMessages();
-    }
-  });
-
-  process.stdin.on('end', () => {
-    log('Extension disconnected (stdin end)');
-    cleanupAndExit(0);
-  });
-
-  process.stdin.on('error', (error: Error) => {
-    log('stdin error:', String(error));
-    cleanupAndExit(1);
-  });
-}
-
-function sendRequestToExtension(
-  action: string,
-  data: any,
-  timeoutMs: number,
-  trustedInternal = false,
-  controlSource: ControlSource = 'local',
-): Promise<any> {
-  if (!extensionAgentAllowed && requiresExtensionAgentAccess(action, data, trustedInternal))
-    return Promise.reject(new Error('Extension Agent access is disabled or awaiting coordination'));
-  if (
-    (trustedInternal || isHostToExtensionAction(action)) &&
-    extensionRpcVersion !== EXTENSION_RPC_VERSION
-  ) {
-    return Promise.reject(
-      new ExtensionRpcError(
-        'PROTOCOL_MISMATCH',
-        'Update the Mearl extension and local service, then reconnect.',
-      ),
-    );
-  }
-
-  const id = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      pendingRequests.delete(id);
-      reject(new Error(`Request timeout after ${timeoutMs}ms`));
-    }, timeoutMs);
-
-    pendingRequests.set(id, { resolve, reject, timer });
-    sendToExtension(
-      createExtensionRequestMessage(id, action, data, trustedInternal, controlSource),
-    );
-  });
-}
-
-function toTimeoutMs(action: string, data: any): number {
-  if (
-    action === 'page_runtime' &&
-    ['send', 'message_commit'].includes(data?.operation) &&
-    data.timeoutSec !== undefined
-  ) {
-    if (
-      typeof data.timeoutSec !== 'number' ||
-      !Number.isFinite(data.timeoutSec) ||
-      data.timeoutSec <= 0 ||
-      data.timeoutSec > 300
-    )
-      throw new Error('Invalid page request timeout');
-    return data.timeoutSec * 1000;
-  }
-  if (action === 'send_request') {
-    const timeoutMs = Number(data && data.timeout ? data.timeout : 30000);
-    return timeoutMs + 5000;
-  }
-  if (action === 'page_wait') {
-    const timeoutMs = Number(data?.time ?? data?.timeout ?? 10000);
-    return timeoutMs + 5000;
-  }
-  if (action === 'tab_open') {
-    return 40000;
-  }
-  if (action === 'run_actions') {
-    const actions = Array.isArray(data?.actions) ? data.actions : [{}];
-    const timeoutMs = actions.reduce((total: number, step: any) => {
-      const stepAction = String(step?.action ?? '');
-      if (!stepAction || stepAction === 'run_actions') return total + DEFAULT_TIMEOUT_MS;
-      return total + toTimeoutMs(stepAction, step?.data ?? {});
-    }, 0);
-    return Math.max(DEFAULT_TIMEOUT_MS, timeoutMs);
-  }
-  // Page interaction actions run with built-in observation unless disabled,
-  // so the socket timeout must cover the observation and navigation windows.
-  if (shouldObservePageAction(action, data)) {
-    const observationMs = Math.min(Math.max(Number(data?.observe?.timeoutMs ?? 3000), 500), 30000);
-    const navigationGraceMs = Math.min(
-      Math.max(Number(data?.observe?.navigationGraceMs ?? 1000), 0),
-      5000,
-    );
-    const navigationTimeoutMs = Math.min(
-      Math.max(Number(data?.observe?.navigationTimeoutMs ?? 15000), 1000),
-      30000,
-    );
-    return Math.max(
-      DEFAULT_TIMEOUT_MS,
-      observationMs + navigationGraceMs + 4000 + navigationTimeoutMs + 5000,
-    );
-  }
-  return DEFAULT_TIMEOUT_MS;
+function browserProvider(
+  transport: BrowserTransport = defaultBrowserTransport(),
+): HostBrowserProvider {
+  return transport === 'extension' ? extensionProvider : cdpProvider;
 }
 
 interface HostActionResult {
@@ -1742,11 +1198,11 @@ async function dispatchHostRequest(request: any, managed = false): Promise<HostA
   if (action === 'profile_install') {
     if (controlSource !== 'local' || request.controlSessionId !== undefined)
       throw new Error('App profile installation requires local setup');
-    if (extensionVersion === null)
+    if (!extensionProvider.connected)
       throw new Error('Connect a Mearl extension before installing App profiles');
     if (typeof data.source !== 'string') throw new Error('Expected an App profile source');
     return {
-      data: await sendRequestToExtension(
+      data: await extensionProvider.request(
         '__profile_install',
         { source: data.source },
         145000,
@@ -1765,7 +1221,7 @@ async function dispatchHostRequest(request: any, managed = false): Promise<HostA
     return { data: { session: getControlSessionManager().registry.find(data.sessionId) ?? null } };
   }
   if (action === 'provider_control_sessions_changed') {
-    sendToExtension({ type: 'control_sessions_changed' });
+    extensionProvider.send({ type: 'control_sessions_changed' });
     return { data: { refreshed: true } };
   }
   if (!managed && action === 'browser_close' && request.controlSessionId === undefined)
@@ -1816,40 +1272,18 @@ async function dispatchHostRequest(request: any, managed = false): Promise<HostA
   if (action === 'browser_list') {
     if (discoverCdp) cancelInventoryExit();
     const providerWarnings = await ensureInstalledProvidersRunning();
-    const shouldDiscover = isDaemonMode && !skipBrowserRegistration;
-    if (discoverCdp && CDP_BROWSER_ID === 'cdp') {
-      await retireUnreachableBrowserRecord(CDP_BROWSER_ID, canConnectInstanceSocket);
-    }
-    let discoveryProbeError: string | undefined;
-    const discovered = shouldDiscover
-      ? await ensureDiscoverableCdpBrowser({
-          isPublished: () => cdpBrowserPublished,
-          isAvailable: async () => {
-            const probe = await getCdpSession().probeAvailability();
-            discoveryProbeError = probe.error ? oneLineError(probe.error) : undefined;
-            log(
-              `CDP discovery probe ${describeCdpEndpoint()} -> ${probe.available ? 'ok' : `fail (${discoveryProbeError || 'unknown error'})`}`,
-            );
-            return probe.available;
-          },
-          publish: publishDaemonBrowser,
-          monitor: monitorConnectedDaemonBrowser,
-        })
-      : false;
+    const { discovered, warning } = await cdpProvider.discover();
     const inventory = await listBrowserInventory(getBrowserProviderCoordinator().providerRuntimes);
     const registeredCdpAvailable = inventory.browsers.some(
       browser =>
-        browser.browserId === CDP_BROWSER_ID &&
+        browser.browserId === cdpProvider.browserId &&
         browser.transport === 'cdp' &&
         browser.status === 'connected',
     );
-    const discoveryWarnings =
-      shouldDiscover && !discovered && !registeredCdpAvailable
-        ? [
-            `CDP discovery probe ${describeCdpEndpoint()} failed: ${discoveryProbeError || 'unknown error'}`,
-          ]
-        : [];
-    const inventoryData = appendWarnings(inventory, [...providerWarnings, ...discoveryWarnings]);
+    const inventoryData = appendWarnings(inventory, [
+      ...providerWarnings,
+      ...(warning && !registeredCdpAvailable ? [warning] : []),
+    ]);
     const closeConnection = skipBrowserRegistration || (discoverCdp && !discovered);
     if (closeConnection) scheduleInventoryExit();
     return { data: inventoryData, closeConnection };
@@ -1860,41 +1294,25 @@ async function dispatchHostRequest(request: any, managed = false): Promise<HostA
     const startedAt = Date.now();
     const affectedTabIds = new Set<number>();
     const transports: Array<'extension' | 'cdp'> = [];
-    const failures: Array<Record<string, any>> = [];
+    const failures: BrowserReleaseFailure[] = [];
     let released = true;
     let hadActiveControl = false;
     try {
       const releaseErrors: string[] = [];
-      if (extensionVersion !== null) {
+      for (const transport of ['extension', 'cdp'] as const) {
         try {
-          const result = await sendRequestToExtension(action, data, toTimeoutMs(action, data));
+          const result = await browserProvider(transport).release(data);
           released = released && result?.released !== false;
           hadActiveControl = hadActiveControl || result?.hadActiveControl === true;
-          if (result?.hadActiveControl) transports.push('extension');
+          if (result?.hadActiveControl) transports.push(transport);
           for (const tabId of result?.affectedTabIds ?? []) affectedTabIds.add(tabId);
           if (Array.isArray(result?.failures)) failures.push(...result.failures);
         } catch (error) {
           releaseErrors.push(
-            `extension: ${error instanceof Error ? error.message : String(error)}`,
+            `${transport}: ${error instanceof Error ? error.message : String(error)}`,
           );
         }
       }
-
-      if (cdpSession) {
-        const session = cdpSession;
-        cdpSession = null;
-        try {
-          const result = await releaseCdpControl(session);
-          released = released && result.released;
-          hadActiveControl = hadActiveControl || result.hadActiveControl;
-          if (result.hadActiveControl) transports.push('cdp');
-          for (const tabId of result.affectedTabIds) affectedTabIds.add(tabId);
-        } catch (error) {
-          session.close();
-          releaseErrors.push(`cdp: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      }
-      cdpAutoReconnectEnabled = false;
 
       if (releaseErrors.length > 0) {
         throw new Error(`Failed to fully release browser control (${releaseErrors.join('; ')})`);
@@ -1904,7 +1322,7 @@ async function dispatchHostRequest(request: any, managed = false): Promise<HostA
         success: released,
         transport: transports.join('+') || 'none',
         duration_ms: Date.now() - startedAt,
-        extension_version: extensionVersion ?? 'not_connected',
+        extension_version: extensionProvider.version ?? 'not_connected',
       });
       return {
         data: {
@@ -1918,66 +1336,34 @@ async function dispatchHostRequest(request: any, managed = false): Promise<HostA
     } catch (error) {
       trackAction(action, {
         success: false,
-        transport: transports.join('+') || (extensionVersion !== null ? 'extension' : 'cdp'),
+        transport: transports.join('+') || defaultBrowserTransport(),
         duration_ms: Date.now() - startedAt,
         error_code: classifyAnalyticsError(error),
-        extension_version: extensionVersion ?? 'not_connected',
+        extension_version: extensionProvider.version ?? 'not_connected',
       });
       throw error;
     }
   }
   if (!isExtensionBrowserAction(action) && (typeof action !== 'string' || !action.startsWith('__')))
     throw new Error(`Unsupported action: ${String(action)}`);
-  if (request.transport === 'extension' && extensionVersion === null) {
+  if (request.transport === 'extension' && !extensionProvider.connected) {
     throw new Error('CONTROL_SESSION_TRANSPORT_UNAVAILABLE: extension is disconnected');
   }
-  const useExtension = request.transport !== 'cdp' && extensionVersion !== null;
-  const transport = useExtension ? 'extension' : 'cdp';
+  const transport = request.transport === 'cdp' ? 'cdp' : defaultBrowserTransport();
   const startedAt = Date.now();
   try {
     validateRequiredActionTabId(action, data);
-    let result: any;
-    if (useExtension) {
-      if (action === 'send_request' && hasSendRequestFiles(data)) {
-        result = await sendRequestWithTransferredFiles(data, (internalAction, payload, timeoutMs) =>
-          sendRequestToExtension(internalAction, payload, timeoutMs, true, controlSource),
-        );
-      } else if (action === 'run_actions' && hasRunActionsSendRequestFiles(data)) {
-        result = await sendRunActionsWithTransferredFiles(
-          data,
-          (internalAction, payload, timeoutMs) =>
-            sendRequestToExtension(internalAction, payload, timeoutMs, true, controlSource),
-          transformed => toTimeoutMs('run_actions', transformed),
-        );
-      } else {
-        result = await sendRequestToExtension(
-          action,
-          data,
-          toTimeoutMs(action, data),
-          false,
-          controlSource,
-        );
-      }
-    } else {
-      if (!cdpPermissionNoticeLogged) {
-        cdpPermissionNoticeLogged = true;
-        log(
-          'CDP mode: domain permission checks are not enforced — all actions run without domain authorization',
-        );
-      }
-      result = await handleViaCdp(
-        action,
-        data,
-        toTimeoutMs(action, data),
-        controlSource,
-        request.deadline,
-      );
-    }
+    const result = await browserProvider(transport).invoke(
+      action,
+      data,
+      controlSource,
+      request.deadline,
+    );
     trackAction(action, {
       success: true,
       transport,
       duration_ms: Date.now() - startedAt,
-      extension_version: extensionVersion ?? 'not_connected',
+      extension_version: extensionProvider.version ?? 'not_connected',
     });
     return { data: result };
   } catch (error) {
@@ -1986,7 +1372,7 @@ async function dispatchHostRequest(request: any, managed = false): Promise<HostA
       transport,
       duration_ms: Date.now() - startedAt,
       error_code: classifyAnalyticsError(error),
-      extension_version: extensionVersion ?? 'not_connected',
+      extension_version: extensionProvider.version ?? 'not_connected',
     });
     throw error;
   }
@@ -2043,55 +1429,6 @@ async function handleSocketRequest(socket: net.Socket, line: string): Promise<vo
 
 async function handleSocketLine(socket: net.Socket, line: string): Promise<void> {
   await handleSocketRequest(socket, line);
-}
-
-/**
- * Handle an action via CDP (no extension required).
- *
- * Unlike the extension channel, CDP mode does NOT enforce domain
- * authorization — the user who launched the managed browser is assumed
- * to trust the agent unconditionally (similar to Playwright / Puppeteer).
- * The extension channel applies per-domain checks via
- * `assertAgentActionAuthorized` in agentBridge.
- *
- * Throws if the action is not supported via CDP or if Chrome's debug
- * port is not available.
- */
-async function handleViaCdp(
-  action: string,
-  data: any,
-  _timeoutMs: number,
-  controlSource: ControlSource,
-  deadline?: number,
-): Promise<any> {
-  if (action !== 'page_runtime' && !getRegisteredActionNames().includes(action)) {
-    throw new Error(`Action "${action}" is not supported in CDP mode`);
-  }
-  const probe = await getCdpSession().probeAvailability();
-  if (!probe.available) {
-    if (CDP_ENDPOINT_FILE)
-      throw new Error(`The remote CDP endpoint is not available: ${probe.error}`);
-    throw new Error(
-      `Chrome DevTools remote debugging is not available on port ${CDP_PORT}. ` +
-        'Enable it via chrome://inspect/#remote-debugging (Chrome 145+) ' +
-        `or install the Mearl extension. ${probe.error}`,
-    );
-  }
-
-  if (isDaemonMode && !skipBrowserRegistration) {
-    publishDaemonBrowser();
-    if (!shouldReconnectDaemonBrowser()) monitorConnectedDaemonBrowser();
-  }
-
-  if (action === 'page_runtime') return getCdpPageHost().handle(data);
-
-  // Page interaction actions get built-in observation here; the extension
-  // channel applies the equivalent wrapper in its own dispatch layer.
-  if (shouldObservePageAction(action, data)) {
-    return cdpObservedPageAction(getCdpSession(), action, data, controlSource, deadline);
-  }
-
-  return dispatchCdpAction(getCdpSession(), action, data, controlSource, deadline);
 }
 
 /** Shared connection handler used by both the instance and legacy sockets. */
@@ -2246,21 +1583,13 @@ function cleanupInstanceSocketFile(): void {
 function cleanupAndExit(code: number): void {
   controlSessionManager?.artifacts.disposeSync();
   cancelInventoryExit();
-  if (cdpRegistrationTimer) {
-    clearInterval(cdpRegistrationTimer);
-    cdpRegistrationTimer = null;
-  }
   // Cloud-connector child processes are intentionally NOT killed here. They run
   // detached so they survive extension reloads / native-host restarts; the next
   // native-host re-discovers and adopts them via the connector registry.
-  cdpPageHost?.dispose();
-  cdpPageHost = undefined;
-  cdpSession?.close();
+  cdpProvider.dispose();
   agentChatManager?.dispose();
   agentChatManager = null;
-  extensionAgentPolicy.close();
-  unregisterBrowser();
-  cdpBrowserPublished = false;
+  extensionProvider.dispose();
   // releaseLegacySocket only unlinks the legacy file if we actually own it, so
   // this never disturbs another host that holds it.
   releaseLegacySocket();
@@ -2290,67 +1619,6 @@ function shutdownWithDeadline(): void {
   cleanupAndExit(0);
 }
 
-function publishDaemonBrowser(): boolean {
-  cancelInventoryExit();
-  if (cdpBrowserPublished) return true;
-  const registered = registerBrowser({
-    browserId: CDP_BROWSER_ID,
-    socketPath: INSTANCE_SOCKET_PATH,
-    browserName: CDP_BROWSER_NAME,
-    nativeHostVersion: NATIVE_HOST_VERSION,
-    transport: 'cdp',
-    // Discovery has no focus signal, so its record sorts behind connected browsers with no focus time.
-    lastFocusedAt: discoverCdp ? -1 : CDP_BROWSER_ID.startsWith('managed:') ? 0 : undefined,
-    preserveFocus: !discoverCdp,
-  });
-  cdpBrowserPublished = registered;
-  return registered;
-}
-
-function unpublishDaemonBrowser(): void {
-  if (!cdpBrowserPublished) return;
-  unregisterBrowser();
-  cdpBrowserPublished = false;
-}
-
-function shouldReconnectDaemonBrowser(): boolean {
-  return Boolean(CDP_ENDPOINT_FILE) || CDP_BROWSER_ID.startsWith('managed:');
-}
-
-function monitorConnectedDaemonBrowser(): void {
-  if (cdpRegistrationTimer) return;
-  cdpRegistrationTimer = setInterval(() => {
-    if (getCdpSession().hasActiveConnections()) return;
-    unpublishDaemonBrowser();
-    if (cdpRegistrationTimer) clearInterval(cdpRegistrationTimer);
-    cdpRegistrationTimer = null;
-    if (discoverCdp) scheduleInventoryExit();
-  }, 2_000);
-  cdpRegistrationTimer.unref();
-}
-
-async function monitorReconnectableDaemonBrowser(): Promise<void> {
-  let checking = false;
-  const refresh = async (): Promise<void> => {
-    if (checking) return;
-    if (!cdpAutoReconnectEnabled) return;
-    checking = true;
-    try {
-      const available = await getCdpSession().isAvailable();
-      if (available) publishDaemonBrowser();
-      else unpublishDaemonBrowser();
-    } finally {
-      checking = false;
-    }
-  };
-
-  await refresh();
-  cdpRegistrationTimer = setInterval(() => {
-    void refresh();
-  }, 2_000);
-  cdpRegistrationTimer.unref();
-}
-
 async function main(): Promise<void> {
   await nativeCapabilities
     .refresh()
@@ -2365,7 +1633,7 @@ async function main(): Promise<void> {
   initCloudConnector({
     log,
     isDaemonMode,
-    sendToExtension: sendToExtension,
+    sendToExtension: message => extensionProvider.send(message),
     version: NATIVE_HOST_VERSION,
   });
 
@@ -2378,10 +1646,10 @@ async function main(): Promise<void> {
         ? 'CDP discovery'
         : 'CDP';
     log(
-      `running in ${mode} daemon mode, pid=${process.pid}, version=${NATIVE_HOST_VERSION}, cdp=${describeCdpEndpoint()}`,
+      `running in ${mode} daemon mode, pid=${process.pid}, version=${NATIVE_HOST_VERSION}, cdp=${cdpProvider.endpointDescription}`,
     );
   } else {
-    setupNativeMessageInput();
+    extensionProvider.start();
   }
   if (discoverCdp) scheduleInventoryExit(DISCOVERY_REQUEST_IDLE_EXIT_MS);
   await startSocketServer();
@@ -2389,7 +1657,7 @@ async function main(): Promise<void> {
     const updatePreset = createNativePresetAutoUpdater({
       directory: nativeCapabilityDirectory(),
       invoke: invokePresetHost,
-      extensionConnected: () => extensionVersion !== null,
+      extensionConnected: () => extensionProvider.connected,
       browserSelection: () =>
         requestPresetBrowser({ operation: 'status' }) as Promise<{
           presetId?: string;
@@ -2405,11 +1673,7 @@ async function main(): Promise<void> {
     }, 60 * 60_000).unref();
   }
 
-  // Managed endpoints reconnect without a local Chrome authorization prompt.
-  // Ordinary local Chrome connects only in response to an explicit CDP action.
-  if (isDaemonMode && !skipBrowserRegistration && shouldReconnectDaemonBrowser()) {
-    await monitorReconnectableDaemonBrowser();
-  }
+  await cdpProvider.start();
 
   process.on('SIGINT', () => cleanupAndExit(0));
   process.on('SIGTERM', () => cleanupAndExit(0));

@@ -37,12 +37,13 @@ function host(browserId) {
   let request = 0;
   return {
     send,
-    async action(action, data) {
+    receive,
+    async action(action, data, transport) {
       return new Promise((resolve, reject) => {
         const socket = createConnection(join(home, `mearl-agent-${child.pid}.sock`));
         let response = '';
         const timer = setTimeout(() => { socket.destroy(); reject(new Error('Socket action timed out')); }, 5000);
-        socket.on('connect', () => socket.write(JSON.stringify({ id: 'disabled-file-action', action, data, transport: 'extension', protocolVersion: 3, deadline: Date.now() + 4000 }) + '\n'));
+        socket.on('connect', () => socket.write(JSON.stringify({ id: 'socket-request', action, data, transport, protocolVersion: 3, deadline: Date.now() + 4000 }) + '\n'));
         socket.on('error', error => { clearTimeout(timer); reject(error); });
         socket.on('data', chunk => {
           response += chunk;
@@ -69,6 +70,25 @@ try {
   a.send({ type: 'agent_access', revision: pa.agentPolicy.revision, enabled: true }); await a.barrier();
   b.send({ type: 'agent_access', revision: pb.agentPolicy.revision, enabled: true }); await b.barrier();
   assert.deepEqual(await registered(), ['coordination-a', 'coordination-b']);
+  const tabList = a.action('tab_list', {});
+  const request = await a.receive(message => message.action === 'tab_list');
+  const tabs = [{ tabId: 9, url: 'https://example.test/' }];
+  a.send({ id: request.id, success: true, data: { tabs } });
+  assert.deepEqual((await tabList).data, { tabs });
+
+  const release = a.action('browser_release', {});
+  const releaseRequest = await a.receive(message => message.action === 'browser_release');
+  a.send({
+    id: releaseRequest.id,
+    success: true,
+    data: { released: true, hadActiveControl: true, affectedTabIds: [9] },
+  });
+  assert.deepEqual((await release).data, {
+    released: true,
+    hadActiveControl: true,
+    transports: ['extension'],
+    affectedTabIds: [9],
+  });
   a.send({ type: 'agent_access', revision: pa.agentPolicy.revision, enabled: false });
   a.send({ type: 'browser_focus' }); await a.barrier();
   assert.deepEqual(await registered(), ['coordination-b']);
@@ -77,11 +97,11 @@ try {
     ['send_request', upload],
     ['run_actions', { tabId: 1, actions: [{ action: 'send_request', data: upload }, { action: 'page_eval', data: { tabId: 1, expression: '1' } }] }],
   ]) {
-    const response = await a.action(action, data);
+    const response = await a.action(action, data, 'extension');
     assert.equal(response.success, false);
     assert.match(response.error, /Extension Agent access is disabled/);
   }
-  console.log('PASS: real Native Messaging handshake, stale revision rejection, profile isolation, and no focus-event resurrection');
+  console.log('PASS: real Native Messaging handshake, stale revision rejection, profile isolation, socket action routing, release, and no focus-event resurrection');
 } finally {
   await Promise.all(children.map(child => new Promise(resolve => { if (child.exitCode !== null || child.signalCode !== null) return resolve(); child.once('exit', resolve); child.stdin.end(); setTimeout(() => child.kill(), 2000).unref(); })));
   await rm(home, { recursive: true, force: true });

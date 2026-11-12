@@ -254,9 +254,15 @@ describe('agent script execution', () => {
   });
   it('passes Provider launch-form parameters through browserList while retaining options-only calls', async () => {
     const invoke = vi.spyOn(UnifiedClient.prototype, 'invoke').mockResolvedValue({});
-    const result = await executeScript(`await mearl.browserList({provider:'ego',launchForm:{variant:'attach',values:{}}},{local:true});`);
+    const result = await executeScript(
+      `await mearl.browserList({provider:'ego',launchForm:{variant:'attach',values:{}}},{local:true});`,
+    );
     expect(result.success).toBe(true);
-    expect(invoke).toHaveBeenCalledWith('browser_list', { provider: 'ego', launchForm: { variant: 'attach', values: {} } }, expect.objectContaining({ local: true }));
+    expect(invoke).toHaveBeenCalledWith(
+      'browser_list',
+      { provider: 'ego', launchForm: { variant: 'attach', values: {} } },
+      expect.objectContaining({ local: true }),
+    );
   });
 
   it('exports artifacts through internal SDK transport with the inherited session', async () => {
@@ -331,6 +337,25 @@ describe('agent script execution', () => {
       executionStopped: true,
       mayHaveLateEffects: true,
       pendingActions: ['fixture'],
+    });
+  });
+
+  it('reports calls still pending at the script deadline when a transport timeout arrives first', async () => {
+    const now = Date.now;
+    const invoke = vi.spyOn(UnifiedClient.prototype, 'invoke').mockImplementationOnce(async () => {
+      vi.spyOn(Date, 'now').mockImplementation(() => now() + 5000);
+      throw new Error('Socket timed out');
+    });
+    const result = await executeScript('await mearl.tabOpen({ url: "https://example.test/" });', {
+      executionTimeoutSec: 3,
+    });
+    expect(invoke).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({
+      success: false,
+      error: { code: 'SCRIPT_TIMEOUT' },
+      executionStopped: true,
+      pendingActions: ['tabOpen'],
+      mayHaveLateEffects: true,
     });
   });
 
@@ -420,11 +445,14 @@ describe('agent script execution', () => {
       );
       let pid: number;
       try {
-        pid = await vi.waitFor(async () => {
-          const value = Number(await readFile(marker, 'utf8'));
-          expect(value).toBeGreaterThan(0);
-          return value;
-        }, { timeout: 7000 });
+        pid = await vi.waitFor(
+          async () => {
+            const value = Number(await readFile(marker, 'utf8'));
+            expect(value).toBeGreaterThan(0);
+            return value;
+          },
+          { timeout: 7000 },
+        );
       } catch (error) {
         controller.abort();
         await running;

@@ -32,11 +32,8 @@ import {
 import { CdpSession } from './cdp-backend/cdp-session.js';
 import { pruneCdpSessionStorage } from './cdp-backend/plugin-pages.js';
 import { readDevToolsActivePort } from './cdp-backend/discover.js';
-import {
-  cdpImportCookies,
-  resolveCookieCopyPlan,
-  type TransferableCookie,
-} from './cdp-backend/cookie-transfer.js';
+import { cdpImportCookies } from './cdp-backend/cookie-transfer.js';
+import { resolveCookieCopyPlan, type TransferableCookie } from './browser-cookie-copy.js';
 import type { BuiltinBrowserLaunchOptions } from './builtin-provider-options.js';
 import { stoppedPersistentBrowserRecord } from './persistent-browser-record.js';
 

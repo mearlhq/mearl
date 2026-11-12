@@ -6,17 +6,17 @@ import {
   type ProviderBrowser,
   type ProviderRuntime,
 } from '@mearl/provider';
-import type { TransferableCookie } from './cdp-backend/cookie-transfer.js';
+import type { TransferableCookie } from '../browser-cookie-copy.js';
 import {
   closeManagedBrowser,
   launchManagedBrowser,
   listManagedBrowsers,
   type ManagedBrowserSummary,
-} from './managed-browser.js';
-import type { BuiltinBrowserLaunchOptions } from './builtin-provider-options.js';
-import { listRegisteredBrowsers } from './browser-registry.js';
-import { NATIVE_HOST_VERSION } from './version.js';
-import { discoverTargets } from './cdp-backend/discover.js';
+} from '../managed-browser.js';
+import type { BuiltinBrowserLaunchOptions } from '../builtin-provider-options.js';
+import { listRegisteredBrowsers } from '../browser-registry.js';
+import { NATIVE_HOST_VERSION } from '../version.js';
+import { discoverTargets } from '../cdp-backend/discover.js';
 
 const commonLaunchProperties = {
   name: { type: 'string', minLength: 1 },
@@ -31,7 +31,7 @@ const commonLaunchProperties = {
   },
 } as const;
 
-export interface BuiltinProviderDependencies {
+export interface LocalBrowserProviderDependencies {
   nativeHostScript: string;
   exportCookies: (domains: string[]) => Promise<TransferableCookie[]>;
   log: (...args: any[]) => void;
@@ -91,7 +91,7 @@ function localBrowser(
   };
 }
 
-function localDefinition(deps: BuiltinProviderDependencies): BrowserProviderDefinition {
+function localDefinition(deps: LocalBrowserProviderDependencies): BrowserProviderDefinition {
   return {
     descriptor: {
       providerId: 'local',
@@ -150,8 +150,8 @@ function localDefinition(deps: BuiltinProviderDependencies): BrowserProviderDefi
   };
 }
 
-export function createBuiltinBrowserProviders(
-  deps: BuiltinProviderDependencies,
-): ProviderRuntime[] {
-  return [createProviderRuntime(localDefinition(deps))];
+export function createLocalBrowserProvider(
+  deps: LocalBrowserProviderDependencies,
+): ProviderRuntime {
+  return createProviderRuntime(localDefinition(deps));
 }

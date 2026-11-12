@@ -14,10 +14,10 @@ vi.mock('../managed-browser.js', () => ({
 vi.mock('../browser-registry.js', () => ({ listRegisteredBrowsers: () => [] }));
 vi.mock('../cdp-backend/discover.js', () => ({ discoverTargets: mocks.discoverTargets }));
 
-import { createBuiltinBrowserProviders } from '../builtin-browser-providers.js';
+import { createLocalBrowserProvider } from '../builtin-providers/local.js';
 
-function runtimes() {
-  return createBuiltinBrowserProviders({
+function createRuntime() {
+  return createLocalBrowserProvider({
     nativeHostScript: '/fixture/native-host.js',
     exportCookies: vi.fn(),
     log: vi.fn(),
@@ -48,7 +48,7 @@ describe('built-in Provider lifecycle', () => {
       { type: 'page', id: 'settings', url: 'chrome://settings/' },
       { type: 'page', id: 'current-page', url: 'https://example.test/' },
     ]);
-    const runtime = runtimes()[0]!;
+    const runtime = createRuntime();
     expect((await runtime.listBrowsers())[0]?.operations).toContain('access');
     const access = await runtime.getAccess({ browserId: 'managed:profile' });
     expect(mocks.discoverTargets).toHaveBeenCalledWith(59652);
@@ -72,7 +72,7 @@ describe('built-in Provider lifecycle', () => {
         createdAt: '2026-09-08T00:00:00Z',
       },
     ];
-    const runtime = runtimes()[0]!;
+    const runtime = createRuntime();
     expect((await runtime.listBrowsers())[0]?.operations).not.toContain('access');
     await expect(runtime.getAccess({ browserId: 'managed:profile' })).rejects.toThrow(
       'does not support access',
@@ -93,14 +93,14 @@ describe('built-in Provider lifecycle', () => {
       },
     ];
     mocks.discoverTargets.mockResolvedValue([{ type: 'service_worker', id: 'worker' }]);
-    await expect(runtimes()[0]!.getAccess({ browserId: 'managed:profile' })).rejects.toThrow(
+    await expect(createRuntime().getAccess({ browserId: 'managed:profile' })).rejects.toThrow(
       'no inspectable page',
     );
   });
 
   it('declares the shared cookie-sync form component for local launches', () => {
     expect(
-      runtimes()[0]!.definition.browserType.inputSchema.properties.copyCookieDomains,
+      createRuntime().definition.browserType.inputSchema.properties.copyCookieDomains,
     ).toMatchObject({ type: 'object', component: 'cookie-sync' });
   });
 
@@ -116,7 +116,7 @@ describe('built-in Provider lifecycle', () => {
     };
     mocks.localBrowsers = [browser];
     mocks.launchLocal.mockResolvedValue({ ...browser, running: true });
-    await expect(runtimes()[0]!.start({ browserId: browser.browserId })).resolves.toMatchObject({
+    await expect(createRuntime().start({ browserId: browser.browserId })).resolves.toMatchObject({
       browserId: browser.browserId,
       status: 'running_disconnected',
       persistence: 'persistent',

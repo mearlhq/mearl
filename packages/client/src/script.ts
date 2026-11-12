@@ -148,10 +148,14 @@ export async function executeScript(
         }
       };
       const abort = () => stop({ code: 'SCRIPT_CANCELLED', message: 'Script execution cancelled' });
-      const deadline = setTimeout(
-        () => stop({ code: 'SCRIPT_TIMEOUT', message: 'Script execution deadline exceeded' }),
-        Math.max(0, executionDeadline - Date.now()),
-      );
+      const timeOut = () =>
+        stop({ code: 'SCRIPT_TIMEOUT', message: 'Script execution deadline exceeded' });
+      const pastDeadline = () => {
+        if (Date.now() < executionDeadline) return false;
+        timeOut();
+        return true;
+      };
+      const deadline = setTimeout(timeOut, Math.max(0, executionDeadline - Date.now()));
       signal?.addEventListener('abort', abort, { once: true });
       if (signal?.aborted) abort();
       const appendOutput = (stream: 'stdout' | 'stderr', chunk: Buffer) => {
@@ -204,13 +208,15 @@ export async function executeScript(
         }
       };
       const send = (message: unknown) => {
-        if (outcome !== undefined || !child.connected) return;
+        // A transport timer can settle a pending call before the script timer gets its turn.
+        if (outcome !== undefined || !child.connected || pastDeadline()) return;
         child.send(message as any, error => {
           if (error) stop(serializeError(error));
         });
       };
       child.on('message', (message: any) => {
-        if (outcome !== undefined || !message || typeof message !== 'object') return;
+        if (outcome !== undefined || !message || typeof message !== 'object' || pastDeadline())
+          return;
         if (message.type === 'done' || message.type === 'error') {
           stop(
             message.type === 'error'

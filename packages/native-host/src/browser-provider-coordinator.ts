@@ -13,7 +13,7 @@ import type {
   ProviderRuntime,
   ProviderLaunchFormRequest,
 } from '@mearl/provider';
-import { resolveCookieCopyPlan, type TransferableCookie } from './cdp-backend/cookie-transfer.js';
+import { resolveCookieCopyPlan, type TransferableCookie } from './browser-cookie-copy.js';
 import {
   accessProviderBrowser,
   closeProviderBrowser,

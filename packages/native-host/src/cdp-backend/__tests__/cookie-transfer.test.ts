@@ -1,13 +1,15 @@
 const hook = vi.hoisted(() => vi.fn());
-vi.mock('../../native-capability-services.js', () => ({ nativeCapabilities: { require: () => hook } }));
+vi.mock('../../native-capability-services.js', () => ({
+  nativeCapabilities: { require: () => hook },
+}));
 import { describe, expect, it, vi } from 'vitest';
+import { cdpImportCookiesWithClient } from '../cookie-transfer.js';
 import {
-  cdpImportCookiesWithClient,
   cookieMatchesDomain,
   normalizeCookieDomain,
   normalizeCookieDomains,
   resolveCookieCopyPlan,
-} from '../cookie-transfer.js';
+} from '../../browser-cookie-copy.js';
 
 describe('cookie transfer domain handling', () => {
   it('normalizes hostnames and URLs', () => {
