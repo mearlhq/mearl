@@ -47,7 +47,7 @@ mearl browser_list
 
 Try this prompt in an agent connected to Mearl. Include the target `browserId` when multiple environments are connected:
 
-> Use Mearl to open https://example.com in the selected browser, tell me the page title, and take a screenshot.
+> Use Mearl to open <https://example.com> in the selected browser, tell me the page title, and take a screenshot.
 
 ## CLI and SDK
 

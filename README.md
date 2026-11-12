@@ -47,7 +47,7 @@ mearl browser_list
 
 在已接入 Mearl 的 Agent 中试一句。连接多个环境时，附上目标 `browserId`：
 
-> 用 Mearl 在选中的浏览器里打开 https://example.com，告诉我页面标题，并截一张图。
+> 用 Mearl 在选中的浏览器里打开 <https://example.com>，告诉我页面标题，并截一张图。
 
 ## CLI 与 SDK
 
