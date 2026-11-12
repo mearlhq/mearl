@@ -275,7 +275,7 @@ client、native-host、cloud-server 和 MCP server 的已安装版本。发现�
 安装 skill 并自动注册命令，或直接注册已有入口：
 
 ```bash
-npx @mearl/setup plugin install https://github.com/mearlhq/mearl --github --skill browser-tab-manager --yes
+npx @mearl/setup plugin install mearlhq/mearl --github --skill browser-tab-manager --yes
 npx @mearl/setup plugin /absolute/path/to/browser-tab-manager
 npx @mearl/setup plugin uninstall tabs
 mearl tabs summary

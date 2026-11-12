@@ -45,7 +45,7 @@
 用 Mearl setup 安装 Skill 并注册插件，例如安装格式转换：
 
 ```bash
-npx @mearl/setup plugin install https://github.com/mearlhq/mearl --github --skill format-converter --yes
+npx @mearl/setup plugin install mearlhq/mearl --github --skill format-converter --yes
 ```
 
 工具箱和 Node 插件需要兼容的 Mearl 本地组件。图片压缩会把图片上传到 TinyPNG。安装来源可指定发行标签，以固定 Skill 版本。

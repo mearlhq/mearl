@@ -275,7 +275,7 @@ Intervals use local calendar days. Run `mearl check --updates` for immediate rel
 Install a Skill and automatically register commands, or register an existing entry:
 
 ```bash
-npx @mearl/setup plugin install https://github.com/mearlhq/mearl --github --skill browser-tab-manager --yes
+npx @mearl/setup plugin install mearlhq/mearl --github --skill browser-tab-manager --yes
 npx @mearl/setup plugin /absolute/path/to/browser-tab-manager
 npx @mearl/setup plugin uninstall tabs
 mearl tabs summary

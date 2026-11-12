@@ -45,7 +45,7 @@ Select a card title for instructions. To install a Skill, use the ID at the bott
 Use Mearl setup to install a Skill and register its plugin. This example installs Format Converter:
 
 ```bash
-npx @mearl/setup plugin install https://github.com/mearlhq/mearl --github --skill format-converter --yes
+npx @mearl/setup plugin install mearlhq/mearl --github --skill format-converter --yes
 ```
 
 The Toolbox and Node plugins require compatible local Mearl components. Image compression uploads images to TinyPNG. You can pin a Skill version by specifying a release tag in the installation source.

@@ -47,7 +47,7 @@ In the extension's quick settings, open the App selector and choose **Add App em
 Install a Skill and register its CLI, SDK, and MCP capabilities with one command:
 
 ```bash
-npx @mearl/setup plugin install https://github.com/mearlhq/mearl --github --skill browser-tab-manager --yes
+npx @mearl/setup plugin install mearlhq/mearl --github --skill browser-tab-manager --yes
 mearl tabs summary
 ```
 
