@@ -229,6 +229,8 @@ export interface BrowserCapabilities {
   screenshot: BrowserScreenshotKind;
   /** Fixed per instance. Omitted means Mearl sessions; external delegates task control. */
   controlSessionMode?: BrowserControlSessionMode;
+  /** Provider returns dialog receipts from page_snapshot and accepts page_press dialogId. */
+  nativeDialogs?: true;
 }
 
 export interface RegularBrowserInfo extends BrowserInfoBase {

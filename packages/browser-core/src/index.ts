@@ -76,6 +76,7 @@ export * from './browserCapabilities.js';
 export * from './runActions.js';
 export * from './sendRequestFiles.js';
 export * from './sendRequestHeaders.js';
+export * from './headerRules.js';
 export * from './cookie.js';
 export * from './controlledFavicon.js';
 export * from './capture.js';

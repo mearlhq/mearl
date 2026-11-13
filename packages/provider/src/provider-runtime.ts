@@ -402,6 +402,18 @@ export function validateProviderBrowser(browser: ProviderBrowser): void {
     if (browser.control.kind === 'host' && capabilities.controlSessionMode === 'external') {
       throw new Error('External control sessions require Provider control');
     }
+    if (capabilities.nativeDialogs !== undefined && capabilities.nativeDialogs !== true) {
+      throw new Error(`Provider browser ${browser.browserId} has invalid native dialog capability`);
+    }
+    if (
+      capabilities.nativeDialogs === true &&
+      (!capabilities.actions.includes('page_snapshot') ||
+        !capabilities.actions.includes('page_press'))
+    ) {
+      throw new Error(
+        `Provider browser ${browser.browserId} advertises native dialogs without page_snapshot and page_press`,
+      );
+    }
     const supportsScreenshot = capabilities.actions.includes('page_screenshot');
     if (supportsScreenshot === (capabilities.screenshot === 'none')) {
       throw new Error(

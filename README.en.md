@@ -32,6 +32,7 @@ For MCP clients, run `npx @mearl/setup --mcp` to configure the integration. [Set
 
 - **Everyday browser**: optionally install the [Chrome extension](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm) to reuse open tabs and signed-in sessions and access the Toolbox and DevTools.
 - **CDP Provider**: use `browser_manage` with `attach` to connect to Chrome or Electron with remote debugging enabled. Use the returned `browserId` to control existing pages.
+- **[Firefox Provider](https://github.com/mearlhq/provider-firefox)**: attach to Firefox with a local WebDriver BiDi port. No extension is required. It lives in its own repository and, once published, installs with `npx @mearl/setup provider install @mearl/provider-firefox`.
 - **Remote browser or device**: install and configure the corresponding Provider. Available actions depend on its declared capabilities.
 
 See the [CLI / SDK documentation](packages/client/README.en.md) for connections, permissions, and supported capabilities. Setup prepares local tools; complete extension installation and environment connection for your selected route.

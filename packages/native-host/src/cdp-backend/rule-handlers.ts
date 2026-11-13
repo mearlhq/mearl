@@ -1,6 +1,11 @@
 /** CDP request-header rules, scoped to the current browser control session. */
 
-import type { AddRuleParams, RulesResult, SetRuleParams } from '@mearl/browser-core';
+import {
+  compileHeaderRule,
+  type AddRuleParams,
+  type RulesResult,
+  type SetRuleParams,
+} from '@mearl/browser-core';
 import { registerActions } from './action-registry.js';
 import type { CdpSession, PageSession } from './cdp-session.js';
 import {
@@ -8,9 +13,6 @@ import {
   unregisterCdpFetchPauseHandler,
   type CdpFetchPauseContext,
 } from './fetch-interceptor.js';
-
-const RESOURCE_TYPES = new Set(['main_frame', 'sub_frame', 'xmlhttprequest']);
-const HEADER_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
 
 interface HeaderRule {
   ruleId: number;
@@ -41,62 +43,7 @@ interface RuleState {
 const stores = new WeakMap<CdpSession, RuleState>();
 
 function validateRule(data: AddRuleParams): Omit<HeaderRule, 'ruleId' | 'enabled'> {
-  if (data?.actionType !== 'modifyHeaders') {
-    throw new Error('CDP set_rule supports modifyHeaders request headers only');
-  }
-  if (typeof data.filter !== 'string' || !data.filter.trim() || data.filter.length > 2048) {
-    throw new Error('CDP set_rule requires a non-empty regex filter (max 2048 characters)');
-  }
-  let regex: RegExp;
-  try {
-    regex = new RegExp(data.filter);
-  } catch {
-    throw new Error('CDP set_rule filter is not a valid regex');
-  }
-  if (data.responseHeaders?.length || data.initiatorDomains) {
-    throw new Error('CDP set_rule does not support responseHeaders or initiatorDomains');
-  }
-  if (!Array.isArray(data.requestHeaders) || data.requestHeaders.length === 0) {
-    throw new Error('CDP set_rule requires requestHeaders');
-  }
-  const requestHeaders = data.requestHeaders.map(header => {
-    if (
-      !header ||
-      typeof header.header !== 'string' ||
-      !HEADER_NAME.test(header.header) ||
-      header.operation !== 'set' ||
-      typeof header.value !== 'string' ||
-      /[\r\n\0]/.test(header.value)
-    ) {
-      throw new Error(
-        'CDP set_rule supports request header set operations with valid names and values',
-      );
-    }
-    return { header: header.header, operation: 'set' as const, value: header.value };
-  });
-  const resourceTypes = data.resourceTypes ?? ['main_frame', 'sub_frame', 'xmlhttprequest'];
-  if (
-    !Array.isArray(resourceTypes) ||
-    resourceTypes.length === 0 ||
-    resourceTypes.some(type => !RESOURCE_TYPES.has(type))
-  ) {
-    throw new Error(
-      'CDP set_rule supports main_frame, sub_frame, and xmlhttprequest resource types',
-    );
-  }
-  const priority = data.priority ?? 1;
-  if (!Number.isInteger(priority) || priority < 1) {
-    throw new Error('CDP set_rule priority must be a positive integer');
-  }
-  return {
-    actionType: 'modifyHeaders',
-    filter: data.filter,
-    regex,
-    requestHeaders,
-    resourceTypes: [...resourceTypes],
-    priority,
-    description: data.description ?? 'Rule added via MCP/Skill',
-  };
+  return compileHeaderRule(data, 'CDP set_rule');
 }
 
 function matchesResourceType(

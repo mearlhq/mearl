@@ -185,6 +185,25 @@ describe('Mearl control over ordinary Provider actions', () => {
     ).rejects.toThrow('not negotiated');
     expect(request).not.toHaveBeenCalled();
   });
+  it('forwards native dialog presses when the Provider negotiates them', async () => {
+    const { service, browser, request } = fixture();
+    browser.capabilities!.nativeDialogs = true;
+    browser.capabilities!.actions.push('page_press');
+    await expect(
+      service.invoke(browser.browserId, 'page_press', {
+        tabId: 7,
+        key: 'Enter',
+        dialogId: 'dialog',
+      }),
+    ).resolves.toMatchObject({ tabId: 7 });
+    expect(request).toHaveBeenCalledWith(
+      browser,
+      'page_press',
+      expect.objectContaining({ dialogId: 'dialog' }),
+      'local',
+      undefined,
+    );
+  });
   it('describes a Provider from its advertised actions without inventing App support or dispatching a page action', async () => {
     const { service, browser, request } = fixture();
     const result = await service.invoke(browser.browserId, 'get_capabilities');

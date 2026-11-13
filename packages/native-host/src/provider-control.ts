@@ -177,12 +177,12 @@ export class ProviderControlService {
     const nativeDialogPress = (action: string, payload: any) =>
       action === 'page_press' &&
       (payload?.dialogId !== undefined || payload?.promptText !== undefined);
-    if (
+    const nativeDialogsRequested =
       nativeDialogPress(action, data) ||
       (action === 'run_actions' &&
         Array.isArray(data?.actions) &&
-        data.actions.some((step: any) => nativeDialogPress(step?.action, step?.data)))
-    ) {
+        data.actions.some((step: any) => nativeDialogPress(step?.action, step?.data)));
+    if (nativeDialogsRequested && browser.capabilities?.nativeDialogs !== true) {
       throw new Error(
         'Provider native dialog handling is not negotiated. Use the built-in CDP or extension transport.',
       );
