@@ -479,6 +479,11 @@ function validateDefinition(definition: BrowserProviderDefinition): void {
   }
   if (!definition.browserType.name?.trim())
     throw new Error('provider browser type name is required');
+  if (
+    definition.browserType.openOperation !== undefined &&
+    !['launch', 'attach'].includes(definition.browserType.openOperation)
+  )
+    throw new Error('Provider browser open operation is invalid');
   if (!isOptionalProviderLocales(definition.browserType.locales, ['name']))
     throw new Error('Provider browser type locales are invalid');
   if (

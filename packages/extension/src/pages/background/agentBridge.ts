@@ -1096,7 +1096,7 @@ export class AgentBridge {
         );
       case '__page_record_status':
         return { active: hasPageRecording(data.recordingId) };
-      case 'browser_release':
+      case '__control_release':
         return handleBrowserRelease();
       case 'request_permission':
         return handleRequestPermission(data);

@@ -11,7 +11,13 @@ import { browserConnectionIdentity, listRegisteredBrowsers } from './browser-reg
 import { requestBrowserSocket } from './browser-socket-request.js';
 import { ProviderControlService } from './provider-control.js';
 import { ProviderEnhancementService } from './provider-enhancements.js';
-import { BROWSER_ENHANCEMENT_PROTOCOL_VERSION, BROWSER_ENHANCEMENT_NAVIGATION_ORIGIN_VERSION, BROWSER_ENHANCEMENT_PREPARATION_VERSION, BROWSER_ENHANCEMENT_HOST_ENVIRONMENT_VERSION, PROVIDER_APP_RESOURCE_PROTOCOL_VERSION } from '@mearl/browser-core';
+import {
+  BROWSER_ENHANCEMENT_PROTOCOL_VERSION,
+  BROWSER_ENHANCEMENT_NAVIGATION_ORIGIN_VERSION,
+  BROWSER_ENHANCEMENT_PREPARATION_VERSION,
+  BROWSER_ENHANCEMENT_HOST_ENVIRONMENT_VERSION,
+  PROVIDER_APP_RESOURCE_PROTOCOL_VERSION,
+} from '@mearl/browser-core';
 import { acceptedAppResources, ProviderAppResourceService } from './provider-app-resources.js';
 import { Utf8LineBuffer } from './socketLines.js';
 import { NATIVE_HOST_VERSION } from './version.js';
@@ -64,26 +70,53 @@ export async function runProviderControlHost(token: string): Promise<void> {
   });
   const enhancements = new ProviderEnhancementService({
     browsers: listRegisteredBrowsers,
-    request: (browser, action, data, deadline) => requestBrowserSocket(
-      browser.socketPath, action, data, NATIVE_HOST_VERSION,
-      providerRequestTimeoutMs(action, data, deadline), browser.providerBrowserId,
-      undefined, { deadline },
-    ),
-    enhance: (browser, provider, data, deadline, providerTabId) => requestBrowserSocket(
-      browser.socketPath, '__provider_enhancement', data, NATIVE_HOST_VERSION,
-      providerRequestTimeoutMs(data.operation === 'invoke' ? data.action : 'page_frames', data, deadline),
-      undefined, undefined, {
-        providerTarget: provider.browserId, providerControlToken: token,
-        providerSourceIdentity: browserConnectionIdentity(provider), providerPageId: providerTabId,
-        deadline,
-      },
-    ),
+    request: (browser, action, data, deadline) =>
+      requestBrowserSocket(
+        browser.socketPath,
+        action,
+        data,
+        NATIVE_HOST_VERSION,
+        providerRequestTimeoutMs(action, data, deadline),
+        browser.providerBrowserId,
+        undefined,
+        { deadline },
+      ),
+    enhance: (browser, provider, data, deadline, providerTabId) =>
+      requestBrowserSocket(
+        browser.socketPath,
+        '__provider_enhancement',
+        data,
+        NATIVE_HOST_VERSION,
+        providerRequestTimeoutMs(
+          data.operation === 'invoke' ? data.action : 'page_frames',
+          data,
+          deadline,
+        ),
+        undefined,
+        undefined,
+        {
+          providerTarget: provider.browserId,
+          providerControlToken: token,
+          providerSourceIdentity: browserConnectionIdentity(provider),
+          providerPageId: providerTabId,
+          deadline,
+        },
+      ),
   });
   const appResources = new ProviderAppResourceService({
     browsers: listRegisteredBrowsers,
     snapshot: acceptedAppResources,
-    verify: (browser, tabId, deadline) => requestBrowserSocket(browser.socketPath, '__provider_enhancement_target', { tabId }, NATIVE_HOST_VERSION,
-      providerRequestTimeoutMs('page_frames', {}, deadline), browser.providerBrowserId, undefined, { deadline }),
+    verify: (browser, tabId, deadline) =>
+      requestBrowserSocket(
+        browser.socketPath,
+        '__provider_enhancement_target',
+        { tabId },
+        NATIVE_HOST_VERSION,
+        providerRequestTimeoutMs('page_frames', {}, deadline),
+        browser.providerBrowserId,
+        undefined,
+        { deadline },
+      ),
   });
   const server = net.createServer(socket => {
     connections.add(socket);
@@ -107,14 +140,27 @@ export async function runProviderControlHost(token: string): Promise<void> {
       let result: unknown;
       if (request.action === '__control_session_resolve') {
         result = { session: service.find(data.sessionId) ?? null };
+      } else if (request.action === 'session_list') {
+        if (request.controlSessionId !== undefined)
+          throw new Error('session_list does not accept a session override');
+        result = { sessions: service.list() };
       } else if (request.action === '__provider_enhancement') {
-        if (typeof request.providerTarget !== 'string' || request.controlSessionId !== undefined ||
-          (request.transport !== undefined && request.transport !== 'provider'))
-          throw new Error('Provider enhancements require an external browser without a Mearl session');
+        if (
+          typeof request.providerTarget !== 'string' ||
+          request.controlSessionId !== undefined ||
+          (request.transport !== undefined && request.transport !== 'provider')
+        )
+          throw new Error(
+            'Provider enhancements require an external browser without a Mearl session',
+          );
         result = await enhancements.invoke(request.providerTarget, data, request.deadline);
       } else if (request.action === '__provider_app_resources') {
-        if (typeof request.providerTarget !== 'string' || request.controlSource !== 'local' || request.controlSessionId !== undefined ||
-          (request.transport !== undefined && request.transport !== 'provider'))
+        if (
+          typeof request.providerTarget !== 'string' ||
+          request.controlSource !== 'local' ||
+          request.controlSessionId !== undefined ||
+          (request.transport !== undefined && request.transport !== 'provider')
+        )
           throw new Error('App resources require a local external browser without a Mearl session');
         result = await appResources.invoke(request.providerTarget, data, request.deadline);
       } else if (request.action === 'browser_sessions') {

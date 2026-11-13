@@ -17,17 +17,17 @@ describe('native CDP composite handlers', () => {
     );
   });
 
-  it('rejects browser_release inside a composite action', async () => {
+  it('rejects browser_manage inside a composite action', async () => {
     await expect(
       cdpRunActions({} as any, {
         tabId: 7,
-        actions: [{ action: 'browser_release' }],
+        actions: [{ action: 'browser_manage', data: { operation: 'release' } } as any],
       }),
     ).resolves.toEqual(
       expect.objectContaining({
         completedSteps: 0,
         failedStep: 0,
-        error: 'Step 0: browser-level action "browser_release" is not allowed in run_actions',
+        error: 'Step 0: unsupported action "browser_manage"',
       }),
     );
   });

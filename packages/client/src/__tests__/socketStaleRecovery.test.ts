@@ -21,7 +21,7 @@ vi.mock('../browserRegistry.js', () => ({
   describeBrowser: vi.fn(),
 }));
 
-import { invoke, invokeLocalHost, setDefaultBrowser, SOCKET_PATH } from '../socket.js';
+import { invokeLocalHost, setDefaultBrowser, SOCKET_PATH } from '../socket.js';
 import { listLiveBrowsers } from '../browserRegistry.js';
 
 interface MockSocket extends EventEmitter {
@@ -110,7 +110,7 @@ describe('stale legacy socket recovery', () => {
       } as fs.Stats);
       const unlinkSpy = vi.spyOn(fs, 'unlinkSync').mockImplementation(() => undefined);
 
-      const resultPromise = invoke('tab_list');
+      const resultPromise = invokeLocalHost('preset_components_install');
       await vi.runAllTimersAsync();
 
       await expect(resultPromise).resolves.toEqual({ tabs: [] });
@@ -142,7 +142,7 @@ describe('stale legacy socket recovery', () => {
         } as fs.Stats);
       const unlinkSpy = vi.spyOn(fs, 'unlinkSync').mockImplementation(() => undefined);
 
-      const resultPromise = invoke('tab_list');
+      const resultPromise = invokeLocalHost('preset_components_install');
       await vi.runAllTimersAsync();
 
       await expect(resultPromise).resolves.toEqual({ tabs: [] });

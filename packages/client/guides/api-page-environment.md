@@ -10,7 +10,7 @@
 
 scale 只改变视觉比例，不改变页面读取的视口或 DPR。预设的真实生效方向、尺寸、UA 和触摸能力以设置响应为准；折叠设备可能按自然方向归一化，不自行按 ID 推断方向。旧预设仍保留原尺寸与 UA。
 
-设备外壳开启/移除需要重载。任务会话用 `browser_release --session <sessionId>` 收尾，默认保留设备与 App 模拟；明确需要清理时传 `preserveEnvironment=false`。不带会话的浏览器级 release 会清理依赖调试连接的模拟，关闭 Tab 后该 Tab 的配置失效。任务只要求切换配置时，成功响应足够；要求查看页面效果时再做快照/截图。
+设备外壳开启/移除需要重载。任务会话用 `session_manage --session <sessionId> --payload '{"operation":"end"}'` 收尾，默认保留设备与 App 模拟；明确需要清理时传 `preserveEnvironment=false`。不带会话的浏览器级 release 会清理依赖调试连接的模拟，关闭 Tab 后该 Tab 的配置失效。任务只要求切换配置时，成功响应足够；要求查看页面效果时再做快照/截图。
 
 ## App 与设备联动
 

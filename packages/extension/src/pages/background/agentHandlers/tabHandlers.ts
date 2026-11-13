@@ -132,7 +132,7 @@ export async function removeCollectingTab(tabId: number): Promise<void> {
   try {
     await updateCollectDnrRule();
   } catch (error) {
-    // 保留待清理标记，让后续 browser_release 能再次尝试同步 DNR 规则。
+    // 保留待清理标记，让后续 释放浏览器控制 能再次尝试同步 DNR 规则。
     collectingTabIds.add(tabId);
     throw error;
   }

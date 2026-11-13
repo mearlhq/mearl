@@ -585,6 +585,7 @@ describe('BrowserManager', () => {
     fireEvent.click(screen.getByRole('button', { name: 'browserManagerAdd' }));
     await waitFor(() =>
       expect(managerMocks.request).toHaveBeenCalledWith('launch', {
+        operation: 'launch',
         provider: 'resource-fixture',
         providerOptions: { attached: true },
       }),
@@ -613,6 +614,7 @@ describe('BrowserManager', () => {
     fireEvent.click(screen.getByRole('button', { name: 'browserManagerAdd' }));
     await waitFor(() =>
       expect(managerMocks.request).toHaveBeenCalledWith('launch', {
+        operation: 'launch',
         provider: 'resource-fixture',
         providerOptions: { region: 'two', resource: 'free-two' },
       }),
@@ -1019,6 +1021,7 @@ describe('BrowserManager', () => {
 
     await waitFor(() =>
       expect(managerMocks.request).toHaveBeenCalledWith('launch', {
+        operation: 'launch',
         provider: 'example-device',
         providerOptions: { debugId: 'my_device' },
       }),
@@ -1083,6 +1086,7 @@ describe('BrowserManager', () => {
 
     await waitFor(() =>
       expect(managerMocks.request).toHaveBeenCalledWith('launch', {
+        operation: 'launch',
         provider: 'fixture',
         providerOptions: {
           enabled: true,
@@ -1156,6 +1160,7 @@ describe('BrowserManager', () => {
 
     await waitFor(() =>
       expect(managerMocks.request).toHaveBeenCalledWith('launch', {
+        operation: 'launch',
         provider: 'second',
         providerOptions: { secondCode: 'second-value' },
       }),
@@ -1241,6 +1246,7 @@ describe('BrowserManager', () => {
 
     await waitFor(() =>
       expect(managerMocks.request).toHaveBeenCalledWith('launch', {
+        operation: 'launch',
         provider: 'example-cloud',
         providerOptions: {
           sessionId: 'session-123',
@@ -1463,6 +1469,7 @@ describe('BrowserManager', () => {
 
     await waitFor(() =>
       expect(managerMocks.request).toHaveBeenCalledWith('launch', {
+        operation: 'launch',
         provider: 'local',
         providerOptions: { name: 'local-visible', persistent: false, headless: false },
       }),
@@ -1479,6 +1486,7 @@ describe('BrowserManager', () => {
 
     await waitFor(() =>
       expect(managerMocks.request).toHaveBeenCalledWith('launch', {
+        operation: 'launch',
         provider: 'local',
         providerOptions: {
           name: expect.stringMatching(/^local-[a-z0-9]{6}$/),
@@ -1539,6 +1547,7 @@ describe('BrowserManager', () => {
     expect(accountMocks.withAutoLogin).toHaveBeenCalled();
     await waitFor(() =>
       expect(managerMocks.request).toHaveBeenCalledWith('launch', {
+        operation: 'launch',
         provider: 'local',
         providerOptions: {
           name: expect.stringMatching(/^qa-account-[a-z0-9]{6}$/),
@@ -1628,6 +1637,7 @@ describe('BrowserManager', () => {
 
     await waitFor(() =>
       expect(managerMocks.request).toHaveBeenCalledWith('launch', {
+        operation: 'launch',
         provider: 'local',
         providerOptions: {
           name: 'local-with-login',

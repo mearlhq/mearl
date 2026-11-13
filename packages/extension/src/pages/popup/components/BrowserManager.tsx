@@ -1830,6 +1830,9 @@ export function BrowserManager({
       const { provider, providerOptions, ...options } = params;
       const launchOptions = (providerOptions ?? options) as Record<string, BrowserJsonValue>;
       await requestBrowserManager('launch', {
+        operation:
+          providers.find(item => item.provider.id === provider)?.browserType.openOperation ??
+          'launch',
         provider: provider ?? 'local',
         providerOptions: launchOptions,
       });

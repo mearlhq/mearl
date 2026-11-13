@@ -78,12 +78,12 @@ npx @mearl/setup update --local
 mearl <action> --help
 
 # Launch isolated headless Chrome instances
-mearl browser_launch --payload '{"name":"browser-a","url":"https://example.com"}'
-mearl browser_launch --payload '{"name":"browser-b","persistent":true}'
-mearl browser_launch --payload '{"name":"cookie-copy","copyCookieDomains":["example.com"]}'
-mearl browser_launch --payload '{"name":"figma","userAgentMode":"desktop","copyCookieDomains":["figma.com"]}'
+mearl browser_manage --payload '{"operation":"launch","name":"browser-a","url":"https://example.com"}'
+mearl browser_manage --payload '{"operation":"launch","name":"browser-b","persistent":true}'
+mearl browser_manage --payload '{"operation":"launch","name":"cookie-copy","copyCookieDomains":["example.com"]}'
+mearl browser_manage --payload '{"operation":"launch","name":"figma","userAgentMode":"desktop","copyCookieDomains":["figma.com"]}'
 mearl browser_list
-mearl browser_release
+mearl browser_manage --payload '{"operation":"release"}'
 ```
 
 ### Agent scripts
@@ -139,7 +139,7 @@ Browser APIs and plugin calls inherit script `--browser`, `--session`, `--connec
 individual `options` may override them. `--server` selects cloud-server. After `--session new` establishes a session,
 later calls use its returned ID automatically; `mearl.session` and CLI stderr report session information.
 First await a session-establishing browser call before concurrency or Skill commands. Script completion disconnects SDK connections but retains control sessions;
-explicitly call `mearl.browserRelease` according to task lifetime. JavaScript variables reset each round; continue with returned `sessionId` and `tabId`.
+explicitly call `mearl.sessionManage({ operation: "end", sessionId })` to end the session. JavaScript variables reset each round; continue with returned `sessionId` and `tabId`.
 
 Scripts run in separate Node.js processes inheriting caller cwd/environment with host Node.js permissions;
 they are not security sandboxes. Load modules through dynamic imports such as `await import('node:fs/promises')`.
@@ -159,9 +159,9 @@ It supports `signal` cancellation and `executionTimeoutSec`, sharing executors w
 
 ### Control sessions and files
 
-Use `mearl browser_control --browser '<browserId>' --payload '{"operation":"handoff"}'` for handoff and `resume` for return. Ordinary browsers automatically select their sole unfinished session; use `tabId` or `--session` when multiple sessions exist. No matching session returns an error. Ego manages its task through its Space without an additional session parameter.
+Use `session_list` to find control sessions. Use `session_manage` with `handoff` or `resume` and pass `--session <sessionId>` or a payload `sessionId`. For external Providers such as Ego, select the task with `--browser`.
 
-For multi-step tasks, use `--session new` on the first `tab_open` or `page_snapshot`. The response adds `session` alongside ordinary results; later `sessionId` routes automatically without separate creation/query actions. Sessions bind one browser/transport and associate pages on first use, tracking reused and created pages separately. One session controls a page at a time; sessionless calls cannot bypass ownership. Sessions do not isolate Cookies/storage.
+Use `session_manage --browser <browserId> --payload '{"operation":"new"}'` to create an empty session, or pass `--session new` on the first `tab_open`, `page_snapshot`, or `page_screenshot`. Use the returned `sessionId` for subsequent calls.
 
 `sessionId` is a short ID such as `s_aB3d_E-f`. The resident control host keeps sessions/browser/transport mappings in memory. New CLI processes internally query local/remote hosts for routing, without caller-managed routing or mapping files. Control-host exit invalidates sessions.
 
@@ -170,13 +170,13 @@ Calls may omit `--session`; existing actions, `run_actions`, and upload `filePat
 ```bash
 mearl tab_open --session new --payload '{"url":"https://example.com"}'
 mearl page_snapshot --session '<sessionId>' --payload '{"tabId":12345}'
-mearl browser_control --session '<sessionId>' --payload '{"operation":"handoff","reason":"Please scan the QR code"}'
+mearl session_manage --session '<sessionId>' --payload '{"operation":"handoff","reason":"Please scan the QR code"}'
 mearl page_download --session '<sessionId>' --payload '{"tabId":12345,"trigger":{"selector":"#export"}}' --output /absolute/path/report.csv
 mearl page_upload --session '<sessionId>' --payload '{"tabId":12345,"selector":"input[type=file]","files":[{"filePath":"/absolute/path/report.csv"}]}'
-mearl browser_release --session '<sessionId>' --payload '{"closeCreatedTabs":true,"keepTabIds":[12345]}'
+mearl session_manage --session '<sessionId>' --payload '{"operation":"end","closeCreatedTabs":true,"keepTabIds":[12345]}'
 ```
 
-Users take over, return, or end sessions in Popup browser management. Handoff stops queued stale requests and later batch steps; dispatched actions may still apply. Take a fresh snapshot after return. CDP-only environments can use the same `browser_control` with `operation:"resume"` after explicit user confirmation. Sessions survive CLI connections, expire on host exit, and are not idle-cleaned while users work.
+Users take over, return, or end sessions in Popup browser management. Handoff stops queued stale requests and later batch steps; dispatched actions may still apply. Take a fresh snapshot after return. CDP-only environments can use the same `session_manage` with `operation:"resume"` after explicit user confirmation. Sessions survive CLI connections, expire on host exit, and are not idle-cleaned while users work.
 
 New extension background tabs join a collapsed `Mearl` group; foreground tabs join the expanded `Mearl · 待操作` group. Both reuse one existing window and merge same-name managed groups. Subsequent opened tabs enter that window and inherit source-group expansion. Closing the work window selects another existing window without creating one. Explicit `tab_open.group` overrides grouping; reused ordinary pages retain windows/groups. Handoff moves only managed session pages into the pending group; return moves those still pending into `Mearl`. Groups remain expanded if users view other grouped pages or the window has no other visible page.
 
@@ -198,7 +198,7 @@ npx @mearl/setup provider install @example/mearl-provider-device
 mearl example-device --help
 
 # Provider launch arguments use providerOptions
-mearl browser_launch --payload '{"provider":"example-device","providerOptions":{}}'
+mearl browser_manage --payload '{"operation":"launch","provider":"example-device","providerOptions":{}}'
 mearl browser_list
 
 # Use global Browser IDs returned by browser_list for later operations
@@ -209,9 +209,9 @@ npx @mearl/setup provider update example-device
 npx @mearl/setup provider uninstall example-device
 ```
 
-Creating a `pairing` instance with `browser_launch` returns `pairing.url` and an optional pairing code. Agents should render the URL directly as
+Creating a `pairing` instance with `browser_manage` returns `pairing.url` and an optional pairing code. Agents should render the URL directly as
 a QR code, then confirm the same Browser ID becomes `connected` before page operations. Until the device connects,
-it cannot become the default target. Use `browser_close` to delete the Provider instance. Each Provider
+it cannot become the default target. Use `browser_manage close` to delete the Provider instance. Each Provider
 receives only explicitly supported actions; screenshot support distinguishes native captures, reconstructed images, and unsupported.
 
 Unknown or misspelled actions return up to three candidates and examples based on available commands/common aliases,
@@ -230,7 +230,7 @@ without connecting to browsers or executing suggestions. For example, `mearl tab
 
 CLI, SDK, and MCP share return structures. Snapshot `@eN` refs are directly actionable; internal mappings remain runtime-local.
 Ordinary `session` includes session ID, browser, transport, state, and generation. Query tabs with `tab_list`;
-`browser_control` handoff for ordinary sessions also returns session `tabs`. External Providers omit `session` and return `{ controlSessionMode: "external", operation, control }`; supported Providers accept `operation: "finish"` with `keepTabIds` to finish a task while retaining result pages. `run_actions` steps preserve individual action results.
+`session_manage` handoff for ordinary sessions also returns session `tabs`. External Providers omit `session` and return `{ controlSessionMode: "external", operation, control }`; supported Providers accept `operation: "end"` with `keepTabIds` to finish a task while retaining result pages. `run_actions` steps preserve individual action results.
 stdout defaults to compact JSON in pipes/redirection and pretty output in interactive terminals. `--compact` forces compact layout without changing values. Snapshots collapse unnamed, stateless groups without refs while preserving control states and text.
 
 With nonempty `fields`, `get_requests` omits request/response bodies by default, returning extracted fields and metadata;
@@ -250,7 +250,7 @@ Mearl aggregates local and configured cloud-server browsers by default, routing 
 | `--local` | Current machine only |
 | `--server <url>` | Override the automatically read cloud-server URL |
 
-`browser_list --help` and `browser_launch --help` show scenario-specific host options. For connection/transport troubleshooting, use
+`browser_list --help` and `browser_manage --help` show scenario-specific host options. For connection/transport troubleshooting, use
 `mearl check --help`. `mearl check` checks connection/browser status. `mearl check --updates` also concurrently queries
 latest client, native-host, cloud-connector, and extension releases. Release queries wait about 1.5 seconds at most;
 unreachable sources report unconfirmed updates without affecting browser checks. `--json` returns machine-readable results,
@@ -469,11 +469,12 @@ Node plugins execute on the CLI/SDK/MCP Server host, never forwarded with browse
 | Page runtimes | `page_runtime` (internal document adapter; plugins use `app.page`) |
 | Composition | `run_actions` |
 | Environment and Cookies | `set_device_emulation` `set_app_profile` `set_timezone` `get_cookie` `set_cookie` |
-| Browsers | `browser_list` `browser_launch` `browser_release` `browser_close` |
+| Browsers | `browser_list` `browser_manage` |
+| Control sessions | `session_list` `session_manage` |
 
 Interactive actions (`page_click` / `page_drag` / `page_type` / `page_hover` / `page_scroll` / `page_press` / `page_upload`) wait for asynchronous stability by default and return `{ action, observation }`. Pre-dispatch argument/ref/target failures return `action.stage: "precondition"`, omitting meaningless observation/diagnostics. Potentially dispatched input with confirmation timeout returns `action.stage: "dispatch-uncertain"` and observations for reconciliation. Known targets, hits, coordinates, dispatch modes, and input sequences appear in `action.attempt` as diagnostic evidence, not proof of effect. CLI failures exit 1. `observe: false` performs bare actions; `diagnostics: true` collects new error logs/business requests during the action, with analytics optionally enabled through `diagnostics.events`. `page_eval` defaults to bare execution and permits observation/diagnostics.
 
-`tab_open active:true` requests activation. Extension do-not-disturb defaults on: HTTP(S) pages get background-focus emulation before first navigation without switching tabs/windows. Disabling it activates/restores windows. `activation.mode` distinguishes `background` / `foreground`; emulated visibilityState does not prove foreground. Handoff, release, and disconnect disable focus emulation regardless of preserveEnvironment. After return, reactivate the same URL with `reuse:"require", active:true` if needed. Sessionless tasks finish with browser_release. Pure CDP/external Providers follow their own activation support. Stability observation waits for bounded-duration CSS animations within budget. Selector/ref clicks first scroll targets clipped by nested containers, failing explicitly only if still clipped.
+`tab_open active:true` requests activation. Extension do-not-disturb defaults on: HTTP(S) pages get background-focus emulation before first navigation without switching tabs/windows. Disabling it activates/restores windows. `activation.mode` distinguishes `background` / `foreground`; emulated visibilityState does not prove foreground. Handoff, release, and disconnect disable focus emulation regardless of preserveEnvironment. After return, reactivate the same URL with `reuse:"require", active:true` if needed. Sessionless tasks finish with browser_manage release. Pure CDP/external Providers follow their own activation support. Stability observation waits for bounded-duration CSS animations within budget. Selector/ref clicks first scroll targets clipped by nested containers, failing explicitly only if still clipped.
 
 In extension mode, `tab_open` with `appProfile` applies the App environment. Set `emulation.deviceShell` to `true` for the simulated WebView and system bars. On supported fixed devices with a single WebView, the extension applies the saved **Phone frame** preference from Quick Settings. Agent page actions target the active business WebView.
 
@@ -493,17 +494,17 @@ Disambiguate repeated text through `page_click.scope` CSS/ref subtrees. Extensio
 
 `browser_list` lists ordinary, Provider, and managed browsers. `type` distinguishes
 `regular` / `managed`; `status` distinguishes `connected` / `pairing` / `running_disconnected` /
-`stopped`. Ordinary browser actions require a connected browser. To attach to a running browser with remote debugging enabled, use the CDP Provider.
+`stopped`. Ordinary browser actions require a connected browser. If neither an extension nor a CDP browser is connected locally, `browser_list` uses the CDP Provider to discover the default Chrome instance with remote debugging enabled. Browser commands also try discovery when no target is available. Use the following command to attach explicitly.
 
 ```bash
-mearl browser_launch --local --payload '{"provider":"cdp","providerOptions":{}}'
+mearl browser_manage --local --payload '{"operation":"attach","provider":"cdp","providerOptions":{}}'
 ```
 
 Set `providerOptions.port` to use a specific debugging port. Pass the returned `browserId` to `check --browser` or page actions. With `MEARL_SOCKET_PATH`, inventory requests use that instance socket.
 
-Call `browser_release` only on explicit user requests to end debugging, detach, or clean session resources. It releases
-debugger/CDP control and temporary session state while keeping browsers/tabs. Providers declare managed-instance launch, close, persistence,
-access, and sign-in synchronization semantics; run `mearl <providerId>`. Access URLs are excluded from
+`browser_manage` with `release` clears debugger/CDP control and temporary state while keeping the browser attached.
+Use `detach` to disconnect while leaving the browser and its tabs running.
+Run `mearl <providerId>` for the Provider’s lifecycle and sign-in options. Access URLs are excluded from
 `browser_list`; explicitly run `mearl check --browser <id|name>` when needed and treat returned
 `browserAccess.url` as sensitive.
 

@@ -259,6 +259,11 @@ function isProviderBrowserType(value: unknown): value is ProviderPackageMetadata
   if (!value || typeof value !== 'object') return false;
   const browserType = value as Partial<ProviderPackageMetadata['browserType']>;
   if (typeof browserType.name !== 'string' || !browserType.name.trim()) return false;
+  if (
+    browserType.openOperation !== undefined &&
+    !['launch', 'attach'].includes(browserType.openOperation)
+  )
+    return false;
   if (!isOptionalProviderLocales(browserType.locales, ['name'])) return false;
   if (
     browserType.controlSessionModes !== undefined &&

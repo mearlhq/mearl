@@ -47,8 +47,11 @@ export function resolveActionTimeoutSec(
   }
   if (action === 'tab_open') return Math.max(fallback, 40);
   if (action === 'set_cookie' && data.reload === true) return Math.max(fallback, 40);
-  if (action === 'browser_launch') return Math.max(fallback, 90);
-  if (action === 'browser_close') return Math.max(fallback, BROWSER_CLOSE_TIMEOUT_SEC);
+  if (action === 'browser_manage') {
+    if (data.operation === 'launch' || data.operation === 'attach') return Math.max(fallback, 90);
+    if (data.operation === 'close' || data.operation === 'detach')
+      return Math.max(fallback, BROWSER_CLOSE_TIMEOUT_SEC);
+  }
   if (action === 'run_actions') {
     const actions = Array.isArray(data.actions) ? data.actions : [{}];
     const timeoutSec = actions.reduce((total: number, step: Record<string, any>) => {

@@ -19,7 +19,7 @@ describe('internal extension action boundary', () => {
     expect(isPrivateExtensionAction('browser_instances')).toBe(true);
     expect(isPrivateExtensionAction('browser_providers')).toBe(true);
     expect(isPrivateExtensionAction('__prepare_send_request')).toBe(false);
-    expect(isPrivateExtensionAction('browser_launch')).toBe(false);
+    expect(isPrivateExtensionAction('browser_manage')).toBe(false);
     expect(isPrivateExtensionAction('__unknown')).toBe(false);
   });
 
@@ -31,7 +31,7 @@ describe('internal extension action boundary', () => {
     expect(isPrivateExtensionAction(null)).toBe(false);
   });
 
-  it.each(['browser_list', 'browser_launch', 'browser_close', 'browser_release'])(
+  it.each(['browser_list', 'browser_manage', 'browser_close', 'browser_manage release'])(
     'keeps the public browser action %s available to clients',
     action => {
       expect(isPrivateExtensionAction(action)).toBe(false);

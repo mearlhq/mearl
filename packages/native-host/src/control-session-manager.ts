@@ -4,6 +4,7 @@ import {
   type BrowserReleaseParams,
   type ControlSessionInfo,
   type PageDownloadParams,
+  type SessionManageParams,
 } from '@mearl/browser-core';
 import { assertBrowserRequestDeadline, ControlSessionRegistry } from './control-session.js';
 import { BrowserArtifactStore } from './browser-artifacts.js';
@@ -94,8 +95,7 @@ export class ControlSessionManager {
     reason?: string,
   ): Promise<ControlSessionInfo> {
     if (operation === 'release') {
-      await this.invoke('browser_release', {}, id);
-      return this.registry.info(id);
+      return this.endSession(id);
     }
     if (operation === 'resume') await this.activityQueues.get(id)?.catch(() => {});
     const current = this.registry.info(id);
@@ -125,6 +125,58 @@ export class ControlSessionManager {
     return info;
   }
 
+  async manageSession(
+    data: SessionManageParams,
+    sessionId?: string,
+    requestedTransport?: ControlSessionInfo['transport'],
+    deadline?: number,
+  ): Promise<{ session: ControlSessionInfo }> {
+    assertBrowserRequestDeadline(deadline);
+    if (data.operation === 'new') {
+      if (sessionId) throw new Error('session_manage new does not accept a session id');
+      const session = this.registry.create(requestedTransport ?? this.dependencies.transport());
+      this.dependencies.notify();
+      return { session };
+    }
+    if (!sessionId || sessionId === 'new')
+      throw new Error('Specify an existing sessionId or --session <id>');
+    const session = this.registry.info(sessionId);
+    if (requestedTransport && session.transport !== requestedTransport)
+      throw new Error('A session cannot change transport');
+    if (data.operation === 'end') return { session: await this.endSession(sessionId, data) };
+    return {
+      session: await this.userControl(
+        sessionId,
+        data.operation,
+        data.operation === 'handoff' ? data.reason : undefined,
+      ),
+    };
+  }
+
+  async releaseBrowser<T>(release: () => Promise<T>): Promise<T> {
+    return this.registry.releaseBrowser(async () => {
+      await this.recordings?.discard('extension', {});
+      await this.recordings?.discard('cdp', {});
+      return release();
+    });
+  }
+
+  private async endSession(
+    id: string,
+    params: BrowserReleaseParams = {},
+  ): Promise<ControlSessionInfo> {
+    const { transport } = this.registry.info(id);
+    const session = await this.registry.release(id, params, async (tabs, close) => {
+      await this.recordings?.discard(transport, { sessionId: id });
+      await this.recordings?.discard(transport, { tabIds: tabs });
+      await this.dependencies.cleanup(tabs, transport, params.preserveEnvironment !== false);
+      await this.closeTabs(close, transport, id);
+      await this.artifacts.release(id, params.keepArtifactIds);
+    });
+    this.dependencies.notify();
+    return session;
+  }
+
   async invoke(
     action: string,
     data: any,
@@ -142,20 +194,6 @@ export class ControlSessionManager {
     )
       throw new Error('Internal session fields are reserved');
     validateRequiredActionTabId(action, data);
-    if (action === 'browser_control' && sessionId === undefined) {
-      const candidates = this.registry
-        .list()
-        .filter(
-          session => data.tabId === undefined || session.tabs.some(tab => tab.tabId === data.tabId),
-        );
-      if (candidates.length === 0)
-        throw new Error(
-          'CONTROL_SESSION_NOT_FOUND: no control session matches this browser and page',
-        );
-      if (candidates.length > 1)
-        throw new Error('CONTROL_SESSION_AMBIGUOUS: specify --session or tabId to select a task');
-      sessionId = candidates[0].sessionId;
-    }
     const created = sessionId === 'new';
     if (sessionId === 'new') {
       if (!['tab_open', 'page_snapshot', 'page_screenshot'].includes(action))
@@ -168,44 +206,6 @@ export class ControlSessionManager {
     const transport = info?.transport ?? requestedTransport ?? this.dependencies.transport();
     if (requestedTransport && transport !== requestedTransport)
       throw new Error('A session cannot change transport');
-    if (action === 'browser_control') {
-      if (data.keepTabIds !== undefined)
-        throw new Error('keepTabIds is only supported by external Provider finish');
-      if (!sessionId || !['handoff', 'resume'].includes(data.operation))
-        throw new Error('browser_control supports handoff/resume for this browser');
-      if (data.tabId !== undefined && !info!.tabs.some(tab => tab.tabId === data.tabId))
-        throw new Error('TAB_NOT_IN_CONTROL_SESSION');
-      if (data.operation === 'resume')
-        return { session: await this.userControl(sessionId, 'resume') };
-      return { session: await this.userControl(sessionId, 'handoff', data.reason) };
-    }
-    if (action === 'browser_release' && sessionId) {
-      const params = data as BrowserReleaseParams;
-      await this.registry.release(sessionId, params, async (tabs, close) => {
-        await this.recordings?.discard(transport, { sessionId });
-        await this.recordings?.discard(transport, { tabIds: tabs });
-        await this.dependencies.cleanup(tabs, transport, params.preserveEnvironment !== false);
-        await this.closeTabs(close, transport, sessionId!);
-        await this.artifacts.release(sessionId!, params.keepArtifactIds);
-      });
-      this.dependencies.notify();
-      return {
-        released: true,
-        hadActiveControl: true,
-        transports: [transport],
-        affectedTabIds: info!.tabs.map(tab => tab.tabId),
-        session: this.registry.state(sessionId),
-      };
-    }
-    if (action === 'browser_release' || action === 'browser_close')
-      this.registry.assertBrowserRelease();
-    if ((action === 'browser_release' || action === 'browser_close') && !sessionId) {
-      return this.registry.releaseBrowser(async () => {
-        await this.recordings?.discard('extension', {});
-        await this.recordings?.discard('cdp', {});
-        return this.dependencies.invoke(action, data, transport);
-      });
-    }
     let recording: ReturnType<PageRecordings['resolve']> | undefined;
     if (action === 'page_record') {
       if (origin !== 'local' || !this.recordings)

@@ -70,6 +70,7 @@ export * from './pluginPages.js';
 export * from './pluginPageRuntime.js';
 export * from './pluginPageHost.js';
 export * from './browserActionProtocol.js';
+export * from './browserManagement.js';
 export * from './cdpRecording.js';
 export * from './browserCapabilities.js';
 export * from './runActions.js';

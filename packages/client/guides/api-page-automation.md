@@ -131,7 +131,7 @@ JS
 
 ## 文件产物与传输
 
-文件中转的单文件上限为 256 MiB。Extension/CDP 支持上传与下载；外部 Provider 按 `capabilities.actions` 声明的 `page_upload`、`page_download` 使用对应能力。无会话产物空闲一小时回收，会话产物默认随 `browser_release --session <sessionId>` 清理，需要保留时传 `keepArtifactIds`。宿主退出清理暂存文件，保存到调用方的结果文件保留。
+文件中转的单文件上限为 256 MiB。Extension/CDP 支持上传与下载；外部 Provider 按 `capabilities.actions` 声明的 `page_upload`、`page_download` 使用对应能力。无会话产物空闲一小时回收，会话产物默认随 `session_manage --session <sessionId> --payload '{"operation":"end"}'` 清理，需要保留时传 `keepArtifactIds`。宿主退出清理暂存文件，保存到调用方的结果文件保留。
 
 ## run_actions
 

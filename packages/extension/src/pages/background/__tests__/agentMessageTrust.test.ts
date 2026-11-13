@@ -9,6 +9,6 @@ describe('agent internal action boundary', () => {
   it('allows native-host trusted internal actions and normal agent actions', () => {
     expect(isAgentActionAllowedByInternalBoundary('__export_cookies', true)).toBe(true);
     expect(isAgentActionAllowedByInternalBoundary('__toolbox_open')).toBe(true);
-    expect(isAgentActionAllowedByInternalBoundary('browser_launch')).toBe(true);
+    expect(isAgentActionAllowedByInternalBoundary('browser_manage')).toBe(true);
   });
 });

@@ -2,6 +2,9 @@ import {
   describeBrowserCapabilities,
   findMatchingTabs,
   parseExternalBrowserControl,
+  parseBrowserManageParams,
+  parseSessionManageParams,
+  resolveSessionManageId,
   type ControlSessionInfo,
 } from '@mearl/browser-core';
 import { ControlSessionManager } from './control-session-manager.js';
@@ -194,10 +197,6 @@ export class ProviderControlService {
         data,
       );
     }
-    if (action === 'browser_release') {
-      action = 'browser_instances';
-      data = { operation: 'detach' };
-    }
     const lifecycle =
       action === 'browser_control'
         ? data.operation
@@ -269,16 +268,57 @@ export class ProviderControlService {
       if (deadline !== undefined) providerRequestTimeoutMs(action, data, deadline);
       this.reap();
       const browser = this.browser(browserId);
-      if (browser.capabilities?.controlSessionMode === 'external' && sessionId !== undefined) {
+      const external = browser.capabilities?.controlSessionMode === 'external';
+      if (external && sessionId !== undefined)
         throw new Error(
-          'CONTROL_SESSION_UNSUPPORTED: this Provider manages task control externally; use browser_control without --session.',
+          'CONTROL_SESSION_UNSUPPORTED: this Provider manages task control externally',
         );
-      }
-      if (browser.capabilities?.controlSessionMode === 'external' && action === 'browser_control') {
-        const params = parseExternalBrowserControl(data);
-        return this.request(browser, action, params, origin);
-      }
       const { manager } = this.getControl(browser);
+      if (action === 'session_manage') {
+        const command = parseSessionManageParams(data);
+        const id = resolveSessionManageId(command, sessionId);
+        if (!external) {
+          if (command.operation === 'new' && browser.status !== 'connected')
+            throw new Error('Provider browser is not connected');
+          return manager.manageSession(command, id, 'provider', deadline);
+        }
+        if (id || command.operation === 'new')
+          throw new Error(
+            'CONTROL_SESSION_UNSUPPORTED: this Provider manages task control externally',
+          );
+        const { operation, ...params } = command;
+        const result = await this.request(
+          browser,
+          'browser_control',
+          parseExternalBrowserControl({
+            ...params,
+            operation: operation === 'end' ? 'finish' : operation,
+          }),
+          origin,
+        );
+        return { ...result, operation };
+      }
+      if (action === 'browser_manage') {
+        if (sessionId !== undefined)
+          throw new Error('browser_manage does not accept a control session');
+        const command = parseBrowserManageParams(data);
+        if (command.operation === 'close')
+          return manager.releaseBrowser(() =>
+            this.request(
+              browser,
+              'browser_close',
+              { deleteProfile: command.deleteProfile },
+              origin,
+            ),
+          );
+        if (command.operation === 'detach')
+          return manager.releaseBrowser(() =>
+            this.request(browser, 'browser_instances', { operation: 'detach' }, origin),
+          );
+        if (command.operation === 'release')
+          return manager.releaseBrowser(() => this.request(browser, 'browser_release', {}, origin));
+        throw new Error(`Provider browser does not support browser_manage ${command.operation}`);
+      }
       if (action === 'get_versions' || action === 'get_browser_access_url')
         return this.request(browser, action, data, origin);
       if (action === 'browser_instances') {
@@ -288,6 +328,8 @@ export class ProviderControlService {
           this.request(browser, action, data, origin, host),
         );
       }
+      if (action === 'browser_release')
+        throw new Error('Use browser_manage with operation "release"');
       return manager.invoke(action, data, sessionId, undefined, origin, deadline);
     });
   }

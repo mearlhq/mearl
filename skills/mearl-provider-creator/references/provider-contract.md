@@ -32,7 +32,7 @@ Provider 包在 `package.json` 的 `mearl.provider` 中声明 `providerId`、名
 }
 ```
 
-`browserType.inputSchema` 描述 `browser_launch.providerOptions`。Provider 自有配置放在 `browserType.configuration.inputSchema`。包含凭据的字段标记 `secret`，敏感值只用于当次调用，不返回到实例列表。
+`browserType.inputSchema` 描述 `browser_manage.providerOptions`。Provider 自有配置放在 `browserType.configuration.inputSchema`。包含凭据的字段标记 `secret`，敏感值只用于当次调用，不返回到实例列表。
 
 runtime 应把 manifest 当作 Provider 元数据的单一事实源。可在一个轻量模块中读取与校验 `package.json#mearl.provider`，再用同一对象填充 descriptor 和 `browserType`；版本也从 package 读取，避免发布时只更新其中一份。构建后的 `entry` 必须能从安装目录独立启动：可以把 `@mearl/provider` runtime 打进单文件产物，也可以声明真实的运行时依赖，但不能只依赖开发工作区的模块提升或源码路径。平台 SDK 可按其分发方式保留为外部依赖。
 
@@ -131,7 +131,7 @@ await publish();
 | 静态 | manifest 和 descriptor 一致，schema、状态、operation 与 capability 通过 Runtime 校验 |
 | 单测 | 创建、列表、快照发布时间、状态转换、拒绝未声明 action、关闭与敏感信息边界 |
 | 包 | typecheck 和 build 通过，发布包包含 manifest 指向的 entry，entry 不依赖开发工作区解析 |
-| 安装（包已在可访问注册源时） | `mearl <providerId> --help` 可读，`browser_launch` 和 `browser_list` 对同一实例语义一致 |
+| 安装（包已在可访问注册源时） | `mearl <providerId> --help` 可读，`browser_manage` 和 `browser_list` 对同一实例语义一致 |
 | 端到端 | 一个真实 action 返回可核对结果，关闭或释放后外部资源达到预期终态 |
 
 不默认发布包、创建计费云资源、扫码配对或删除持久化数据。这些动作只在用户明确授权并确认目标后执行；没有可安装的已发布包时，将安装层标记为未验证，不用发布动作换取验证结论。

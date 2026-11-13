@@ -428,8 +428,8 @@ describe('external provider routing', () => {
     try {
       await expect(
         invoke(
-          'browser_release',
-          {},
+          'session_manage',
+          { operation: 'end' },
           {
             browser: target.browserId,
             controlSessionId: 'cs_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
@@ -440,9 +440,9 @@ describe('external provider routing', () => {
         providerTarget: target.browserId,
         controlSessionId: 'cs_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
       });
-      await expect(invoke('browser_release', {}, { browser: target.browserId })).rejects.toThrow(
-        'does not support browser_release',
-      );
+      await expect(
+        invoke('browser_manage', { operation: 'detach' }, { browser: target.browserId }),
+      ).rejects.toThrow('does not support browser_manage');
     } finally {
       target.operations = operations;
     }
@@ -541,7 +541,7 @@ describe('external provider routing', () => {
     expect(createConnectionMock).not.toHaveBeenCalled();
   });
 
-  it('routes browser_release to a Provider that declares detach', async () => {
+  it('routes detach to a Provider that declares detach', async () => {
     let request: Record<string, unknown> | undefined;
     createConnectionMock.mockImplementation(() => {
       const socket = new EventEmitter() as MockSocket;
@@ -562,11 +562,12 @@ describe('external provider routing', () => {
     });
 
     await expect(
-      invoke('browser_release', {}, { browser: 'provider:fixture:device-a' }),
+      invoke('browser_manage', { operation: 'detach' }, { browser: 'provider:fixture:device-a' }),
     ).resolves.toEqual({ detached: true });
     expect(createConnectionMock).toHaveBeenCalledWith('/tmp/mearl-provider-control.sock');
     expect(request).toMatchObject({
-      action: 'browser_release',
+      action: 'browser_manage',
+      data: { operation: 'detach' },
       providerTarget: 'provider:fixture:device-a',
     });
   });
@@ -746,12 +747,12 @@ describe('external provider routing', () => {
         return socket;
       });
 
-      const input = { provider: 'cdp', providerOptions: { port: 9223 } };
-      const result = invoke('browser_launch', input);
+      const input = { operation: 'attach', provider: 'cdp', providerOptions: { port: 9223 } };
+      const result = invoke('browser_manage', input);
       if (supported) await expect(result).resolves.toEqual({});
       else await expect(result).rejects.toThrow('reload the extension to restart its Native Host');
       expect(createConnectionMock).toHaveBeenCalledWith('/tmp/mearl-native-browser.sock');
-      expect(request).toMatchObject({ action: 'browser_launch', data: input });
+      expect(request).toMatchObject({ action: 'browser_manage', data: input });
     },
   );
 });

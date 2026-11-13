@@ -95,7 +95,11 @@ export function listLiveBrowsers(): LiveBrowser[] {
  * Find the browser matching a user selector: exact browserId first, then an
  * exact (case-insensitive) name, then a substring of id/name.
  */
-export function findBrowser(browsers: LiveBrowser[], selector: string): LiveBrowser | null {
+export function findBrowser(
+  browsers: LiveBrowser[],
+  selector: string,
+  exactOnly = false,
+): LiveBrowser | null {
   const sel = selector.trim().toLowerCase();
   if (!sel) return null;
 
@@ -111,6 +115,7 @@ export function findBrowser(browsers: LiveBrowser[], selector: string): LiveBrow
     );
   }
   if (exactNameMatches[0]) return exactNameMatches[0];
+  if (exactOnly) return null;
 
   return (
     browsers.find(

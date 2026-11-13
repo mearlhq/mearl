@@ -73,7 +73,11 @@ export class BrowserProviderCoordinator {
     return this.runtimes;
   }
 
-  async launch(input: BrowserLaunchParams, deadline?: number): Promise<ManagedBrowserInfo> {
+  async launch(
+    input: BrowserLaunchParams,
+    deadline?: number,
+    operation: 'launch' | 'attach' = 'launch',
+  ): Promise<ManagedBrowserInfo> {
     const providerId = input.provider?.trim() || 'local';
     const runtime = this.runtimes.find(
       item => item.definition.descriptor.providerId === providerId,
@@ -84,6 +88,14 @@ export class BrowserProviderCoordinator {
     if (input.providerOptions && Object.keys(builtinOptions).length > 0) {
       throw new Error('Use either providerOptions or flat launch options, not both');
     }
+    const external = runtime
+      ? undefined
+      : listExternalBrowserProviders().find(provider => provider.provider.id === providerId);
+    if (!runtime && !external) throw new Error(`Provider is not registered: ${providerId}`);
+    const browserType = runtime?.definition.browserType ?? external?.browserType;
+    const acceptedOperation = browserType?.openOperation ?? 'launch';
+    if (operation !== acceptedOperation)
+      throw new Error(`Provider ${providerId} requires operation "${acceptedOperation}"`);
     if (runtime) {
       const descriptor = runtime.definition.descriptor;
       const options = { ...(input.providerOptions ?? builtinOptions) } as JsonObject;
@@ -96,16 +108,12 @@ export class BrowserProviderCoordinator {
         browser: await runtime.launch(options, { deadline }),
       });
     }
-    const external = listExternalBrowserProviders().find(
-      provider => provider.provider.id === providerId,
-    );
-    if (!external) throw new Error(`Provider is not registered: ${providerId}`);
     if (Object.keys(builtinOptions).length > 0) {
       throw new Error('External Provider launch options must be supplied in providerOptions');
     }
     const host = await this.hostContext((input.providerOptions ?? {}) as JsonObject);
     return providerBrowserInfo({
-      provider: external.provider,
+      provider: external!.provider,
       browser: await launchProviderBrowser({
         provider: providerId,
         providerOptions: (input.providerOptions ?? {}) as JsonObject,

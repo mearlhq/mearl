@@ -79,7 +79,7 @@ Chrome Extension
 @mearl/client  /  @mearl/cloud-connector
 ```
 
-`browser_launch` 会为每个托管 Chrome 启动一个带独立 CDP 配置的 native-host 子进程，使多个 headless/Profile 实例可以同时被现有浏览器注册表寻址。外部 Provider 也可使用私有远端 CDP 模式复用同一套通用页面 action；远端服务的凭据、生命周期和文件中转仍由 Provider 自己负责。
+`browser_manage` 的 `launch` 会为每个托管 Chrome 启动一个带独立 CDP 配置的 native-host 子进程，使多个 headless/Profile 实例可以同时被现有浏览器注册表寻址。外部 Provider 也可使用私有远端 CDP 模式复用同一套通用页面 action；远端服务的凭据、生命周期和文件中转仍由 Provider 自己负责。
 
 ## 侧边栏 Agent Chat
 

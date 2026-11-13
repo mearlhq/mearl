@@ -15,5 +15,7 @@ export function providerRequestTimeoutMs(
       throw new Error('Provider request deadline exceeds the supported range');
     return remaining;
   }
+  if (action === 'browser_close')
+    return resolveActionTimeoutSec('browser_manage', { operation: 'close' }, 120) * 1000;
   return resolveActionTimeoutSec(action, data, 120) * 1000;
 }

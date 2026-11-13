@@ -40,7 +40,7 @@ const wechatMiniProgram = `npx @mearl/setup plugin install mearlhq/profile-wecha
 mearl wxa run ./dist`;
 const chineseBqb = 'https://github.com/F-loat/ChineseBQB-weapp';
 const egoSetup = `npx @mearl/setup@latest provider install @mearl/provider-ego
-mearl browser_launch --payload '{"provider":"ego","providerOptions":{"name":"My task"}}'`;
+mearl browser_manage --payload '{"operation":"launch","provider":"ego","providerOptions":{"name":"My task"}}'`;
 const skillCreatorInstall =
   'npx skills add https://github.com/mearlhq/mearl --skill mearl-skill-creator --global';
 const registerReportPlugin = `npx @mearl/setup plugin ./skills/report-export
@@ -747,15 +747,15 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
         {
           id: 'control',
           title: 'Keep control in Ego',
-          text: 'Use mearl browser_control with the full browserId for handoff, resume and finish, without --session. Resume only after the user explicitly returns control. Ego blocks native page operations during takeover. finish keeps no Agent pages by default; keepTabIds accepts numeric IDs from tab_list. browser_release only detaches the Provider and does not finish the Space or clear emulation.',
-          command: `mearl browser_control --browser '<browserId>' --payload '{"operation":"handoff"}'
-mearl browser_control --browser '<browserId>' --payload '{"operation":"resume"}'
-mearl browser_control --browser '<browserId>' --payload '{"operation":"finish","keepTabIds":[1,2]}'`,
+          text: 'Use mearl session_manage with the full browserId for handoff, resume and end, without --session. Resume only after the user explicitly returns control. Ego blocks native page operations during takeover. The end operation keeps no Agent pages by default; keepTabIds accepts numeric IDs from tab_list. browser_manage detach only detaches the Provider and does not finish the Space or clear emulation.',
+          command: `mearl session_manage --browser '<browserId>' --payload '{"operation":"handoff"}'
+mearl session_manage --browser '<browserId>' --payload '{"operation":"resume"}'
+mearl session_manage --browser '<browserId>' --payload '{"operation":"end","keepTabIds":[1,2]}'`,
         },
         {
           id: 'emulation',
           title: 'Device shells, WebViews and App services',
-          text: 'Configure device and App emulation independently through set_device_emulation and set_app_profile. Enable deviceShell to use a device shell and root WebView. The shared native page host supplies installed App protocol and authorization services; real authorization requires user approval, and takeover cancels pending authorization. Retained pages depend on the Provider connection for emulation and host services. Clear emulation before finish when ordinary pages are needed. Extension-specific request/log entry points are not provided.',
+          text: 'Configure device and App emulation independently through set_device_emulation and set_app_profile. Enable deviceShell to use a device shell and root WebView. The shared native page host supplies installed App protocol and authorization services; real authorization requires user approval, and takeover cancels pending authorization. Retained pages depend on the Provider connection for emulation and host services. Clear emulation before ending when ordinary pages are needed. Extension-specific request/log entry points are not provided.',
           links: [
             { label: 'Provider contracts', path: 'packages/provider/README.en.md', shared: true },
             { label: 'Device emulation and App Profiles', page: 'emulation' },
@@ -802,10 +802,10 @@ mearl browser_control --browser '<browserId>' --payload '{"operation":"finish","
         {
           id: 'control',
           title: '由 Ego 统一控制权',
-          text: '使用 mearl browser_control 和完整 browserId 交接、恢复和完成任务，不传 --session，仅在用户明确交还后恢复。接管期间 Ego 阻断原生页面操作。finish 默认不保留 Agent 页面；keepTabIds 使用 tab_list 返回的数字 ID 保留结果页。browser_release 只解绑 Provider，不结束 Space，也不清除模拟。',
-          command: `mearl browser_control --browser '<browserId>' --payload '{"operation":"handoff"}'
-mearl browser_control --browser '<browserId>' --payload '{"operation":"resume"}'
-mearl browser_control --browser '<browserId>' --payload '{"operation":"finish","keepTabIds":[1,2]}'`,
+          text: '使用 mearl session_manage 和完整 browserId 交接、恢复和完成任务，不传 --session，仅在用户明确交还后恢复。接管期间 Ego 阻断原生页面操作。end 默认不保留 Agent 页面；keepTabIds 使用 tab_list 返回的数字 ID 保留结果页。browser_manage detach 只解绑 Provider，不结束 Space，也不清除模拟。',
+          command: `mearl session_manage --browser '<browserId>' --payload '{"operation":"handoff"}'
+mearl session_manage --browser '<browserId>' --payload '{"operation":"resume"}'
+mearl session_manage --browser '<browserId>' --payload '{"operation":"end","keepTabIds":[1,2]}'`,
         },
         {
           id: 'emulation',

@@ -2,7 +2,7 @@ import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { promisify } from 'node:util';
 import { once } from 'node:events';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { homedir, tmpdir, userInfo } from 'node:os';
 import path from 'node:path';
@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { keyedConfigFile, removeRecordIfPid } from '@mearl/daemon-core';
 
 const nativeHostScript = fileURLToPath(new URL('../../dist/index.js', import.meta.url));
+const clientScript = fileURLToPath(new URL('../../../client/dist/bin.js', import.meta.url));
 
 async function stopChild(child: ChildProcess | undefined): Promise<void> {
   if (!child || child.exitCode !== null || child.signalCode !== null || !child.pid) return;
@@ -60,6 +61,169 @@ describe.skipIf(process.env.MEARL_RUN_CONTROL_INTEGRATION !== '1')(
     afterAll(async () => {
       if (launcherDirectory) await rm(launcherDirectory, { recursive: true, force: true });
     });
+
+    it.skipIf(process.platform === 'win32')(
+      'discovers a running Chrome without an extension for both scripts and browser_list',
+      async () => {
+        const directory = await mkdtemp(path.join(tmpdir(), 'mearl-auto-cdp-'));
+        const profile = path.join(
+          directory,
+          ...(process.platform === 'darwin'
+            ? ['Library', 'Application Support', 'Google', 'Chrome']
+            : ['.config', 'google-chrome']),
+        );
+        const bin = path.join(directory, 'bin');
+        const socketDir = await mkdtemp('/tmp/mearl-cdp-');
+        const env = {
+          ...process.env,
+          HOME: directory,
+          TMPDIR: socketDir,
+          PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
+        };
+        const cli = async (...args: string[]) => {
+          const { stdout } = await promisify(execFile)(process.execPath, [clientScript, ...args], {
+            env,
+            timeout: 15000,
+          });
+          return JSON.parse(stdout);
+        };
+        let chrome: ChildProcess | undefined;
+        let browser: string | undefined;
+        const server = createServer((_, res) => {
+          res.writeHead(200, { 'content-type': 'text/html' });
+          res.end('<title>Existing Chrome tab</title>');
+        });
+        try {
+          server.listen(0, '127.0.0.1');
+          await once(server, 'listening');
+          const url = `http://127.0.0.1:${(server.address() as import('node:net').AddressInfo).port}/`;
+          await mkdir(bin);
+          await symlink(nativeHostScript, path.join(bin, 'mearl-native-host'));
+          chrome = spawn(
+            chromeExecutable,
+            [
+              '--headless=new',
+              '--no-first-run',
+              '--no-default-browser-check',
+              '--remote-debugging-port=0',
+              `--user-data-dir=${profile}`,
+              url,
+            ],
+            { stdio: 'ignore' },
+          );
+          const startupDeadline = Date.now() + 15000;
+          let port: number | undefined;
+          while (port === undefined && Date.now() < startupDeadline) {
+            const file = await readFile(path.join(profile, 'DevToolsActivePort'), 'utf8').catch(
+              () => '',
+            );
+            port = Number(file.split('\n')[0]) || undefined;
+            if (port === undefined) await new Promise(resolve => setTimeout(resolve, 50));
+          }
+          assert(port, 'Chrome must expose a debugging port');
+          browser = `mearl:local:cdp:${port}`;
+
+          const script = path.join(directory, 'existing-script.js');
+          await writeFile(script, 'console.log(JSON.stringify(await mearl.tabList()));\n');
+          const tabs = await cli('run', '--local', '--file', script);
+          assert(tabs.tabs.some((tab: { url: string }) => tab.url === url));
+          await cli(
+            'browser_manage',
+            '--local',
+            '--browser',
+            browser,
+            '--payload',
+            '{"operation":"release"}',
+          );
+          await new Promise(resolve => setTimeout(resolve, 2300));
+          const afterRelease = await cli('tab_list', '--local', '--browser', browser);
+          assert(afterRelease.tabs.some((tab: { url: string }) => tab.url === url));
+          const listing = await cli('browser_list', '--local');
+          assert.equal(listing.defaultBrowserId, browser);
+          assert.equal(listing.browsers.length, 1);
+          assert.equal(listing.browsers[0].provider.id, 'cdp');
+          await cli(
+            'browser_manage',
+            '--local',
+            '--browser',
+            browser,
+            '--payload',
+            '{"operation":"detach"}',
+          );
+          const attached = await cli(
+            'browser_manage',
+            '--local',
+            '--payload',
+            JSON.stringify({ operation: 'attach', provider: 'cdp', providerOptions: { port } }),
+          );
+          assert.equal(attached.browserId, browser);
+          assert.equal(attached.ownership, 'attached');
+          const afterAttach = await cli('browser_list', '--local');
+          assert.equal(afterAttach.browsers.length, 1);
+          assert.equal(afterAttach.defaultBrowserId, browser);
+          const createSession = () =>
+            cli(
+              'session_manage',
+              '--local',
+              '--browser',
+              browser!,
+              '--payload',
+              '{"operation":"new"}',
+            );
+          const first = (await createSession()).session;
+          const second = (await createSession()).session;
+          assert.deepEqual(first.tabs, []);
+          assert.equal(first.browserId, browser);
+          const sessionList = () => cli('session_list', '--local', '--browser', browser!);
+          assert.deepEqual(
+            (await sessionList()).sessions.map((item: any) => item.sessionId),
+            [first.sessionId, second.sessionId],
+          );
+          const end = async (sessionId: string) =>
+            cli(
+              'session_manage',
+              '--local',
+              '--session',
+              sessionId,
+              '--payload',
+              '{"operation":"end"}',
+            );
+          assert.equal((await end(first.sessionId)).session.status, 'released');
+          assert.deepEqual(
+            (await sessionList()).sessions.map((item: any) => item.sessionId),
+            [second.sessionId],
+          );
+          await end(second.sessionId);
+          await cli(
+            'browser_manage',
+            '--local',
+            '--browser',
+            browser,
+            '--payload',
+            '{"operation":"detach"}',
+          );
+          assert.equal(chrome.exitCode, null);
+          const version = await fetch(`http://127.0.0.1:${port}/json/version`).then(r => r.json());
+          assert(version.webSocketDebuggerUrl);
+        } finally {
+          if (browser)
+            await cli(
+              'browser_manage',
+              '--local',
+              '--browser',
+              browser,
+              '--payload',
+              '{"operation":"detach"}',
+            ).catch(() => {});
+          await stopChild(chrome);
+          server.closeAllConnections();
+          server.close();
+          await rm(directory, { recursive: true, force: true });
+          await rm(socketDir, { recursive: true, force: true });
+        }
+      },
+      45000,
+    );
 
     it('attaches to an existing Chrome profile and releases control without closing it', async () => {
       const { UnifiedClient } = await import('../../../client/dist/unified.js');
@@ -115,13 +279,14 @@ describe.skipIf(process.env.MEARL_RUN_CONTROL_INTEGRATION !== '1')(
             : path.join(tmpdir(), `mearl-agent-${host.pid}.sock`);
         const { invoke } = await import('../../../client/dist/socket.js');
         const input = {
+          operation: 'attach',
           provider: 'cdp',
           providerOptions: { name: 'Existing Chrome', port, headless: true },
         };
         let attached;
         while (Date.now() < startupDeadline) {
           try {
-            attached = await invoke('browser_launch', input, { socketPath: hostSocket });
+            attached = await invoke('browser_manage', input, { socketPath: hostSocket });
             break;
           } catch (error) {
             const code = (error as { cause?: NodeJS.ErrnoException }).cause?.code;
@@ -134,15 +299,20 @@ describe.skipIf(process.env.MEARL_RUN_CONTROL_INTEGRATION !== '1')(
         assert.equal(attached.provider.id, 'cdp');
         assert.equal(attached.ownership, 'attached');
         assert.equal(attached.details.cdpPort, port);
-        const withProfile = { provider: 'cdp', providerOptions: { userDataDir: directory } };
+        const withProfile = {
+          operation: 'attach',
+          provider: 'cdp',
+          providerOptions: { userDataDir: directory },
+        };
         assert.equal(
-          (await invoke('browser_launch', withProfile, { socketPath: hostSocket })).browserId,
+          (await invoke('browser_manage', withProfile, { socketPath: hostSocket })).browserId,
           browser,
         );
         await assert.rejects(
           invoke(
-            'browser_launch',
+            'browser_manage',
             {
+              operation: 'attach',
               provider: 'cdp',
               providerOptions: { userDataDir: path.join(directory, 'missing-profile') },
             },
@@ -180,11 +350,11 @@ describe.skipIf(process.env.MEARL_RUN_CONTROL_INTEGRATION !== '1')(
         );
         assert(screenshot.data);
         await assert.rejects(
-          client.invoke('browser_release', {}, { local: true, browser }),
+          client.invoke('browser_manage', { operation: 'release' }, { local: true, browser }),
           /ACTIVE_CONTROL_SESSIONS/,
         );
-        await client.invoke('browser_release', {}, { session });
-        await client.invoke('browser_release', {}, { local: true, browser });
+        await client.invoke('session_manage', { operation: 'end' }, { session });
+        await client.invoke('browser_manage', { operation: 'detach' }, { local: true, browser });
         const targets = await fetch(`http://localhost:${port}/json`).then(response =>
           response.json(),
         );
@@ -212,17 +382,18 @@ describe.skipIf(process.env.MEARL_RUN_CONTROL_INTEGRATION !== '1')(
           path.join(directory, 'DevToolsActivePort'),
           `${port}\n${new URL(version.webSocketDebuggerUrl).pathname}\n`,
         );
-        const fromProfile = await invoke('browser_launch', withProfile, { socketPath: hostSocket });
+        const fromProfile = await invoke('browser_manage', withProfile, { socketPath: hostSocket });
         browser = fromProfile.browserId;
         assert.equal(fromProfile.name, 'CDP');
         assert.equal(fromProfile.details.cdpPort, port);
-        await client.invoke('browser_release', {}, { local: true, browser });
+        await client.invoke('browser_manage', { operation: 'detach' }, { local: true, browser });
         browser = undefined;
         const endpointFile = path.join(directory, 'cdp-endpoint');
         await writeFile(endpointFile, version.webSocketDebuggerUrl, { mode: 0o600 });
         const fromFile = await invoke(
-          'browser_launch',
+          'browser_manage',
           {
+            operation: 'attach',
             provider: 'cdp',
             providerOptions: { endpointFile, headless: true },
           },
@@ -235,7 +406,9 @@ describe.skipIf(process.env.MEARL_RUN_CONTROL_INTEGRATION !== '1')(
       } finally {
         if (staleRecord) removeRecordIfPid(staleRecord, process.pid);
         if (browser)
-          await client.invoke('browser_release', {}, { local: true, browser }).catch(() => {});
+          await client
+            .invoke('browser_manage', { operation: 'detach' }, { local: true, browser })
+            .catch(() => {});
         client.disconnect();
         await stopChild(host);
         await stopChild(chrome);
@@ -385,10 +558,10 @@ describe.skipIf(process.env.MEARL_RUN_CONTROL_INTEGRATION !== '1')(
           releaseRequest = Promise.withResolvers<() => void>();
           const second = await startRequest();
           const receipt = await client.invoke(
-            'browser_close',
-            { browser },
+            'browser_manage',
+            { operation: 'close' },
             {
-              browser: router ? `mearl:local:managed:${router}` : browser,
+              browser,
               timeoutSec: 3,
             },
           );
@@ -563,22 +736,22 @@ describe.skipIf(process.env.MEARL_RUN_CONTROL_INTEGRATION !== '1')(
         assert.equal(batch.failedStep, 1);
         assert.equal(batch.results[0].data.result, 42);
         await client.invoke(
-          'browser_control',
+          'session_manage',
           { operation: 'handoff', reason: 'integration user' },
-          { browser },
+          options,
         );
         await assert.rejects(
           client.invoke('page_click', { tabId, selector: '#export' }, options),
           /CONTROL_SESSION_PAUSED/,
         );
-        await client.invoke('browser_control', { operation: 'resume' }, { browser });
+        await client.invoke('session_manage', { operation: 'resume' }, options);
         await client.invoke('page_snapshot', { tabId }, options);
         const keep = await client.invoke(
-          'browser_release',
-          { closeCreatedTabs: true, keepTabIds: [tabId] },
+          'session_manage',
+          { operation: 'end', closeCreatedTabs: true, keepTabIds: [tabId] },
           options,
         );
-        assert(keep.released);
+        assert.equal(keep.session.status, 'released');
         const tabs = await client.invoke('tab_list', {}, { browser });
         assert(tabs.tabs.some((t: any) => t.tabId === tabId));
         await assert.rejects(

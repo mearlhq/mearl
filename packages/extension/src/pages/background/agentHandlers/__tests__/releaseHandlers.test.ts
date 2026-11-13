@@ -51,7 +51,7 @@ import { removeCollectingTab } from '../tabHandlers';
 import { handleBrowserRelease } from '../releaseHandlers';
 import { runSerializedQuickSimulationUpdate } from '../../quickSimulationUpdateQueue';
 
-describe('browser_release extension handler', () => {
+describe('browser_manage release extension handler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(stopRequestCollection).mockResolvedValue(undefined);
@@ -61,16 +61,26 @@ describe('browser_release extension handler', () => {
 
   it('waits for in-flight environment work before resetting its page', async () => {
     let finish!: () => void, started!: () => void;
-    const running = new Promise<void>(resolve => { started = resolve; });
-    const gate = new Promise<void>(resolve => { finish = resolve; });
+    const running = new Promise<void>(resolve => {
+      started = resolve;
+    });
+    const gate = new Promise<void>(resolve => {
+      finish = resolve;
+    });
     let current = 'baseline';
     const inFlight = runSerializedQuickSimulationUpdate(42, async () => {
-      started(); await gate; current = 'owned change';
+      started();
+      await gate;
+      current = 'owned change';
     });
     await running;
-    vi.mocked(releaseDebuggerControlForTab).mockImplementationOnce(async () => { current = 'reset'; return true; });
+    vi.mocked(releaseDebuggerControlForTab).mockImplementationOnce(async () => {
+      current = 'reset';
+      return true;
+    });
     const reset = handleBrowserRelease({ tabIds: [42] });
-    await Promise.resolve(); await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
     expect(releaseDebuggerControlForTab).not.toHaveBeenCalled();
     finish();
     await inFlight;

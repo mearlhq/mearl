@@ -151,7 +151,7 @@ export async function ensureControlledIndicator(
   });
 }
 
-/** browser_release 使用：停止跨导航注入并恢复当前文档的 favicon。 */
+/** 释放浏览器控制 使用：停止跨导航注入并恢复当前文档的 favicon。 */
 export async function releaseControlledIndicator(session: PageSession): Promise<void> {
   return enqueueIndicatorOperation(session, async () => {
     const current = injectedSessions.get(session);

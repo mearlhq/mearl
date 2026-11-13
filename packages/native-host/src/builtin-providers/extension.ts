@@ -205,7 +205,7 @@ export class ExtensionBrowserProvider implements HostBrowserProvider {
 
   async release(data: BrowserReleaseParams): Promise<BrowserReleaseResult | undefined> {
     if (this.connected)
-      return this.request('browser_release', data, toTimeoutMs('browser_release', data));
+      return this.request('__control_release', data, toTimeoutMs('__control_release', data), true);
   }
 
   async deactivate(tabIds: number[]): Promise<void> {

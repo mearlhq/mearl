@@ -20,6 +20,10 @@ import { resolveActionTimeoutSec } from './actionTimeouts.js';
 import {
   validateRequiredActionTabId,
   parseBrowserListParams,
+  parseBrowserManageParams,
+  parseSessionManageParams,
+  resolveSessionManageId,
+  type ControlSessionInfo,
   type BrowserSource,
 } from '@mearl/browser-core';
 import type { PluginInvocation, PluginInvokeOptions } from './plugins/sdk/plugin.js';
@@ -169,12 +173,13 @@ function findBrowsers(
   browsers: BrowserRecord[],
   selector: string,
   connectedOnly = true,
+  exactOnly = false,
 ): BrowserRecord[] {
   const candidates = connectedOnly
     ? browsers.filter(browser => browser.status === 'connected')
     : browsers;
   const exact = candidates.filter(browser => browserMatches(browser, selector));
-  if (exact.length > 0) return exact;
+  if (exact.length > 0 || exactOnly) return exact;
   const normalized = normalizeBrowserSelector(selector);
   return candidates.filter(
     browser =>
@@ -328,15 +333,50 @@ export class UnifiedClient {
         connection.disconnect();
       }
     }
+    if (action === 'browser_manage') {
+      const command = parseBrowserManageParams(data);
+      if (options.session || options.controlSessionId)
+        throw new Error('browser_manage does not accept a control session');
+      if ((command.operation === 'close' || command.operation === 'detach') && !options.browser)
+        throw new Error('Specify the browser with --browser <id|name>');
+    }
+    if (action === 'session_list') {
+      if (options.session || options.controlSessionId)
+        throw new Error('session_list does not accept a session override');
+      if (Object.keys(data).length) throw new Error('session_list does not accept a payload');
+      return this.listSessions(options);
+    }
+    if (action === 'session_manage') {
+      const command = parseSessionManageParams(data);
+      if (options.session === 'new' || options.controlSessionId === 'new')
+        throw new Error('Use operation "new" to create a session');
+      if (command.operation === 'new') {
+        if (options.session || options.controlSessionId)
+          throw new Error('session_manage new does not accept a session id');
+      } else {
+        const id = resolveSessionManageId(command, options.session ?? options.controlSessionId);
+        if (options.controlSessionId && id !== options.controlSessionId)
+          throw new Error('Conflicting session IDs');
+        if (!id && !options.browser)
+          throw new Error(
+            'Specify a sessionId or --session <id>, or select an external Provider browser',
+          );
+        if (id) {
+          const { sessionId: _id, ...payload } = command;
+          data = payload;
+          options = { ...options, session: id };
+        }
+      }
+    }
     if (options.session && options.session !== 'new') {
       const session = await this.resolveControlSession(options.session, options);
       const selected = decodeBrowserTarget(options.browser);
       const pinned = decodeBrowserTarget(session.browser);
       if (
         options.browser &&
-        (!selected ||
-          selected.browser !== pinned?.browser ||
-          selected.connector !== pinned?.connector)
+        (selected
+          ? selected.browser !== pinned?.browser || selected.connector !== pinned?.connector
+          : options.browser !== pinned?.browser)
       ) {
         throw new Error('The selected browser does not match the control session');
       }
@@ -549,30 +589,19 @@ export class UnifiedClient {
 
     const optionTarget = decodeBrowserTarget(options.browser);
     const defaultTarget = options.browser ? undefined : decodeBrowserTarget(this.defaultBrowser);
-    const closeTarget =
-      action === 'browser_close' && typeof data.browser === 'string'
-        ? decodeBrowserTarget(data.browser)
-        : undefined;
-    const target = optionTarget ?? closeTarget ?? defaultTarget;
+    const target = optionTarget ?? defaultTarget;
     const connector = target?.connector ?? options.connector ?? this.defaultConnector;
     const browser =
       optionTarget?.browser ??
       defaultTarget?.browser ??
       (options.browser && !optionTarget ? options.browser : undefined) ??
       (this.defaultBrowser && !defaultTarget ? this.defaultBrowser : undefined);
-    const requestData = closeTarget ? { ...data, browser: closeTarget.browser } : data;
 
     if (target && !target.connector) {
       if (options.connector) {
         throw new Error('A local browser cannot be used together with --connector.');
       }
-      return this.invokeLocal(
-        action,
-        requestData,
-        timeoutSec,
-        target.browser,
-        options.controlSessionId,
-      );
+      return this.invokeLocal(action, data, timeoutSec, target.browser, options.controlSessionId);
     }
     if (connector) {
       const selected =
@@ -584,7 +613,7 @@ export class UnifiedClient {
       }
       return this.invokeRemote(
         action,
-        requestData,
+        data,
         timeoutSec,
         browser,
         selected,
@@ -594,33 +623,29 @@ export class UnifiedClient {
     if (!this.options.serverUrl) {
       return this.invokeLocal(
         action,
-        requestData,
+        data,
         timeoutSec,
         options.browser ?? this.defaultBrowser,
         options.controlSessionId,
       );
     }
 
-    const selector =
-      options.browser ??
-      this.defaultBrowser ??
-      (action === 'browser_close' && typeof data.browser === 'string' ? data.browser : undefined);
+    const selector = options.browser ?? this.defaultBrowser;
+    const instanceOperation =
+      action === 'browser_manage' && (data.operation === 'close' || data.operation === 'detach');
     const resolved = await this.resolveUnifiedBrowser(
       selector,
       timeoutSec,
-      action === 'browser_close',
+      instanceOperation,
+      instanceOperation,
     );
-    if (resolved) {
-      if (action === 'browser_close') {
-        const nextOptions = { ...options };
-        delete nextOptions.browser;
-        return this.invoke(action, { ...data, browser: resolved }, nextOptions);
-      }
-      return this.invoke(action, data, { ...options, browser: resolved });
-    }
+    if (resolved) return this.invokeRouted(action, data, { ...options, browser: resolved });
 
-    if (action === 'browser_launch') {
-      return this.invokeLaunchWithoutControlBrowser(data, timeoutSec);
+    if (
+      action === 'browser_manage' &&
+      (data.operation === 'launch' || data.operation === 'attach')
+    ) {
+      return this.invokeOpenWithoutControlBrowser(data, timeoutSec);
     }
     throw new Error(
       'No connected browser is available. Run `mearl browser_list` to inspect all sources.',
@@ -635,20 +660,15 @@ export class UnifiedClient {
   ): Promise<any> {
     const optionTarget = decodeBrowserTarget(options.browser);
     const defaultTarget = options.browser ? undefined : decodeBrowserTarget(this.defaultBrowser);
-    const closeTarget =
-      action === 'browser_close' && typeof data.browser === 'string'
-        ? decodeBrowserTarget(data.browser)
-        : undefined;
-    if (optionTarget?.connector || defaultTarget?.connector || closeTarget?.connector) {
+    if (optionTarget?.connector || defaultTarget?.connector) {
       throw new Error('A remote browser cannot be used together with --local.');
     }
     const browser =
       optionTarget?.browser ?? defaultTarget?.browser ?? options.browser ?? this.defaultBrowser;
-    const requestData = closeTarget ? { ...data, browser: closeTarget.browser } : data;
-    return this.invokeLocal(action, requestData, timeoutSec, browser, options.controlSessionId);
+    return this.invokeLocal(action, data, timeoutSec, browser, options.controlSessionId);
   }
 
-  private async invokeLaunchWithoutControlBrowser(
+  private async invokeOpenWithoutControlBrowser(
     data: Record<string, any>,
     timeoutSec: number,
   ): Promise<any> {
@@ -662,10 +682,10 @@ export class UnifiedClient {
       ? discoveredConnectors.filter(connector => connector.connectorId !== localConnectorId)
       : discoveredConnectors;
     if (localAvailable && connectors.length === 0) {
-      return this.invokeLocal('browser_launch', data, timeoutSec, undefined);
+      return this.invokeLocal('browser_manage', data, timeoutSec, undefined);
     }
     if (!localAvailable && connectors.length === 1) {
-      return this.invokeRemote('browser_launch', data, timeoutSec, undefined, connectors[0]!);
+      return this.invokeRemote('browser_manage', data, timeoutSec, undefined, connectors[0]!);
     }
     if (!localAvailable && connectors.length === 0) {
       throw new Error(
@@ -677,7 +697,7 @@ export class UnifiedClient {
       ...connectors.map(connector => `${connector.name} [${connector.connectorId}]`),
     ].join(', ');
     throw new Error(
-      'The browser host for browser_launch is ambiguous. ' +
+      'The browser host for browser_manage is ambiguous. ' +
         `Pass --local, --connector <id|name>, or --browser <global-id>. Available: ${availableHosts}`,
     );
   }
@@ -719,10 +739,11 @@ export class UnifiedClient {
     selector: string | undefined,
     timeoutSec: number,
     includeDisconnected: boolean,
+    exactOnly = false,
   ): Promise<string | undefined> {
     const listing = await this.listAllBrowsers(timeoutSec);
     if (selector) {
-      const matches = findBrowsers(listing.browsers, selector, !includeDisconnected);
+      const matches = findBrowsers(listing.browsers, selector, !includeDisconnected, exactOnly);
       if (matches.length > 1) {
         throw new Error(
           `Browser selector "${selector}" is ambiguous. Use an exact global browserId from browser_list.`,
@@ -846,6 +867,70 @@ export class UnifiedClient {
         connectorName: connector.name,
       }),
     );
+  }
+
+  private async listSessions(options: UnifiedInvokeOptions): Promise<{
+    sessions: ControlSessionInfo[];
+    warnings?: string[];
+  }> {
+    const timeoutSec = options.timeoutSec ?? this.options.requestTimeoutSec;
+    const target = decodeBrowserTarget(options.browser);
+    if (options.local && (target?.connector || options.connector))
+      throw new Error('Use either --local or a remote connector');
+    if (target && !target.connector && options.connector)
+      throw new Error('A local browser cannot be used together with --connector.');
+    const connector = target?.connector ?? options.connector;
+    if (connector) {
+      const selected =
+        target?.connector && !options.connector
+          ? { connectorId: target.connector, name: target.connector }
+          : await this.resolveConnector(options.connector ?? connector, timeoutSec);
+      if (target?.connector && target.connector !== selected.connectorId)
+        throw new Error('The selected browser belongs to a different cloud connector.');
+      return this.invokeRemote(
+        'session_list',
+        {},
+        timeoutSec,
+        target?.browser ?? options.browser,
+        selected,
+      );
+    }
+    if (options.local || target || !this.options.serverUrl)
+      return this.invokeLocal('session_list', {}, timeoutSec, target?.browser ?? options.browser);
+    if (options.browser) {
+      const browser = await this.resolveUnifiedBrowser(options.browser, timeoutSec, true);
+      if (!browser) throw new Error('No browser matches the session list filter');
+      return this.listSessions({ ...options, browser });
+    }
+
+    const local = this.invokeLocal('session_list', {}, timeoutSec, undefined);
+    const remote = this.listConnectors(timeoutSec);
+    const [localResult, connectors] = await Promise.allSettled([local, remote]);
+    const localConnectorId =
+      localResult.status === 'fulfilled' && !process.env.MEARL_SOCKET_PATH
+        ? loadLocalConnectorId()
+        : null;
+    const sources =
+      connectors.status === 'fulfilled'
+        ? connectors.value.connectors.filter(item => item.connectorId !== localConnectorId)
+        : [];
+    const results = [
+      localResult,
+      ...(await Promise.allSettled(
+        sources.map(item => this.invokeRemote('session_list', {}, timeoutSec, undefined, item)),
+      )),
+    ];
+    const warnings = connectors.status === 'rejected' ? [errorMessage(connectors.reason)] : [];
+    const sessions = results.flatMap((result, index) => {
+      const name = index ? sources[index - 1]!.name : 'this machine';
+      if (result.status === 'rejected') {
+        warnings.push(`${name}: ${errorMessage(result.reason)}`);
+        return [];
+      }
+      for (const warning of result.value.warnings ?? []) warnings.push(`${name}: ${warning}`);
+      return result.value.sessions as ControlSessionInfo[];
+    });
+    return { sessions, ...(warnings.length ? { warnings } : {}) };
   }
 
   private async listAllBrowsers(timeoutSec: number): Promise<BrowserListResult> {
@@ -1008,8 +1093,28 @@ export class UnifiedClient {
           }),
         },
       };
-    if (action !== 'browser_launch' || typeof result?.browserId !== 'string') return result;
-    return decorateBrowser(result, source);
+    if (action === 'session_list' && Array.isArray(result?.sessions)) {
+      return {
+        ...result,
+        sessions: result.sessions.map((session: ControlSessionInfo) => ({
+          ...session,
+          browserId: encodeBrowserTarget({
+            browser: session.browserId,
+            connector: source.connectorId,
+          }),
+        })),
+      };
+    }
+    if (action !== 'browser_manage' || typeof result?.browserId !== 'string') return result;
+    return typeof result.name === 'string'
+      ? decorateBrowser(result, source)
+      : {
+          ...result,
+          browserId: encodeBrowserTarget({
+            browser: result.browserId,
+            connector: source.connectorId,
+          }),
+        };
   }
 
   private async resolveControlSession(
@@ -1019,18 +1124,22 @@ export class UnifiedClient {
     if (!/^s_[A-Za-z0-9_-]{8}$/.test(id))
       throw new Error('Invalid session id; reuse session.sessionId from the first response');
     const cached = this.controlSessions.get(id);
-    if (cached) return cached;
+    const target = decodeBrowserTarget(options.browser);
+    if (options.local && (target?.connector || options.connector))
+      throw new Error('Use either --local or a remote connector');
+    const connector = options.connector ?? target?.connector;
+    if (cached && !connector && (!options.local || !decodeBrowserTarget(cached.browser)?.connector))
+      return cached;
     const timeoutSec = options.timeoutSec ?? 15;
-    const localLookup = this.invokeLocal(
-      '__control_session_resolve',
-      { sessionId: id },
-      timeoutSec,
-      undefined,
-    );
+    const localLookup = connector
+      ? Promise.resolve({ session: null })
+      : this.invokeLocal('__control_session_resolve', { sessionId: id }, timeoutSec, undefined);
     const discover = async () => {
-      const { connectors } = await this.listConnectors(timeoutSec);
+      const sources = connector
+        ? [await this.resolveConnector(connector, timeoutSec)]
+        : (await this.listConnectors(timeoutSec)).connectors;
       return Promise.allSettled(
-        connectors.map(connector =>
+        sources.map(connector =>
           this.invokeRemote(
             '__control_session_resolve',
             { sessionId: id },
@@ -1041,9 +1150,10 @@ export class UnifiedClient {
         ),
       );
     };
+    const queryRemote = this.options.serverUrl && !options.local && (!target || connector);
     const [local, remote] = await Promise.allSettled([
       localLookup,
-      this.options.serverUrl && !options.local ? discover() : Promise.resolve([]),
+      queryRemote ? discover() : Promise.resolve([]),
     ]);
     const localSession = local.status === 'fulfilled' ? local.value?.session : undefined;
     const localTarget = decodeBrowserTarget(localSession?.browserId);
@@ -1086,9 +1196,9 @@ export class UnifiedClient {
         `CONTROL_SESSION_NOT_FOUND: ${id}${errors.length ? ` (${errors.join('; ')})` : ''}`,
       );
     }
-    const target = { browser: session.browserId, id, transport: session.transport };
-    this.controlSessions.set(id, target);
-    return target;
+    const resolved = { browser: session.browserId, id, transport: session.transport };
+    this.controlSessions.set(id, resolved);
+    return resolved;
   }
 
   private async ensureConnected(): Promise<void> {

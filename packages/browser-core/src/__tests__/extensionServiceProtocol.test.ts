@@ -16,8 +16,8 @@ describe('extension RPC contracts', () => {
     },
   );
   it('distinguishes shared browser services from privileged helpers and private management', () => {
-    expect(isExtensionUiServiceAction('browser_launch')).toBe(true);
-    expect(isPrivateExtensionServiceAction('browser_launch')).toBe(false);
+    expect(isExtensionUiServiceAction('browser_manage')).toBe(true);
+    expect(isPrivateExtensionServiceAction('browser_manage')).toBe(false);
     expect(isPrivateExtensionServiceAction('browser_instances')).toBe(true);
     expect(isPrivateExtensionServiceAction('agent_chat_run')).toBe(false);
     expect(isHostToExtensionAction('__send_request_files')).toBe(true);

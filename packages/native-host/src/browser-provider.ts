@@ -194,13 +194,14 @@ export function closeProviderBrowser(
   browser: BrowserRecord,
   options: { deleteProfile?: boolean } = {},
 ): Promise<unknown> {
-  return requestControlledProvider(browser, 'browser_close', {
+  return requestControlledProvider(browser, 'browser_manage', {
+    operation: 'close',
     deleteProfile: options.deleteProfile === true,
   });
 }
 
 export function detachProviderBrowser(browser: BrowserRecord): Promise<unknown> {
-  return requestControlledProvider(browser, 'browser_instances', { operation: 'detach' });
+  return requestControlledProvider(browser, 'browser_manage', { operation: 'detach' });
 }
 
 export async function accessProviderBrowser(browser: BrowserRecord): Promise<ProviderAccess> {

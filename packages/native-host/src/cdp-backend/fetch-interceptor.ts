@@ -156,7 +156,7 @@ export async function unregisterCdpFetchPauseHandler(
   await session.client.sendCommand('Fetch.disable', {}).catch(() => {});
 }
 
-/** browser_release 使用：丢弃指定会话注册表；底层 CDP 连接随后关闭并恢复默认网络行为。 */
+/** 释放浏览器控制 使用：丢弃指定会话注册表；底层 CDP 连接随后关闭并恢复默认网络行为。 */
 export function clearCdpFetchInterceptionState(sessions?: Iterable<PageSession>): void {
   if (!sessions) {
     interceptionStates = new WeakMap();

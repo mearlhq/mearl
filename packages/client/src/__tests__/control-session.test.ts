@@ -45,7 +45,11 @@ describe('control session routing', () => {
       browserId: 'mearl:local:provider:fixture:a',
       transport: 'provider',
     });
-    await client.invoke('browser_release', {}, { session: first.session.sessionId });
+    await client.invoke(
+      'session_manage',
+      { operation: 'end' },
+      { session: first.session.sessionId },
+    );
     expect(invokeLocal.mock.calls[1]![2]).toMatchObject({
       browser: 'provider:fixture:a',
       controlSessionId: id,

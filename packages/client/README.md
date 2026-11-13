@@ -78,12 +78,12 @@ npx @mearl/setup update --local
 mearl <action> --help
 
 # 启动两个隔离的 headless Chrome
-mearl browser_launch --payload '{"name":"browser-a","url":"https://example.com"}'
-mearl browser_launch --payload '{"name":"browser-b","persistent":true}'
-mearl browser_launch --payload '{"name":"cookie-copy","copyCookieDomains":["example.com"]}'
-mearl browser_launch --payload '{"name":"figma","userAgentMode":"desktop","copyCookieDomains":["figma.com"]}'
+mearl browser_manage --payload '{"operation":"launch","name":"browser-a","url":"https://example.com"}'
+mearl browser_manage --payload '{"operation":"launch","name":"browser-b","persistent":true}'
+mearl browser_manage --payload '{"operation":"launch","name":"cookie-copy","copyCookieDomains":["example.com"]}'
+mearl browser_manage --payload '{"operation":"launch","name":"figma","userAgentMode":"desktop","copyCookieDomains":["figma.com"]}'
 mearl browser_list
-mearl browser_release
+mearl browser_manage --payload '{"operation":"release"}'
 ```
 
 ### Agent 脚本
@@ -139,7 +139,7 @@ console.log(result);
 单次调用的 `options` 可覆盖。`--server` 指定 cloud-server。`--session new` 成功建立会话后，
 后续调用自动使用返回的 ID，`mearl.session` 和 CLI stderr 同时提供会话信息。
 先 await 建立会话的浏览器调用，再执行并发或 Skill 命令。脚本结束断开 SDK 连接，控制会话保留；
-按任务生命周期显式调用 `mearl.browserRelease`。每轮重建 JS 变量，使用已返回的 `sessionId` 和 `tabId` 继续任务。
+按任务生命周期显式调用 `mearl.sessionManage({ operation: "end", sessionId })`。每轮重建 JS 变量，使用已返回的 `sessionId` 和 `tabId` 继续任务。
 
 每次脚本在独立 Node.js 进程运行，继承调用方的工作目录和环境，拥有该宿主的 Node.js 权限；
 它不是安全沙箱。用 `await import('node:fs/promises')` 等动态 import 加载模块；
@@ -159,9 +159,9 @@ SDK 宿主可从 `@mearl/client/script` 导入 `executeScript(code, options)`，
 
 ### 控制会话与文件
 
-接管和交还统一使用 `mearl browser_control --browser '<browserId>' --payload '{"operation":"handoff"}'`（交还为 `resume`）。普通浏览器自动选择唯一的未结束会话；存在多个会话时，用 `tabId` 或 `--session` 明确目标，无匹配会话时返回错误。Ego 的任务由其 Space 管理，无需额外会话参数。
+用 `session_list` 查询控制会话，使用 `session_manage` 的 `handoff` 和 `resume` 交接控制。指定 `--session <sessionId>` 或在 payload 中传入 `sessionId`。Ego 等外部 Provider 通过 `--browser` 指定任务。
 
-多步骤任务首次 `tab_open` 或 `page_snapshot` 使用 `--session new`，响应在原结果旁附带 `session`，后续用其 `sessionId` 自动路由，无需额外创建/查询 action。Session 绑定一个浏览器与传输；页面首次使用自动关联，复用页面与新建页面分别记录。同一页面只允许一个会话控制，旧调用不能绕过占用；Session 不隔离 Cookie 或存储。
+用 `session_manage --browser <browserId> --payload '{"operation":"new"}'` 创建空会话。也可以在首次 `tab_open`、`page_snapshot` 或 `page_screenshot` 上用 `--session new`。后续用响应中的 `sessionId` 自动路由。会话绑定一个浏览器与传输，页面在首次使用时关联。同一页面只允许一个会话控制，会话之间共享 Cookie 和存储。
 
 `sessionId` 是形如 `s_aB3d_E-f` 的短 ID。会话及其浏览器、传输映射保存在常驻控制宿主的内存中；新的 CLI 进程会内部查询本机和远端宿主完成路由，无需调用方保存或传递路由信息，也不写入会话映射文件。控制宿主退出后会话失效。
 
@@ -170,13 +170,13 @@ SDK 宿主可从 `@mearl/client/script` 导入 `executeScript(code, options)`，
 ```bash
 mearl tab_open --session new --payload '{"url":"https://example.com"}'
 mearl page_snapshot --session '<sessionId>' --payload '{"tabId":12345}'
-mearl browser_control --session '<sessionId>' --payload '{"operation":"handoff","reason":"请完成扫码"}'
+mearl session_manage --session '<sessionId>' --payload '{"operation":"handoff","reason":"请完成扫码"}'
 mearl page_download --session '<sessionId>' --payload '{"tabId":12345,"trigger":{"selector":"#export"}}' --output /absolute/path/report.csv
 mearl page_upload --session '<sessionId>' --payload '{"tabId":12345,"selector":"input[type=file]","files":[{"filePath":"/absolute/path/report.csv"}]}'
-mearl browser_release --session '<sessionId>' --payload '{"closeCreatedTabs":true,"keepTabIds":[12345]}'
+mearl session_manage --session '<sessionId>' --payload '{"operation":"end","closeCreatedTabs":true,"keepTabIds":[12345]}'
 ```
 
-用户在 Popup 的浏览器管理页接管、交还或结束会话。交接后排队旧请求和批次后续步骤停止；已派发动作可能仍然生效。交还后重新取快照。CDP-only 环境可在用户明确确认后用同一 `browser_control` 的 `operation:"resume"` 交还，无需额外 action。会话跨 CLI 连接保留，宿主进程退出后失效；不会根据空闲时间清理用户正在操作的会话。
+用户在 Popup 的浏览器管理页接管、交还或结束会话。交接后排队旧请求和批次后续步骤停止；已派发动作可能仍然生效。交还后重新取快照。CDP-only 环境可在用户明确确认后用同一 `session_manage` 的 `operation:"resume"` 交还，无需额外 action。会话跨 CLI 连接保留，宿主进程退出后失效；不会根据空闲时间清理用户正在操作的会话。
 
 扩展中新开的后台页面默认加入折叠的 `Mearl` 标签组，前台新页进入展开的 `Mearl · 待操作` 组。两个管理组统一复用同一个已有窗口，同名管理组会合并；页面打开的后续标签也收进该窗口，并继承源组的展开状态。工作窗口关闭后重新选择已有窗口，不额外创建窗口。显式传入 `tab_open.group` 时使用指定分组；复用普通页面时保留原窗口和分组。接管会话只把管理组内的会话页面移入待操作组；交还后，仍在待操作组内的会话页面收回 `Mearl` 组。用户正在查看组内其他页面，或窗口没有其他可显示页面时，保留展开状态。
 
@@ -198,7 +198,7 @@ npx @mearl/setup provider install @example/mearl-provider-device
 mearl example-device --help
 
 # Provider 启动参数统一放在 providerOptions
-mearl browser_launch --payload '{"provider":"example-device","providerOptions":{}}'
+mearl browser_manage --payload '{"operation":"launch","provider":"example-device","providerOptions":{}}'
 mearl browser_list
 
 # 后续操作使用 browser_list 返回的全局 Browser ID
@@ -209,9 +209,9 @@ npx @mearl/setup provider update example-device
 npx @mearl/setup provider uninstall example-device
 ```
 
-`browser_launch` 创建 `pairing` 实例时会直接返回 `pairing.url` 和可选的配对码；Agent 应把 URL 直接渲染为
+`browser_manage` 创建 `pairing` 实例时会直接返回 `pairing.url` 和可选的配对码；Agent 应把 URL 直接渲染为
 二维码交给用户，扫码后确认同一 Browser ID 变为 `connected`，再开始页面操作。在设备连入前
-该实例不会成为默认操作目标；可用 `browser_close` 删除对应 Provider 实例。每个 Provider
+该实例不会成为默认操作目标；可用 `browser_manage close` 删除对应 Provider 实例。每个 Provider
 只接收它为该浏览器显式声明支持的 actions，截图能力同时标明为原生截图、重建画面或不支持。
 
 输入不存在或拼写有误的 action 时，CLI 会基于可用命令和常见别名直接返回最多三个候选及调用示例，
@@ -230,7 +230,7 @@ npx @mearl/setup provider uninstall example-device
 
 CLI、SDK、MCP 使用同一返回结构。快照中的 `@eN` 可直接用于操作，内部节点映射只保存在运行时。
 常规响应的 `session` 包含会话 ID、浏览器、传输、状态和代次；标签页清单通过 `tab_list` 查询，
-`browser_control` 的普通会话交接结果包含会话页面的 `tabs`。外部 Provider 不传 `session`，返回 `{ controlSessionMode: "external", operation, control }`；支持的 Provider 可用 `operation: "finish"` 和 `keepTabIds` 完成任务并保留结果页。`run_actions` 的步骤使用各 action 的返回结构。
+`session_manage` 的普通会话交接结果包含会话页面的 `tabs`。外部 Provider 不传 `session`，返回 `{ controlSessionMode: "external", operation, control }`；支持的 Provider 可用 `operation: "end"` 和 `keepTabIds` 完成任务并保留结果页。`run_actions` 的步骤使用各 action 的返回结构。
 stdout 在管道或重定向时默认输出紧凑 JSON，在交互终端默认美化；`--compact` 可强制紧凑排版，不改变返回字段和值。快照会折叠无名称、无 ref 且无状态的分组，控件状态与文本内容完整保留。
 
 `get_requests` 指定非空 `fields` 时默认省略请求体和响应体，只返回提取字段及请求元数据；
@@ -250,7 +250,7 @@ Mearl 默认聚合当前机器和已配置 cloud-server 下的浏览器，并通
 | `--local`                | 只使用当前机器                        |
 | `--server <url>`         | 覆盖自动读取的 cloud-server 地址      |
 
-`browser_list --help` 和 `browser_launch --help` 会按场景展示宿主选择参数；连接或传输排障运行
+`browser_list --help` 和 `browser_manage --help` 会按场景展示宿主选择参数；连接或传输排障运行
 `mearl check --help`。`mearl check` 检查连接与浏览器状态；`mearl check --updates` 还会并发查询
 client、native-host、cloud-connector 和扩展的最新发布版本。发布版本查询最长等待约 1.5 秒，
 无法访问发布源时会提示无法确认更新，不影响浏览器可用性检查。`--json` 输出机器可读的检查结果，
@@ -469,11 +469,12 @@ Node 插件在运行 CLI、SDK 或 MCP Server 的宿主上执行，不随浏览�
 | 页面运行时    | `page_runtime`（内部文档适配，插件使用 `app.page`） |
 | 组合调用      | `run_actions`                                                                                                                        |
 | 环境与 Cookie | `set_device_emulation` `set_app_profile` `set_timezone` `get_cookie` `set_cookie`                                                     |
-| 浏览器        | `browser_list` `browser_launch` `browser_release` `browser_close`                                                                    |
+| 浏览器 | `browser_list` `browser_manage` |
+| 控制会话 | `session_list` `session_manage` |
 
 页面交互动作（`page_click` / `page_drag` / `page_type` / `page_hover` / `page_scroll` / `page_press` / `page_upload`）默认等待异步稳定并返回 `{ action, observation }`。参数、ref 或目标解析在派发前失败时返回 `action.stage: "precondition"`，省略无意义的 `observation` / `diagnostics`；浏览器可能已收到输入但确认超时时返回 `action.stage: "dispatch-uncertain"`，并保留 observation 供核验当前状态。能够在超时前确定的目标、命中、坐标、派发模式和输入序列状态保存在 `action.attempt`，它是诊断证据，不表示动作已经生效。失败时 CLI 退出码为 1。传 `observe: false` 可执行裸动作；需要同一动作期间的新增 error logs 和业务 requests 时传 `diagnostics: true`，埋点通过 `diagnostics.events` 按需开启。`page_eval` 默认裸执行，可按需开启观察或诊断。
 
-`tab_open active:true` 请求激活目标页。扩展免打扰默认开启：HTTP(S) 页面在首次导航前启用后台焦点模拟，不切换标签页或窗口；关闭免打扰才会真实激活并恢复最小化窗口。`activation.mode` 区分 `background` / `foreground`，模拟后的 `visibilityState` 不代表窗口在前台。焦点模拟在交接、释放控制或扩展连接断开时关闭，`preserveEnvironment` 不保留它；交还后按需对同 URL 使用 `reuse:"require", active:true` 再次激活。不带会话时通过 `browser_release` 收尾。纯 CDP 和外部 Provider 遵循各自的激活能力。页面动作的稳定观察会在有限预算内等待有限时长 CSS 动画。selector/ref 点击遇到嵌套滚动裁剪时会先滚动目标，仍不可见时才以明确的裁剪错误停止。
+`tab_open active:true` 请求激活目标页。扩展免打扰默认开启：HTTP(S) 页面在首次导航前启用后台焦点模拟，不切换标签页或窗口；关闭免打扰才会真实激活并恢复最小化窗口。`activation.mode` 区分 `background` / `foreground`，模拟后的 `visibilityState` 不代表窗口在前台。焦点模拟在交接、释放控制或扩展连接断开时关闭，`preserveEnvironment` 不保留它；交还后按需对同 URL 使用 `reuse:"require", active:true` 再次激活。不带会话时通过 `browser_manage release` 收尾。纯 CDP 和外部 Provider 遵循各自的激活能力。页面动作的稳定观察会在有限预算内等待有限时长 CSS 动画。selector/ref 点击遇到嵌套滚动裁剪时会先滚动目标，仍不可见时才以明确的裁剪错误停止。
 
 扩展模式下，`tab_open` 传入 `appProfile` 会应用 App 环境。需要模拟 WebView 和系统栏时，设置 `emulation.deviceShell: true`。对于使用单个 WebView 的受支持固定机型，扩展会沿用快捷设置里保存的**手机壳**偏好。Agent 的页面操作以当前业务 WebView 为目标。
 
@@ -493,16 +494,16 @@ Node 插件在运行 CLI、SDK 或 MCP Server 的宿主上执行，不随浏览�
 
 `browser_list` 统一列出普通浏览器、Provider 浏览器和托管浏览器。`type` 区分
 `regular` / `managed`，`status` 区分 `connected` / `pairing` / `running_disconnected` /
-`stopped`；只有 `connected` 的浏览器可作为常规操作目标。用 CDP Provider 接入已开启远程调试的浏览器：
+`stopped`；只有 `connected` 的浏览器可作为常规操作目标。本机没有已连接的扩展或已接入的 CDP 实例时，`browser_list` 会通过 CDP Provider 发现已开启远程调试的默认 Chrome。直接执行浏览器命令时，如果没有可用目标，也会尝试发现。可以用下列命令显式接入。
 
 ```bash
-mearl browser_launch --local --payload '{"provider":"cdp","providerOptions":{}}'
+mearl browser_manage --local --payload '{"operation":"attach","provider":"cdp","providerOptions":{}}'
 ```
 
 需要指定调试端口时传入 `providerOptions.port`。用响应中的 `browserId` 执行 `check --browser` 或页面操作。设置 `MEARL_SOCKET_PATH` 时，清单请求沿用该实例 Socket。
 
-`browser_release` 仅在用户明确要求结束调试、退出接管或清理会话资源时调用；它会释放
-debugger/CDP 控制和会话级临时状态，保留浏览器及全部标签页。托管实例的启动、关闭、持久化、
+`browser_manage` 的 `release` 清理 debugger/CDP 控制及临时状态，保留浏览器、标签页和原有接入。
+`detach` 断开接入并保留浏览器。托管实例的启动、关闭、持久化、
 接入和登录态同步语义由各 Provider 声明；运行 `mearl <providerId>` 获取当前说明。访问入口不在
 `browser_list` 中，需要时显式运行 `mearl check --browser <id|名称>`，并把返回的
 `browserAccess.url` 按敏感信息处理。

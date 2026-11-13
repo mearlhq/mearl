@@ -567,7 +567,7 @@ export class CdpSession {
       : null;
     if (this.requireActivePortFile && fileInfo?.port !== this.port)
       throw new Error(
-        'The Chrome profile debugging port changed during attachment. Run browser_launch again.',
+        'The Chrome profile debugging port changed during attachment. Run browser_manage with operation "attach" again.',
       );
     if (fileInfo) {
       return { url: `ws://localhost:${fileInfo.port}${fileInfo.browserWsPath}` };

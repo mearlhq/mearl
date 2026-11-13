@@ -64,6 +64,10 @@ export class CdpBrowserProvider implements HostBrowserProvider {
     return this.options.args.daemon && !this.options.args.skipBrowserRegistration;
   }
 
+  get isConnected(): boolean {
+    return this.published;
+  }
+
   get isAttached(): boolean {
     return this.published && this.options.args.attachCdp;
   }
@@ -208,12 +212,15 @@ export class CdpBrowserProvider implements HostBrowserProvider {
 
   async release() {
     const session = this.session;
+    this.autoReconnectEnabled = false;
     try {
       if (session) return await releaseCdpControl(session);
     } catch (error) {
       session?.close();
       throw error;
     } finally {
+      this.pageHost?.dispose();
+      this.pageHost = undefined;
       this.session = null;
       this.autoReconnectEnabled = false;
     }
@@ -339,7 +346,7 @@ export class CdpBrowserProvider implements HostBrowserProvider {
   private monitorConnection(): void {
     if (this.registrationTimer) return;
     this.registrationTimer = setInterval(() => {
-      if (this.session?.hasActiveConnections()) return;
+      if (!this.autoReconnectEnabled || this.session?.hasActiveConnections()) return;
       this.unpublish();
       clearInterval(this.registrationTimer);
       this.registrationTimer = undefined;

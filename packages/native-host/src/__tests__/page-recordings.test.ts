@@ -57,7 +57,7 @@ describe('page_record', () => {
         totalBytes: bytes.length,
       });
     } finally {
-      await manager.invoke('browser_release', {});
+      await manager.releaseBrowser(async () => {});
       await manager.artifacts.dispose();
     }
   });
@@ -86,7 +86,7 @@ describe('page_record', () => {
       });
       expect(stream.stop).toHaveBeenCalledTimes(1);
     } finally {
-      await manager.invoke('browser_release', {});
+      await manager.releaseBrowser(async () => {});
       await manager.artifacts.dispose();
     }
   });
@@ -124,7 +124,7 @@ describe('page_record', () => {
       });
       expect(stream.stop).toHaveBeenCalledOnce();
     } finally {
-      await manager.invoke('browser_release', {});
+      await manager.releaseBrowser(async () => {});
       await manager.artifacts.dispose();
     }
   });
@@ -145,7 +145,7 @@ describe('page_record', () => {
       expect(stream.isAlive).toHaveBeenCalledOnce();
       expect(stream.stop).not.toHaveBeenCalled();
     } finally {
-      await manager.invoke('browser_release', {});
+      await manager.releaseBrowser(async () => {});
       await manager.artifacts.dispose();
     }
   });
@@ -172,7 +172,7 @@ describe('page_record', () => {
       expect(status.recording).toBeUndefined();
       expect(stream.close).toHaveBeenCalledOnce();
     } finally {
-      await manager.invoke('browser_release', {});
+      await manager.releaseBrowser(async () => {});
       await manager.artifacts.dispose();
     }
   });
@@ -196,7 +196,7 @@ describe('page_record', () => {
         tabId: 42,
       });
     } finally {
-      await manager.invoke('browser_release', {});
+      await manager.releaseBrowser(async () => {});
       await manager.artifacts.dispose();
     }
   });
@@ -240,7 +240,7 @@ describe('page_record', () => {
         ),
       ).rejects.toThrow('RECORDING_NOT_FOUND');
     } finally {
-      await manager.invoke('browser_release', {}, session.sessionId);
+      await manager.manageSession({ operation: 'end' }, session.sessionId);
       await manager.artifacts.dispose();
     }
   });
@@ -255,8 +255,8 @@ describe('page_record', () => {
         await manager.userControl(session.sessionId, operation);
         expect(stream.close).toHaveBeenCalledOnce();
       } finally {
-        await manager.invoke('browser_release', {}, session.sessionId);
-        await manager.invoke('browser_release', {});
+        await manager.manageSession({ operation: 'end' }, session.sessionId);
+        await manager.releaseBrowser(async () => {});
         await manager.artifacts.dispose();
       }
       await expect(

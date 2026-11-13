@@ -77,13 +77,7 @@ describe('external Provider control', () => {
     const { service, browser, request } = fixture();
     browser.capabilities!.controlSessionMode = 'external';
     for (const session of ['new', 's_existing', '']) {
-      for (const action of [
-        'page_snapshot',
-        'tab_open',
-        'browser_release',
-        'get_versions',
-        'browser_instances',
-      ]) {
+      for (const action of ['page_snapshot', 'tab_open', 'get_versions', 'browser_instances']) {
         await expect(
           service.invoke(browser.browserId, action, { tabId: 7 }, session),
         ).rejects.toThrow('CONTROL_SESSION_UNSUPPORTED');
@@ -97,12 +91,14 @@ describe('external Provider control', () => {
     const { service, browser, request } = fixture();
     browser.capabilities!.controlSessionMode = 'external';
     browser.operations = ['handoff', 'resume', 'finish'];
-    for (const operation of ['handoff', 'resume', 'finish']) {
-      await service.invoke(browser.browserId, 'browser_control', { operation });
+    for (const operation of ['handoff', 'resume', 'end']) {
+      await expect(
+        service.invoke(browser.browserId, 'session_manage', { operation }),
+      ).resolves.toMatchObject({ operation });
       expect(request).toHaveBeenLastCalledWith(
         browser,
         'browser_control',
-        { operation },
+        { operation: operation === 'end' ? 'finish' : operation },
         'local',
         undefined,
       );
@@ -110,19 +106,29 @@ describe('external Provider control', () => {
     expect(service.list()).toEqual([]);
     const calls = request.mock.calls.length;
     await expect(
-      service.invoke(browser.browserId, 'browser_control', {
-        operation: 'finish',
+      service.invoke(browser.browserId, 'session_manage', {
+        operation: 'end',
         keepTabIds: [-1],
       }),
     ).rejects.toThrow('keepTabIds');
     await expect(
-      service.invoke(browser.browserId, 'browser_control', { operation: 'resume' }, 'new'),
+      service.invoke(browser.browserId, 'session_manage', { operation: 'resume' }, 'new'),
     ).rejects.toThrow('CONTROL_SESSION_UNSUPPORTED');
     browser.operations = [];
     await expect(
-      service.invoke(browser.browserId, 'browser_control', { operation: 'handoff' }),
+      service.invoke(browser.browserId, 'session_manage', { operation: 'handoff' }),
     ).rejects.toThrow('does not support');
     expect(request).toHaveBeenCalledTimes(calls);
+  });
+
+  it('releases Provider control without detaching the instance', async () => {
+    const { service, browser, request } = fixture();
+    browser.capabilities!.actions.push('browser_release');
+    await service.invoke(browser.browserId, 'browser_manage', { operation: 'release' });
+    expect(request.mock.calls.map(call => call[1])).toEqual(['browser_release']);
+    await expect(service.invoke(browser.browserId, 'browser_release', {})).rejects.toThrow(
+      'browser_manage',
+    );
   });
 
   it('keeps ordinary validation and artifact handling without creating a task session or clearing the page', async () => {
@@ -141,7 +147,7 @@ describe('external Provider control', () => {
       filename: 'data.txt',
     });
     expect(artifact.artifact.artifactId).toBeTruthy();
-    await service.invoke(browser.browserId, 'browser_release');
+    await service.invoke(browser.browserId, 'browser_manage', { operation: 'detach' });
     expect(request.mock.calls.map(call => call[1])).toEqual(['page_snapshot', 'browser_instances']);
     expect(request.mock.calls[1]![2]).toEqual({ operation: 'detach' });
     expect(service.list()).toEqual([]);
@@ -518,12 +524,7 @@ describe('Mearl control over ordinary Provider actions', () => {
       id,
     );
     await started;
-    await service.invoke(
-      browser.browserId,
-      'browser_control',
-      { operation: 'handoff', tabId: 7 },
-      id,
-    );
+    await service.invoke(browser.browserId, 'session_manage', { operation: 'handoff' }, id);
     finish();
     expect(await batch).toMatchObject({
       completedSteps: 1,
@@ -574,21 +575,21 @@ describe('Mearl control over ordinary Provider actions', () => {
       { url: 'https://result.example', reuse: 'never' },
       id,
     );
-    await expect(service.invoke(browser.browserId, 'browser_close', {})).rejects.toThrow(
-      'ACTIVE_CONTROL_SESSIONS',
-    );
-    await expect(service.invoke(browser.browserId, 'browser_release', {})).rejects.toThrow(
-      'ACTIVE_CONTROL_SESSIONS',
-    );
+    await expect(
+      service.invoke(browser.browserId, 'browser_manage', { operation: 'close' }),
+    ).rejects.toThrow('ACTIVE_CONTROL_SESSIONS');
+    await expect(
+      service.invoke(browser.browserId, 'browser_manage', { operation: 'detach' }),
+    ).rejects.toThrow('ACTIVE_CONTROL_SESSIONS');
     await service.invoke(
       browser.browserId,
-      'browser_release',
-      { closeCreatedTabs: true, keepTabIds: [8] },
+      'session_manage',
+      { operation: 'end', closeCreatedTabs: true, keepTabIds: [8] },
       id,
     );
     expect(request.mock.calls.map(call => call[1])).toEqual(['page_snapshot', 'tab_open']);
     await service.invoke(browser.browserId, 'page_click', { tabId: 7 });
-    await service.invoke(browser.browserId, 'browser_release', {});
+    await service.invoke(browser.browserId, 'browser_manage', { operation: 'detach' });
     expect(request).toHaveBeenLastCalledWith(
       browser,
       'browser_instances',
@@ -610,8 +611,8 @@ describe('Mearl control over ordinary Provider actions', () => {
     );
     await service.invoke(
       browser.browserId,
-      'browser_release',
-      { closeCreatedTabs: true, preserveEnvironment: false },
+      'session_manage',
+      { operation: 'end', closeCreatedTabs: true, preserveEnvironment: false },
       id,
     );
     const closed = request.mock.calls.filter(call => call[1] === 'tab_close');
@@ -620,7 +621,7 @@ describe('Mearl control over ordinary Provider actions', () => {
       { tabId: 7, apiName: 'api.example', enabled: false },
       { tabId: 8, apiName: 'api.example', enabled: false },
     ]);
-    expect(request.mock.calls.some(call => call[1] === 'browser_release')).toBe(false);
+    expect(request.mock.calls.some(call => call[1] === 'browser_instances')).toBe(false);
   });
 
   it('checks reuse before dispatch so opening cannot mutate another task page', async () => {
@@ -645,8 +646,8 @@ describe('Mearl control over ordinary Provider actions', () => {
     await expect(
       service.invoke(
         browser.browserId,
-        'browser_release',
-        { preserveEnvironment: false },
+        'session_manage',
+        { operation: 'end', preserveEnvironment: false },
         opened.session.sessionId,
       ),
     ).rejects.toThrow('Timezone reset failed');
@@ -695,8 +696,8 @@ describe('Mearl control over ordinary Provider actions', () => {
     expect(await readFile(upload.filePaths[0], 'utf8')).toBe('report');
     await service.invoke(
       browser.browserId,
-      'browser_release',
-      { keepArtifactIds: [artifactId] },
+      'session_manage',
+      { operation: 'end', keepArtifactIds: [artifactId] },
       id,
     );
     expect(
@@ -761,7 +762,7 @@ describe('Mearl control over ordinary Provider actions', () => {
       );
       const uploadPath = request.mock.calls.at(-1)![2].filePaths[0];
       expect(await readFile(uploadPath, 'utf8')).toBe('downloaded report');
-      await service.invoke(browser.browserId, 'browser_release', {}, id);
+      await service.invoke(browser.browserId, 'session_manage', { operation: 'end' }, id);
       await expect(access(uploadPath)).rejects.toMatchObject({ code: 'ENOENT' });
     } finally {
       await rm(directory, { recursive: true, force: true });

@@ -117,8 +117,8 @@ describe('getTopLevelDomain', () => {
 });
 
 describe('actionRequiresDomainCheck', () => {
-  it('allows browser_release to relinquish control without page authorization', () => {
-    expect(actionRequiresDomainCheck('browser_release')).toBe(false);
+  it('allows browser_manage release to relinquish control without page authorization', () => {
+    expect(actionRequiresDomainCheck('__control_release')).toBe(false);
   });
 
   it('reloads the extension independently of the active page domain', () => {

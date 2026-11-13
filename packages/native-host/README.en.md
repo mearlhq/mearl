@@ -79,7 +79,7 @@ Chrome Extension
 @mearl/client  /  @mearl/cloud-connector
 ```
 
-`browser_launch` starts a native-host child with independent CDP configuration for each managed Chrome, making concurrent headless/profile instances addressable in the browser registry. External Providers may reuse generic page actions through private remote CDP. Providers still own remote credentials, lifecycle, and file staging.
+`browser_manage` with `launch` starts a native-host child with independent CDP configuration for each managed Chrome, making concurrent headless/profile instances addressable in the browser registry. External Providers may reuse generic page actions through private remote CDP. Providers still own remote credentials, lifecycle, and file staging.
 
 ## Sidebar Agent Chat
 

@@ -10,7 +10,7 @@ describe('extension service boundary', () => {
     'browser_sessions',
     'browser_instances',
     'browser_providers',
-    'browser_launch',
+    'browser_manage',
     'agent_chat_start',
     'agent_skills_install',
     'start_cloud_connector',

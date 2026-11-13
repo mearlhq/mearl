@@ -119,7 +119,7 @@ describe('UnifiedClient browser routing', () => {
     expect(invokeLocal).not.toHaveBeenCalled();
   });
 
-  it('keeps Provider pairing metadata on the global browser_launch response', async () => {
+  it('keeps Provider pairing metadata on the global browser_manage response', async () => {
     invokeLocal.mockResolvedValue({
       browserId: 'provider:example-device:pairing_fixture',
       name: '真机',
@@ -133,7 +133,11 @@ describe('UnifiedClient browser routing', () => {
     const client = new UnifiedClient();
 
     await expect(
-      client.invoke('browser_launch', { provider: 'example-device', providerOptions: {} }),
+      client.invoke('browser_manage', {
+        operation: 'launch',
+        provider: 'example-device',
+        providerOptions: {},
+      }),
     ).resolves.toEqual({
       browserId: 'mearl:local:provider:example-device:pairing_fixture',
       originalBrowserId: 'provider:example-device:pairing_fixture',
@@ -303,8 +307,9 @@ describe('UnifiedClient browser routing', () => {
     invokeLocal.mockResolvedValue({ count: 0, connectedCount: 0, browsers: [] });
     const { client, send } = createConnectedClient();
     const launchPromise = client.invoke(
-      'browser_launch',
+      'browser_manage',
       {
+        operation: 'launch',
         provider: 'example-cloud',
         providerOptions: { name: 'cloud-browser' },
       },
@@ -315,9 +320,10 @@ describe('UnifiedClient browser routing', () => {
     respond(client, send, 0, { count: 1, connectors: [CONNECTOR] });
     await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(2));
     expect(messageAt(send, 1)).toMatchObject({
-      action: 'browser_launch',
+      action: 'browser_manage',
       connector: 'node-a',
       data: {
+        operation: 'launch',
         provider: 'example-cloud',
         providerOptions: { name: 'cloud-browser' },
       },
@@ -339,15 +345,41 @@ describe('UnifiedClient browser routing', () => {
       source: { kind: 'remote', connectorId: 'node-a', connectorName: 'work-mac' },
     });
 
-    const closePromise = client.invoke('browser_close', { browser: launched.browserId });
+    const closePromise = client.invoke(
+      'browser_manage',
+      { operation: 'close' },
+      { browser: launched.browserId },
+    );
     await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(3));
     expect(messageAt(send, 2)).toMatchObject({
-      action: 'browser_close',
+      action: 'browser_manage',
       connector: 'node-a',
-      data: { browser: 'example-cloud:session-a' },
+      browser: 'example-cloud:session-a',
+      data: { operation: 'close' },
     });
     respond(client, send, 2, { closed: true });
     await expect(closePromise).resolves.toEqual({ closed: true });
+  });
+
+  it('lists sessions across hosts with globally routable browser IDs', async () => {
+    invokeLocal.mockResolvedValue({
+      sessions: [{ sessionId: 's_abcdefgh', browserId: 'local-chrome' }],
+    });
+    const { client, send } = createConnectedClient();
+    const pending = client.invoke('session_list');
+    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1));
+    respond(client, send, 0, { connectors: [CONNECTOR] });
+    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(2));
+    expect(messageAt(send, 1)).toMatchObject({ action: 'session_list', connector: 'node-a' });
+    respond(client, send, 1, {
+      sessions: [{ sessionId: 's_ijklmnop', browserId: 'remote-chrome' }],
+    });
+    await expect(pending).resolves.toEqual({
+      sessions: [
+        { sessionId: 's_abcdefgh', browserId: 'mearl:local:local-chrome' },
+        { sessionId: 's_ijklmnop', browserId: 'mearl:remote:node-a:remote-chrome' },
+      ],
+    });
   });
 
   it('uses MEARL_BROWSER while resolving targets across local and remote sources', async () => {

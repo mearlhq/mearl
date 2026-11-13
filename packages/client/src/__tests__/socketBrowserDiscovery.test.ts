@@ -91,11 +91,12 @@ function createBrowserListSocket(): MockSocket {
                     transport: browser.transport,
                   })),
                 {
-                  browserId: 'cdp',
+                  browserId: 'cdp:9222',
                   name: 'CDP',
-                  type: 'regular',
+                  type: 'managed',
                   status: 'connected',
                   transport: 'cdp',
+                  provider: { id: 'cdp', name: 'CDP', builtin: true },
                 },
               ],
             },
@@ -169,8 +170,14 @@ describe('browser_list local inventory', () => {
     await expect(resultPromise).resolves.toMatchObject({
       count: 1,
       connectedCount: 1,
-      defaultBrowserId: 'cdp',
-      browsers: [expect.objectContaining({ browserId: 'cdp', transport: 'cdp' })],
+      defaultBrowserId: 'cdp:9222',
+      browsers: [
+        expect.objectContaining({
+          browserId: 'cdp:9222',
+          transport: 'cdp',
+          provider: expect.objectContaining({ id: 'cdp' }),
+        }),
+      ],
     });
     expect(spawnMock).toHaveBeenCalledWith(
       'mearl-native-host',
@@ -196,10 +203,10 @@ describe('browser_list local inventory', () => {
     await expect(resultPromise).resolves.toMatchObject({
       count: 2,
       connectedCount: 1,
-      defaultBrowserId: 'cdp',
+      defaultBrowserId: 'cdp:9222',
       browsers: [
         expect.objectContaining({ browserId: 'provider:example-device:device', status: 'pairing' }),
-        expect.objectContaining({ browserId: 'cdp', transport: 'cdp' }),
+        expect.objectContaining({ browserId: 'cdp:9222', transport: 'cdp' }),
       ],
     });
     expect(spawnMock).toHaveBeenCalledWith(
@@ -217,7 +224,7 @@ describe('browser_list local inventory', () => {
     const resultPromise = invoke('browser_list');
     await vi.runAllTimersAsync();
     await expect(resultPromise).resolves.toMatchObject({
-      browsers: [expect.objectContaining({ browserId: 'cdp' })],
+      browsers: [expect.objectContaining({ browserId: 'cdp:9222' })],
     });
     expect(createConnectionMock).toHaveBeenCalledWith('/tmp/pinned-host.sock');
     expect(spawnMock).not.toHaveBeenCalled();
@@ -238,7 +245,7 @@ describe('browser_list local inventory', () => {
     await vi.runAllTimersAsync();
 
     await expect(resultPromise).resolves.toMatchObject({
-      browsers: [expect.objectContaining({ browserId: 'cdp' })],
+      browsers: [expect.objectContaining({ browserId: 'cdp:9222' })],
     });
     expect(createConnectionMock).toHaveBeenCalledWith('/tmp/managed-a.sock');
     expect(spawnMock).not.toHaveBeenCalled();
@@ -276,7 +283,7 @@ describe('browser_list local inventory', () => {
 
     const resultPromise = invoke('browser_list');
     await vi.runAllTimersAsync();
-    await expect(resultPromise).resolves.toMatchObject({ defaultBrowserId: 'cdp' });
+    await expect(resultPromise).resolves.toMatchObject({ defaultBrowserId: 'cdp:9222' });
 
     expect(createConnectionMock).toHaveBeenCalledTimes(2);
     expect(createConnectionMock).toHaveBeenNthCalledWith(2, DISCOVERY_SOCKET_PATH);

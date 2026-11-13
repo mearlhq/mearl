@@ -287,7 +287,7 @@ describe('runMearlCli', () => {
     expect(help).toContain('复用配对码（必填：debugId）');
     expect(help).toContain('token');
     expect(help).toContain('敏感');
-    expect(help).toContain('mearl browser_launch');
+    expect(help).toContain('mearl browser_manage');
   });
 
   it('appends commands from a registered same-name plugin to Provider help', async () => {
@@ -397,7 +397,7 @@ describe('runMearlCli', () => {
     expect(listHelp).not.toContain('--cdp');
     expect(listHelp).not.toContain('--server');
 
-    await expect(runMearlCli(['browser_launch', '--help'])).resolves.toBe(0);
+    await expect(runMearlCli(['browser_manage', '--help'])).resolves.toBe(0);
     const launchHelp = String(error.mock.calls.at(-1)?.[0]);
     expect(launchHelp).toContain('宿主选择（本机与远端同时可用时）');
     expect(launchHelp).toContain('--local');

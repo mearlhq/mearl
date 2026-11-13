@@ -29,7 +29,10 @@ import { Utf8LineBuffer } from './socketLines.js';
 import {
   isAgentServiceAction,
   isExtensionBrowserAction,
-  isBrowserCommandAction,
+  parseBrowserManageParams,
+  parseSessionManageParams,
+  resolveSessionManageId,
+  type BrowserManageParams,
   isToolboxServiceAction,
   ExtensionRpcError,
   type HostToExtensionActionMap,
@@ -42,6 +45,7 @@ import {
   type AgentChatRunOptions,
   type BrowserTransport,
   type BrowserReleaseFailure,
+  type BrowserReleaseResult,
   type ControlSource,
 } from '@mearl/browser-core';
 import {
@@ -73,7 +77,7 @@ import {
   type SandboxBrowserAccessCapability,
 } from './sandbox-browser-access.js';
 import { CdpBrowserProvider } from './builtin-providers/cdp.js';
-import { createCdpAttachProvider } from './builtin-providers/cdp-attach.js';
+import { CDP_PROVIDER, createCdpAttachProvider } from './builtin-providers/cdp-attach.js';
 import { ExtensionBrowserProvider } from './builtin-providers/extension.js';
 import { createLocalBrowserProvider } from './builtin-providers/local.js';
 import type { HostBrowserProvider } from './builtin-providers/host-browser-provider.js';
@@ -694,19 +698,21 @@ function getBrowserProviderCoordinator(): BrowserProviderCoordinator {
   return browserProviderCoordinator;
 }
 
-async function launchBrowser(data: any, deadline?: number): Promise<any> {
-  return getBrowserProviderCoordinator().launch(data, deadline);
+function openBrowser(
+  { operation, ...params }: Extract<BrowserManageParams, { operation: 'launch' | 'attach' }>,
+  deadline?: number,
+) {
+  return getBrowserProviderCoordinator().launch(params, deadline, operation);
 }
 
 async function closeBrowser(
   data: any,
-  request?: { deadline?: number; controlSource: ControlSource },
+  request: { deadline?: number; controlSource: ControlSource },
 ): Promise<any> {
   const selector = String(data?.browser ?? data?.browserId ?? data?.name ?? '').trim();
   if (!selector) throw new Error('browser is required');
   const deleteProfile = data?.deleteProfile === true;
   const coordinator = getBrowserProviderCoordinator();
-  if (!request) return coordinator.close(selector, deleteProfile);
   const { deadline, controlSource } = request;
   return coordinator.close(selector, deleteProfile, (close, localBrowserId) => {
     assertBrowserRequestDeadline(deadline);
@@ -723,8 +729,8 @@ async function closeBrowser(
       if (!owner) return close();
       return requestBrowserSocket(
         owner.socketPath,
-        'browser_close',
-        { browser: localBrowserId, deleteProfile },
+        'browser_manage',
+        { operation: 'close', browser: localBrowserId, deleteProfile },
         NATIVE_HOST_VERSION,
         undefined,
         localBrowserId,
@@ -732,10 +738,7 @@ async function closeBrowser(
         { deadline, controlSource },
       );
     }
-    return registry.releaseBrowser(() => {
-      assertBrowserRequestDeadline(deadline);
-      return close();
-    });
+    return close();
   });
 }
 
@@ -1017,14 +1020,26 @@ async function handleExtensionControlMessage(
     return;
   }
 
-  if (action === 'browser_launch') {
-    const result = await launchBrowser(data);
-    sendToExtension({ id, success: true, data: result });
-    return;
-  }
-
-  if (action === 'browser_close') {
-    const result = await closeBrowser(data);
+  if (action === 'browser_manage') {
+    const { browser, ...params } = data;
+    const command = parseBrowserManageParams(params);
+    let result;
+    if (command.operation === 'launch' || command.operation === 'attach') {
+      result = await openBrowser(command);
+    } else if (typeof browser !== 'string' || !browser.trim()) {
+      throw new Error('browser is required');
+    } else if (command.operation === 'close') {
+      result = await closeBrowser(
+        { browser, deleteProfile: command.deleteProfile },
+        {
+          controlSource: 'local',
+        },
+      );
+    } else if (command.operation === 'detach') {
+      result = await getBrowserProviderCoordinator().detach(browser);
+    } else {
+      throw new Error('Invalid browser management operation for the extension');
+    }
     sendToExtension({ id, success: true, data: result });
     return;
   }
@@ -1145,6 +1160,60 @@ function browserProvider(
   );
 }
 
+async function releaseBrowserControl(): Promise<BrowserReleaseResult> {
+  const startedAt = Date.now();
+  const affectedTabIds = new Set<number>();
+  const transports: Array<'extension' | 'cdp'> = [];
+  const failures: BrowserReleaseFailure[] = [];
+  let released = true;
+  let hadActiveControl = false;
+  try {
+    const releaseErrors: string[] = [];
+    for (const transport of ['extension', 'cdp'] as const) {
+      if (transport === 'cdp' && (!isDaemonMode || inventoryOnly)) continue;
+      try {
+        const result = await browserProvider(transport).release({});
+        released = released && result?.released !== false;
+        hadActiveControl = hadActiveControl || result?.hadActiveControl === true;
+        if (result?.hadActiveControl) transports.push(transport);
+        for (const tabId of result?.affectedTabIds ?? []) affectedTabIds.add(tabId);
+        if (Array.isArray(result?.failures)) failures.push(...result.failures);
+      } catch (error) {
+        releaseErrors.push(
+          `${transport}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    if (releaseErrors.length > 0) {
+      throw new Error(`Failed to fully release browser control (${releaseErrors.join('; ')})`);
+    }
+
+    trackAction('browser_manage', {
+      success: released,
+      transport: transports.join('+') || 'none',
+      duration_ms: Date.now() - startedAt,
+      extension_version: extensionProvider.version ?? 'not_connected',
+    });
+    return {
+      released,
+      hadActiveControl,
+      transports,
+      affectedTabIds: [...affectedTabIds].sort((a, b) => a - b),
+      ...(failures.length ? { failures } : {}),
+    };
+  } catch (error) {
+    trackAction('browser_manage', {
+      success: false,
+      transport: transports.join('+') || defaultBrowserTransport(),
+      duration_ms: Date.now() - startedAt,
+      error_code: classifyAnalyticsError(error),
+      extension_version: extensionProvider.version ?? 'not_connected',
+    });
+    throw error;
+  }
+}
+
 interface HostActionResult {
   data: any;
   closeConnection?: boolean;
@@ -1237,27 +1306,78 @@ async function dispatchHostRequest(request: any, managed = false): Promise<HostA
     extensionProvider.send({ type: 'control_sessions_changed' });
     return { data: { refreshed: true } };
   }
-  if (!managed && action === 'browser_close' && request.controlSessionId === undefined)
-    return { data: await closeBrowser(data, { deadline: request.deadline, controlSource }) };
+  if (action === 'session_list') {
+    if (request.controlSessionId !== undefined)
+      throw new Error('session_list does not accept a session override');
+    return { data: { sessions: getControlSessionManager().registry.list() } };
+  }
+  if (action === 'session_manage') {
+    const command = parseSessionManageParams(data);
+    if (
+      command.operation === 'new' &&
+      (request.transport === 'cdp'
+        ? !cdpProvider.isConnected
+        : !extensionProvider.connected && !cdpProvider.isConnected)
+    )
+      throw new Error('No connected browser for session_manage new');
+    return {
+      data: await getControlSessionManager().manageSession(
+        command,
+        resolveSessionManageId(command, request.controlSessionId),
+        request.transport,
+        request.deadline,
+      ),
+    };
+  }
+  // A private CDP host also serves the external Provider's control capability.
+  if (action === 'browser_release' && isDaemonMode && skipBrowserRegistration && !inventoryOnly) {
+    return { data: await getControlSessionManager().releaseBrowser(releaseBrowserControl) };
+  }
+  if (action === 'browser_manage') {
+    if (request.controlSessionId !== undefined)
+      throw new Error('browser_manage does not accept a control session');
+    const { browser, ...params } = data;
+    const command = parseBrowserManageParams(params);
+    if (command.operation === 'launch' || command.operation === 'attach')
+      return { data: await openBrowser(command, request.deadline) };
+    if (command.operation === 'close')
+      return {
+        data: await closeBrowser(
+          { browser, deleteProfile: command.deleteProfile },
+          {
+            deadline: request.deadline,
+            controlSource,
+          },
+        ),
+      };
+    if (command.operation === 'detach' && !cdpProvider.isAttached)
+      throw new Error('This browser does not support detach');
+    return getControlSessionManager().releaseBrowser(async () => {
+      assertBrowserRequestDeadline(request.deadline);
+      const result = await releaseBrowserControl();
+      if (command.operation === 'release') return { data: result };
+      if (!result.released) throw new Error('Could not fully release control before detaching');
+      cdpProvider.dispose();
+      return { data: { detached: true }, closeHost: true };
+    });
+  }
   if (
     !managed &&
-    (isBrowserCommandAction(action) ||
+    (isExtensionBrowserAction(action) ||
+      action === 'page_download' ||
+      action === 'page_record' ||
       (typeof action === 'string' && action.startsWith('__artifact_')))
   ) {
-    const closeHost =
-      action === 'browser_release' &&
-      request.controlSessionId === undefined &&
-      cdpProvider.isAttached;
-    const result = await getControlSessionManager().invoke(
-      action,
-      data,
-      request.controlSessionId,
-      request.transport,
-      controlSource,
-      request.deadline,
-    );
-    if (closeHost) cdpProvider.dispose();
-    return { data: result, closeHost };
+    return {
+      data: await getControlSessionManager().invoke(
+        action,
+        data,
+        request.controlSessionId,
+        request.transport,
+        controlSource,
+        request.deadline,
+      ),
+    };
   }
   if (action === 'start_cloud_connector') {
     if (!data.serverUrl || typeof data.serverUrl !== 'string')
@@ -1298,68 +1418,28 @@ async function dispatchHostRequest(request: any, managed = false): Promise<HostA
   if (action === 'agent_chat_run') return { data: await getAgentChatManager().runTask(data) };
   if (action === 'browser_list') {
     const providerWarnings = await ensureInstalledProvidersRunning();
+    const hasLocalBrowser = listRegisteredBrowsers().some(
+      browser =>
+        (browser.status === undefined || browser.status === 'connected') &&
+        (browser.transport === 'extension' ||
+          (browser.transport === 'cdp' && !browser.browserId.startsWith('managed:'))),
+    );
+    if (!attachCdp && (!skipBrowserRegistration || inventoryOnly) && !hasLocalBrowser) {
+      try {
+        await openBrowser(
+          { operation: 'attach', provider: CDP_PROVIDER.providerId },
+          request.deadline,
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        providerWarnings.push(`Local CDP discovery: ${message}`);
+      }
+    }
     const inventory = await listBrowserInventory(getBrowserProviderCoordinator().providerRuntimes);
     const inventoryData = appendWarnings(inventory, providerWarnings);
     const closeConnection = inventoryOnly && skipBrowserRegistration;
     if (closeConnection) scheduleInventoryExit();
     return { data: inventoryData, closeConnection };
-  }
-  if (action === 'browser_close') return { data: await closeBrowser(data) };
-  if (action === 'browser_launch') return { data: await launchBrowser(data, request.deadline) };
-  if (action === 'browser_release') {
-    const startedAt = Date.now();
-    const affectedTabIds = new Set<number>();
-    const transports: Array<'extension' | 'cdp'> = [];
-    const failures: BrowserReleaseFailure[] = [];
-    let released = true;
-    let hadActiveControl = false;
-    try {
-      const releaseErrors: string[] = [];
-      for (const transport of ['extension', 'cdp'] as const) {
-        if (transport === 'cdp' && (!isDaemonMode || inventoryOnly)) continue;
-        try {
-          const result = await browserProvider(transport).release(data);
-          released = released && result?.released !== false;
-          hadActiveControl = hadActiveControl || result?.hadActiveControl === true;
-          if (result?.hadActiveControl) transports.push(transport);
-          for (const tabId of result?.affectedTabIds ?? []) affectedTabIds.add(tabId);
-          if (Array.isArray(result?.failures)) failures.push(...result.failures);
-        } catch (error) {
-          releaseErrors.push(
-            `${transport}: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        }
-      }
-
-      if (releaseErrors.length > 0) {
-        throw new Error(`Failed to fully release browser control (${releaseErrors.join('; ')})`);
-      }
-
-      trackAction(action, {
-        success: released,
-        transport: transports.join('+') || 'none',
-        duration_ms: Date.now() - startedAt,
-        extension_version: extensionProvider.version ?? 'not_connected',
-      });
-      return {
-        data: {
-          released,
-          hadActiveControl,
-          transports,
-          affectedTabIds: [...affectedTabIds].sort((a, b) => a - b),
-          ...(failures.length ? { failures } : {}),
-        },
-      };
-    } catch (error) {
-      trackAction(action, {
-        success: false,
-        transport: transports.join('+') || defaultBrowserTransport(),
-        duration_ms: Date.now() - startedAt,
-        error_code: classifyAnalyticsError(error),
-        extension_version: extensionProvider.version ?? 'not_connected',
-      });
-      throw error;
-    }
   }
   if (!isExtensionBrowserAction(action) && (typeof action !== 'string' || !action.startsWith('__')))
     throw new Error(`Unsupported action: ${String(action)}`);

@@ -179,6 +179,7 @@ export function createCdpAttachProvider(
     descriptor: CDP_PROVIDER,
     browserType: {
       name: 'CDP',
+      openOperation: 'attach',
       inputSchema: {
         type: 'object',
         additionalProperties: false,
@@ -194,15 +195,15 @@ export function createCdpAttachProvider(
     listBrowsers: () => connectedCdpBrowsers().map(attachedBrowser),
     launch: (options, context) => attach(options, nativeHostScript, socketPathForPid, context),
     close: async () => {
-      throw new Error('Use browser_release to detach from the CDP browser');
+      throw new Error('Use browser_manage detach to disconnect from the CDP browser');
     },
     detach: async ({ browserId }, context) => {
       const record = connectedCdpBrowsers().find(browser => browser.browserId === browserId);
       if (!record) throw new Error(`CDP browser not found: ${browserId}`);
       return requestBrowserSocket(
         record.socketPath,
-        'browser_release',
-        {},
+        'browser_manage',
+        { operation: 'detach' },
         NATIVE_HOST_VERSION,
         undefined,
         undefined,

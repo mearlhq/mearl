@@ -9,4 +9,9 @@ export const SDK_METHOD_ACTIONS = new Map(
 );
 SDK_METHOD_ACTIONS.set('selectBrowser', 'browser_select_browser');
 SDK_METHOD_ACTIONS.set('captureCheckpoint', 'tab_checkpoint');
-export const SDK_OPTIONS_ONLY_METHODS = new Set(['browserList', 'tabList', 'getRules']);
+export const SDK_OPTIONS_ONLY_METHODS = new Set([
+  'browserList',
+  'sessionList',
+  'tabList',
+  'getRules',
+]);

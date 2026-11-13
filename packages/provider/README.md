@@ -12,7 +12,7 @@ action 清单直接复用 `@mearl/browser-core/browserActionProtocol` 的能力�
 
 默认由 Mearl 管理控制会话。Provider 继续接收目标实例、页面与普通 action，无需处理控制会话 ID、资源归属或人工交接状态。带 `--session` 的释放只结束 Mearl 任务控制；实例关闭、退出接管与 Cookie 同步仍使用 Provider 的生命周期方法。上传与下载分别按 `capabilities.actions` 中的 `page_upload`、`page_download` 声明使用。
 
-普通 action 响应中的 `session` 由 Mearl 附加，只包含路由与控制状态；`browser_control` 交接时还包含会话页面清单。`page_snapshot` 的文本 ref 可直接用于后续操作，Provider 应在自身运行时保存其定位映射，不在响应中输出内部节点 ID 字典。
+普通 action 响应中的 `session` 由 Mearl 附加，只包含路由与控制状态；`session_manage` 交接时还包含会话页面清单。`page_snapshot` 的文本 ref 可直接用于后续操作，Provider 应在自身运行时保存其定位映射，不在响应中输出内部节点 ID 字典。
 
 `page_upload` 接收执行宿主上的 `filePaths`，Mearl 负责中转调用方文件与浏览器产物。`page_download` 接收 `{ tabId, trigger, url?, timeout? }`；Provider 先监听下载，再执行点击，等待文件完成后返回 `ProviderDownloadResult`：`{ filename, filePath, action, owned? }`。`filePath` 是本地 Provider 进程宿主上的绝对路径，云端文件由 Provider 取回；`action` 是点击结果，`owned:true` 允许 Mearl 在导入后删除该中转文件。Mearl 将结果转为统一的浏览器产物，支持调用方保存、后续上传与会话清理。下载超时或来源不确定时返回错误，不重复点击。
 
@@ -129,12 +129,14 @@ Runtime 会统一校验 schema、状态机、操作能力和页面 action capabi
 `start`、`detach`、`getAccess`、`syncCookies` 等可选实现必须与实例声明的 operation 对应；
 这些生命周期方法由 Provider runtime 协调，浏览器动作使用统一的 Mearl 协议。
 
-公共 `browser_launch` 对所有 Provider 接收 `{ provider, providerOptions }`，返回与
+公共 `browser_manage` 的 `launch` 接收 `{ operation, provider, providerOptions }`，返回与
 `browser_list.browsers[]` 相同的 `ManagedBrowserInfo`（对象形式的 Provider identity、状态、
 持久化策略、操作和安全元数据）。管理器内部字段、控制连接和临时访问地址不进入该结果。
 Local 的 CLI 顶层参数是便捷输入；外部 Provider 参数必须放在 `providerOptions`，两者不得混用。
 
-内置 `cdp` Provider 接入已启用调试的 Chrome 或 Electron。`providerOptions.port` 指定端口，`userDataDir` 读取指定 Profile 的 `DevToolsActivePort`，`endpointFile` 读取私有 WebSocket 地址。文件和目录使用目标宿主上的绝对路径。若 Profile 文件记录了端口，同时传入的 `port` 须与其一致。`browser_release` 断开控制并保留浏览器。
+只接入现有资源的 Provider 可声明 `browserType.openOperation: "attach"`；Host 校验操作，再调用 Provider 的实例入口。
+
+`browser_manage` 的 `attach` 使用内置 `cdp` Provider 接入已启用调试的 Chrome 或 Electron。`providerOptions.port` 指定端口，`userDataDir` 读取指定 Profile 的 `DevToolsActivePort`，`endpointFile` 读取私有 WebSocket 地址。文件和目录使用目标宿主上的绝对路径。若 Profile 文件记录了端口，同时传入的 `port` 须与其一致。`browser_release` 断开控制并保留浏览器。
 
 内置浏览器保留本地启动交互；外部 Provider 根据 `browserType.inputSchema` 生成输入项。
 两者提交同一结构的 `providerOptions`。
@@ -208,7 +210,7 @@ npx @mearl/setup provider uninstall <provider-id>
 - `browser_sessions` 由 Mearl 控制进程处理，不转交外部 Provider；会话释放与实例 `detach` 分开执行。
 
 SDK 负责将 Socket 请求分发到 `configure/getLaunchForm/start/detach/syncCookies` 等方法。
-`browser_release` 普通 action 不承担实例解绑；公开 CLI 的无会话释放由 Mearl 转换为 `detach`。
+公开命令 `browser_manage` 的 `release` 转发到 Provider 声明的 `browser_release` 能力，保留实例接入。用 `detach` 断开接入。
 打包 SDK 的 Provider 必须更新 SDK 并重新构建，修改安装元数据不能替换运行中的旧代码。
 
 ## 外部任务控制与页面增强
@@ -219,7 +221,7 @@ SDK 在服务启动和操作前确认 Mearl 控制宿主支持此模式；旧宿
 同一运行时内实例的控制模式固定。该模式不接受 Mearl `--session`，页面归属和交接仍由外部工具负责。
 未声明该字段的 Provider 保持原有行为。
 
-支持统一交接入口时，实现 `BrowserProviderDefinition.control(request, context)`，并在实例的 `operations` 中声明 `handoff`、`resume`、`finish` 中实际支持的操作。Mearl 将 `browser_control` 转发给该方法，不创建 Mearl 会话。请求包含 Provider 内的 `browserId`、`operation`，以及可选的 `tabId`、`reason`；只有 `finish` 可带 `keepTabIds`。返回 `{ controlSessionMode: "external", operation, control }`，其中 control 分别为 `user`、`agent`、`finished`。Provider 必须校验控制权和保留页归属，拒绝不支持的参数，并让交接预检在页面操作等待期间仍可响应。只有用户明确交还后才可 resume。
+支持统一交接入口时，实现 `BrowserProviderDefinition.control(request, context)`，并在实例的 `operations` 中声明 `handoff`、`resume`、`finish` 中实际支持的操作。Mearl 将 `session_manage` 的 `handoff`、`resume` 和 `end` 转发给该方法，其中 `end` 对应 Provider 的 `finish`。请求包含 Provider 内的 `browserId`、`operation`，以及可选的 `tabId`、`reason`；只有 `finish` 可带 `keepTabIds`。返回 `{ controlSessionMode: "external", operation, control }`，其中 control 分别为 `user`、`agent`、`finished`。Provider 必须校验控制权和保留页归属，拒绝不支持的参数，并让交接预检在页面操作等待期间仍可响应。只有用户明确交还后才可 resume。
 
 外部 Provider 可用 `createProviderEnhancementClient(providerId, browserId)` 为已获准页面绑定 Mearl
 Extension 的环境增强，依次调用 `bind`、`invoke`、`release`。这条通道只允许设备、App、时区类增强，

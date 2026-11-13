@@ -43,9 +43,9 @@ App 可用性以当前目标的 `set_app_profile --help` 或 `get_capabilities` 
 
 ## 人工交接与收尾
 
-扫码、验证码或系统交互需要用户时，用 `browser_control` 的 handoff 交接，说明原因。用户接管或 `CONTROL_SESSION_PAUSED` 后停止派发；交回后重新观察，不重放未完成批次。无扩展 UI 时，须在用户明确确认交还后再 resume。
+扫码、验证码或系统交互需要用户时，用 `session_manage` 的 handoff 交接，说明原因。用户接管或 `CONTROL_SESSION_PAUSED` 后停止派发；交回后重新观察，不重放未完成批次。无扩展 UI 时，须在用户明确确认交还后再 resume。
 
-会话任务用 `browser_release --session <id>` 释放归属，默认保留页面、Mock 和模拟环境。保留用户原有页和结果页，只有确认不需要的过程页才关闭。不带 session 的浏览器级释放仅用于用户要求结束调试或清理环境；外部工具按其自身约定收尾。具体归属与保留参数见[控制会话](./api-browser-setup.md#control-sessions)。
+会话任务用 `session_manage --session <id> --payload '{"operation":"end"}'` 释放归属，默认保留页面、Mock 和模拟环境。保留用户原有页和结果页，只有确认不需要的过程页才关闭。不带 session 的浏览器级释放仅用于用户要求结束调试或清理环境；外部工具按其自身约定收尾。具体归属与保留参数见[控制会话](./api-browser-setup.md#control-sessions)。
 
 ## 按需深入
 

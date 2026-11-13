@@ -52,8 +52,17 @@ describe('MCP page tool contracts', () => {
     const tool = tools.find((tool: any) => tool.name === 'browser_get_capabilities');
     expect(tool.annotations.readOnlyHint).toBe(true);
     expect(tool.inputSchema.properties.app.type).toBe('string');
-    await state.handlers.get(CallToolRequestSchema)!({ params: { name: 'browser_get_capabilities', arguments: { app: 'example/app', browser: 'test-browser' } } });
-    expect(state.invoke).toHaveBeenCalledWith('get_capabilities', { app: 'example/app' }, expect.objectContaining({ browser: 'test-browser' }));
+    await state.handlers.get(CallToolRequestSchema)!({
+      params: {
+        name: 'browser_get_capabilities',
+        arguments: { app: 'example/app', browser: 'test-browser' },
+      },
+    });
+    expect(state.invoke).toHaveBeenCalledWith(
+      'get_capabilities',
+      { app: 'example/app' },
+      expect.objectContaining({ browser: 'test-browser' }),
+    );
   });
   it('bounds the final script response while retaining execution and session metadata', async () => {
     state.executeScript.mockResolvedValueOnce({
@@ -267,9 +276,14 @@ describe('MCP page tool contracts', () => {
   });
 });
 
-it.each(['sample-session', { presets: ['sample-session'], domains: ['site.example.com'] }])('forwards capability-provided Cookie scopes through the existing browser_launch tool', async scope => {
-  const args = { name: 'fixture', copyCookieDomains: scope };
-  const result = await state.handlers.get(CallToolRequestSchema)!({ params: { name: 'browser_launch', arguments: args } });
-  expect(state.invoke).toHaveBeenLastCalledWith('browser_launch', args, {});
-  expect(result.isError).toBeUndefined();
-});
+it.each(['sample-session', { presets: ['sample-session'], domains: ['site.example.com'] }])(
+  'forwards capability-provided Cookie scopes through the existing browser_manage tool',
+  async scope => {
+    const args = { operation: 'launch', name: 'fixture', copyCookieDomains: scope };
+    const result = await state.handlers.get(CallToolRequestSchema)!({
+      params: { name: 'browser_manage', arguments: args },
+    });
+    expect(state.invoke).toHaveBeenLastCalledWith('browser_manage', args, {});
+    expect(result.isError).toBeUndefined();
+  },
+);

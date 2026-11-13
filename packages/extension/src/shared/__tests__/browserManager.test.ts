@@ -14,9 +14,15 @@ describe('browser management requests', () => {
     await requestBrowserSessions({ operation: 'release', sessionId: 'session-one' });
     await requestBrowserManager('close', { browser: 'example-device:instance-one' });
     expect(vi.mocked(chrome.runtime.sendMessage).mock.calls.map(([message]) => message)).toEqual([
-      { action: 'browser_instances', data: { operation: 'detach', browser: 'example-device:instance-one' } },
+      {
+        action: 'browser_manage',
+        data: { operation: 'detach', browser: 'example-device:instance-one' },
+      },
       { action: 'browser_sessions', data: { operation: 'release', sessionId: 'session-one' } },
-      { action: 'browser_close', data: { browser: 'example-device:instance-one' } },
+      {
+        action: 'browser_manage',
+        data: { operation: 'close', browser: 'example-device:instance-one' },
+      },
     ]);
   });
 
@@ -59,9 +65,9 @@ describe('browser management requests', () => {
       success: false,
       error: 'Browser is busy',
     });
-    await expect(requestBrowserManager('start', { browser: 'example-device:instance-one' })).rejects.toThrow(
-      'Browser is busy',
-    );
+    await expect(
+      requestBrowserManager('start', { browser: 'example-device:instance-one' }),
+    ).rejects.toThrow('Browser is busy');
     expect(chrome.runtime.sendMessage).toHaveBeenCalledTimes(1);
   });
 });

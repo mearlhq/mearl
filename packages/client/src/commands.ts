@@ -88,28 +88,6 @@ export const COMMANDS = [
     examples: ['get_capabilities', `get_capabilities --payload '{"app":"example/app"}'`],
   },
   {
-    name: 'browser_control',
-    description: '交接或恢复浏览器控制；外部 Provider 也可结束任务',
-    params: [
-      {
-        name: 'operation',
-        type: '"handoff" | "resume" | "finish"',
-        required: true,
-        description: '交给用户操作；resume 仅在用户明确交还后使用',
-      },
-      { name: 'tabId', type: 'number', description: '可选的目标页面' },
-      { name: 'reason', type: 'string', description: '用户需要处理的事项' },
-      {
-        name: 'keepTabIds',
-        type: 'number[]',
-        description: '外部 Provider finish 时保留的结果页；默认不保留任务页面',
-      },
-    ],
-    notes: [
-      '统一使用 --browser 选择目标。普通浏览器自动选择唯一的控制会话；多个会话时用 tabId 或 --session 明确任务。外部 Provider 由宿主管理任务，不传 --session。finish 仅用于支持它的外部 Provider。仅在用户明确交还后 resume；已经发出的操作可能仍然生效。',
-    ],
-  },
-  {
     name: 'page_download',
     description: '先监听再点击，等待下载完成并创建浏览器文件产物',
     outputFlag: true,
@@ -471,41 +449,16 @@ export const COMMANDS = [
     examples: ['browser_list', 'browser_list --local'],
   },
   {
-    name: 'browser_release',
-    description:
-      '释放当前浏览器的调试控制和会话级临时效果（含设备/时区模拟）；不用于普通任务收尾，Provider 实例的行为以 mearl <providerId> 为准',
+    name: 'browser_manage',
+    description: '启动、接入、断开、关闭浏览器或释放浏览器级控制资源',
     params: [
       {
-        name: 'closeCreatedTabs',
-        type: 'boolean',
-        description: '带 --session 时关闭会话创建的过程页，默认 false',
+        name: 'operation',
+        type: '"launch" | "attach" | "detach" | "close" | "release"',
+        required: true,
+        description: 'launch 启动，attach 接入，detach 断开接入，close 关闭，release 清理调试控制',
       },
-      {
-        name: 'keepTabIds',
-        type: 'number[]',
-        description: '保留的结果页面；复用的用户页面始终保留',
-      },
-      {
-        name: 'preserveEnvironment',
-        type: 'boolean',
-        description: '带 --session 时默认 true，保留 Mock 与模拟现场；false 清理这些页面的环境',
-      },
-      {
-        name: 'keepArtifactIds',
-        type: 'string[]',
-        description: '保留在浏览器宿主的文件产物；其余会话临时文件删除',
-      },
-    ],
-    notes: [
-      '带 --session 时可用于任务收尾，只释放该会话；未带会话时保留原浏览器级释放行为，活动会话存在时拒绝全局释放。',
-    ],
-    summary: '释放浏览器调试控制和会话级临时效果',
-    examples: ['browser_release', 'browser_release --browser chrome-a'],
-  },
-  {
-    name: 'browser_launch',
-    description: '通过 Provider 启动或接入浏览器实例',
-    params: [
+      { name: 'deleteProfile', type: 'boolean', description: '仅 close，删除持久化数据' },
       {
         name: 'name',
         type: 'string',
@@ -514,7 +467,8 @@ export const COMMANDS = [
       {
         name: 'provider',
         type: 'string',
-        description: '运行环境，默认 local；cdp 接入已开启远程调试的 Chromium 或 Electron',
+        description:
+          'launch 默认 local；attach 指定接入 Provider，例如 cdp 接入已开启远程调试的 Chromium 或 Electron',
       },
       {
         name: 'providerOptions',
@@ -545,32 +499,61 @@ export const COMMANDS = [
           '从控制浏览器复制 Cookie：可传域名数组、已安装能力提供的范围名，或组合范围与额外域名',
       },
     ],
+    notes: [
+      'close / detach 使用 --browser 指定目标。detach 保留浏览器进程；release 清理浏览器级调试状态并保留接入。活动会话需先用 session_manage end 结束。',
+    ],
     examples: [
-      `browser_launch --local --payload '{"provider":"cdp","providerOptions":{"name":"Electron","port":9223}}'`,
-      `browser_launch --payload '{"provider":"example-device","providerOptions":{}}'`,
-      `browser_launch --payload '{"name":"figma","userAgentMode":"desktop","copyCookieDomains":["figma.com"]}'`,
-      `browser_launch --payload '{"name":"with-cookies","copyCookieDomains":["example.com","sub.example.org"]}'`,
+      `browser_manage --local --payload '{"operation":"attach","provider":"cdp","providerOptions":{"name":"Electron","port":9223}}'`,
+      `browser_manage --payload '{"operation":"launch","provider":"example-device","providerOptions":{}}'`,
+      `browser_manage --payload '{"operation":"launch","name":"figma","userAgentMode":"desktop","copyCookieDomains":["figma.com"]}'`,
+      `browser_manage --payload '{"operation":"launch","name":"with-cookies","copyCookieDomains":["example.com","sub.example.org"]}'`,
     ],
   },
   {
-    name: 'browser_close',
-    description: '关闭指定托管浏览器，并按 Provider 策略保留或清理持久化数据',
+    name: 'session_list',
+    description: '列出当前可用的 Mearl 控制会话，可按浏览器或宿主筛选',
+    examples: ['session_list', 'session_list --local', 'session_list --browser chrome-a'],
+  },
+  {
+    name: 'session_manage',
+    description: '创建、交接、恢复或结束控制会话',
     params: [
       {
-        name: 'browser',
-        type: 'string',
+        name: 'operation',
+        type: '"new" | "handoff" | "resume" | "end"',
         required: true,
-        description: '托管浏览器的 browserId 或名称',
+        description: 'new 创建空会话，handoff 交给用户，resume 恢复控制，end 结束会话并释放资源',
+      },
+      { name: 'sessionId', type: 'string', description: '已有会话 ID，也可使用 --session' },
+      { name: 'reason', type: 'string', description: 'handoff 时说明需要用户处理的事项' },
+      {
+        name: 'closeCreatedTabs',
+        type: 'boolean',
+        description: 'end 时关闭会话创建的过程页，默认 false',
       },
       {
-        name: 'deleteProfile',
+        name: 'keepTabIds',
+        type: 'number[]',
+        description: '保留的结果页面；复用的用户页面始终保留',
+      },
+      {
+        name: 'preserveEnvironment',
         type: 'boolean',
-        description: '强制删除持久化数据，默认 false',
+        description: 'end 默认 true，保留 Mock 与模拟现场；false 清理这些页面的环境',
+      },
+      {
+        name: 'keepArtifactIds',
+        type: 'string[]',
+        description: '保留在浏览器宿主的文件产物；其余会话临时文件删除',
       },
     ],
+    notes: [
+      'new 通过 --browser 选择浏览器，返回 session.sessionId。handoff、resume、end 使用已有会话 ID。',
+      '仅在用户明确交还后 resume。外部 Provider 自行管理任务时通过 --browser 执行 handoff、resume 或 end。',
+    ],
     examples: [
-      `browser_close --payload '{"browser":"managed:account-a"}'`,
-      `browser_close --payload '{"browser":"account-b","deleteProfile":true}'`,
+      `session_manage --browser '<browserId>' --payload '{"operation":"new"}'`,
+      `session_manage --session '<sessionId>' --payload '{"operation":"end","closeCreatedTabs":true}'`,
     ],
   },
   // ── 标签页 ────────────────────────────────────────────────────────────────

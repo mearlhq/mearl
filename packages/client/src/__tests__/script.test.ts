@@ -62,8 +62,7 @@ describe('agent script execution', () => {
     await runMearlCli(['page_click', '--help']);
     const help = String(error.mock.calls[0][0]);
     expect(getCommandHelp('pageClick')).toBe(help);
-    expect(getCommandHelp('browserRelease')).toContain('browserRelease(options?)');
-    expect(getCommandHelp('browserRelease')).toContain('browserRelease(params, options)');
+    expect(getCommandHelp('sessionManage')).toContain('sessionManage(params, options?)');
     const result = await executeScript(`
       const value = { items: [{ id: 1 }] }; value.self = value;
       console.log(JSON.stringify({ help: await mearl.help('pageClick'), shape: mearl.structure(value) }));
@@ -225,8 +224,8 @@ describe('agent script execution', () => {
       await mearl.getCapabilities({ app: 'example/app' });
       await mearl.selectBrowser({ browser: 'selected' });
       await mearl.captureCheckpoint({ tabId: 7 });
-      await mearl.browserRelease({ session: 's_other' });
-      await mearl.browserRelease({ closeCreatedTabs: true }, { session: 's_existing' });
+      await mearl.sessionManage({ operation: 'end' }, { session: 's_other' });
+      await mearl.sessionManage({ operation: 'end', closeCreatedTabs: true }, { session: 's_existing' });
       await mearl.invoke('page_snapshot', { tabId: 7 }, { timeoutSec: 5 });
     `,
       { browser: 'default' },
@@ -243,15 +242,43 @@ describe('agent script execution', () => {
         { browser: 'default', session: undefined },
       ],
       ['tab_checkpoint', { tabId: 7 }, { browser: 'default', session: undefined }],
-      ['browser_release', {}, { browser: 'default', session: 's_other' }],
+      ['session_manage', { operation: 'end' }, { browser: 'default', session: 's_other' }],
       [
-        'browser_release',
-        { closeCreatedTabs: true },
+        'session_manage',
+        { operation: 'end', closeCreatedTabs: true },
         { browser: 'default', session: 's_existing' },
       ],
       ['page_snapshot', { tabId: 7 }, { browser: 'default', session: undefined, timeoutSec: 5 }],
     ]);
   });
+  it('uses a newly created session and stops forwarding it after end', async () => {
+    const active = {
+      sessionId: 's_abcdefgh',
+      browserId: 'mearl:local:fixture',
+      transport: 'cdp',
+      status: 'active',
+    };
+    const invoke = vi
+      .spyOn(UnifiedClient.prototype, 'invoke')
+      .mockResolvedValueOnce({ session: active })
+      .mockResolvedValueOnce({ tabs: [] })
+      .mockResolvedValueOnce({ session: { ...active, status: 'released' } })
+      .mockResolvedValueOnce({ tabs: [] });
+    const result = await executeScript(`
+      const { session } = await mearl.sessionManage({ operation: 'new' });
+      await mearl.tabList();
+      await mearl.sessionManage({ operation: 'end', sessionId: session.sessionId });
+      await mearl.tabList();
+    `);
+    expect(result.success).toBe(true);
+    expect(invoke.mock.calls.map(([, , options]) => options?.session)).toEqual([
+      undefined,
+      active.sessionId,
+      undefined,
+      undefined,
+    ]);
+  });
+
   it('passes Provider launch-form parameters through browserList while retaining options-only calls', async () => {
     const invoke = vi.spyOn(UnifiedClient.prototype, 'invoke').mockResolvedValue({});
     const result = await executeScript(

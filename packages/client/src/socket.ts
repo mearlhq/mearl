@@ -18,6 +18,7 @@ import {
   assertProviderControlSessionMode,
   ensureProviderControlHost,
   listInstalledProviders,
+  readProviderControlHost,
 } from '@mearl/provider/host';
 import {
   MEARL_PROVIDER_PROTOCOL_VERSION,
@@ -36,6 +37,8 @@ import { resolveActionTimeoutSec } from './actionTimeouts.js';
 import {
   isBrowserCapabilityAction,
   parseBrowserListParams,
+  parseBrowserManageParams,
+  parseSessionManageParams,
   type BrowserControlSessionMode,
 } from '@mearl/browser-core';
 
@@ -178,11 +181,11 @@ function isConnectedBrowser(browser: LiveBrowser): boolean {
 }
 
 function supportsAction(browser: LiveBrowser, action: string, data: Record<string, any>): boolean {
+  if (action === 'browser_release') return false;
   if (browser.transport === 'provider') {
     if (
-      action === 'browser_control' ||
-      (action === 'get_capabilities' && isConnectedBrowser(browser)) ||
-      (action === 'browser_release' && (data as any)[SESSION_OPTION])
+      action === 'session_manage' ||
+      (action === 'get_capabilities' && isConnectedBrowser(browser))
     )
       return true;
     if (action.startsWith('__artifact_'))
@@ -197,13 +200,24 @@ function supportsAction(browser: LiveBrowser, action: string, data: Record<strin
   if (action === 'get_browser_access_url') {
     return browser.transport !== 'provider' || browser.operations?.includes('access') === true;
   }
-  if (action === 'browser_close') {
-    if (browser.transport !== 'provider') return true;
-    const required = data.deleteProfile === true ? 'deleteData' : 'close';
-    return browser.operations?.includes(required as any) === true;
-  }
-  if (action === 'browser_release') {
-    return browser.transport !== 'provider' || browser.operations?.includes('detach') === true;
+  if (action === 'browser_manage') {
+    switch (data.operation) {
+      case 'close':
+        return (
+          browser.transport !== 'provider' ||
+          browser.operations?.includes(data.deleteProfile === true ? 'deleteData' : 'close') ===
+            true
+        );
+      case 'detach':
+        return browser.operations?.includes('detach') === true;
+      case 'release':
+        return (
+          browser.transport !== 'provider' ||
+          browser.capabilities?.actions.includes('browser_release') === true
+        );
+      default:
+        return browser.transport !== 'provider';
+    }
   }
   if (!isConnectedBrowser(browser)) return false;
   return (
@@ -220,7 +234,7 @@ function routableBrowsers(
   return browsers.filter(
     browser =>
       isConnectedBrowser(browser) &&
-      (!['browser_list', 'browser_launch'].includes(action) || browser.transport !== 'provider') &&
+      (action !== 'browser_list' || browser.transport !== 'provider') &&
       supportsAction(browser, action, data),
   );
 }
@@ -337,6 +351,7 @@ async function trySpawnNativeHost(): Promise<boolean> {
 async function loadLocalBrowserList(
   timeoutSec: number,
   controlSource: CompatibleControlSource,
+  requestDeadline?: number,
 ): Promise<Record<string, any>> {
   if (inventoryListPromise) return inventoryListPromise;
   const cacheKey = inventoryCacheKey();
@@ -353,12 +368,22 @@ async function loadLocalBrowserList(
     const pid = await spawnNativeHost(['--daemon', '--inventory', '--skip-browser-registration']);
     if (pid === undefined) throw new Error('Native host did not report its process id');
     const socketPath = instanceSocketPath(pid);
-    const deadline = Date.now() + Math.min(timeoutSec * 1_000, INVENTORY_STARTUP_TIMEOUT_MS);
+    const deadline = Math.min(Date.now() + timeoutSec * 1_000, requestDeadline ?? Infinity);
+    const startupDeadline = Math.min(deadline, Date.now() + INVENTORY_STARTUP_TIMEOUT_MS);
     while (true) {
       try {
-        return await invokeOnce('browser_list', {}, timeoutSec, socketPath, controlSource);
+        return await invokeOnce(
+          'browser_list',
+          {},
+          timeoutSec,
+          socketPath,
+          controlSource,
+          undefined,
+          undefined,
+          deadline,
+        );
       } catch (error) {
-        if (!isConnError(error) || Date.now() >= deadline) throw error;
+        if (!isConnError(error) || Date.now() >= startupDeadline) throw error;
         await new Promise(resolve => setTimeout(resolve, INVENTORY_RETRY_INTERVAL_MS));
       }
     }
@@ -448,9 +473,26 @@ export function invoke(
   if (action === '__control_session_resolve') {
     return resolveControlSession(data.sessionId, timeoutSec, controlSource);
   }
+  if (action === 'session_list') {
+    if (options.controlSessionId)
+      throw new Error('session_list does not accept a session override');
+    return listControlSessions(
+      browser,
+      timeoutSec,
+      controlSource,
+      options.socketPath,
+      options.deadline,
+    );
+  }
   // 统一解析 payload 顶层字段中的 `@<path>` 文件引用（所有 action 通用）
   const resolvedData = resolveFileRefs(data);
   Object.defineProperty(resolvedData, SESSION_OPTION, { value: options.controlSessionId });
+  if (action === 'browser_manage') {
+    parseBrowserManageParams(resolvedData);
+    if (options.controlSessionId)
+      throw new Error('browser_manage does not accept a control session');
+  }
+  if (action === 'session_manage') parseSessionManageParams(resolvedData);
   if (action === 'browser_list') {
     const discovery = parseBrowserListParams(resolvedData);
     if (discovery) {
@@ -519,6 +561,50 @@ export function invokeLocalHost(
   return socketPath
     ? invokeOnce(action, accepted, timeoutSec, socketPath, 'local')
     : invokeViaLegacy(action, accepted, timeoutSec, 'local', false, true);
+}
+
+async function listControlSessions(
+  selector: string | undefined,
+  timeoutSec: number,
+  controlSource: CompatibleControlSource,
+  socketPath?: string,
+  deadline?: number,
+) {
+  const explicitSocket = socketPath ?? process.env.MEARL_SOCKET_PATH?.trim();
+  const browsers = listLiveBrowsers();
+  const target = !socketPath && selector ? findBrowser(browsers, selector) : undefined;
+  if (selector && !socketPath && !target) throw new Error(formatNoMatchError(selector, browsers));
+  const sockets = new Set<string>();
+  if (target) {
+    if (target.transport !== 'provider') sockets.add(target.socketPath);
+  } else if (explicitSocket) {
+    sockets.add(explicitSocket);
+  } else {
+    for (const browser of browsers) {
+      if (browser.transport !== 'provider') sockets.add(browser.socketPath);
+    }
+  }
+  if (target?.transport === 'provider' || (!explicitSocket && !target)) {
+    const host = readProviderControlHost();
+    if (host) sockets.add(host.socketPath);
+  }
+  const requests = [...sockets].map(path =>
+    invokeOnce('session_list', {}, timeoutSec, path, controlSource, undefined, undefined, deadline),
+  );
+  const results = await Promise.allSettled(requests);
+  const warnings = results.flatMap(result =>
+    result.status === 'rejected' ? [String(result.reason?.message ?? result.reason)] : [],
+  );
+  if ((selector || explicitSocket) && results.length && warnings.length === results.length)
+    throw new Error(warnings.join('; '));
+  const sessions = results
+    .flatMap(result =>
+      result.status === 'fulfilled' && Array.isArray(result.value?.sessions)
+        ? result.value.sessions
+        : [],
+    )
+    .filter(session => !target || session.browserId === target.browserId);
+  return { sessions, ...(warnings.length ? { warnings } : {}) };
 }
 
 /** Session ownership lives in the control hosts and survives individual CLI connections. */
@@ -596,10 +682,18 @@ async function dispatchInvoke(
   socketPath?: string,
   deadline?: number,
 ): Promise<any> {
+  const opensBrowser =
+    action === 'browser_manage' && (data.operation === 'launch' || data.operation === 'attach');
+  const instanceOperation =
+    action === 'browser_manage' && (data.operation === 'close' || data.operation === 'detach');
+  if (instanceOperation && !selector)
+    throw new Error('Specify the browser with --browser <id|name>');
   const send = (path: string, target?: LiveBrowser) =>
     invokeOnce(
       action,
-      data,
+      action === 'browser_manage' && data.operation === 'close' && target?.transport !== 'provider'
+        ? { ...data, browser: target?.browserId ?? selector }
+        : data,
       timeoutSec,
       path,
       controlSource,
@@ -624,19 +718,23 @@ async function dispatchInvoke(
   const browsers = listLiveBrowsers();
   // Explicit target: must match a live browser; do not silently fall back.
   if (selector) {
-    const match = findBrowser(browsers, selector);
+    const match = findBrowser(browsers, selector, instanceOperation);
     if (!match) {
+      if (action === 'browser_manage' && data.operation === 'close')
+        return invokeViaLegacy(
+          action,
+          { ...data, browser: selector },
+          timeoutSec,
+          controlSource,
+          false,
+          true,
+          deadline,
+        );
       throw new Error(formatNoMatchError(selector, browsers));
     }
-    if (action === 'browser_launch' && match.transport === 'provider')
+    if (opensBrowser && match.transport === 'provider')
       return invokeViaLegacy(action, data, timeoutSec, controlSource, false, true, deadline);
-    if (
-      match.status === 'pairing' &&
-      action !== 'get_versions' &&
-      action !== 'browser_close' &&
-      action !== 'browser_release' &&
-      action !== 'browser_control'
-    ) {
+    if (match.status === 'pairing' && action !== 'get_versions' && action !== 'browser_manage') {
       throw new Error(`Browser ${describeBrowser(match)} is waiting for device pairing`);
     }
     if (!supportsAction(match, action, data)) {
@@ -673,7 +771,7 @@ async function dispatchInvoke(
 
   if (action === 'browser_list') {
     try {
-      return await loadLocalBrowserList(timeoutSec, controlSource);
+      return await loadLocalBrowserList(timeoutSec, controlSource, deadline);
     } catch (error) {
       if (
         isUnavailableConnection(error) &&
@@ -686,15 +784,22 @@ async function dispatchInvoke(
     }
   }
 
-  return invokeViaLegacy(
-    action,
-    data,
-    timeoutSec,
-    controlSource,
-    false,
-    action === 'browser_launch',
-    deadline,
-  );
+  // A browser command can be the first request in a script without the extension.
+  const session = (data as typeof data & { [SESSION_OPTION]?: string })[SESSION_OPTION];
+  if (
+    (!session || session === 'new') &&
+    (action === 'page_record' ||
+      (action !== 'browser_release' && isBrowserCapabilityAction(action)) ||
+      (action === 'session_manage' && data.operation === 'new'))
+  ) {
+    await loadLocalBrowserList(timeoutSec, controlSource, deadline).catch(() => undefined);
+    const discovered = routableBrowsers(listLiveBrowsers(), action, data).find(
+      target => target.socketPath !== candidates[0]?.socketPath,
+    );
+    if (discovered) return send(discovered.socketPath, discovered);
+  }
+
+  return invokeViaLegacy(action, data, timeoutSec, controlSource, false, opensBrowser, deadline);
 }
 
 /** Legacy well-known socket, repairing a missing or stale endpoint and retrying once. */
@@ -861,7 +966,8 @@ async function invokeOnce(
           if (response.success) {
             settle(null, response.data);
           } else if (
-            action === 'browser_launch' &&
+            action === 'browser_manage' &&
+            data.operation === 'attach' &&
             typeof data.provider === 'string' &&
             data.provider.trim() === 'cdp' &&
             response.error === 'Provider is not registered: cdp'

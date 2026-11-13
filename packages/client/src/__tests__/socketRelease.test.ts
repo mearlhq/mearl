@@ -22,7 +22,7 @@ vi.mock('../browserRegistry.js', () => ({
   describeBrowser: vi.fn(),
 }));
 
-import { invoke } from '../socket.js';
+import { invokeLocalHost } from '../socket.js';
 
 function createConnectionErrorSocket(code: string): EventEmitter & {
   end: ReturnType<typeof vi.fn>;
@@ -57,7 +57,7 @@ describe('legacy connection recovery', () => {
   });
 
   it('can retry native-host startup on a later invocation in the same process', async () => {
-    const failedAction = invoke('tab_list').then(
+    const failedAction = invokeLocalHost('preset_components_install').then(
       () => null,
       error => error as Error,
     );
@@ -69,7 +69,7 @@ describe('legacy connection recovery', () => {
     spawnMock.mockClear();
     createConnectionMock.mockClear();
 
-    const laterAction = invoke('tab_list').then(
+    const laterAction = invokeLocalHost('preset_components_install').then(
       () => null,
       error => error as Error,
     );

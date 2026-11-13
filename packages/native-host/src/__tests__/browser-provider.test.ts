@@ -43,7 +43,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@mearl/provider/host', async importOriginal => ({
-  ...await importOriginal<typeof import('@mearl/provider/host')>(),
+  ...(await importOriginal<typeof import('@mearl/provider/host')>()),
   listInstalledProviders: () => mocks.installed,
   ensureProviderControlHost: vi.fn(async () => ({ socketPath: '/tmp/provider-control.sock' })),
   readProviderControlHost: vi.fn(() => ({ socketPath: '/tmp/provider-control.sock' })),
@@ -90,11 +90,15 @@ beforeEach(() => {
 describe('external browser providers', () => {
   it('rejects lifecycle mutations for external control on an older host', async () => {
     const browser = {
-      browserId: 'provider:fixture:space', providerBrowserId: 'space',
-      transport: 'provider', provider: { id: 'fixture', protocolVersion: 3 },
+      browserId: 'provider:fixture:space',
+      providerBrowserId: 'space',
+      transport: 'provider',
+      provider: { id: 'fixture', protocolVersion: 3 },
       capabilities: { actions: [], screenshot: 'none', controlSessionMode: 'external' },
     };
-    await expect(closeProviderBrowser(browser as any)).rejects.toThrow('CONTROL_SESSION_MODE_UNSUPPORTED');
+    await expect(closeProviderBrowser(browser as any)).rejects.toThrow(
+      'CONTROL_SESSION_MODE_UNSUPPORTED',
+    );
     expect(mocks.request).not.toHaveBeenCalled();
   });
   it('routes dynamic form discovery directly to the selected Provider without a browser', async () => {
@@ -208,8 +212,8 @@ describe('external browser providers', () => {
 
     expect(mocks.request).toHaveBeenCalledWith(
       '/tmp/provider-control.sock',
-      'browser_close',
-      { deleteProfile: false },
+      'browser_manage',
+      { operation: 'close', deleteProfile: false },
       '1.0.0',
       1_080_000,
       undefined,

@@ -47,11 +47,8 @@ export function formatCommandHelp(commandName: string, command: CommandDef): str
   if (method)
     lines.push(
       'SDK：',
-      ...(method === 'browserRelease' || method === 'browserList'
-        ? [
-            `  await mearl.${method}(options?)`,
-            `  await mearl.${method}(params, options)`,
-          ]
+      ...(method === 'browserList'
+        ? [`  await mearl.${method}(options?)`, `  await mearl.${method}(params, options)`]
         : [
             `  await mearl.${method}(${SDK_OPTIONS_ONLY_METHODS.has(method) ? 'options?' : 'params, options?'})`,
           ]),
@@ -68,18 +65,18 @@ export function formatCommandHelp(commandName: string, command: CommandDef): str
     }
     lines.push('');
   }
-  if (command.name === 'browser_list') {
+  if (command.name === 'browser_list' || command.name === 'session_list') {
     lines.push(
       '目标范围（按需）：',
       '  --local               只列出当前机器上的浏览器',
       '  --connector <id|名称> 只列出指定远端 connector 的浏览器',
       '',
     );
-  } else if (command.name === 'browser_launch') {
+  } else if (command.name === 'browser_manage') {
     lines.push(
       '宿主选择（本机与远端同时可用时）：',
-      '  --local               在当前机器启动',
-      '  --connector <id|名称> 在指定远端 connector 启动',
+      '  --local               在当前机器启动或接入',
+      '  --connector <id|名称> 在指定远端 connector 启动或接入',
       '  --browser <id|名称>   在控制浏览器所在宿主启动，并可作为 Cookie/UA 来源',
       '',
     );

@@ -54,10 +54,9 @@ const MCP_TOOL_ACTIONS = {
   browser_get_rules: 'get_rules',
   browser_get_capabilities: 'get_capabilities',
   browser_page_screenshot: 'page_screenshot',
-  browser_launch: 'browser_launch',
-  browser_close: 'browser_close',
-  browser_release: 'browser_release',
-  browser_control: 'browser_control',
+  browser_manage: 'browser_manage',
+  session_list: 'session_list',
+  session_manage: 'session_manage',
   browser_page_download: 'page_download',
   browser_page_record: 'page_record',
   browser_tab_open: 'tab_open',
@@ -513,7 +512,7 @@ async function main() {
         tools: {},
       },
       instructions:
-        '取得 tabId 后持续显式复用，默认后台操作。首次进入或导航后取一次 browser_page_snapshot，按 viewport、局部根节点或 query 控制范围；AX 稀疏时才用 dom，每次快照只用本次新 ref。交互默认返回 { action, observation }，先检查 action.success 再核验业务效果；precondition 表示未派发，没有 observation/diagnostics；dispatch-uncertain 表示可能已生效，先检查 action.attempt 与可用观察或最小快照，避免直接重试。delta 优先复用 effects 中的 ref/selector，changed=true 且 effects 为空不表示失败；navigation 的 ready 表示就绪，openedTabs 已提供可操作 tabId。增量缺少下一步目标、ref 失效、需要新滚动视口或 fullSnapshotRecommended 提示时补最小快照，不固定追加 wait/snapshot/screenshot。布局和遮挡用 inspect，视觉任务用 screenshot，结构化工具无法表达时才用最小 page_eval。observe:false 且未开启 diagnostics 时返回裸动作结果，没有 action/observation；仅开启诊断时返回 { action, diagnostics }，诊断不等待 DOM/导航稳定。page_eval 默认返回 { result }。run_actions 只用于无需中间判断的紧密序列，步骤没有内置观察。按用户目标核验终态；browser_release 只在用户要求结束接管或清理会话时调用。',
+        '取得 tabId 后持续显式复用，默认后台操作。首次进入或导航后取一次 browser_page_snapshot，按 viewport、局部根节点或 query 控制范围；AX 稀疏时才用 dom，每次快照只用本次新 ref。交互默认返回 { action, observation }，先检查 action.success 再核验业务效果；precondition 表示未派发，没有 observation/diagnostics；dispatch-uncertain 表示可能已生效，先检查 action.attempt 与可用观察或最小快照，避免直接重试。delta 优先复用 effects 中的 ref/selector，changed=true 且 effects 为空不表示失败；navigation 的 ready 表示就绪，openedTabs 已提供可操作 tabId。增量缺少下一步目标、ref 失效、需要新滚动视口或 fullSnapshotRecommended 提示时补最小快照，不固定追加 wait/snapshot/screenshot。布局和遮挡用 inspect，视觉任务用 screenshot，结构化工具无法表达时才用最小 page_eval。observe:false 且未开启 diagnostics 时返回裸动作结果，没有 action/observation；仅开启诊断时返回 { action, diagnostics }，诊断不等待 DOM/导航稳定。page_eval 默认返回 { result }。run_actions 只用于无需中间判断的紧密序列，步骤没有内置观察。按用户目标核验终态；需要结束会话时使用 session_manage end；清理整个浏览器的调试状态时使用 browser_manage release。',
     },
   );
 
@@ -606,19 +605,28 @@ async function main() {
   // 定义工具列表
   const tools = defineMcpTools([
     {
-      name: 'browser_control',
+      name: 'session_manage',
       description:
-        '交接、恢复控制；统一使用 browser 选择目标，普通浏览器自动选择唯一会话，多个会话时用 tabId 或 session 指定任务。外部 Provider 不传 session，支持的 Provider 可 finish。仅在用户明确交还后 resume。',
+        '创建、交接、恢复或结束控制会话。new 用 browser 选择浏览器；其余操作用 sessionId 或 session。外部 Provider 用 browser 指定任务。仅在用户明确交还后 resume。',
       inputSchema: {
         type: 'object',
         properties: {
-          operation: { type: 'string', enum: ['handoff', 'resume', 'finish'] },
-          keepTabIds: { type: 'array', items: { type: 'integer', minimum: 0 }, uniqueItems: true },
+          operation: { type: 'string', enum: ['new', 'handoff', 'resume', 'end'] },
+          browser: { type: 'string' },
+          sessionId: { type: 'string' },
           reason: { type: 'string' },
-          tabId: { type: 'number' },
+          closeCreatedTabs: { type: 'boolean' },
+          keepTabIds: { type: 'array', items: { type: 'integer', minimum: 0 }, uniqueItems: true },
+          preserveEnvironment: { type: 'boolean' },
+          keepArtifactIds: { type: 'array', items: { type: 'string' } },
         },
         required: ['operation'],
       },
+    },
+    {
+      name: 'session_list',
+      description: '列出控制会话，可使用 browser 筛选',
+      inputSchema: { type: 'object', properties: { browser: { type: 'string' } } },
     },
     {
       name: 'browser_page_download',
@@ -1194,12 +1202,15 @@ async function main() {
       },
     },
     {
-      name: 'browser_launch',
+      name: 'browser_manage',
       description:
-        '通过 Provider 启动或接入浏览器实例。默认启动独立 Chrome。使用 cdp 接入已开启远程调试的 Chrome 或 Electron，providerOptions.port 可指定端口。配对实例会返回 pairing URL。',
+        'launch 启动实例，attach 通过 cdp 接入运行中的 Chrome 或 Electron，detach 断开接入并保留浏览器，close 关闭实例，release 清理浏览器级控制并保留接入。close 和 detach 必须指定 browser。',
       inputSchema: {
         type: 'object',
         properties: {
+          operation: { type: 'string', enum: ['launch', 'attach', 'detach', 'close', 'release'] },
+          browser: { type: 'string' },
+          deleteProfile: { type: 'boolean' },
           name: {
             type: 'string',
             description: '本地实例名称；使用默认 local Provider 时必填',
@@ -1253,36 +1264,7 @@ async function main() {
               '从控制浏览器复制 Cookie，可传域名数组、已安装能力提供的范围名称，或 {presets, domains} 组合。保留 HttpOnly/Secure/SameSite/过期时间等属性；所需域名权限仍由宿主管理。',
           },
         },
-        anyOf: [{ required: ['name'] }, { required: ['provider'] }],
-      },
-    },
-    {
-      name: 'browser_close',
-      description:
-        '关闭一个 Provider 托管浏览器；持久化数据默认按 Provider 策略保留，deleteProfile=true 时一并删除。名称有歧义时使用完整 browserId。',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          browser: {
-            type: 'string',
-            description: 'browser_launch 返回的 browserId 或实例名称',
-          },
-          deleteProfile: {
-            type: 'boolean',
-            description: '是否强制删除 Provider 持久化数据，默认 false',
-            default: false,
-          },
-        },
-        required: ['browser'],
-      },
-    },
-    {
-      name: 'browser_release',
-      description:
-        '仅在用户明确要求结束调试、退出接管或清理会话资源时调用，不作为普通任务收尾。它会释放 debugger/CDP 控制和会话级临时效果，后续浏览器操作可自动重新建立控制；Provider 实例的生命周期操作由 Browser Manager 处理。',
-      inputSchema: {
-        type: 'object',
-        properties: {},
+        required: ['operation'],
       },
     },
     {
@@ -2375,14 +2357,6 @@ async function main() {
                   : {}),
                 properties: {
                   ...tool.inputSchema.properties,
-                  ...(tool.name === 'browser_release'
-                    ? {
-                        closeCreatedTabs: { type: 'boolean' },
-                        keepTabIds: { type: 'array', items: { type: 'number' } },
-                        preserveEnvironment: { type: 'boolean' },
-                        keepArtifactIds: { type: 'array', items: { type: 'string' } },
-                      }
-                    : {}),
                   ...(tool.name === 'browser_page_upload'
                     ? {
                         files: {
@@ -2397,11 +2371,15 @@ async function main() {
                         },
                       }
                     : {}),
-                  session: {
-                    type: 'string',
-                    description:
-                      '首次 tab_open/page_snapshot 传 new；后续复用返回的 session.sessionId',
-                  },
+                  ...(!['browser_manage', 'session_list'].includes(tool.name)
+                    ? {
+                        session: {
+                          type: 'string',
+                          description:
+                            '首次 tab_open/page_snapshot 传 new；后续复用返回的 session.sessionId',
+                        },
+                      }
+                    : {}),
                 },
               },
             },
@@ -2460,8 +2438,13 @@ async function main() {
           }
           delete payload.payloadFile;
         }
-        const acceptsBrowser =
-          name === 'browser_get_capabilities' || name === 'browser_page_record';
+        const acceptsBrowser = [
+          'browser_get_capabilities',
+          'browser_page_record',
+          'browser_manage',
+          'session_list',
+          'session_manage',
+        ].includes(name);
         const browser = acceptsBrowser ? payload.browser : undefined;
         if (acceptsBrowser) delete payload.browser;
         result = await client.invoke(MCP_TOOL_ACTIONS[name as McpBrowserToolName], payload, {

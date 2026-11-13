@@ -26,7 +26,7 @@ metadata:
 4. 使用 `BrowserProviderDefinition` 实现 `listBrowsers`、`launch`、`close` 与真实需要的可选生命周期方法。只有 `control.kind: "provider"` 才实现 `handleAction`，并只声明已端到端验证的 capability。
 5. 将 Provider 实例列表作为单一事实源，并在 server 启动后及每次可观察状态变化后通过 `server.updateBrowsers()` 发布完整快照。`definition.listBrowsers` 只供 Provider runtime 查询与校验，不会自动更新 Mearl 宿主的 `browser_list`；轮询或 SDK 事件都必须落到同一份快照再发布。
 6. 优先从 `package.json#mearl.provider` 读取 runtime descriptor，避免手写两份 ID、协议、版本和 schema。验证构建产物能独立解析全部运行时依赖、manifest 的 `entry` 确实被打包，再运行包级测试、typecheck 和 build。不用关闭校验或宽化类型来掩盖契约错误。
-7. 先直接运行 Provider runtime，验证 schema、实例创建与列表、一个真实 action 和关闭流程。在包已经发布到当前用户可访问的注册源时，再通过 Mearl 安装并验证 Provider 帮助、`browser_launch` 与 `browser_list`；不要为了补齐安装验证而擅自发布包。若验证必须创建计费资源、扫码配对、删除数据或提供凭据，停在该动作前请用户介入。
+7. 先直接运行 Provider runtime，验证 schema、实例创建与列表、一个真实 action 和关闭流程。在包已经发布到当前用户可访问的注册源时，再通过 Mearl 安装并验证 Provider 帮助、`browser_manage` 与 `browser_list`；不要为了补齐安装验证而擅自发布包。若验证必须创建计费资源、扫码配对、删除数据或提供凭据，停在该动作前请用户介入。
 
 ## 实现约束
 

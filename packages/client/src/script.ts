@@ -89,19 +89,27 @@ export async function executeScript(
     overrides: UnifiedInvokeOptions = {},
   ) => {
     controller.signal.throwIfAborted();
+    const managesSession = action === 'session_manage';
+    const sessionOverride = managesSession ? payload.sessionId : undefined;
+    const inheritsSession =
+      action !== 'browser_manage' &&
+      action !== 'session_list' &&
+      !(managesSession && (payload.operation === 'new' || sessionOverride));
     const result = await client.invoke(action, payload, {
       ...defaults,
-      session: sessionId,
+      session: inheritsSession ? sessionId : undefined,
       ...overrides,
     });
     if (result?.action?.stage === 'dispatch-uncertain' || result?.stage === 'dispatch-uncertain')
       uncertainEffects = true;
     if (
       result?.session?.sessionId &&
-      (!overrides.session || overrides.session === 'new' || overrides.session === sessionId)
+      (!overrides.session || overrides.session === 'new' || overrides.session === sessionId) &&
+      (!sessionOverride || !sessionId || sessionOverride === sessionId)
     ) {
       session = result.session;
-      if (!overrides.session || overrides.session === 'new') sessionId = result.session.sessionId;
+      if (!overrides.session || overrides.session === 'new')
+        sessionId = result.session.status === 'released' ? undefined : result.session.sessionId;
     }
     return result;
   };
@@ -294,13 +302,12 @@ export async function executeScript(
                 ...args[2],
               });
             const optionsOnly =
-              (OPTIONS_ONLY.has(method) &&
-                !(
-                  method === 'browserList' &&
-                  args[0] &&
-                  ('provider' in args[0] || 'launchForm' in args[0])
-                )) ||
-              (method === 'browserRelease' && args.length < 2);
+              OPTIONS_ONLY.has(method) &&
+              !(
+                method === 'browserList' &&
+                args[0] &&
+                ('provider' in args[0] || 'launchForm' in args[0])
+              );
             return invoke(
               METHOD_ACTIONS.get(method)!,
               optionsOnly ? {} : (args[0] ?? {}),

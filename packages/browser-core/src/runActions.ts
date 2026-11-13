@@ -42,7 +42,7 @@ export async function runActionBatch(
     else if (!isExtensionBrowserAction(action)) validationError = `unsupported action "${action}"`;
     else if (action === 'run_actions')
       validationError = `composite action "${action}" is not allowed in run_actions`;
-    else if (action === 'browser_release' || action === 'get_capabilities')
+    else if (action === 'get_capabilities')
       validationError = `browser-level action "${action}" is not allowed in run_actions`;
     if (validationError)
       return {

@@ -2,7 +2,7 @@ import { setBackgroundPageActivity } from '../backgroundPageActivity';
 import { cleanupBrowserEnhancements } from '../browserEnhancements';
 import { runSerializedQuickSimulationUpdate } from '../quickSimulationUpdateQueue';
 /**
- * Agent handler: browser_release
+ * Agent handler: 释放浏览器控制
  *
  * 释放当前浏览器内由 Mearl 持有的临时控制状态，保留浏览器与全部标签页。
  */

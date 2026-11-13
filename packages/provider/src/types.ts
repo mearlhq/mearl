@@ -5,6 +5,7 @@ import type {
   BrowserPairingInfo,
   BrowserReference,
   BrowserProviderLocales,
+  BrowserProviderDefinition as BrowserProviderDefinitionInfo,
   BrowserProviderInputOption,
   ProviderEnhancementTarget,
   BrowserProviderOperation,
@@ -158,6 +159,7 @@ export interface ProviderConfigurationDefinition {
 
 export interface ProviderBrowserType extends BrowserProviderLocales<'name'> {
   name: string;
+  openOperation?: BrowserProviderDefinitionInfo['browserType']['openOperation'];
   /** Host must support every listed mode before launch. Omitted means Mearl only. */
   controlSessionModes?: readonly BrowserControlSessionMode[];
   documentationUrl?: string;

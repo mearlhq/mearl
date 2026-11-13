@@ -45,7 +45,7 @@ export function clearCdpPageMocks(session: PageSession): void {
   mockStores.delete(session);
 }
 
-/** browser_release 使用：丢弃所有依赖当前 CDP 会话的 mock 状态。 */
+/** 释放浏览器控制 使用：丢弃所有依赖当前 CDP 会话的 mock 状态。 */
 export function clearCdpMockState(): void {
   mockStores = new WeakMap();
 }

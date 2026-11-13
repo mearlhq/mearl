@@ -193,7 +193,7 @@ export class ControlSessionRegistry {
         action === 'run_actions' &&
         !id &&
         this.list().length &&
-        steps.some((step: any) => ['tab_open', 'browser_close'].includes(step.action))
+        steps.some((step: any) => step.action === 'tab_open')
       ) {
         throw new Error(
           'ACTIVE_CONTROL_SESSIONS: open pages outside run_actions while sessions are active',

@@ -74,8 +74,15 @@ export interface BrowserManagementActionMap {
     request: Record<string, never>;
     response: BrowserActionMap['browser_list']['response'];
   };
-  browser_launch: BrowserActionMap['browser_launch'];
-  browser_close: BrowserActionMap['browser_close'];
+  browser_manage: {
+    request:
+      | Extract<BrowserActionMap['browser_manage']['request'], { operation: 'launch' | 'attach' }>
+      | ({ browser: string } & Extract<
+          BrowserActionMap['browser_manage']['request'],
+          { operation: 'close' | 'detach' }
+        >);
+    response: BrowserActionMap['browser_manage']['response'];
+  };
   get_browser_access_url: { request: { browser: string }; response: BrowserAccessResult };
 }
 export const BROWSER_MANAGEMENT_ACTIONS = {
@@ -83,8 +90,7 @@ export const BROWSER_MANAGEMENT_ACTIONS = {
   browser_instances: true,
   browser_providers: true,
   browser_list: true,
-  browser_launch: true,
-  browser_close: true,
+  browser_manage: true,
   get_browser_access_url: true,
 } as const satisfies Record<keyof BrowserManagementActionMap, true>;
 export type BrowserManagementAction = keyof BrowserManagementActionMap;
@@ -202,6 +208,7 @@ export interface HostToExtensionActionMap {
     request: BrowserReleaseParams & { tabIds: number[]; returningToAgent?: boolean };
     response: BrowserReleaseResult;
   };
+  __control_release: { request: BrowserReleaseParams; response: BrowserReleaseResult };
   __control_deactivate: { request: { tabIds: number[] }; response: { updated: true } };
   __send_request_files: {
     request:
@@ -238,6 +245,7 @@ export const HOST_TO_EXTENSION_ACTIONS = {
   __page_record: true,
   __page_record_status: true,
   __control_cleanup: true,
+  __control_release: true,
   __control_deactivate: true,
   __send_request_files: true,
 } as const satisfies Record<keyof HostToExtensionActionMap, true>;
@@ -288,8 +296,9 @@ export function getExtensionServiceTimeout(
   if (action === 'browser_instances') return data.operation === 'detach' ? 60000 : 120000;
   if (action === 'browser_providers')
     return data.operation === 'launch_form' ? 120000 : data.operation === 'list' ? 15000 : 60000;
-  if (action === 'browser_launch') return 120000;
-  if (action === 'browser_close' || action === 'get_browser_access_url') return 60000;
+  if (action === 'browser_manage')
+    return data.operation === 'launch' || data.operation === 'attach' ? 120000 : 60000;
+  if (action === 'get_browser_access_url') return 60000;
   if (action === 'toolbox_plugin_uninstall' || action === 'toolbox_page') return 120000;
   if (action === 'toolbox_tool_invoke') return 180000;
   if (action === 'toolbox_tool_open') return 60000;

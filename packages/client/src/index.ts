@@ -90,6 +90,9 @@ export type {
   BrowserInfoBase,
   BrowserJsonValue,
   BrowserLaunchParams,
+  BrowserManageParams,
+  ControlSessionInfo,
+  SessionManageParams,
   BrowserProviderOperation,
   BrowserListResult,
   BrowserListParams,
@@ -246,34 +249,24 @@ export function selectBrowser(
   return invoke('browser_select_browser', params, options);
 }
 
-export function browserRelease(
+export function browserManage(
+  params: Protocol.BrowserManageParams,
   options?: UnifiedInvokeOptions,
-): Promise<Protocol.BrowserActionResponse<'browser_release'>>;
-export function browserRelease(
-  params: Protocol.BrowserReleaseParams,
-  options: UnifiedInvokeOptions,
-): Promise<Protocol.BrowserActionResponse<'browser_release'>>;
-export function browserRelease(
-  paramsOrOptions: Protocol.BrowserReleaseParams | UnifiedInvokeOptions = {},
-  options?: UnifiedInvokeOptions,
-): Promise<Protocol.BrowserActionResponse<'browser_release'>> {
-  return options
-    ? invoke('browser_release', paramsOrOptions, options)
-    : invoke('browser_release', {}, paramsOrOptions as UnifiedInvokeOptions);
+): Promise<Protocol.BrowserActionResponse<'browser_manage'>> {
+  return invoke('browser_manage', params, options);
 }
 
-export function browserLaunch(
-  params: Protocol.BrowserLaunchParams,
+export function sessionList(
   options?: UnifiedInvokeOptions,
-): Promise<Protocol.BrowserActionResponse<'browser_launch'>> {
-  return invoke('browser_launch', params, options);
+): Promise<Protocol.BrowserActionResponse<'session_list'>> {
+  return invoke('session_list', {}, options);
 }
 
-export function browserClose(
-  params: Protocol.BrowserCloseParams,
+export function sessionManage(
+  params: Protocol.SessionManageParams,
   options?: UnifiedInvokeOptions,
-): Promise<Protocol.BrowserActionResponse<'browser_close'>> {
-  return invoke('browser_close', params, options);
+): Promise<Protocol.BrowserActionResponse<'session_manage'>> {
+  return invoke('session_manage', params, options);
 }
 
 export function setRule(
@@ -468,13 +461,6 @@ export function runActions(
   options?: UnifiedInvokeOptions,
 ): Promise<Protocol.BrowserActionResponse<'run_actions'>> {
   return invoke('run_actions', params, options);
-}
-
-export function browserControl(
-  params: Protocol.BrowserControlParams,
-  options?: UnifiedInvokeOptions,
-) {
-  return invoke('browser_control', params, options);
 }
 
 export function pageDownload(params: Protocol.PageDownloadParams, options?: UnifiedInvokeOptions) {

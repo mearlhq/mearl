@@ -76,8 +76,8 @@ try {
   a.send({ id: request.id, success: true, data: { tabs } });
   assert.deepEqual((await tabList).data, { tabs });
 
-  const release = a.action('browser_release', {});
-  const releaseRequest = await a.receive(message => message.action === 'browser_release');
+  const release = a.action('browser_manage', { operation: 'release' });
+  const releaseRequest = await a.receive(message => message.action === '__control_release');
   a.send({
     id: releaseRequest.id,
     success: true,

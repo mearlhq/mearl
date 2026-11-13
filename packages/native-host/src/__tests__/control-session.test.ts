@@ -39,7 +39,7 @@ describe('control sessions', () => {
     }
   });
 
-  it('resolves browser control by unique session or owned page without guessing between tasks', async () => {
+  it('manages explicitly created sessions by id and ends only the selected session', async () => {
     const manager = new ControlSessionManager({
       browserId: () => 'browser',
       transport: () => 'extension',
@@ -49,37 +49,32 @@ describe('control sessions', () => {
       notify: vi.fn(),
     });
     try {
-      await expect(manager.invoke('browser_control', { operation: 'handoff' })).rejects.toThrow(
-        'CONTROL_SESSION_NOT_FOUND',
+      const { session: first } = await manager.manageSession({ operation: 'new' });
+      const { session: second } = await manager.manageSession({ operation: 'new' });
+      expect(first).toMatchObject({ browserId: 'browser', status: 'active', tabs: [] });
+      expect(manager.registry.list()).toEqual([first, second]);
+      await expect(manager.manageSession({ operation: 'handoff' })).rejects.toThrow(
+        'existing sessionId',
       );
-      const first = manager.registry.create('extension');
-      manager.registry.claim(first.sessionId, 1, 'attached');
-      expect(await manager.invoke('browser_control', { operation: 'handoff' })).toMatchObject({
+      await expect(manager.releaseBrowser(async () => {})).rejects.toThrow(
+        'ACTIVE_CONTROL_SESSIONS',
+      );
+      await expect(
+        manager.manageSession({ operation: 'handoff' }, first.sessionId),
+      ).resolves.toMatchObject({
         session: { sessionId: first.sessionId, status: 'user' },
       });
-      expect(await manager.invoke('browser_control', { operation: 'resume' })).toMatchObject({
+      await expect(
+        manager.manageSession({ operation: 'resume' }, first.sessionId),
+      ).resolves.toMatchObject({
         session: { sessionId: first.sessionId, status: 'active' },
       });
-      const second = manager.registry.create('extension');
-      manager.registry.claim(second.sessionId, 2, 'attached');
-      await expect(manager.invoke('browser_control', { operation: 'handoff' })).rejects.toThrow(
-        'CONTROL_SESSION_AMBIGUOUS',
-      );
-      expect(manager.registry.info(first.sessionId).status).toBe('active');
-      expect(manager.registry.info(second.sessionId).status).toBe('active');
-      expect(
-        await manager.invoke('browser_control', { operation: 'handoff', tabId: 2 }),
-      ).toMatchObject({ session: { sessionId: second.sessionId, status: 'user' } });
       await expect(
-        manager.invoke('browser_control', { operation: 'resume', tabId: 1 }, second.sessionId),
-      ).rejects.toThrow('TAB_NOT_IN_CONTROL_SESSION');
-      await expect(
-        manager.invoke('browser_control', { operation: 'resume', tabId: 99 }),
-      ).rejects.toThrow('CONTROL_SESSION_NOT_FOUND');
-      await manager.invoke('browser_release', {}, first.sessionId);
-      expect(await manager.invoke('browser_control', { operation: 'resume' })).toMatchObject({
-        session: { sessionId: second.sessionId, status: 'active' },
+        manager.manageSession({ operation: 'end' }, first.sessionId),
+      ).resolves.toMatchObject({
+        session: { sessionId: first.sessionId, status: 'released' },
       });
+      expect(manager.registry.list()).toEqual([second]);
     } finally {
       await manager.artifacts.dispose();
     }
@@ -115,17 +110,15 @@ describe('control sessions', () => {
         expect(result.result).toBe(business);
         expect(result.tabs).toEqual([{ tabId: 1 }]);
       }
-      const handoff = await manager.invoke('browser_control', { operation: 'handoff' }, id);
+      const handoff = await manager.manageSession({ operation: 'handoff' }, id);
       expect(handoff.session).toMatchObject({
         status: 'user',
         tabs: [{ tabId: 1, source: 'attached' }],
       });
       expect(opened.session.status).toBe('active');
-      const released = await manager.invoke('browser_release', {}, id);
-      expect(released.session).toEqual(manager.registry.state(id));
+      const released = await manager.manageSession({ operation: 'end' }, id);
+      expect(released.session).toEqual(manager.registry.info(id));
       expect(released.session.status).toBe('released');
-      expect(released.session).not.toHaveProperty('tabs');
-      expect(released.affectedTabIds).toEqual([1]);
     } finally {
       await manager.artifacts.dispose();
     }
@@ -286,7 +279,10 @@ describe('control sessions', () => {
       await expect(manager.invoke('page_snapshot', { tabId: 2 })).rejects.toThrow(
         'TAB_CONTROLLED_BY_SESSION',
       );
-      await manager.invoke('browser_release', { closeCreatedTabs: true }, opened.session.sessionId);
+      await manager.manageSession(
+        { operation: 'end', closeCreatedTabs: true },
+        opened.session.sessionId,
+      );
       expect(cleanup).toHaveBeenCalledWith([1, 2], 'extension', true);
       expect(invoke).toHaveBeenCalledWith('tab_close', { tabId: 2 }, 'extension');
     } finally {
@@ -516,9 +512,7 @@ describe('control sessions', () => {
     });
     const opened = await manager.invoke('tab_open', {}, 'new');
     const id = opened.session.sessionId;
-    await expect(manager.invoke('browser_control', { operation: 'resume' }, id)).rejects.toThrow(
-      'not waiting',
-    );
+    await expect(manager.manageSession({ operation: 'resume' }, id)).rejects.toThrow('not waiting');
     expect(cleanup).not.toHaveBeenCalled();
     manager.registry.handoff(id);
     let finish!: () => void;
@@ -531,7 +525,7 @@ describe('control sessions', () => {
     const resume = manager.userControl(id, 'resume');
     await vi.waitFor(() => expect(cleanup).toHaveBeenCalledTimes(1));
     await expect(manager.userControl(id, 'resume')).rejects.toThrow('CONTROL_SESSION_RESUMING');
-    await expect(manager.invoke('browser_release', {}, id)).rejects.toThrow(
+    await expect(manager.manageSession({ operation: 'end' }, id)).rejects.toThrow(
       'CONTROL_SESSION_RESUMING',
     );
     expect(manager.registry.info(id).status).toBe('user');
@@ -644,11 +638,14 @@ describe('control sessions', () => {
     const registry = new ControlSessionRegistry(() => 'browser');
     registry.create('cdp');
     const operation = vi.fn(async () => {});
-    for (const action of ['tab_open', 'browser_close']) {
-      await expect(
-        registry.run(undefined, 'run_actions', { actions: [{ action, data: {} }] }, operation),
-      ).rejects.toThrow('ACTIVE_CONTROL_SESSIONS');
-    }
+    await expect(
+      registry.run(
+        undefined,
+        'run_actions',
+        { actions: [{ action: 'tab_open', data: {} }] },
+        operation,
+      ),
+    ).rejects.toThrow('ACTIVE_CONTROL_SESSIONS');
     await expect(
       registry.run(
         undefined,
@@ -815,9 +812,8 @@ describe('control sessions', () => {
     });
     const opened = await manager.invoke('tab_open', { url: 'https://example.com' }, 'new');
     manager.registry.claim(opened.session.sessionId, 2, 'attached');
-    await manager.invoke(
-      'browser_release',
-      { closeCreatedTabs: true, keepTabIds: [1] },
+    await manager.manageSession(
+      { operation: 'end', closeCreatedTabs: true, keepTabIds: [1] },
       opened.session.sessionId,
     );
     expect(cleanup).toHaveBeenCalledWith([1, 2], 'extension', true);
@@ -846,9 +842,9 @@ describe('background page activity lifetime', () => {
       const { session } = await manager.invoke('tab_open', { active: false }, 'new');
       await manager.invoke('page_snapshot', { tabId: 71 }, session.sessionId);
       expect(deactivate).not.toHaveBeenCalled();
-      await manager.invoke('browser_control', { operation: 'handoff' }, session.sessionId);
+      await manager.manageSession({ operation: 'handoff' }, session.sessionId);
       expect(deactivate).toHaveBeenCalledWith([71], 'extension');
-      await manager.invoke('browser_control', { operation: 'resume' }, session.sessionId);
+      await manager.manageSession({ operation: 'resume' }, session.sessionId);
       expect(cleanup).toHaveBeenCalledWith([71], 'extension', true, true);
       await manager.invoke('page_snapshot', { tabId: 71 }, session.sessionId);
       expect(deactivate).toHaveBeenCalledTimes(1);
@@ -960,7 +956,7 @@ describe('background page activity lifetime', () => {
       const { session } = await manager.invoke('tab_open', {}, 'new');
       const work = manager.invoke('page_click', { tabId: 81, text: 'Open' }, session.sessionId);
       await started;
-      await manager.invoke('browser_control', { operation: 'handoff' }, session.sessionId);
+      await manager.manageSession({ operation: 'handoff' }, session.sessionId);
       await expect(
         manager.invoke('page_click', { tabId: 81, text: 'Again' }, session.sessionId),
       ).rejects.toThrow('CONTROL_SESSION_PAUSED');

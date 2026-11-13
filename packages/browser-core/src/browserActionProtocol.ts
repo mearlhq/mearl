@@ -220,7 +220,7 @@ export type BrowserScreenshotKind = 'native' | 'reconstructed' | 'none';
 export type BrowserControlSessionMode = 'mearl' | 'external';
 
 /** Browser-targeted actions that an external provider may implement. */
-export type BrowserCapabilityAction = ExtensionBrowserAction | 'page_download';
+export type BrowserCapabilityAction = ExtensionBrowserAction | 'page_download' | 'browser_release';
 
 /** Capabilities advertised by an external browser-control provider. */
 export interface BrowserCapabilities {
@@ -407,6 +407,19 @@ export interface BrowserCloseParams {
   deleteProfile?: boolean;
 }
 
+export type BrowserManageParams =
+  | ({ operation: 'launch' } & BrowserLaunchParams)
+  | { operation: 'attach'; provider: string; providerOptions?: Record<string, BrowserJsonValue> }
+  | { operation: 'close'; deleteProfile?: boolean }
+  | { operation: 'detach' }
+  | { operation: 'release' };
+
+export type SessionManageParams =
+  | { operation: 'new' }
+  | { operation: 'handoff'; sessionId?: string; reason?: string }
+  | { operation: 'resume'; sessionId?: string }
+  | ({ operation: 'end'; sessionId?: string } & BrowserReleaseParams);
+
 interface BrowserProviderSchemaBase extends BrowserProviderLocales<
   'title' | 'description' | 'placeholder'
 > {
@@ -476,6 +489,8 @@ export interface BrowserProviderDefinition {
   provider: BrowserProviderIdentity;
   browserType: BrowserProviderLocales<'name'> & {
     name: string;
+    /** Operation exposed for the Provider's instance entry point. Defaults to launch. */
+    openOperation?: 'launch' | 'attach';
     controlSessionModes?: readonly BrowserControlSessionMode[];
     documentationUrl?: string;
     inputSchema: BrowserProviderObjectSchema;
@@ -962,10 +977,7 @@ export interface RequestPermissionParams {
   domain: string;
 }
 
-export type RunActionName = Exclude<
-  ExtensionBrowserAction,
-  'run_actions' | 'browser_release' | 'get_capabilities'
->;
+export type RunActionName = Exclude<ExtensionBrowserAction, 'run_actions' | 'get_capabilities'>;
 
 export interface ActionStep {
   action: RunActionName;
@@ -992,15 +1004,25 @@ export interface BrowserActionMap {
   send_request: { request: SendRequestParams; response: unknown };
   browser_list: { request: BrowserListParams | undefined; response: BrowserListResult };
   browser_select_browser: { request: SelectBrowserParams; response: SelectBrowserResult };
-  browser_release: { request: BrowserReleaseParams; response: BrowserReleaseResult };
-  browser_control: {
-    request: BrowserControlParams;
-    response: { session: ControlSessionInfo } | ExternalBrowserControlResult;
+  browser_manage: {
+    request: BrowserManageParams;
+    response:
+      ManagedBrowserInfo | BrowserReleaseResult | { closed: boolean } | { detached: boolean };
+  };
+  session_list: {
+    request: undefined;
+    response: { sessions: ControlSessionInfo[]; warnings?: string[] };
+  };
+  session_manage: {
+    request: SessionManageParams;
+    response:
+      | { session: ControlSessionInfo }
+      | (Omit<ExternalBrowserControlResult, 'operation'> & {
+          operation: 'handoff' | 'resume' | 'end';
+        });
   };
   page_download: { request: PageDownloadParams; response: PageDownloadResult };
   page_record: { request: PageRecordParams; response: PageRecordResult };
-  browser_launch: { request: BrowserLaunchParams; response: ManagedBrowserInfo };
-  browser_close: { request: BrowserCloseParams; response: unknown };
   page_screenshot: { request: PageScreenshotParams; response: unknown };
   tab_open: { request: TabOpenParams; response: unknown };
   tab_close: { request: TabCloseParams; response: unknown };
@@ -1033,16 +1055,16 @@ export interface BrowserActionMap {
 export type BrowserAction = keyof BrowserActionMap;
 export type BrowserActionRequest<A extends BrowserAction> = BrowserActionMap[A]['request'];
 export type BrowserActionResponse<A extends BrowserAction> = BrowserActionMap[A]['response'] & {
-  /** Routing and execution state; browser_control returns the full tab inventory. */
+  /** Routing and execution state; session_manage returns the full tab inventory. */
   session?: Omit<ControlSessionInfo, 'tabs'>;
 };
 export type BrowserCommandAction = Exclude<BrowserAction, 'browser_select_browser'>;
 export type ExtensionBrowserAction = Exclude<
   BrowserCommandAction,
   | 'browser_list'
-  | 'browser_launch'
-  | 'browser_close'
-  | 'browser_control'
+  | 'browser_manage'
+  | 'session_list'
+  | 'session_manage'
   | 'page_download'
   | 'page_record'
 >;
@@ -1145,12 +1167,11 @@ export const BROWSER_ACTIONS = {
   send_request: true,
   browser_list: true,
   browser_select_browser: true,
-  browser_release: true,
-  browser_control: true,
+  browser_manage: true,
+  session_list: true,
+  session_manage: true,
   page_download: true,
   page_record: true,
-  browser_launch: true,
-  browser_close: true,
   page_screenshot: true,
   tab_open: true,
   tab_close: true,
@@ -1193,12 +1214,11 @@ export const BROWSER_COMMAND_ACTIONS = {
   get_capabilities: true,
   send_request: true,
   browser_list: true,
-  browser_release: true,
-  browser_control: true,
+  browser_manage: true,
+  session_list: true,
+  session_manage: true,
   page_download: true,
   page_record: true,
-  browser_launch: true,
-  browser_close: true,
   page_screenshot: true,
   tab_open: true,
   tab_close: true,
@@ -1240,7 +1260,6 @@ export const EXTENSION_BROWSER_ACTIONS = {
   get_rules: true,
   get_capabilities: true,
   send_request: true,
-  browser_release: true,
   page_screenshot: true,
   tab_open: true,
   tab_close: true,
@@ -1273,6 +1292,8 @@ export const EXTENSION_BROWSER_ACTIONS = {
 export const BROWSER_CAPABILITY_ACTIONS = {
   ...EXTENSION_BROWSER_ACTIONS,
   page_download: true,
+  // Provider wire operation for releasing control while preserving its instance.
+  browser_release: true,
 } as const satisfies Record<BrowserCapabilityAction, true>;
 
 export function isBrowserAction(value: unknown): value is BrowserAction {

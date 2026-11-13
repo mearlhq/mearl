@@ -235,7 +235,12 @@ export function handleDebuggerSessionDetach(
 }
 
 /** 记录 Runtime 上报的 MAIN world，使晚于 Runtime.enable 的 iframe 求值也能可靠定位。 */
-export function handleDebuggerSessionEvent(tabId: number, method: string, params: any, sessionId?: string): void {
+export function handleDebuggerSessionEvent(
+  tabId: number,
+  method: string,
+  params: any,
+  sessionId?: string,
+): void {
   const state = sessionStates.get(tabId);
   if (!state?.attached) return;
   if (method === 'Runtime.executionContextsCleared') {
@@ -333,7 +338,11 @@ export async function resolveDebuggerFrameExecutionContextId(
       3000,
     );
 
-    function listener(source: chrome.debugger.Debuggee & { sessionId?: string }, method: string, params: any): void {
+    function listener(
+      source: chrome.debugger.Debuggee & { sessionId?: string },
+      method: string,
+      params: any,
+    ): void {
       if (settled || source.tabId !== tabId || source.sessionId !== sessionId) return;
       if (method !== 'Runtime.executionContextCreated') return;
       const context = params.context;
@@ -346,11 +355,12 @@ export async function resolveDebuggerFrameExecutionContextId(
 
     chrome.debugger.onEvent.addListener(listener);
     const enable = () => chrome.debugger.sendCommand(debugTarget, 'Runtime.enable');
-    const enumeration = refresh && !sessionId
-      ? refreshDebuggerExecutionContexts(tabId).then(refreshed =>
-          refreshed ? undefined : enable(),
-        )
-      : enable();
+    const enumeration =
+      refresh && !sessionId
+        ? refreshDebuggerExecutionContexts(tabId).then(refreshed =>
+            refreshed ? undefined : enable(),
+          )
+        : enable();
     enumeration.catch(() => fail(`Failed to enumerate execution contexts for frame ${frameId}`));
   });
 }
@@ -374,7 +384,7 @@ export function listActiveDebuggerTabIds(): number[] {
 /**
  * 主动释放指定标签页的共享 debugger session。
  *
- * 与单个 lease.release() 不同，这会让所有消费者同时失效，供 browser_release
+ * 与单个 lease.release() 不同，这会让所有消费者同时失效，供浏览器级控制清理
  * 在保留标签页的前提下交还浏览器控制权。
  */
 export async function releaseDebuggerSession(

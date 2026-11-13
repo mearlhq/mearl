@@ -30,16 +30,8 @@ describe('command parameter contracts', () => {
     );
   });
 
-  it('warns that browser_release clears persistent session effects', () => {
-    const description = COMMAND_MAP.get('browser_release')?.description;
-
-    expect(description).toContain('设备/时区模拟');
-    expect(description).toContain('不用于普通任务收尾');
-    expect(description).toContain('mearl <providerId>');
-  });
-
   it('documents structured Provider options without changing built-in launch parameters', () => {
-    const params = COMMAND_MAP.get('browser_launch')?.params ?? [];
+    const params = COMMAND_MAP.get('browser_manage')?.params ?? [];
     expect(params.find(param => param.name === 'providerOptions')?.description).toContain('结构化');
     expect(params.some(param => param.name === 'mode')).toBe(false);
     expect(params.some(param => param.name === 'sessionId')).toBe(false);

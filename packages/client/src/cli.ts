@@ -69,13 +69,11 @@ const CATEGORIES: { title: string; names: string[] }[] = [
   },
   {
     title: '浏览器',
-    names: [
-      'browser_list',
-      'browser_launch',
-      'browser_release',
-      'browser_close',
-      'browser_control',
-    ],
+    names: ['browser_list', 'browser_manage'],
+  },
+  {
+    title: '控制会话',
+    names: ['session_list', 'session_manage'],
   },
 ];
 
@@ -320,7 +318,7 @@ function printProviderHelp(
   if (browserType.help?.length) lines.push('');
   lines.push(
     '创建：',
-    `  ${commandName} browser_launch --payload '{"provider":"${provider.providerId}","providerOptions":{}}'`,
+    `  ${commandName} browser_manage --payload '{"operation":"${browserType.openOperation ?? 'launch'}","provider":"${provider.providerId}","providerOptions":{}}'`,
     '',
     '启动参数（providerOptions）：',
   );

@@ -12,7 +12,7 @@ The action catalog directly reuses `@mearl/browser-core/browserActionProtocol`, 
 
 Mearl manages control sessions by default. Providers receive target instances, pages, and ordinary actions, without handling session IDs, resource ownership, or human handoff state. Release with `--session` ends only Mearl task control; instance closure, detachment, and Cookie synchronization use Provider lifecycle methods. Upload and download require `page_upload` and `page_download`, respectively, in `capabilities.actions`.
 
-Mearl appends `session` to ordinary action responses with routing and control state only; `browser_control` handoff also includes session pages. Text refs from `page_snapshot` are directly actionable. Providers retain locator mappings in their runtime rather than exposing internal node-ID dictionaries.
+Mearl appends `session` to ordinary action responses with routing and control state only; `session_manage` handoff also includes session pages. Text refs from `page_snapshot` are directly actionable. Providers retain locator mappings in their runtime rather than exposing internal node-ID dictionaries.
 
 `page_upload` receives `filePaths` on the execution host; Mearl stages caller files and browser artifacts. `page_download` receives `{ tabId, trigger, url?, timeout? }`: listen for downloads before clicking, wait for completion, then return `ProviderDownloadResult`: `{ filename, filePath, action, owned? }`. `filePath` is absolute on the local Provider process host; Providers retrieve remote files. `action` is the click result; `owned:true` lets Mearl delete the staged file after import. Mearl converts it to a browser artifact for saving, later upload, and session cleanup. Return an error on timeout or uncertain provenance without clicking again.
 
@@ -131,12 +131,14 @@ The runtime validates schemas, state machines, operations, and page-action capab
 Optional implementations such as `start`, `detach`, `getAccess`, and `syncCookies` must match declared instance operations;
 the Provider runtime coordinates these lifecycle methods while browser actions use the unified Mearl protocol.
 
-Public `browser_launch` accepts `{ provider, providerOptions }` for all Providers and returns
+The public `browser_manage` command accepts `{ operation, provider, providerOptions }` for `launch` and returns
 the same `ManagedBrowserInfo` as `browser_list.browsers[]`: object-form Provider identity, state,
 persistence policy, operations, and security metadata. Internal manager fields, control connections, and temporary access URLs are excluded.
 Local top-level CLI arguments are convenience inputs. External Provider arguments must use `providerOptions`; the two cannot be mixed.
 
-The built-in `cdp` Provider attaches to a running Chrome or Electron instance with debugging enabled. Set `providerOptions.port` for a specific port, `userDataDir` to read a profile's `DevToolsActivePort`, or `endpointFile` to read a private WebSocket URL. Use absolute paths on the target host. If the profile file records a port, any supplied `port` must match it. `browser_release` disconnects and leaves the browser running.
+A Provider that only attaches to existing resources can declare `browserType.openOperation: "attach"`. The host checks the operation before calling the Provider entry point.
+
+The `attach` operation uses the built-in `cdp` Provider to connect to a running Chrome or Electron instance with debugging enabled. Set `providerOptions.port` for a specific port, `userDataDir` to read a profile's `DevToolsActivePort`, or `endpointFile` to read a private WebSocket URL. Use absolute paths on the target host. If the profile file records a port, any supplied `port` must match it. `browser_manage detach` disconnects and leaves the browser running.
 
 Built-in browsers retain local launch interactions; external Provider inputs are generated from `browserType.inputSchema`.
 Both submit the same `providerOptions` structure.
@@ -210,7 +212,7 @@ runtime descriptors, running processes, and callers must match. Update the relev
 - Mearl's control process handles `browser_sessions`, without forwarding to external Providers. Session release and instance `detach` are separate.
 
 The SDK dispatches Socket requests to methods such as `configure/getLaunchForm/start/detach/syncCookies`.
-The ordinary `browser_release` action does not detach instances; Mearl converts public CLI release without a session to `detach`.
+The public `browser_manage` command forwards `release` to the Provider’s advertised `browser_release` capability, which preserves the instance attachment. Use `detach` to disconnect.
 Providers bundling the SDK must update it and rebuild. Editing installation metadata cannot replace running code.
 
 ## External task control and page enhancement
@@ -221,7 +223,7 @@ The SDK checks Mearl host support at startup and before operations; unsupported 
 An instance's control mode is fixed within a runtime. External mode rejects Mearl `--session`; external tools own page ownership and handoff.
 Providers omitting this field retain default behavior.
 
-To support unified handoff, implement `BrowserProviderDefinition.control(request, context)` and advertise the supported `handoff`, `resume` and `finish` operations on each instance. Mearl forwards `browser_control` without creating a Mearl session. Requests contain the Provider-local `browserId`, `operation`, optional `tabId` and `reason`; only `finish` accepts `keepTabIds`. Return `{ controlSessionMode: "external", operation, control }`, where control is respectively `user`, `agent` or `finished`. Providers must validate control ownership and retained pages, reject unsupported parameters, and keep handoff preflight responsive while page operations wait. Resume only after the user explicitly returns control.
+To support unified handoff, implement `BrowserProviderDefinition.control(request, context)` and advertise the supported `handoff`, `resume` and `finish` operations on each instance. Mearl forwards `session_manage` operations to that method, mapping `end` to Provider `finish`. Requests contain the Provider-local `browserId`, `operation`, optional `tabId` and `reason`; only `finish` accepts `keepTabIds`. Return `{ controlSessionMode: "external", operation, control }`, where control is respectively `user`, `agent` or `finished`. Providers must validate control ownership and retained pages, reject unsupported parameters, and keep handoff preflight responsive while page operations wait. Resume only after the user explicitly returns control.
 
 External Providers can bind Mearl Extension environment enhancement to authorized pages through
 `createProviderEnhancementClient(providerId, browserId)`, calling `bind`, `invoke`, and `release`. Only device, App, and time-zone enhancement is allowed,

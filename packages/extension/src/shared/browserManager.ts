@@ -1,5 +1,8 @@
 import type {
   BrowserManagementActionMap,
+  BrowserLaunchParams,
+  BrowserCloseParams,
+  ManagedBrowserInfo,
   BrowserInstanceOperations,
   BrowserProviderOperations,
   BrowserSessionOperations,
@@ -12,8 +15,13 @@ import { requestExtensionService } from './extensionServiceRequest';
 export type BrowserProviderSummary = BrowserProviderDefinition;
 interface BrowserManagerRequestMap {
   list: BrowserManagementActionMap['browser_list'];
-  launch: BrowserManagementActionMap['browser_launch'];
-  close: BrowserManagementActionMap['browser_close'];
+  launch: {
+    request: BrowserLaunchParams & {
+      operation: 'launch' | 'attach';
+    };
+    response: ManagedBrowserInfo;
+  };
+  close: { request: BrowserCloseParams; response: unknown };
   access: BrowserManagementActionMap['get_browser_access_url'];
   providers: BrowserProviderOperations['list'];
   configure: BrowserProviderOperations['configure'];
@@ -28,10 +36,19 @@ export type BrowserManagerOperation = keyof BrowserManagerRequestMap;
 const requests = {
   list: (data: BrowserManagerRequestMap['list']['request']) =>
     requestExtensionService('browser_list', data),
-  launch: (data: BrowserManagerRequestMap['launch']['request']) =>
-    requestExtensionService('browser_launch', data),
+  launch: async (data: BrowserManagerRequestMap['launch']['request']) =>
+    (await requestExtensionService(
+      'browser_manage',
+      data.operation === 'attach'
+        ? {
+            operation: 'attach',
+            provider: data.provider ?? '',
+            providerOptions: data.providerOptions,
+          }
+        : { ...data, operation: 'launch' },
+    )) as ManagedBrowserInfo,
   close: (data: BrowserManagerRequestMap['close']['request']) =>
-    requestExtensionService('browser_close', data),
+    requestExtensionService('browser_manage', { ...data, operation: 'close' }),
   access: (data: BrowserManagerRequestMap['access']['request']) =>
     requestExtensionService('get_browser_access_url', data),
   providers: (_data: BrowserManagerRequestMap['providers']['request']) =>
@@ -43,7 +60,7 @@ const requests = {
   start: (data: BrowserManagerRequestMap['start']['request']) =>
     requestExtensionService('browser_instances', { ...data, operation: 'start' }),
   detach: (data: BrowserManagerRequestMap['detach']['request']) =>
-    requestExtensionService('browser_instances', { ...data, operation: 'detach' }),
+    requestExtensionService('browser_manage', { ...data, operation: 'detach' }),
   syncCookies: (data: BrowserManagerRequestMap['syncCookies']['request']) =>
     requestExtensionService('browser_instances', { ...data, operation: 'sync_cookies' }),
 } satisfies {

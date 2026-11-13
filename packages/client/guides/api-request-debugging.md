@@ -47,7 +47,7 @@ send_request 报 Cookie access not authorized / Permission denied / Host permiss
 
 完整 mockData 适合替换响应，fields 适合基于真实响应微调。需要同一接口多种情况时用 conditions 子集匹配，按业务入参隔离；无条件规则会覆盖。$index 从 0 起描述同一场景调用顺序，不作为业务请求字段匹配。
 
-用 get_mocks 回查目标 tabId 的配置，然后触发页面业务请求验证效果。设置成功不等于页面已收到 Mock。`browser_release --session <sessionId>` 默认保留 Mock；不带 `--session` 的浏览器级释放会清理依赖调试连接的 Mock，保持 Mock 终态时保留环境。禁用目标 Mock 用 enabled=false。
+用 get_mocks 回查目标 tabId 的配置，然后触发页面业务请求验证效果。设置成功不等于页面已收到 Mock。`session_manage --session <sessionId> --payload '{"operation":"end"}'` 默认保留 Mock；不带 `--session` 的浏览器级释放会清理依赖调试连接的 Mock，保持 Mock 终态时保留环境。禁用目标 Mock 用 enabled=false。
 
 ## 大 payload 与文件引用
 

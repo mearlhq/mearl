@@ -230,7 +230,7 @@ export async function markTabControlled(
   }
 }
 
-/** browser_release 使用：撤销登记和当前文档的视觉标识，但保留标签页。 */
+/** 释放浏览器控制 使用：撤销登记和当前文档的视觉标识，但保留标签页。 */
 export async function releaseControlledTab(tabId: number): Promise<void> {
   await unregisterControlledTab(tabId);
   injectFavicon({
