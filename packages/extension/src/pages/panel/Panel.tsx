@@ -61,7 +61,9 @@ import { appendNavigationDivider } from './utils/navigationDividers';
 import { PANEL_PRESERVE_LOG_KEY } from '../../shared/devicePreviewPanel';
 
 const RequestCasesModal = lazy(() =>
-  import('./components/request-cases/RequestCasesModal').then(m => ({ default: m.RequestCasesModal })),
+  import('./components/request-cases/RequestCasesModal').then(m => ({
+    default: m.RequestCasesModal,
+  })),
 );
 
 const RequestImportModal = lazy(() =>
@@ -80,11 +82,15 @@ interface PanelProps {
 
 export const Panel: FC<PanelProps> = ({ previewToken }) => {
   const isDevtools = previewToken === undefined;
-  const [previewState, setPreviewState] = useState<'connecting' | 'capturing' | 'error'>('connecting');
+  const [previewState, setPreviewState] = useState<'connecting' | 'capturing' | 'error'>(
+    'connecting',
+  );
   const browserUiSettings = useBrowserUiSettings();
   const [requests, setRequests] = useState<CapturedRequest[]>([]);
   const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
-  const [preserveLog, setPreserveLog] = useLocalStorage<boolean>(PANEL_PRESERVE_LOG_KEY, false, { sync: true });
+  const [preserveLog, setPreserveLog] = useLocalStorage<boolean>(PANEL_PRESERVE_LOG_KEY, false, {
+    sync: true,
+  });
   const [navigationDividers, setNavigationDividers] = useState<NavigationDivider[]>([]);
   const [isHiddenListExpanded, setIsHiddenListExpanded] = useState<boolean>(false);
   const [tabId, setTabId] = useState<number | null>(null);
@@ -117,13 +123,23 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
   // ─── 热度地图 ──────────────────────────────────────────────────────────────
   const [pageSpmAB, setPageSpmAB] = useState<string | null>(null);
   const [pagePath, setPagePath] = useState<string | null>(null);
-  const isTripPath = !!pagePath && !!browserUiSettings.heatmap && pagePath.startsWith(browserUiSettings.heatmap.pathPrefix);
+  const isTripPath =
+    !!pagePath &&
+    !!browserUiSettings.heatmap &&
+    pagePath.startsWith(browserUiSettings.heatmap.pathPrefix);
   const isTripPathRef = useRef(isTripPath);
   useEffect(() => {
     isTripPathRef.current = isTripPath;
   }, [isTripPath]);
-  const [storedHeatmapMeasure, setHeatmapMeasure] = useLocalStorage<HeatmapMeasure>('panel-heatmap-measure', '');
-  const heatmapMeasure = browserUiSettings.heatmap?.measures.some(value => value.id === storedHeatmapMeasure) ? storedHeatmapMeasure : browserUiSettings.heatmap?.defaultMeasure ?? '';
+  const [storedHeatmapMeasure, setHeatmapMeasure] = useLocalStorage<HeatmapMeasure>(
+    'panel-heatmap-measure',
+    '',
+  );
+  const heatmapMeasure = browserUiSettings.heatmap?.measures.some(
+    value => value.id === storedHeatmapMeasure,
+  )
+    ? storedHeatmapMeasure
+    : (browserUiSettings.heatmap?.defaultMeasure ?? '');
   const [heatmapStatus, setHeatmapStatus] = useState<HeatmapStatus>('idle');
   const [heatmapError, setHeatmapError] = useState<string | null>(null);
   const [heatmapErrorCode, setHeatmapErrorCode] = useState<HeatmapErrorCode | null>(null);
@@ -201,7 +217,11 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
   }, [hiddenNonProtocolApis]);
 
   // 使用 抓包身份 Hook：登录弹窗状态在这里订阅，userInfo 由各子组件直接通过 hook 访问
-  const { loginModalOpen, closeLoginWindow, loginDefinition: captureLoginDefinition } = useCaptureIdentity({
+  const {
+    loginModalOpen,
+    closeLoginWindow,
+    loginDefinition: captureLoginDefinition,
+  } = useCaptureIdentity({
     source: 'cookie-first',
     lazy: true,
   });
@@ -243,7 +263,10 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
 
   // 将 hiddenApis 数组转换为 Set 以便低阶查找
   const hiddenApisSet = useMemo(() => new Set(hiddenApis), [hiddenApis]);
-  const hiddenNonProtocolApisSet = useMemo(() => new Set(hiddenNonProtocolApis), [hiddenNonProtocolApis]);
+  const hiddenNonProtocolApisSet = useMemo(
+    () => new Set(hiddenNonProtocolApis),
+    [hiddenNonProtocolApis],
+  );
 
   const editingOverride = useMemo(
     () =>
@@ -379,8 +402,10 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
     const handleMainFrameCommitted = (event: Event) => {
       const detail = (event as CustomEvent<{ url: string; timestampMs?: number }>).detail;
       const url = detail?.url ?? '';
-      const timestampMs = typeof detail?.timestampMs === 'number' && Number.isFinite(detail.timestampMs)
-        ? detail.timestampMs : Date.now();
+      const timestampMs =
+        typeof detail?.timestampMs === 'number' && Number.isFinite(detail.timestampMs)
+          ? detail.timestampMs
+          : Date.now();
       setTraceResult(null);
       if (!preserveLog) {
         requestCaptureStateRef.current = { ...requestCaptureStateRef.current };
@@ -456,10 +481,14 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
   useEffect(() => {
     if (tabId === null || mode !== 'rum') return;
     const revision = ++spmOverlayRevision.current;
-    void sendMessageSafely<{ enabled: boolean }>({ action: 'getSpmOverlayState', tabId }).then(state => {
-      if (revision === spmOverlayRevision.current) setShowAllSpm(state?.enabled === true);
-    }).catch(() => {});
-    return () => { spmOverlayRevision.current++; };
+    void sendMessageSafely<{ enabled: boolean }>({ action: 'getSpmOverlayState', tabId })
+      .then(state => {
+        if (revision === spmOverlayRevision.current) setShowAllSpm(state?.enabled === true);
+      })
+      .catch(() => {});
+    return () => {
+      spmOverlayRevision.current++;
+    };
   }, [tabId, mode]);
 
   const handleToggleShowAllSpm = () => {
@@ -488,7 +517,10 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
 
   const applyHeatmapResultRef = useRef<(r: HeatmapStartResult) => void>(() => {});
   const applyHeatmapResult = useCallback((result: HeatmapStartResult) => {
-    if (!trackingMetadataEnabledRef.current || (!result.success && result.error === 'HEATMAP_CANCELLED'))
+    if (
+      !trackingMetadataEnabledRef.current ||
+      (!result.success && result.error === 'HEATMAP_CANCELLED')
+    )
       return;
     if (result.success) {
       setHeatmapStatus('active');
@@ -550,7 +582,10 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
 
   // 热度地图按已安装设置、RUM 模式和路径范围显示。
   useEffect(() => {
-    if ((!trackingMetadataEnabled || mode !== 'rum' || !isTripPath) && heatmapStatusRef.current !== 'idle') {
+    if (
+      (!trackingMetadataEnabled || mode !== 'rum' || !isTripPath) &&
+      heatmapStatusRef.current !== 'idle'
+    ) {
       stopHeatmap();
       setHeatmapStatus('idle');
       setHeatmapError(null);
@@ -722,12 +757,20 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
   const requestFilters = useRequestFilters(filteredRequests, requests.length > 0);
   const tracePageStartedAt = navigationDividers.at(-1)?.timestampMs ?? 0;
   const getTraceRequests = useCallback(
-    () => requestFilters.displayedRequests.filter(request => request.timestampMs >= tracePageStartedAt),
+    () =>
+      requestFilters.displayedRequests.filter(request => request.timestampMs >= tracePageStartedAt),
     [requestFilters.displayedRequests, tracePageStartedAt],
   );
   const sourceTracer = useSourceTracer({
     getRequests: getTraceRequests,
-    scopeKey: JSON.stringify([filterText, requestFilters.selectedTypes, requestFilters.selectedNamespaces, hiddenApis, hiddenNonProtocolApis, tracePageStartedAt]),
+    scopeKey: JSON.stringify([
+      filterText,
+      requestFilters.selectedTypes,
+      requestFilters.selectedNamespaces,
+      hiddenApis,
+      hiddenNonProtocolApis,
+      tracePageStartedAt,
+    ]),
     onResult: setTraceResult,
   });
   const includeGenericRequests = requestFilters.selectedTypes.some(type => type !== 'protocol');
@@ -810,12 +853,28 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
         sourceTraceActive={sourceTracer.isPicking}
       />
       {!isDevtools && (
-        <div role="status" className={previewState === 'error'
-          ? 'flex items-center justify-between border-b border-border bg-bg-primary px-2 py-1 text-xs text-warning-text'
-          : 'sr-only'}>
-          {previewState === 'capturing' ? t('devicePreviewCapturing')
-            : previewState === 'connecting' ? t('loading') : t('devicePreviewCaptureUnavailable')}
-          {previewState === 'error' && <button type="button" className="rounded px-2 py-1 hover:bg-bg-hover" onClick={retryPreview}>{t('retry')}</button>}
+        <div
+          role="status"
+          className={
+            previewState === 'error'
+              ? 'flex items-center justify-between border-b border-border bg-bg-primary px-2 py-1 text-xs text-warning-text'
+              : 'sr-only'
+          }
+        >
+          {previewState === 'capturing'
+            ? t('devicePreviewCapturing')
+            : previewState === 'connecting'
+              ? t('loading')
+              : t('devicePreviewCaptureUnavailable')}
+          {previewState === 'error' && (
+            <button
+              type="button"
+              className="rounded px-2 py-1 hover:bg-bg-hover"
+              onClick={retryPreview}
+            >
+              {t('retry')}
+            </button>
+          )}
         </div>
       )}
       {needsPermission && currentHost && (
@@ -856,6 +915,7 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
           rightPanel={
             <EventDetail
               event={selectedRumEvent}
+              tabId={tabId}
               trackingMetadataEnabled={trackingMetadataEnabled}
               pinnedEventFields={currentPinnedEventFields}
               onPinEventField={pinEventField}
@@ -996,7 +1056,9 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
           requestImportEnabled={requestImportEnabled}
           onClose={() => setShowRequestImportModal(false)}
           onImportMock={addMockOverride}
-          onOpenRequestCases={requestCasesEnabled ? () => setShowRequestCasesModal(true) : undefined}
+          onOpenRequestCases={
+            requestCasesEnabled ? () => setShowRequestCasesModal(true) : undefined
+          }
           requestApiNames={requests.filter(r => !hiddenApisSet.has(r.apiName)).map(r => r.apiName)}
         />
       </Suspense>
@@ -1044,24 +1106,28 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
       {showSettingsModal && (
         <SettingsModal
           onClose={() => setShowSettingsModal(false)}
-          previewTabId={isDevtools ? undefined : tabId ?? undefined}
+          previewTabId={isDevtools ? undefined : (tabId ?? undefined)}
         />
       )}
 
       {/* 内嵌登录弹窗 */}
       <Suspense fallback={null}>
-        {captureLoginDefinition && <LoginModal
-          isOpen={requestCasesEnabled && loginModalOpen}
-          onClose={closeLoginWindow}
-          url={captureLoginDefinition.url}
-          title={t('loginRequestCases')}
-        />}
-        {metadataLoginDefinition && <LoginModal
-          isOpen={requestMetadataEnabled && requestMetadataLoginModalOpen}
-          onClose={closeRequestMetadataLogin}
-          url={metadataLoginDefinition.login.url}
-          title={browserUiText(metadataLoginDefinition.login.title, getCurrentLanguage())}
-        />}
+        {captureLoginDefinition && (
+          <LoginModal
+            isOpen={requestCasesEnabled && loginModalOpen}
+            onClose={closeLoginWindow}
+            url={captureLoginDefinition.url}
+            title={t('loginRequestCases')}
+          />
+        )}
+        {metadataLoginDefinition && (
+          <LoginModal
+            isOpen={requestMetadataEnabled && requestMetadataLoginModalOpen}
+            onClose={closeRequestMetadataLogin}
+            url={metadataLoginDefinition.login.url}
+            title={browserUiText(metadataLoginDefinition.login.title, getCurrentLanguage())}
+          />
+        )}
       </Suspense>
 
       <SourceTraceCard
@@ -1074,5 +1140,9 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
       <ToastContainer />
     </div>
   );
-  return <ElementPickerTabContext.Provider value={isDevtools ? undefined : tabId}>{content}</ElementPickerTabContext.Provider>;
+  return (
+    <ElementPickerTabContext.Provider value={isDevtools ? undefined : tabId}>
+      {content}
+    </ElementPickerTabContext.Provider>
+  );
 };

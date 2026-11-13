@@ -2,13 +2,16 @@
  * 在被检查页面中高亮匹配给定 SPM 的 DOM 元素。
  * DevTools 面板页不能直接使用 chrome.tabs，需经由 background service worker 中转。
  */
-export function highlightSpmInPage(spm: string, onResult?: (found: number) => void): void {
+export function highlightSpmInPage(
+  tabId: number,
+  spm: string,
+  onResult?: (found: number) => void,
+): void {
   if (!spm) {
     onResult?.(0);
     return;
   }
 
-  const tabId = chrome.devtools.inspectedWindow.tabId;
   chrome.runtime.sendMessage({ action: 'highlightSpm', tabId, spm }, response => {
     if (chrome.runtime.lastError) {
       onResult?.(0);

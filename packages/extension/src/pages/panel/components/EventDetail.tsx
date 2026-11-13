@@ -31,19 +31,24 @@ interface HotzoneButtonProps {
   onHighlight: (spm: string, key: string) => void;
 }
 
-const HotzoneButton: FC<HotzoneButtonProps> = ({ spm, result, onHighlight, hkey }) => (
-  <button
-    onClick={() => onHighlight(spm, hkey)}
-    title={t('aplusHighlightButtonTitle')}
-    className="shrink-0 flex items-center gap-0.5 px-1.5 py-0.5 rounded text-2xs cursor-pointer transition-colors bg-bg-secondary text-text-secondary hover:bg-amber-500/20 hover:text-amber-600 dark:hover:text-amber-400"
-  >
-    <Crosshair size={11} />
-    {result !== null && result !== undefined && <span>{result > 0 ? result : '?'}</span>}
-  </button>
-);
+const HotzoneButton: FC<HotzoneButtonProps> = ({ spm, result, onHighlight, hkey }) => {
+  const label = t('aplusHighlightButtonTitle');
+  return (
+    <button
+      onClick={() => onHighlight(spm, hkey)}
+      title={label}
+      aria-label={label}
+      className="shrink-0 flex items-center gap-0.5 px-1.5 py-0.5 rounded text-2xs cursor-pointer transition-colors bg-bg-secondary text-text-secondary hover:bg-amber-500/20 hover:text-amber-600 dark:hover:text-amber-400"
+    >
+      <Crosshair size={11} />
+      {result !== null && result !== undefined && <span>{result > 0 ? result : '?'}</span>}
+    </button>
+  );
+};
 
 interface RumEventDetailProps {
   event: RumEvent | null;
+  tabId: number | null;
   trackingMetadataEnabled?: boolean;
   pinnedEventFields?: PinnedEventField[];
   onPinEventField?: (path: string[], value: any) => void;
@@ -53,6 +58,7 @@ interface RumEventDetailProps {
 
 export const EventDetail: FC<RumEventDetailProps> = ({
   event,
+  tabId,
   trackingMetadataEnabled = false,
   pinnedEventFields = [],
   onPinEventField,
@@ -66,52 +72,66 @@ export const EventDetail: FC<RumEventDetailProps> = ({
   );
   const [expandedPaths, setExpandedPaths] = useState<Record<string, boolean>>({});
   const [hotzoneResults, setHotzoneResults] = useState<Record<string, number | null>>({});
+  const hotzoneRevision = useRef(0);
   const tabContentRef = useRef<HTMLDivElement>(null);
   const devtoolsNetwork = chrome.devtools?.network;
+  const locateTitle = devtoolsNetwork
+    ? t('aplusHighlightOnPageTitle')
+    : t('aplusHighlightButtonTitle');
 
   const isAplus = event?.source === 'aplus';
   // i18n-tracker 转换后的 rum EXP/CLK 事件也需要展示 aplus 风格的详情
   const isAplusLike =
     isAplus || (event?.source === 'rum' && ['EXP', 'CLK'].includes(event?.event_type ?? ''));
-  const [resolvedPoint, setResolvedPoint] = useState<{ event: RumEvent; point: AplusSpmResolution } | null>(null);
+  const [resolvedPoint, setResolvedPoint] = useState<{
+    event: RumEvent;
+    point: AplusSpmResolution;
+  } | null>(null);
   useEffect(() => {
     let current = true;
     if (event && isAplusLike && !event.point) {
-      void resolveAplusSpm(event.event_type, event._raw).then(point => {
-        if (current) setResolvedPoint({ event, point });
-      }).catch(console.warn);
+      void resolveAplusSpm(event.event_type, event._raw)
+        .then(point => {
+          if (current) setResolvedPoint({ event, point });
+        })
+        .catch(console.warn);
     }
-    return () => { current = false; };
+    return () => {
+      current = false;
+    };
   }, [event, isAplusLike]);
   const { mainSpm, highlightSpm } = isAplusLike
-    ? event?.point ?? (resolvedPoint?.event === event ? resolvedPoint.point : { mainSpm: '', highlightSpm: '' })
+    ? (event?.point ??
+      (resolvedPoint?.event === event ? resolvedPoint.point : { mainSpm: '', highlightSpm: '' }))
     : { mainSpm: '', highlightSpm: '' };
   const displaySpm = mainSpm;
 
   useEffect(() => {
     setExpandedPaths({});
     setHotzoneResults({});
-    // 切换事件时自动高亮 SPM 元素
-    if (devtoolsNetwork && highlightSpm) {
-      highlightSpmInPage(highlightSpm, found => {
-        setHotzoneResults({ 'main-spm': found });
-      });
-    }
-  }, [event?.id, highlightSpm, devtoolsNetwork]);
-
-  // 页面跳转后重新高亮（content script 重新注入，原有高亮丢失）
-  useEffect(() => {
-    if (!devtoolsNetwork || !highlightSpm) return;
-    const onNavigated = () => {
-      setTimeout(() => {
-        highlightSpmInPage(highlightSpm, found => {
+    const revision = ++hotzoneRevision.current;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const highlightMain = () => {
+      if (tabId === null || !highlightSpm) return;
+      highlightSpmInPage(tabId, highlightSpm, found => {
+        if (hotzoneRevision.current === revision) {
           setHotzoneResults(prev => ({ ...prev, 'main-spm': found }));
-        });
-      }, 500);
+        }
+      });
     };
-    devtoolsNetwork.onNavigated.addListener(onNavigated);
-    return () => devtoolsNetwork.onNavigated.removeListener(onNavigated);
-  }, [highlightSpm, devtoolsNetwork]);
+    highlightMain();
+    const onNavigated = () => {
+      clearTimeout(timer);
+      timer = setTimeout(highlightMain, 500);
+    };
+    const navigation = tabId !== null && highlightSpm ? devtoolsNetwork?.onNavigated : undefined;
+    navigation?.addListener(onNavigated);
+    return () => {
+      hotzoneRevision.current++;
+      clearTimeout(timer);
+      navigation?.removeListener(onNavigated);
+    };
+  }, [event?.id, highlightSpm, tabId, devtoolsNetwork]);
 
   const toggleSection = (id: string) => {
     setCollapsedSections(prev => ({ ...prev, [id]: !prev[id] }));
@@ -122,19 +142,24 @@ export const EventDetail: FC<RumEventDetailProps> = ({
   };
 
   const handleHighlight = (spm: string, key: string) => {
+    if (tabId === null) return;
+    const revision = hotzoneRevision.current;
     setHotzoneResults(prev => ({ ...prev, [key]: null }));
-    highlightSpmInPage(spm, found => {
-      setHotzoneResults(prev => ({ ...prev, [key]: found }));
+    highlightSpmInPage(tabId, spm, found => {
+      if (hotzoneRevision.current === revision) {
+        setHotzoneResults(prev => ({ ...prev, [key]: found }));
+      }
     });
   };
 
-  const handleInspect = (spm: string) => {
-    inspectSpmInElements(spm);
+  const handleLocate = (spm: string, key: string) => {
+    if (devtoolsNetwork) inspectSpmInElements(spm);
+    else handleHighlight(spm, key);
   };
 
-  const getSpmJumpClass = (canInspect: boolean, mono = false) => {
+  const getSpmJumpClass = (canLocate: boolean, mono = false) => {
     return clsx(mono ? 'break-all font-mono' : 'break-all', {
-      'cursor-pointer border-b border-dashed border-text-secondary hover:border-solid': canInspect,
+      'cursor-pointer border-b border-dashed border-text-secondary hover:border-solid': canLocate,
     });
   };
 
@@ -164,7 +189,8 @@ export const EventDetail: FC<RumEventDetailProps> = ({
     }
   }
 
-  const canInspectMain = Boolean(devtoolsNetwork) && hotzoneResults['main-spm'] !== 0;
+  const canHighlightMain = tabId !== null && Boolean(highlightSpm);
+  const canLocateMain = canHighlightMain && (!devtoolsNetwork || hotzoneResults['main-spm'] !== 0);
 
   const tabs = [
     {
@@ -208,18 +234,22 @@ export const EventDetail: FC<RumEventDetailProps> = ({
                 value={
                   <div className="flex items-center gap-1.5">
                     <span
-                      onClick={canInspectMain ? () => handleInspect(highlightSpm) : undefined}
-                      title={canInspectMain ? t('aplusHighlightOnPageTitle') : undefined}
-                      className={getSpmJumpClass(canInspectMain)}
+                      onClick={
+                        canLocateMain ? () => handleLocate(highlightSpm, 'main-spm') : undefined
+                      }
+                      title={canLocateMain ? locateTitle : undefined}
+                      className={getSpmJumpClass(canLocateMain)}
                     >
                       {displaySpm}
                     </span>
-                    {devtoolsNetwork && <HotzoneButton
-                      spm={highlightSpm}
-                      hkey="main-spm"
-                      result={hotzoneResults['main-spm']}
-                      onHighlight={handleHighlight}
-                    />}
+                    {canHighlightMain && (
+                      <HotzoneButton
+                        spm={highlightSpm}
+                        hkey="main-spm"
+                        result={hotzoneResults['main-spm']}
+                        onHighlight={handleHighlight}
+                      />
+                    )}
                   </div>
                 }
               />
@@ -313,7 +343,9 @@ export const EventDetail: FC<RumEventDetailProps> = ({
             >
               {aplusExpdata.map((item: any, i: number) => {
                 const expKey = `exp-${i}`;
-                const canInspectExp = Boolean(devtoolsNetwork) && hotzoneResults[expKey] !== 0;
+                const canHighlightExp = tabId !== null;
+                const canLocateExp =
+                  canHighlightExp && (!devtoolsNetwork || hotzoneResults[expKey] !== 0);
                 let bizArgs: unknown;
                 let otherExargs = item.exargs;
                 if (otherExargs && typeof otherExargs === 'object' && !Array.isArray(otherExargs)) {
@@ -330,18 +362,22 @@ export const EventDetail: FC<RumEventDetailProps> = ({
                         value={
                           <div className="flex items-center gap-1.5">
                             <span
-                              onClick={canInspectExp ? () => handleInspect(item.spm) : undefined}
-                              title={canInspectExp ? t('aplusHighlightOnPageTitle') : undefined}
-                              className={getSpmJumpClass(canInspectExp, true)}
+                              onClick={
+                                canLocateExp ? () => handleLocate(item.spm, expKey) : undefined
+                              }
+                              title={canLocateExp ? locateTitle : undefined}
+                              className={getSpmJumpClass(canLocateExp, true)}
                             >
                               {item.spm}
                             </span>
-                            {devtoolsNetwork && <HotzoneButton
-                              spm={item.spm}
-                              hkey={expKey}
-                              result={hotzoneResults[expKey]}
-                              onHighlight={handleHighlight}
-                            />}
+                            {canHighlightExp && (
+                              <HotzoneButton
+                                spm={item.spm}
+                                hkey={expKey}
+                                result={hotzoneResults[expKey]}
+                                onHighlight={handleHighlight}
+                              />
+                            )}
                           </div>
                         }
                       />
