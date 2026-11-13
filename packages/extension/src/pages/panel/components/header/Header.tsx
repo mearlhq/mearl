@@ -101,9 +101,10 @@ export const Header: FC<HeaderProps> = ({
 
       <div className="flex shrink-0 gap-1.5 items-center text-xs">
         {/* 源码追溯 - picker 找元素对应的接口字段 + 源码 */}
-        {mode === 'protocol' && onToggleSourceTrace && (
+        {onToggleSourceTrace && (
           <button
             onClick={onToggleSourceTrace}
+            aria-pressed={sourceTraceActive ?? false}
             className={clsx(
               'p-0.75 rounded transition-colors cursor-pointer',
               sourceTraceActive
@@ -180,10 +181,12 @@ export const Header: FC<HeaderProps> = ({
           </span>
         </button>
         {/* 账号切换徽章，放在最右侧、设置按钮左边；紧贴右侧边缘，故下拉面板右对齐徽章、向左展开 */}
-        {accountsEnabled && (
-          <AccountBadge showRequestCountToggle={false} dropdownAlign="default" />
-        )}
-        <QuickSettingsMenu inspectedTabId={inspectedTabId} onShowSettings={onShowSettings} remoteConfig={remoteConfig} />
+        {accountsEnabled && <AccountBadge showRequestCountToggle={false} dropdownAlign="default" />}
+        <QuickSettingsMenu
+          inspectedTabId={inspectedTabId}
+          onShowSettings={onShowSettings}
+          remoteConfig={remoteConfig}
+        />
       </div>
     </div>
   );

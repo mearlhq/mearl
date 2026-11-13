@@ -18,6 +18,7 @@ vi.mock('../backgroundRequestCollector', () => collector);
 import {
   closeDevicePreviewPanel,
   connectDevicePreviewPanel,
+  getDevicePreviewPanelPort,
   getDevicePreviewPanelToken,
   navigateDevicePreviewPanel,
   updateDevicePreviewPanel,
@@ -27,16 +28,23 @@ function viewer(
   tabId: number,
   token: string,
   url = chrome.runtime.getURL(DEVICE_PREVIEW_PANEL_PAGE),
+  onDisconnect?: Parameters<typeof connectDevicePreviewPanel>[1],
 ) {
   const port = {
     name: DEVICE_PREVIEW_PANEL_PORT + token,
-    sender: { id: chrome.runtime.id, tab: { id: tabId }, frameId: 2, url },
+    sender: {
+      id: chrome.runtime.id,
+      tab: { id: tabId },
+      frameId: 2,
+      url,
+      documentId: 'preview-document',
+    },
     disconnect: vi.fn(),
     postMessage: vi.fn(),
     onMessage: { addListener: vi.fn() },
     onDisconnect: { addListener: vi.fn() },
   };
-  connectDevicePreviewPanel(port as unknown as chrome.runtime.Port);
+  connectDevicePreviewPanel(port as unknown as chrome.runtime.Port, onDisconnect);
   return port;
 }
 
@@ -157,6 +165,27 @@ it('binds captured data to the granted extension frame and resets it on navigati
     finishUpdate?.();
     chrome.tabs = previousTabs;
     stored.mockReset();
+    closeDevicePreviewPanel(tabId);
+  }
+});
+
+it('releases the picker owner when its embedded document is disconnected or closed', () => {
+  const tabId = 19;
+  const token = getDevicePreviewPanelToken(tabId, true)!;
+  const disconnect = vi.fn();
+  try {
+    const port = viewer(tabId, token, undefined, disconnect);
+    expect(getDevicePreviewPanelPort(tabId, port.sender.documentId)).toBe(port);
+    expect(getDevicePreviewPanelPort(tabId, 'another-document')).toBeUndefined();
+    port.onDisconnect.addListener.mock.calls[0]![0]();
+    expect(disconnect).toHaveBeenCalledExactlyOnceWith(tabId, port);
+    expect(getDevicePreviewPanelPort(tabId, port.sender.documentId)).toBeUndefined();
+
+    const reopened = viewer(tabId, token, undefined, disconnect);
+    closeDevicePreviewPanel(tabId);
+    expect(disconnect).toHaveBeenLastCalledWith(tabId, reopened);
+    expect(reopened.disconnect).toHaveBeenCalledOnce();
+  } finally {
     closeDevicePreviewPanel(tabId);
   }
 });

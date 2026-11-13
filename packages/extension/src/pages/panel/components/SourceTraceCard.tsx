@@ -37,6 +37,7 @@ const CONFIDENCE_DOT_CLASS: Record<MatchConfidence, string> = {
 };
 
 interface SourceTraceCardProps {
+  tabId: number | null;
   result: TraceResult | null;
   onClose: () => void;
   onJumpToField: (match: FieldMatch) => void;
@@ -52,6 +53,7 @@ function previewValue(v: unknown): string {
 }
 
 export const SourceTraceCard: FC<SourceTraceCardProps> = ({
+  tabId,
   result,
   onClose,
   onJumpToField,
@@ -181,26 +183,21 @@ export const SourceTraceCard: FC<SourceTraceCardProps> = ({
   };
 
   const handleHighlightOnPage = (match: FieldMatch) => {
-    try {
-      const tabId = chrome.devtools.inspectedWindow.tabId;
-      const key = `${match.request.id}:${match.path.join('.')}`;
-      sendMessageSafely<{ count?: number }>({
-        action: 'traceHighlightField',
-        tabId,
-        value: match.value,
-        ...(typeof result.frameId === 'number' ? { frameId: result.frameId } : {}),
+    if (tabId === null) return;
+    const key = `${match.request.id}:${match.path.join('.')}`;
+    void sendMessageSafely<{ count?: number }>({
+      action: 'traceHighlightField',
+      tabId,
+      value: match.value,
+      ...(typeof result.frameId === 'number' ? { frameId: result.frameId } : {}),
+    })
+      .then(res => {
+        const count = res?.count ?? 0;
+        setHighlightCounts(prev => ({ ...prev, [key]: count }));
       })
-        .then(res => {
-          const count = res?.count ?? 0;
-          setHighlightCounts(prev => ({ ...prev, [key]: count }));
-          // 命中数显示在按钮旁，不弹 toast。0 命中渲染成 "?"（表示"没找到对应 DOM"）
-        })
-        .catch(() => {
-          showToast(t('traceHighlightFailed'), 'error', 2000);
-        });
-    } catch {
-      // not in devtools context
-    }
+      .catch(() => {
+        showToast(t('traceHighlightFailed'), 'error', 2000);
+      });
   };
 
   const renderError = (reason?: string) => {
@@ -222,7 +219,7 @@ export const SourceTraceCard: FC<SourceTraceCardProps> = ({
     <div
       ref={cardRef}
       className={clsx(
-        'fixed z-50 w-95 max-h-[60vh] overflow-hidden flex flex-col',
+        'fixed z-50 w-95 max-w-[calc(100vw-1.5rem)] max-h-[60vh] overflow-hidden flex flex-col',
         'bg-bg-primary border border-border rounded-md shadow-lg text-text-primary',
         position === null && 'bottom-3 right-3',
       )}
@@ -231,13 +228,13 @@ export const SourceTraceCard: FC<SourceTraceCardProps> = ({
     >
       <div
         onMouseDown={handleHeaderMouseDown}
-        className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-toolbar cursor-move select-none"
+        className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-3 py-1.5 border-b border-border bg-toolbar cursor-move select-none"
       >
-        <div className="flex items-center gap-1.5 text-xs font-medium">
+        <div className="flex shrink-0 items-center gap-1.5 text-xs font-medium whitespace-nowrap">
           <MapPin size={12} className="text-blue-500" />
           <span>{t('sourceTrace')}</span>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-1 whitespace-nowrap">
           {result.ok && (
             <button
               onClick={handleCopyPrompt}
@@ -361,7 +358,7 @@ export const SourceTraceCard: FC<SourceTraceCardProps> = ({
                       className="text-blue-500 hover:underline truncate inline-flex items-center gap-0.5"
                       title={`${resolveAbsoluteFile(result.sourceLocation.fileName, projectRoot)}:${result.sourceLocation.lineNumber}`}
                     >
-                      {formatLocation(result.sourceLocation)}
+                      <span className="truncate">{formatLocation(result.sourceLocation)}</span>
                       <ExternalLink size={10} className="shrink-0" />
                     </a>
                     <button

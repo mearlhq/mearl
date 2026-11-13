@@ -238,6 +238,7 @@ import { DEVICE_PREVIEW_PANEL_STATE_ACTION } from '../../shared/devicePreviewPan
 import {
   closeDevicePreviewPanel,
   connectDevicePreviewPanel,
+  getDevicePreviewPanelPort,
   getDevicePreviewPanelToken,
   interruptDevicePreviewPanel,
   navigateDevicePreviewPanel,
@@ -579,6 +580,10 @@ const devtoolsPorts = new Map<number, chrome.runtime.Port>();
 // 存储 devtools_page 的连接端口（用于 page_inspect 读取 Elements 当前选区）
 const devtoolsPagePorts = new Map<number, chrome.runtime.Port>();
 const elementPickerStartGenerations = new Map<number, number>();
+const sourceTraceOwners = new Map<
+  number,
+  { generation: number; previewPort?: chrome.runtime.Port }
+>();
 
 // ── Panel 实时采集通知 ────────────────────────────────────────────────────────
 
@@ -592,10 +597,22 @@ function postToPanel(tabId: number, message: Record<string, unknown>): void {
   }
 }
 
+function postToSourceTraceOwner(
+  tabId: number,
+  previewPort: chrome.runtime.Port | undefined,
+  message: Record<string, unknown>,
+): void {
+  if (previewPort) notifyDevicePreviewPanel(tabId, message);
+  else postToPanel(tabId, message);
+}
+
 // 面板按业务文档的跨文档导航分段。设备壳内的根 WebView 由 CDP 上报。
 function notifyPanelDocumentCommit(tabId: number, url: string, timestampMs: number): void {
+  if (sourceTraceOwners.has(tabId)) void stopTabElementPicker(tabId);
+  const message = { action: 'mainFrameCommitted', url, timestampMs };
+  notifyDevicePreviewPanel(tabId, message);
   void navigateDevicePreviewPanel(tabId, timestampMs, url);
-  postToPanel(tabId, { action: 'mainFrameCommitted', url, timestampMs });
+  postToPanel(tabId, message);
 }
 
 chrome.webNavigation.onCommitted.addListener(details => {
@@ -632,9 +649,16 @@ async function setPanelResponseOverride(tabId: number, data: any): Promise<void>
 }
 
 function nextElementPickerStartGeneration(tabId: number): number {
+  sourceTraceOwners.delete(tabId);
   const generation = (elementPickerStartGenerations.get(tabId) ?? 0) + 1;
   elementPickerStartGenerations.set(tabId, generation);
   return generation;
+}
+
+function stopTabElementPicker(tabId: number) {
+  nextElementPickerStartGeneration(tabId);
+  clearActiveElementPickerSession(tabId);
+  return sendTabMessageToFramesSafe(tabId, { action: 'stopElementPicker' });
 }
 
 // 初始化 Override Notifier（避免循环依赖）
@@ -1920,8 +1944,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         message.type === 'ELEMENT_PICK_CANCELLED' ||
         message.type === 'TRACE_RESULT'
       ) {
+        const traceOwner = sourceTraceOwners.get(tabId);
+        if (message.type === 'TRACE_RESULT' && !traceOwner) return;
+        if (traceOwner && !getActiveElementPickerSession(tabId)) return;
+        nextElementPickerStartGeneration(tabId);
         clearActiveElementPickerSession(tabId);
         void sendTabMessageToFramesSafe(tabId, { action: 'stopElementPicker' });
+        if (traceOwner) {
+          postToSourceTraceOwner(tabId, traceOwner.previewPort, {
+            ...message,
+            type: message.type === 'TRACE_RESULT' ? 'TRACE_RESULT' : 'ELEMENT_PICK_CANCELLED',
+            frameId: sender.frameId,
+          });
+          return;
+        }
       }
       if (
         message.type === 'ELEMENT_COMMENT_CONFIRMED' &&
@@ -1930,18 +1966,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       ) {
         clearActiveElementPickerSession(tabId);
       }
-      // 转发给对应 tab 的 devtools panel
+      const notification = { ...message, frameId: sender.frameId };
       if (typeof message.type === 'string' && message.type.startsWith('SSE_')) {
-        notifyDevicePreviewPanel(tabId, { ...message, frameId: sender.frameId });
+        notifyDevicePreviewPanel(tabId, notification);
       }
-      const port = devtoolsPorts.get(tabId);
-      if (port) {
-        try {
-          port.postMessage({ ...message, frameId: sender.frameId });
-        } catch {
-          // 忽略错误：devtools 可能已关闭
-        }
-      }
+      postToPanel(tabId, notification);
     }
     return;
   }
@@ -2127,9 +2156,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.action === 'startElementPicker') {
+    const previousTrace = sourceTraceOwners.get(tabId);
     const generation = nextElementPickerStartGeneration(tabId);
+    const previewPort = message.traceMode
+      ? getDevicePreviewPanelPort(tabId, sender.documentId)
+      : undefined;
+    if (previousTrace && (!message.traceMode || previousTrace.previewPort !== previewPort)) {
+      postToSourceTraceOwner(tabId, previousTrace.previewPort, {
+        source: 'mearl-content-script',
+        type: 'ELEMENT_PICK_CANCELLED',
+      });
+    }
+    if (message.traceMode) sourceTraceOwners.set(tabId, { generation, previewPort });
     clearActiveElementPickerSession(tabId);
     void (async () => {
+      if (previousTrace) await sendTabMessageToFramesSafe(tabId, { action: 'stopElementPicker' });
       if (elementPickerStartGenerations.get(tabId) !== generation) {
         sendResponse({ success: false, cancelled: true });
         return;
@@ -2244,21 +2285,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         });
       }
       sendResponse({ success: true, frameIds: startedFrameIds });
-    })().catch(error => {
-      if (elementPickerStartGenerations.get(tabId) === generation)
-        clearActiveElementPickerSession(tabId);
-      sendResponse({
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
+    })()
+      .catch(error => {
+        if (elementPickerStartGenerations.get(tabId) === generation)
+          clearActiveElementPickerSession(tabId);
+        sendResponse({
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      })
+      .finally(() => {
+        if (
+          sourceTraceOwners.get(tabId)?.generation === generation &&
+          !getActiveElementPickerSession(tabId)
+        ) {
+          sourceTraceOwners.delete(tabId);
+        }
       });
-    });
     return true;
   }
 
   if (message.action === 'cancelElementPicker') {
-    nextElementPickerStartGeneration(tabId);
-    clearActiveElementPickerSession(tabId);
-    sendTabMessageToFramesSafe(tabId, { action: 'stopElementPicker' }).then(responses =>
+    if (message.traceMode) {
+      const owner = sourceTraceOwners.get(tabId);
+      if (!owner || owner.previewPort !== getDevicePreviewPanelPort(tabId, sender.documentId)) {
+        sendResponse({ success: true, frameIds: [] });
+        return true;
+      }
+    }
+    stopTabElementPicker(tabId).then(responses =>
       sendResponse({ success: true, frameIds: responses.map(result => result.frameId) }),
     );
     return true;
@@ -2293,7 +2348,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.action === 'traceHighlightField') {
     void (async () => {
-      if (!(await ensureElementPickerMainRuntime(tabId))) {
+      const frameId = typeof message.frameId === 'number' ? message.frameId : undefined;
+      const ready =
+        frameId === undefined
+          ? await ensureElementPickerMainRuntime(tabId)
+          : (await ensureElementPickerMainRuntimeForFrames(tabId, [frameId])).length > 0;
+      if (!ready) {
         notifyContentScriptUnreachable(tabId);
         sendResponse({ count: 0 });
         return;
@@ -2303,7 +2363,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         { action: 'traceHighlightField', value: message.value },
         {
           notifyOnUnreachable: true,
-          ...(typeof message.frameId === 'number' ? { frameId: message.frameId } : {}),
+          ...(frameId !== undefined ? { frameId } : {}),
         },
       );
       sendResponse(response ?? { count: 0 });
@@ -2503,6 +2563,7 @@ chrome.tabs.onRemoved.addListener(tabId => {
     .then(contextTabId => (contextTabId === tabId ? setSettingsContextTabId(null) : undefined))
     .catch(() => {});
   elementPickerStartGenerations.delete(tabId);
+  sourceTraceOwners.delete(tabId);
   clearActiveElementPickerSession(tabId);
   clearSpmOverlayState(tabId);
   disposePageRefs(tabId);
@@ -2589,7 +2650,14 @@ chrome.runtime.onConnect.addListener(port => {
     }
     return;
   }
-  if (connectDevicePreviewPanel(port)) return;
+  if (
+    connectDevicePreviewPanel(port, (tabId, disconnectedPort) => {
+      if (sourceTraceOwners.get(tabId)?.previewPort === disconnectedPort) {
+        void stopTabElementPicker(tabId);
+      }
+    })
+  )
+    return;
   if (port.name === AGENT_SIDE_PANEL_PRESENCE_PORT) {
     let windowId: number | null = null;
     port.onMessage.addListener(message => {

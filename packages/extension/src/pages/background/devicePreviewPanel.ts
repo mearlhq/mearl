@@ -25,6 +25,7 @@ interface PreviewPanel {
   since: number;
   status: 'connecting' | 'capturing' | 'error';
   port?: chrome.runtime.Port;
+  disconnectPort?: () => void;
   navigation: NavigationDivider[];
 }
 
@@ -121,7 +122,7 @@ export function closeDevicePreviewPanel(tabId: number): void {
   const panel = panels.get(tabId);
   if (!panel) return;
   panels.delete(tabId);
-  panel.port?.disconnect();
+  panel.disconnectPort?.();
   const release = stopRequestCollection(tabId, consumer).catch(() => {});
   closing.set(tabId, release);
   void release.then(() => {
@@ -129,7 +130,10 @@ export function closeDevicePreviewPanel(tabId: number): void {
   });
 }
 
-export function connectDevicePreviewPanel(port: chrome.runtime.Port): boolean {
+export function connectDevicePreviewPanel(
+  port: chrome.runtime.Port,
+  onDisconnect?: (tabId: number, port: chrome.runtime.Port) => void,
+): boolean {
   if (!port.name.startsWith(DEVICE_PREVIEW_PANEL_PORT)) return false;
   const sender = port.sender;
   const tabId = sender?.tab?.id;
@@ -146,11 +150,19 @@ export function connectDevicePreviewPanel(port: chrome.runtime.Port): boolean {
     return true;
   }
   const viewer = new URL(sender.url).searchParams.get('viewer');
-  panel.port?.disconnect();
+  panel.disconnectPort?.();
   panel.port = port;
-  port.onDisconnect.addListener(() => {
-    if (panel.port === port) panel.port = undefined;
-  });
+  const releasePort = () => {
+    if (panel.port !== port) return;
+    panel.port = undefined;
+    panel.disconnectPort = undefined;
+    onDisconnect?.(tabId, port);
+  };
+  panel.disconnectPort = () => {
+    releasePort();
+    port.disconnect();
+  };
+  port.onDisconnect.addListener(releasePort);
   port.onMessage.addListener(message => {
     if (panel.port !== port) return;
     if (message === 'retry' && panel.status === 'error') void start(tabId, panel);
@@ -164,6 +176,11 @@ export function connectDevicePreviewPanel(port: chrome.runtime.Port): boolean {
   post(panel, { type: 'state', state: panel.status, tabId });
   if (panel.status === 'capturing') sendSnapshot(tabId, panel);
   return true;
+}
+
+export function getDevicePreviewPanelPort(tabId: number, documentId?: string) {
+  const port = panels.get(tabId)?.port;
+  return documentId && port?.sender?.documentId === documentId ? port : undefined;
 }
 
 function clear(panel: PreviewPanel, timestamp: number): void {

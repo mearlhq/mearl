@@ -70,6 +70,7 @@ export interface TraceResult {
 }
 
 interface UseSourceTracerOptions {
+  tabId: number | null;
   // 当前列表筛选后的请求，按时间升序排列。
   getRequests: () => CapturedRequest[];
   // 筛选条件或页面范围变化时更新；后续网络流量沿用本次点选的快照。
@@ -494,7 +495,12 @@ async function matchCandidates(
   return confident.slice(0, MAX_MATCHES);
 }
 
-export function useSourceTracer({ getRequests, scopeKey, onResult }: UseSourceTracerOptions) {
+export function useSourceTracer({
+  tabId,
+  getRequests,
+  scopeKey,
+  onResult,
+}: UseSourceTracerOptions) {
   const [isPicking, setIsPicking] = useState(false);
   const ownerIdRef = useRef(createElementPickerOwnerId());
   const traceRevisionRef = useRef(0);
@@ -502,38 +508,40 @@ export function useSourceTracer({ getRequests, scopeKey, onResult }: UseSourceTr
   const requestScopeRef = useRef({ getRequests, scopeKey });
   requestScopeRef.current = { getRequests, scopeKey };
 
-  useEffect(() => () => { traceRevisionRef.current++; }, []);
-
   const cancel = useCallback(() => {
     traceRevisionRef.current++;
     setIsPicking(false);
-    try {
-      const tabId = chrome.devtools.inspectedWindow.tabId;
-      sendMessageSafely({ action: 'cancelElementPicker', tabId });
-    } catch {
-      // not in devtools context
-    }
-  }, []);
+    if (tabId === null) return;
+    void sendMessageSafely({ action: 'cancelElementPicker', tabId, traceMode: true }).catch(
+      () => {},
+    );
+  }, [tabId]);
 
   const start = useCallback(() => {
-    traceRevisionRef.current++;
-    try {
-      const tabId = chrome.devtools.inspectedWindow.tabId;
-      announceElementPickerSession(ownerIdRef.current);
-      setIsPicking(true);
-      void sendMessageSafely<{ success?: boolean }>({
-        action: 'startElementPicker',
-        tabId,
-        traceMode: true,
+    if (tabId === null) return;
+    const revision = ++traceRevisionRef.current;
+    announceElementPickerSession(ownerIdRef.current);
+    setIsPicking(true);
+    const resetFailedStart = () => {
+      if (traceRevisionRef.current === revision) setIsPicking(false);
+    };
+    void sendMessageSafely<{ success?: boolean }>({
+      action: 'startElementPicker',
+      tabId,
+      traceMode: true,
+    })
+      .then(response => {
+        if (response?.success !== true) resetFailedStart();
       })
-        .then(response => {
-          if (response?.success !== true) setIsPicking(false);
-        })
-        .catch(() => setIsPicking(false));
-    } catch {
-      // not in devtools context
-    }
-  }, []);
+      .catch(resetFailedStart);
+  }, [tabId]);
+
+  useEffect(
+    () => () => {
+      traceRevisionRef.current++;
+    },
+    [tabId],
+  );
 
   const toggle = useCallback(() => {
     if (isPicking) cancel();
@@ -551,7 +559,11 @@ export function useSourceTracer({ getRequests, scopeKey, onResult }: UseSourceTr
       setIsPicking(false);
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && (isPicking || matchingRevisionRef.current === traceRevisionRef.current)) cancel();
+      if (
+        event.key === 'Escape' &&
+        (isPicking || matchingRevisionRef.current === traceRevisionRef.current)
+      )
+        cancel();
     };
     window.addEventListener(ELEMENT_PICKER_SESSION_STARTED_EVENT, handleSessionStarted);
     window.addEventListener('mearl-main-frame-committed', handleNavigation);

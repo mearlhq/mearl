@@ -362,6 +362,11 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
 
   // 源码追溯结果（picker → fiber → 字段匹配）
   const [traceResult, setTraceResult] = useState<TraceResult | null>(null);
+  useEffect(() => {
+    const clearTrace = () => setTraceResult(null);
+    window.addEventListener('mearl-main-frame-committed', clearTrace);
+    return () => window.removeEventListener('mearl-main-frame-committed', clearTrace);
+  }, []);
 
   // 通过 hook 统一管理 SSE 与 background 长连接消息桥接
   const { clearPreview, retryPreview, markPreviewReady } = usePanelPortBridge({
@@ -406,7 +411,6 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
         typeof detail?.timestampMs === 'number' && Number.isFinite(detail.timestampMs)
           ? detail.timestampMs
           : Date.now();
-      setTraceResult(null);
       if (!preserveLog) {
         requestCaptureStateRef.current = { ...requestCaptureStateRef.current };
         setRequests([]);
@@ -762,6 +766,7 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
     [requestFilters.displayedRequests, tracePageStartedAt],
   );
   const sourceTracer = useSourceTracer({
+    tabId,
     getRequests: getTraceRequests,
     scopeKey: JSON.stringify([
       filterText,
@@ -849,7 +854,9 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
         onSelectHeatmapDs={handleSelectHeatmapDs}
         onToggleHeatmap={handleToggleHeatmap}
         accountsEnabled={accountsEnabled}
-        onToggleSourceTrace={isDevtools ? sourceTracer.toggle : undefined}
+        onToggleSourceTrace={
+          tabId !== null && (!isDevtools || mode === 'protocol') ? sourceTracer.toggle : undefined
+        }
         sourceTraceActive={sourceTracer.isPicking}
       />
       {!isDevtools && (
@@ -1131,6 +1138,7 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
       </Suspense>
 
       <SourceTraceCard
+        tabId={tabId}
         result={traceResult}
         onClose={() => setTraceResult(null)}
         onJumpToField={handleJumpToTracedField}

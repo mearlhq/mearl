@@ -156,3 +156,29 @@ it('merges preview SSE chunks into the request already captured by the debugger'
     }),
   ]);
 });
+
+it('delivers source trace results and cancellations from the embedded panel port', () => {
+  renderHook(() => usePanelPortBridgeHarness(1, 'preview-token'));
+  const traced = vi.fn();
+  const cancelled = vi.fn();
+  window.addEventListener('mearl-element-traced', traced);
+  window.addEventListener('mearl-element-pick-cancelled', cancelled);
+  try {
+    const receive = (message: object) =>
+      ports[0].receive({
+        type: 'notification',
+        message: { source: 'mearl-content-script', ...message },
+      });
+    receive({ type: 'TRACE_RESULT', frameId: 7, tagId: 'trace-1', payload: { ok: true } });
+    receive({ type: 'ELEMENT_PICK_CANCELLED' });
+    expect(traced).toHaveBeenCalledWith(
+      expect.objectContaining({
+        detail: { frameId: 7, tagId: 'trace-1', payload: { ok: true } },
+      }),
+    );
+    expect(cancelled).toHaveBeenCalledOnce();
+  } finally {
+    window.removeEventListener('mearl-element-traced', traced);
+    window.removeEventListener('mearl-element-pick-cancelled', cancelled);
+  }
+});
