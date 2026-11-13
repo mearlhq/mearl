@@ -8,12 +8,17 @@
 
 import type { DeviceEnvironmentConfig, ResolvedEmulationConfig } from '@mearl/browser-core';
 import { browserUiText } from '@mearl/preset/bundles';
-import { getQuickDevicePresetLabel, isQuickDevicePresetName, type QuickDeviceChromeConfig } from '../../shared/quickAppProfile';
+import {
+  getQuickDevicePresetLabel,
+  isQuickDevicePresetName,
+  type QuickDeviceChromeConfig,
+} from '../../shared/quickAppProfile';
 import { assertDeviceShellSupported } from '../../shared/chromiumVersion';
 import { markEnvironmentMutation } from './environmentRevisions';
-import { closeDevicePreviewPanel, getDevicePreviewPanelVisibility } from './devicePreviewPanel';
+import { closeDevicePreviewPanel } from './devicePreviewPanel';
 import { getAppProfileForTab } from './utils/appProfileRules';
 import {
+  DEVICE_PREVIEW_PANEL_OPEN,
   DEVICE_PREVIEW_PANEL_WIDTH,
   DEVICE_PREVIEW_TOOLBAR_COLLAPSED,
   type DevicePreviewLayout,
@@ -29,8 +34,7 @@ export interface InheritedViewportDeviceEnvironmentConfig extends DeviceEnvironm
 }
 
 export type DeviceShellEmulationConfig =
-  | ResolvedEmulationConfig
-  | InheritedViewportDeviceEnvironmentConfig;
+  ResolvedEmulationConfig | InheritedViewportDeviceEnvironmentConfig;
 
 export function inheritsDeviceViewport(
   config: DeviceShellEmulationConfig,
@@ -229,27 +233,43 @@ export async function getDeviceShellBootstrapHeaderForTab(tabId: number, forDocu
   const { ruleId: _ruleId, ...payload } = current;
   if (forDocument && payload.config.phoneFrame) {
     const [preferences, tab, profile] = await Promise.all([
-      chrome.storage.local.get([
-        DEVICE_PREVIEW_PANEL_WIDTH,
-        DEVICE_PREVIEW_TOOLBAR_COLLAPSED,
-      ]).catch(() => null),
+      chrome.storage.local
+        .get([
+          DEVICE_PREVIEW_PANEL_OPEN,
+          DEVICE_PREVIEW_PANEL_WIDTH,
+          DEVICE_PREVIEW_TOOLBAR_COLLAPSED,
+        ])
+        .catch(() => null),
       chrome.tabs.get(tabId).catch(() => null),
       getAppProfileForTab(tabId).catch(() => undefined),
     ]);
     if (preferences) {
       const width = preferences[DEVICE_PREVIEW_PANEL_WIDTH];
+      const panelOpen = preferences[DEVICE_PREVIEW_PANEL_OPEN];
       const preset = 'presetName' in payload.emulation ? payload.emulation.presetName : undefined;
       const labels = profile?.binding?.definition.labels;
       payload.previewLayout = {
         width: typeof width === 'number' ? width : undefined,
         toolbarCollapsed: preferences[DEVICE_PREVIEW_TOOLBAR_COLLAPSED] === true,
-        panel: getDevicePreviewPanelVisibility(tabId),
+        panelOpen: typeof panelOpen === 'boolean' ? panelOpen : undefined,
         viewport: tab?.width && tab.height ? { width: tab.width, height: tab.height } : undefined,
-        toolbar: isQuickDevicePresetName(preset) ? {
-          profile: profile ? { id: profile.profile, label: labels ? browserUiText(labels, chrome.i18n.getUILanguage()) : profile.label } : null,
-          preset: { id: preset, label: getQuickDevicePresetLabel(preset, key => chrome.i18n.getMessage(key)) },
-          orientation: payload.emulation.orientation,
-        } : undefined,
+        toolbar: isQuickDevicePresetName(preset)
+          ? {
+              profile: profile
+                ? {
+                    id: profile.profile,
+                    label: labels
+                      ? browserUiText(labels, chrome.i18n.getUILanguage())
+                      : profile.label,
+                  }
+                : null,
+              preset: {
+                id: preset,
+                label: getQuickDevicePresetLabel(preset, key => chrome.i18n.getMessage(key)),
+              },
+              orientation: payload.emulation.orientation,
+            }
+          : undefined,
       };
     }
   }

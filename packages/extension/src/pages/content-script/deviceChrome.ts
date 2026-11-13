@@ -47,10 +47,11 @@ interface QuickDeviceChromeManagerOptions {
     loadingLabel: string;
     toolbarLabel: string;
     initialLayout?: DevicePreviewLayout;
-    requestToken(open: boolean, wide: boolean, retryCapture: boolean): Promise<string | null>;
+    requestToken(open: boolean, retryCapture: boolean): Promise<string | null>;
     url(token: string, viewer: string): string;
     subscribeReady(listener: (viewer: string) => void): () => void;
-    loadLayout(): Promise<Pick<DevicePreviewLayout, 'width' | 'toolbarCollapsed'>>;
+    loadLayout(): Promise<Pick<DevicePreviewLayout, 'width' | 'toolbarCollapsed' | 'panelOpen'>>;
+    savePanelOpen(open: boolean): void;
     saveWidth(width: number): void;
     saveToolbarCollapsed(collapsed: boolean): void;
   };
@@ -344,11 +345,13 @@ function createPreviewControls(
   let readyTimer: number | undefined;
   let loadingTimer: number | undefined;
   let destroyed = false;
-  let wide = viewport().width >= MIN_DOCKED_PREVIEW_WIDTH;
-  let open =
-    initialLayout?.panel?.wide === wide && typeof initialLayout.panel.open === 'boolean'
-      ? initialLayout.panel.open
-      : wide;
+  let preferencesLoaded = initialLayout !== undefined;
+  let panelOpen =
+    typeof initialLayout?.panelOpen === 'boolean' ? initialLayout.panelOpen : undefined;
+  const shouldOpen = (width: number) =>
+    width >= MIN_DEBUG_PREVIEW_WIDTH &&
+    (panelOpen ?? (preferencesLoaded && width >= MIN_DOCKED_PREVIEW_WIDTH));
+  let open = shouldOpen(viewport().width);
   const showStatus = (label = '', isError = false) => {
     statusLabel.textContent = label;
     retryButton.hidden = !isError;
@@ -366,32 +369,37 @@ function createPreviewControls(
   if (!initialLayout) {
     void options
       .loadLayout()
-      .then(({ width, toolbarCollapsed }) => {
+      .catch((): Awaited<ReturnType<typeof options.loadLayout>> => ({}))
+      .then(({ width, toolbarCollapsed, panelOpen: storedOpen }) => {
         if (destroyed) return;
         const hideToolbar = !toolbarChanged && toolbarCollapsed === true;
         const applyWidth = requestedWidth === undefined && validWidth(width);
         if (hideToolbar) toolbar.element.hidden = true;
         if (applyWidth) requestedWidth = width;
-        if (hideToolbar || applyWidth) onChange();
-      })
-      .catch(() => {});
+        if (panelOpen === undefined && typeof storedOpen === 'boolean') {
+          panelOpen = storedOpen;
+          if (!panelOpen) void request(false);
+        }
+        preferencesLoaded = true;
+        onChange();
+      });
   }
 
   const resize = () => {
-    const nextWide = viewport().width >= MIN_DOCKED_PREVIEW_WIDTH;
-    if (nextWide !== wide) {
-      wide = nextWide;
-      open = wide;
+    const { width: viewportWidth } = viewport();
+    const nextOpen = shouldOpen(viewportWidth);
+    if (open !== nextOpen) {
+      open = nextOpen;
       if (open && !frame) void request(true);
     }
-    const { width, panelWidth, panelHeight, maxPanelWidth } = area();
+    const { panelWidth, panelHeight, maxPanelWidth } = area();
     status.hidden = !open || !statusLabel.textContent;
     status.style.width = panelWidth ? `${panelWidth}px` : '100%';
     status.style.height = panelHeight ? `${panelHeight}px` : '100%';
-    button.hidden = width < MIN_DEBUG_PREVIEW_WIDTH;
+    button.hidden = viewportWidth < MIN_DEBUG_PREVIEW_WIDTH;
     toolbarButton.hidden = !toolbar.element.hidden;
     button.style.right = toolbarButton.style.right = `${panelWidth + PREVIEW_CONTROL_INSET}px`;
-    button.setAttribute('aria-expanded', String(open && frame !== null));
+    button.setAttribute('aria-expanded', String(open));
     divider.hidden = panelWidth === 0;
     divider.style.right = `${panelWidth - 4}px`;
     divider.setAttribute('aria-valuenow', String(panelWidth));
@@ -503,7 +511,7 @@ function createPreviewControls(
     }
     if (!enable) removeFrame();
     try {
-      const token = await options.requestToken(enable, wide, retryCapture);
+      const token = await options.requestToken(enable, retryCapture);
       if (destroyed) return;
       if (enable) {
         if (!token) throw new Error('Device preview panel is unavailable');
@@ -528,8 +536,12 @@ function createPreviewControls(
   });
   button.addEventListener('click', event => {
     if (!event.isTrusted) return;
-    open = !(open && frame !== null);
-    if (!open || !frame) void request(open);
+    panelOpen = !open;
+    options.savePanelOpen(panelOpen);
+    if (!panelOpen) {
+      open = false;
+      void request(false);
+    }
     onChange();
   });
   const setToolbarCollapsed = (event: MouseEvent, collapsed: boolean) => {
@@ -558,6 +570,7 @@ function createPreviewControls(
   window.addEventListener('message', receivePanelMessage);
   resize();
   if (open) void request(true);
+  else if (panelOpen === false) void request(false);
 
   return {
     host,
@@ -653,11 +666,12 @@ export function createQuickDeviceChromeManager(
     if (!frame || !rule) return;
     const { width, height, panelWidth, panelHeight } =
       previewControls?.area() ?? previewGeometry(viewport(), false);
-    const toolbar = previewControls?.toolbar.element;
-    const toolbarMaxWidth =
-      width - 2 * (width >= MIN_DEBUG_PREVIEW_WIDTH ? TOOLBAR_SIDE_GUTTER : PREVIEW_CONTROL_INSET);
+    const toolbar = previewControls?.toolbar;
+    const gutter =
+      viewport().width >= MIN_DEBUG_PREVIEW_WIDTH ? TOOLBAR_SIDE_GUTTER : PREVIEW_CONTROL_INSET;
+    const toolbarMaxWidth = width - 2 * gutter;
     const compact = toolbarMaxWidth < 318;
-    const toolbarSpace = toolbar && !toolbar.hidden ? (compact ? 72 : 42) : 0;
+    const toolbarSpace = toolbar && !toolbar.element.hidden ? (compact ? 72 : 42) : 0;
     const centerY = (height + toolbarSpace) / 2;
     const scale = Math.min(
       frame.maxScale ?? 1,
@@ -667,10 +681,11 @@ export function createQuickDeviceChromeManager(
       ),
     );
     if (toolbar) {
-      toolbar.classList.toggle('compact', compact);
-      toolbar.style.left = `${width / 2}px`;
-      toolbar.style.top = `${centerY - (frame.height * scale) / 2 - 16}px`;
-      toolbar.style.maxWidth = `${toolbarMaxWidth}px`;
+      toolbar.element.classList.toggle('compact', compact);
+      toolbar.element.style.left = `${width / 2}px`;
+      toolbar.element.style.top = `${centerY - (frame.height * scale) / 2 - 16}px`;
+      toolbar.element.style.maxWidth = `${toolbarMaxWidth}px`;
+      toolbar.updateLayout(width, height);
     }
     rule.style.setProperty('--mearl-phone-frame-left', panelWidth ? `${width / 2}px` : '50%');
     rule.style.setProperty(

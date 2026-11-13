@@ -327,7 +327,7 @@ describe('Quick device chrome', () => {
       const previewLayout = {
         width: 400,
         toolbarCollapsed: true,
-        panel: { wide: true, open: false },
+        panelOpen: false,
         viewport: { width: 1200, height: 848 },
         toolbar: {
           profile: { id: 'shop', label: '商店' },
@@ -347,10 +347,12 @@ describe('Quick device chrome', () => {
       ]);
       expect(bootstrap).toEqual({ config, previewLayout });
       const { element } = createDevicePreviewToolbar(bootstrap?.previewLayout.toolbar);
-      const selectedLabels = [...element.querySelectorAll('select')].map(
-        select => select.selectedOptions[0]?.textContent,
+      const labels = [...element.querySelectorAll('.device-select-trigger')].map(
+        trigger => trigger.textContent,
       );
-      expect(selectedLabels).toEqual(['商店', 'iPhone 17 Pro']);
+      expect(labels).toEqual(['商店', 'iPhone 17 Pro']);
+      const selected = [...element.querySelectorAll('[role="menuitemradio"][aria-checked="true"]')];
+      expect(selected.map(option => option.textContent)).toEqual(labels);
       let height = 844;
       vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1200);
       vi.spyOn(document.documentElement, 'clientHeight', 'get').mockImplementation(() => height);
@@ -370,6 +372,7 @@ describe('Quick device chrome', () => {
           url: () => 'about:blank',
           subscribeReady: () => () => {},
           loadLayout,
+          savePanelOpen: vi.fn(),
           saveWidth: vi.fn(),
           saveToolbarCollapsed: vi.fn(),
         },
@@ -380,7 +383,7 @@ describe('Quick device chrome', () => {
       expect(style.getPropertyValue('--mearl-phone-frame-left')).toBe('50%');
       expect(style.getPropertyValue('--mearl-phone-frame-top')).toBe('424px');
       expect(style.getPropertyValue('--mearl-phone-frame-scale')).toBe('1');
-      expect(requestToken).not.toHaveBeenCalled();
+      expect(requestToken).toHaveBeenCalledExactlyOnceWith(false, false);
       expect(loadLayout).not.toHaveBeenCalled();
 
       height = 840;
@@ -412,6 +415,7 @@ describe('Quick device chrome', () => {
         url: () => 'about:blank',
         subscribeReady: () => () => {},
         loadLayout: async () => ({}),
+        savePanelOpen: vi.fn(),
         saveWidth: vi.fn(),
         saveToolbarCollapsed: vi.fn(),
       },
@@ -432,8 +436,8 @@ describe('Quick device chrome', () => {
     width = 640;
     window.dispatchEvent(new Event('resize'));
     await vi.waitFor(() => expect(stageLeft()).toBe('128px'));
-    expect(debugToggle.hidden).toBe(true);
-    expect(requestToken).toHaveBeenCalledExactlyOnceWith(true, true, false);
+    expect(debugToggle.hidden).toBe(false);
+    expect(requestToken).toHaveBeenCalledExactlyOnceWith(true, false);
     await vi.waitFor(() => expect(previewRoot.querySelector('iframe')).not.toBeNull());
     const panel = previewRoot.querySelector('iframe')!;
     expect(panel.hidden).toBe(false);
@@ -450,6 +454,78 @@ describe('Quick device chrome', () => {
     expect(panel.hidden).toBe(false);
     expect(previewRoot.querySelector('iframe')).toBe(panel);
     expect(requestToken).toHaveBeenCalledOnce();
+  });
+
+  it('restores manual debug visibility and preserves it across viewport changes', async () => {
+    let width = 1200;
+    let panelOpen = false;
+    vi.spyOn(document.documentElement, 'clientWidth', 'get').mockImplementation(() => width);
+    const attachShadow = vi.spyOn(Element.prototype, 'attachShadow');
+    const requestToken = vi.fn().mockResolvedValue('preview-token');
+    const loadLayout = vi.fn(async () => ({ panelOpen }));
+    const createManager = () => {
+      manager.destroy();
+      manager = createQuickDeviceChromeManager({
+        previewPanel: {
+          label: 'Debug',
+          resizeLabel: 'Resize',
+          unavailableLabel: 'Unavailable',
+          retryLabel: 'Retry',
+          loadingLabel: 'Loading',
+          toolbarLabel: 'Device toolbar',
+          requestToken,
+          url: () => 'about:blank',
+          subscribeReady: () => () => {},
+          loadLayout,
+          savePanelOpen: open => {
+            panelOpen = open;
+          },
+          saveWidth: vi.fn(),
+          saveToolbarCollapsed: vi.fn(),
+        },
+      });
+      manager.update({ ...iosConfig, phoneFrame: { width: 402, height: 874 } });
+      return attachShadow.mock.results
+        .map(result => result.value as ShadowRoot)
+        .flatMap(root => [...root.querySelectorAll<HTMLButtonElement>('.debug-toggle')])
+        .at(-1)!;
+    };
+    const click = (button: HTMLButtonElement) => {
+      const event = new MouseEvent('click');
+      Object.defineProperty(event, 'isTrusted', { value: true });
+      button.dispatchEvent(event);
+    };
+    const resize = (nextWidth: number) => {
+      width = nextWidth;
+      window.dispatchEvent(new Event('resize'));
+    };
+
+    let toggle = createManager();
+    await vi.waitFor(() => expect(requestToken).toHaveBeenCalledExactlyOnceWith(false, false));
+    resize(550);
+    resize(1200);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(requestToken).toHaveBeenCalledOnce();
+
+    await vi.waitFor(() => expect(toggle).toBeEnabled());
+    click(toggle);
+    expect(panelOpen).toBe(true);
+    toggle = createManager();
+    await vi.waitFor(() => expect(toggle).toHaveAttribute('aria-expanded', 'true'));
+    resize(550);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    resize(400);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(panelOpen).toBe(true);
+    resize(550);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+    await vi.waitFor(() => expect(toggle).toBeEnabled());
+    click(toggle);
+    expect(panelOpen).toBe(false);
+    expect(requestToken).toHaveBeenLastCalledWith(false, false);
+    resize(1200);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
   });
 
   it.each([true, false])('retries an uncommitted preview iframe early (%s)', async blank => {
@@ -475,6 +551,7 @@ describe('Quick device chrome', () => {
           url,
           subscribeReady: () => () => {},
           loadLayout: async () => ({}),
+          savePanelOpen: vi.fn(),
           saveWidth: vi.fn(),
           saveToolbarCollapsed: vi.fn(),
         },
@@ -514,6 +591,7 @@ describe('Quick device chrome', () => {
           return () => {};
         },
         loadLayout: async () => ({}),
+        savePanelOpen: vi.fn(),
         saveWidth: vi.fn(),
         saveToolbarCollapsed: vi.fn(),
       },
@@ -531,7 +609,7 @@ describe('Quick device chrome', () => {
     retry.dispatchEvent(click);
     expect(retry.hidden).toBe(true);
     expect(status).toHaveTextContent('Loading');
-    expect(requestToken).toHaveBeenLastCalledWith(true, true, true);
+    expect(requestToken).toHaveBeenLastCalledWith(true, true);
     await vi.waitFor(() => expect(root.querySelector('iframe')).not.toBeNull());
 
     ready(url.mock.calls[0]![1]);

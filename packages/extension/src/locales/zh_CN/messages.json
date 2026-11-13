@@ -833,6 +833,7 @@
   "deviceSimulationEnableFromPage": { "message": "开启端模拟" },
   "deviceSimulationDisableFromPage": { "message": "关闭端模拟" },
   "deviceSimulationNoApp": { "message": "无客户端" },
+  "deviceSimulationDisableApp": { "message": "关闭客户端模拟" },
   "deviceSimulationDisable": { "message": "关闭设备模拟" },
   "devicePreviewCapturing": { "message": "采集中" },
   "devicePreviewCaptureUnavailable": { "message": "采集不可用" },

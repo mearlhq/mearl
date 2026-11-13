@@ -39,35 +39,49 @@ describe('deviceShellRules', () => {
   });
 
   it('sends preview preferences with the shell document without storing them in the device rule', async () => {
-    const { applyDeviceShellForTab, getDeviceShellBootstrapHeaderForTab } = await import('../deviceShellRules');
-    const { getDevicePreviewPanelToken } = await import('../devicePreviewPanel');
+    const { applyDeviceShellForTab, getDeviceShellBootstrapHeaderForTab } =
+      await import('../deviceShellRules');
     const tabId = 31;
     const fixed = resolveEmulationConfig({ enabled: true, preset: 'iphone-17-pro' });
     const storage: { get(keys: string[]): Promise<Record<string, unknown>> } = chrome.storage.local;
     const readPreferences = vi.spyOn(storage, 'get').mockResolvedValue({
       'device-preview-panel-width': 410,
+      'device-preview-panel-open': false,
       'device-preview-toolbar-collapsed': true,
     });
     const previousTabs = chrome.tabs;
     const previousI18n = chrome.i18n;
-    chrome.tabs = { get: vi.fn().mockResolvedValue({ width: 1200, height: 848 }) } as unknown as typeof chrome.tabs;
-    chrome.i18n = { getMessage: (key: string) => key === 'deviceSimulationIphone17Pro' ? 'iPhone 17 Pro' : '' } as typeof chrome.i18n;
+    chrome.tabs = {
+      get: vi.fn().mockResolvedValue({ width: 1200, height: 848 }),
+    } as unknown as typeof chrome.tabs;
+    chrome.i18n = {
+      getMessage: (key: string) => (key === 'deviceSimulationIphone17Pro' ? 'iPhone 17 Pro' : ''),
+    } as typeof chrome.i18n;
     try {
-      await applyDeviceShellForTab(tabId, {
-        ...getQuickDeviceChromeConfig('iphone-17-pro'),
-        phoneFrame: { width: fixed.width, height: fixed.height },
-      }, fixed);
-      getDevicePreviewPanelToken(tabId, false, true);
+      await applyDeviceShellForTab(
+        tabId,
+        {
+          ...getQuickDeviceChromeConfig('iphone-17-pro'),
+          phoneFrame: { width: fixed.width, height: fixed.height },
+        },
+        fixed,
+      );
       const decode = (header: { value: string } | undefined) =>
         JSON.parse(atob(header!.value.split('"')[1]!));
-      expect(decode(await getDeviceShellBootstrapHeaderForTab(tabId))).not.toHaveProperty('previewLayout');
+      expect(decode(await getDeviceShellBootstrapHeaderForTab(tabId))).not.toHaveProperty(
+        'previewLayout',
+      );
       expect(readPreferences).not.toHaveBeenCalled();
       expect(decode(await getDeviceShellBootstrapHeaderForTab(tabId, true)).previewLayout).toEqual({
         width: 410,
         toolbarCollapsed: true,
-        panel: { wide: true, open: false },
+        panelOpen: false,
         viewport: { width: 1200, height: 848 },
-        toolbar: { profile: null, preset: { id: 'iphone-17-pro', label: 'iPhone 17 Pro' }, orientation: 'portrait' },
+        toolbar: {
+          profile: null,
+          preset: { id: 'iphone-17-pro', label: 'iPhone 17 Pro' },
+          orientation: 'portrait',
+        },
       });
     } finally {
       readPreferences.mockRestore();

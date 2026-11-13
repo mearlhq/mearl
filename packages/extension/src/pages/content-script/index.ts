@@ -23,7 +23,11 @@ import { installAppBridgeConfigOverlay } from './appBridgeConfigOverlay';
 import { installFrameVisualRuntime } from './frameVisualRuntime';
 import { installElementPickerRuntime } from './elementPickerRuntime';
 import type { QuickDeviceChromeConfig } from '../../shared/quickAppProfile';
-import { createQuickDeviceChromeManager, readPhoneFrameBootstrap, type QuickDeviceChromeAppState } from './deviceChrome';
+import {
+  createQuickDeviceChromeManager,
+  readPhoneFrameBootstrap,
+  type QuickDeviceChromeAppState,
+} from './deviceChrome';
 import { installAccountAutoLoginCountdown } from './accountAutoLogin';
 import { installWebsiteInstallationBridge } from './installationWebsite';
 
@@ -31,6 +35,7 @@ import { installWebsiteInstallationBridge } from './installationWebsite';
 const QUICK_DEVICE_CHROME_GET_ACTION = 'quickDeviceChromeGet';
 const QUICK_DEVICE_CHROME_UPDATE_ACTION = 'quickDeviceChromeUpdate';
 const DEVICE_PREVIEW_PANEL_WIDTH = 'device-preview-panel-width';
+const DEVICE_PREVIEW_PANEL_OPEN = 'device-preview-panel-open';
 const DEVICE_PREVIEW_TOOLBAR_COLLAPSED = 'device-preview-toolbar-collapsed';
 
 (function () {
@@ -45,14 +50,19 @@ const DEVICE_PREVIEW_TOOLBAR_COLLAPSED = 'device-preview-toolbar-collapsed';
   installWebsiteInstallationBridge();
 
   const isTopFrame = window.top === window;
-  const phoneFrameBootstrap = isTopFrame ? readPhoneFrameBootstrap(
-    (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined)?.serverTiming,
-  ) : undefined;
+  const phoneFrameBootstrap = isTopFrame
+    ? readPhoneFrameBootstrap(
+        (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined)
+          ?.serverTiming,
+      )
+    : undefined;
 
   if (isTopFrame) installAccountAutoLoginCountdown(window.location.href);
 
   const appBridgeActive = listenAppBridgeRelay();
-  const showProfileSettings = isTopFrame ? installAppBridgeConfigOverlay(appBridgeActive) : undefined;
+  const showProfileSettings = isTopFrame
+    ? installAppBridgeConfigOverlay(appBridgeActive)
+    : undefined;
   const deviceChromeManager = isTopFrame
     ? createQuickDeviceChromeManager({
         showProfileSettings,
@@ -67,11 +77,10 @@ const DEVICE_PREVIEW_TOOLBAR_COLLAPSED = 'device-preview-toolbar-collapsed';
           loadingLabel: i18nMessage('loading') || 'Loading…',
           toolbarLabel: i18nMessage('devicePreviewToolbar') || 'Device toolbar',
           initialLayout: phoneFrameBootstrap?.previewLayout,
-          async requestToken(open, wide, retryCapture) {
+          async requestToken(open, retryCapture) {
             const result = await safeSendMessage<{ success?: boolean; token?: string | null }>({
               action: 'devicePreviewPanelState',
               open,
-              wide,
               retryCapture,
             });
             if (!result?.success) {
@@ -81,10 +90,16 @@ const DEVICE_PREVIEW_TOOLBAR_COLLAPSED = 'device-preview-toolbar-collapsed';
             }
             return result.token ?? null;
           },
-          url: (token, viewer) => chrome.runtime.getURL(`src/pages/device-preview-panel/index.html?viewer=${viewer}#${token}`),
+          url: (token, viewer) =>
+            chrome.runtime.getURL(
+              `src/pages/device-preview-panel/index.html?viewer=${viewer}#${token}`,
+            ),
           subscribeReady(listener) {
             const onMessage = (message: { action?: string; viewer?: string }) => {
-              if (message.action === 'devicePreviewPanelReady' && typeof message.viewer === 'string')
+              if (
+                message.action === 'devicePreviewPanelReady' &&
+                typeof message.viewer === 'string'
+              )
                 listener(message.viewer);
             };
             chrome.runtime.onMessage.addListener(onMessage);
@@ -92,19 +107,26 @@ const DEVICE_PREVIEW_TOOLBAR_COLLAPSED = 'device-preview-toolbar-collapsed';
           },
           async loadLayout() {
             const result = await chrome.storage.local.get([
+              DEVICE_PREVIEW_PANEL_OPEN,
               DEVICE_PREVIEW_PANEL_WIDTH,
               DEVICE_PREVIEW_TOOLBAR_COLLAPSED,
             ]);
             return {
               width: result[DEVICE_PREVIEW_PANEL_WIDTH],
+              panelOpen: result[DEVICE_PREVIEW_PANEL_OPEN],
               toolbarCollapsed: result[DEVICE_PREVIEW_TOOLBAR_COLLAPSED] === true,
             };
           },
           saveWidth: width => {
             void chrome.storage.local.set({ [DEVICE_PREVIEW_PANEL_WIDTH]: width }).catch(() => {});
           },
+          savePanelOpen: open => {
+            void chrome.storage.local.set({ [DEVICE_PREVIEW_PANEL_OPEN]: open }).catch(() => {});
+          },
           saveToolbarCollapsed: collapsed => {
-            void chrome.storage.local.set({ [DEVICE_PREVIEW_TOOLBAR_COLLAPSED]: collapsed }).catch(() => {});
+            void chrome.storage.local
+              .set({ [DEVICE_PREVIEW_TOOLBAR_COLLAPSED]: collapsed })
+              .catch(() => {});
           },
         },
         async captureScreenshot() {
@@ -208,7 +230,10 @@ const DEVICE_PREVIEW_TOOLBAR_COLLAPSED = 'device-preview-toolbar-collapsed';
         deviceChromeManager.updateProfileSettings(response?.profileSettings === true);
       if (receivedUpdate) return;
       const config = response?.success ? (response.config ?? null) : null;
-      if (!phoneFrameBootstrap || JSON.stringify(config) !== JSON.stringify(phoneFrameBootstrap.config))
+      if (
+        !phoneFrameBootstrap ||
+        JSON.stringify(config) !== JSON.stringify(phoneFrameBootstrap.config)
+      )
         deviceChromeManager.update(config);
     });
   }
@@ -445,7 +470,6 @@ const DEVICE_PREVIEW_TOOLBAR_COLLAPSED = 'device-preview-toolbar-collapsed';
       // ignore
     }
   }
-
 })();
 
 function installInjectedMessageRelay(isTopFrame: boolean): void {
@@ -490,7 +514,9 @@ function installInjectedMessageRelay(isTopFrame: boolean): void {
             apiName?: string | null;
           }>({
             action: 'getOverrides',
-            tabId, url: message.url, requestBody: message.requestBody,
+            tabId,
+            url: message.url,
+            requestBody: message.requestBody,
           });
           const overrides = overridesResponse?.overrides || [];
           const { url, requestId } = message;

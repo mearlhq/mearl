@@ -4,7 +4,6 @@ import {
   DEVICE_PREVIEW_PANEL_PORT,
   DEVICE_PREVIEW_PANEL_READY_ACTION,
   PANEL_PRESERVE_LOG_KEY,
-  type DevicePreviewLayout,
   type DevicePreviewPanelMessage,
 } from '../../shared/devicePreviewPanel';
 import type { CapturedRequest, NavigationDivider, RumEvent } from '../panel/types';
@@ -20,7 +19,6 @@ import {
 const consumer = 'device-preview-panel';
 const panels = new Map<number, PreviewPanel>();
 const closing = new Map<number, Promise<void>>();
-const panelVisibility = new Map<number, NonNullable<DevicePreviewLayout['panel']>>();
 
 interface PreviewPanel {
   token: string;
@@ -44,9 +42,19 @@ function previewEvent(event: RumEvent): RumEvent {
   return {
     ...event,
     _raw: typeof raw === 'string' ? { preview: raw } : raw,
-    _context: typeof context === 'string'
-      ? { requestUrl: event._context.requestUrl, app: {}, user: {}, session: {}, view: {}, properties: { preview: context }, os: {}, net: {} }
-      : context,
+    _context:
+      typeof context === 'string'
+        ? {
+            requestUrl: event._context.requestUrl,
+            app: {},
+            user: {},
+            session: {},
+            view: {},
+            properties: { preview: context },
+            os: {},
+            net: {},
+          }
+        : context,
   };
 }
 
@@ -83,31 +91,33 @@ async function start(tabId: number, panel: PreviewPanel): Promise<void> {
   post(panel, { type: 'state', state: panel.status, tabId });
 }
 
-export function getDevicePreviewPanelVisibility(tabId: number) {
-  return panelVisibility.get(tabId);
-}
-
-export function getDevicePreviewPanelToken(tabId: number, open?: boolean, wide?: boolean, retryCapture = false): string | null {
+export function getDevicePreviewPanelToken(
+  tabId: number,
+  open?: boolean,
+  retryCapture = false,
+): string | null {
   if (open === false) {
     closeDevicePreviewPanel(tabId);
-    if (wide !== undefined) panelVisibility.set(tabId, { wide, open });
     return null;
   }
-  if (open && wide !== undefined) panelVisibility.set(tabId, { wide, open });
   const existing = panels.get(tabId);
   if (existing) {
     if (open && retryCapture && existing.status === 'error') void start(tabId, existing);
     return existing.token;
   }
   if (!open) return null;
-  const panel: PreviewPanel = { token: crypto.randomUUID(), since: Date.now(), status: 'connecting', navigation: [] };
+  const panel: PreviewPanel = {
+    token: crypto.randomUUID(),
+    since: Date.now(),
+    status: 'connecting',
+    navigation: [],
+  };
   panels.set(tabId, panel);
   void start(tabId, panel);
   return panel.token;
 }
 
 export function closeDevicePreviewPanel(tabId: number): void {
-  panelVisibility.delete(tabId);
   const panel = panels.get(tabId);
   if (!panel) return;
   panels.delete(tabId);
@@ -124,9 +134,14 @@ export function connectDevicePreviewPanel(port: chrome.runtime.Port): boolean {
   const sender = port.sender;
   const tabId = sender?.tab?.id;
   const panel = tabId === undefined ? undefined : panels.get(tabId);
-  if (tabId === undefined || !panel || sender?.id !== chrome.runtime.id || !sender.frameId ||
-      sender.url?.split(/[?#]/, 1)[0] !== chrome.runtime.getURL(DEVICE_PREVIEW_PANEL_PAGE) ||
-      port.name !== DEVICE_PREVIEW_PANEL_PORT + panel.token) {
+  if (
+    tabId === undefined ||
+    !panel ||
+    sender?.id !== chrome.runtime.id ||
+    !sender.frameId ||
+    sender.url?.split(/[?#]/, 1)[0] !== chrome.runtime.getURL(DEVICE_PREVIEW_PANEL_PAGE) ||
+    port.name !== DEVICE_PREVIEW_PANEL_PORT + panel.token
+  ) {
     port.disconnect();
     return true;
   }
@@ -141,7 +156,9 @@ export function connectDevicePreviewPanel(port: chrome.runtime.Port): boolean {
     if (message === 'retry' && panel.status === 'error') void start(tabId, panel);
     if (message === 'clear') clear(panel, Date.now());
     if (message === 'ready' && viewer) {
-      void chrome.tabs.sendMessage(tabId, { action: DEVICE_PREVIEW_PANEL_READY_ACTION, viewer }, { frameId: 0 }).catch(() => {});
+      void chrome.tabs
+        .sendMessage(tabId, { action: DEVICE_PREVIEW_PANEL_READY_ACTION, viewer }, { frameId: 0 })
+        .catch(() => {});
     }
   });
   post(panel, { type: 'state', state: panel.status, tabId });
@@ -155,7 +172,11 @@ function clear(panel: PreviewPanel, timestamp: number): void {
   post(panel, { type: 'snapshot', requests: [], events: [], navigation: [] });
 }
 
-export async function navigateDevicePreviewPanel(tabId: number, timestamp: number, url: string): Promise<void> {
+export async function navigateDevicePreviewPanel(
+  tabId: number,
+  timestamp: number,
+  url: string,
+): Promise<void> {
   const panel = panels.get(tabId);
   if (!panel) return;
   const stored = await chrome.storage.local.get(PANEL_PRESERVE_LOG_KEY).catch(() => ({}));
@@ -185,12 +206,16 @@ export function updateDevicePreviewPanel(tabId: number, update: CollectorUpdate)
   const panel = panels.get(tabId);
   if (!panel?.port || panel.status !== 'capturing') return;
   if (update.type === 'request') {
-    const request = isPreviewRequest(update.request, panel) && !update.removedRequestIds.includes(update.request.id)
-      ? update.request
-      : undefined;
+    const request =
+      isPreviewRequest(update.request, panel) &&
+      !update.removedRequestIds.includes(update.request.id)
+        ? update.request
+        : undefined;
     post(panel, { type: 'request', request, removed: update.removedRequestIds });
   } else {
-    const events = update.events.filter(event => event.batchTimestampMs >= panel.since).map(previewEvent);
+    const events = update.events
+      .filter(event => event.batchTimestampMs >= panel.since)
+      .map(previewEvent);
     post(panel, { type: 'events', events, removed: update.removedEventIds });
   }
 }

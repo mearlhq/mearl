@@ -840,6 +840,7 @@
   "deviceSimulationEnableFromPage": { "message": "Enable app simulation" },
   "deviceSimulationDisableFromPage": { "message": "Disable app simulation" },
   "deviceSimulationNoApp": { "message": "No app" },
+  "deviceSimulationDisableApp": { "message": "Turn off app simulation" },
   "deviceSimulationDisable": { "message": "Turn off device simulation" },
   "devicePreviewCapturing": { "message": "Capturing" },
   "devicePreviewCaptureUnavailable": { "message": "Capture unavailable" },

@@ -768,11 +768,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     void getDeviceShellForTab(tabId)
       .then(shell => {
         const open = shell?.config.phoneFrame ? message.open : false;
-        const wide =
-          shell?.config.phoneFrame && typeof message.wide === 'boolean' ? message.wide : undefined;
         sendResponse({
           success: true,
-          token: getDevicePreviewPanelToken(tabId, open, wide, message.retryCapture === true),
+          token: getDevicePreviewPanelToken(tabId, open, message.retryCapture === true),
         });
       })
       .catch(() => sendResponse({ success: false }));
