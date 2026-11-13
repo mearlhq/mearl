@@ -4,7 +4,7 @@ description: 通过 Mearl 工具箱或 CLI 压缩 PNG、JPEG、WebP 图片并下
 install:
   description: 安装并注册图片压缩工具箱插件
   command: npx @mearl/setup plugin "$SKILL_DIR"
-version: "3.0.0"
+version: "3.1.0"
 ---
 
 # 图片压缩

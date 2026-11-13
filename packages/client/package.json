@@ -1,6 +1,6 @@
 {
   "name": "@mearl/client",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Unified Mearl SDK & CLI for local and remote browsers",
   "type": "module",
   "main": "dist/index.js",

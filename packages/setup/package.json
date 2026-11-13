@@ -1,6 +1,6 @@
 {
   "name": "@mearl/setup",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "One-shot environment setup and configuration for Mearl",
   "type": "module",
   "main": "dist/index.js",

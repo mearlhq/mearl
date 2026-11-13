@@ -1,7 +1,7 @@
 ---
 name: format-converter
 description: 自动识别并在本地双向转换 Unix 时间戳、日期、UTF-8 Base64、Base64 图片和 URL 编码；适用于这几类编码、解码与格式检查，不用于网页抓取或文件压缩。
-version: "3.0.0"
+version: "3.1.0"
 install:
   description: 安装格式转换工具箱与本地转换命令
   command: npx @mearl/setup plugin "$SKILL_DIR"

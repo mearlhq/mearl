@@ -2,13 +2,13 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.mearlhq/mearl",
   "description": "让 AI 与 Chrome 浏览器实时交互：获取历史请求、控制台日志、RUM/埋点事件，并动态设置 Mock 数据。",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@mearl/mcp-server",
-      "version": "3.0.0",
+      "version": "3.1.0",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

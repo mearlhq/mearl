@@ -1,7 +1,7 @@
 {
   "name": "@mearl/native-host",
-  "version": "3.0.0",
-  "description": "Native Messaging Host for Mearl \u2014 bridges Chrome Extension and local socket server",
+  "version": "3.1.0",
+  "description": "Native Messaging Host for Mearl — bridges Chrome Extension and local socket server",
   "type": "module",
   "engines": {
     "node": ">=20.18.0"

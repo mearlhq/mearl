@@ -4,7 +4,7 @@ description: 在 Mearl Popup 中把 SVG、PNG、JPG 设计稿叠加到指定网�
 install:
   description: 安装并注册设计稿对比工具箱插件
   command: npx @mearl/setup plugin "$SKILL_DIR"
-version: "3.0.0"
+version: "3.1.0"
 ---
 
 # 设计稿对比

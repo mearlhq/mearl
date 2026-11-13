@@ -4,7 +4,7 @@ description: 使用 mearl terminal 操作已打开的 xterm.js 和 Ghostty Web �
 install:
   description: 注册 Web 终端 CLI 插件
   command: npx @mearl/setup plugin "$SKILL_DIR"
-version: "3.0.0"
+version: "3.1.0"
 ---
 
 # Web 终端

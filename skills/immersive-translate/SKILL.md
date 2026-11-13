@@ -1,7 +1,7 @@
 ---
 name: immersive-translate
 description: 在 Mearl Popup 中为用户提供网页持续双语阅读，支持自动、Codex 与浏览器内置翻译、译文切换和缓存。用于安装和使用沉浸式翻译面板；不用于 Agent 提取网页、回答网页内容问题、PDF、图片 OCR、视频字幕或文件翻译。
-version: "3.0.0"
+version: "3.1.0"
 install:
   description: 安装并注册沉浸式翻译工具
   command: npx @mearl/setup plugin "$SKILL_DIR"

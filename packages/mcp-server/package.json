@@ -1,6 +1,6 @@
 {
   "name": "@mearl/mcp-server",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "MCP Server for Mearl - enables AI to interact with Chrome browser requests and logs",
   "mcpName": "io.github.mearlhq/mearl",
   "type": "module",

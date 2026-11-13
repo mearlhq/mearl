@@ -1,6 +1,6 @@
 {
   "name": "@mearl/agent-runtime",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Shared local agent provider runtimes for Mearl",
   "type": "module",
   "main": "dist/index.js",

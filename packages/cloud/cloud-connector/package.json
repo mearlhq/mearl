@@ -1,7 +1,7 @@
 {
   "name": "@mearl/cloud-connector",
-  "version": "3.0.0",
-  "description": "Cloud connector for Mearl \u2014 bridges cloud agents to a local native-host",
+  "version": "3.1.0",
+  "description": "Cloud connector for Mearl — bridges cloud agents to a local native-host",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

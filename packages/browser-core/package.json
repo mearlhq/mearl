@@ -1,6 +1,6 @@
 {
   "name": "@mearl/browser-core",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Shared pure-logic utilities for Mearl — usable in both browser extension and Node.js environments",
   "type": "module",
   "main": "dist/index.js",

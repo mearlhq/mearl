@@ -1,7 +1,7 @@
 ---
 name: notes-memory
 description: 管理 Mearl 记事本和跨会话记忆；适用于记录笔记、检索已保存的偏好或项目约定，以及用户要求记住、更新或忘掉信息。不用于修改 Agent 自身的系统配置。
-version: "3.0.0"
+version: "3.1.0"
 install:
   description: 安装记事本、记忆命令和工具箱页面
   command: npx @mearl/setup plugin "$SKILL_DIR"

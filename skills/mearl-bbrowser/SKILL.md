@@ -4,7 +4,7 @@ description: 使用 Mearl 的浏览器扩展或直连 CDP 加载、查询、更�
 install:
   description: 安装并注册 bb-browser 站点适配器兼容插件
   command: npx @mearl/setup plugin "$SKILL_DIR"
-version: "3.0.0"
+version: "3.1.0"
 ---
 
 # Mearl bb-browser 站点适配器

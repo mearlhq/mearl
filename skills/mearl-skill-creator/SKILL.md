@@ -1,7 +1,7 @@
 ---
 name: mearl-skill-creator
 description: 根据网站 URL 和目标操作，探索并验证真实接口与页面流程，创建可复用的 Mearl Skill、CLI 命令或工具箱 GUI；也用于改造已有 Mearl Skill。不用于仅执行一次网站操作或维护与 Mearl 无关的 Skill。
-version: "3.0.0"
+version: "3.1.0"
 metadata:
   argument-hint: '<网站 URL 与目标操作 | 已有 Skill 与改造目标>'
 ---

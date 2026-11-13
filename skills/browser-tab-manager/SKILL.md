@@ -4,7 +4,7 @@ description: 管理当前浏览器标签页：智能分组、取消或关闭已�
 install:
   description: 安装并注册浏览器标签管理 Skill、CLI 命令和工具箱页面
   command: npx @mearl/setup plugin "$SKILL_DIR"
-version: "3.0.0"
+version: "3.1.0"
 metadata:
   argument-hint: 'mearl tabs <summary|smart-group|group|remove-group|close-group|close-mearl> [--payload JSON]'
 ---

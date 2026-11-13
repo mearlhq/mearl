@@ -1,8 +1,8 @@
 {
   "name": "@mearl/extension",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "private": true,
-  "description": "Agent \u9a71\u52a8\u7684\u6d4f\u89c8\u5668\u5de5\u5177\uff08Chrome \u6269\u5c55\uff09\uff1a\u81ea\u52a8\u5316\u9a8c\u8bc1\u3001\u8c03\u8bd5\u89c2\u6d4b\u3001\u4e00\u952e Mock",
+  "description": "Agent 驱动的浏览器工具（Chrome 扩展）：自动化验证、调试观测、一键 Mock",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {

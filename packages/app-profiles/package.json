@@ -1,6 +1,6 @@
 {
   "name": "@mearl/app-profiles",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Declarative App profile compilation for installed capabilities",
   "type": "module",
   "main": "dist/index.js",

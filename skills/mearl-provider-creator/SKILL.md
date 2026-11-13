@@ -1,7 +1,7 @@
 ---
 name: mearl-provider-creator
 description: Use when/适用于：用户希望将云浏览器、真机、外部浏览器平台或已有控制 SDK 接入 Mearl Browser Provider，或要求审计、升级已有 Provider。不用于普通页面操作、设备模拟，或只是安装和使用现成 Provider。
-version: "3.0.0"
+version: "3.1.0"
 metadata:
   argument-hint: '<浏览器平台、SDK 或已有 Provider，以及期望接入的能力>'
 ---
