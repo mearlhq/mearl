@@ -572,7 +572,7 @@ describe('browser app profile bundles', () => {
     const { registry, store } = await registryFixture('other/reader');
     await expect(
       registry.install({ id: 'simulation', source, expectedRevision: null }),
-    ).rejects.toThrow('namespace');
+    ).rejects.toThrow('source ID');
     expect(await store.get('simulation')).toBeUndefined();
   });
 

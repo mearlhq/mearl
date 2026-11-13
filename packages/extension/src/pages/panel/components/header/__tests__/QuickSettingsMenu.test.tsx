@@ -73,10 +73,10 @@ vi.mock('../../../utils/i18n', () => ({
       appSimulationShowMore: '展开更多',
       appSimulationCancelHint: '再次点击取消模拟',
       appSimulationChangeFailed: 'APP 模拟切换失败',
-      appProfileInstallTitle: '添加端模拟',
-      appProfileInstallAction: '添加端模拟',
-      appProfileInstallWeChat: '微信端模拟',
-      appProfileInstallSource: '端模拟来源',
+      appProfileInstallTitle: '添加 Profile',
+      appProfileInstallAction: '添加 Profile',
+      appProfileInstallWeChat: '微信 Profile',
+      appProfileInstallSource: 'Profile 来源',
       extensionUpdateAvailable: '发现新版本 v$1',
       extensionUpdateNow: '立即更新',
       extensionUpdating: '更新中...',
@@ -501,9 +501,9 @@ describe('QuickSettingsMenu', () => {
     ).toEqual(['Partner App']);
     expect(screen.queryByText('Missing App')).toBeNull();
     expect(screen.getByRole('button', { name: 'Partner App' })).toBeEnabled();
-    fireEvent.click(within(menu).getByRole('menuitem', { name: '添加端模拟' }));
-    const dialog = within(await screen.findByRole('dialog', { name: '添加端模拟' }));
-    const source = dialog.getByRole('textbox', { name: '端模拟来源' });
+    fireEvent.click(within(menu).getByRole('menuitem', { name: '添加 Profile' }));
+    const dialog = within(await screen.findByRole('dialog', { name: '添加 Profile' }));
+    const source = dialog.getByRole('textbox', { name: 'Profile 来源' });
     fireEvent.click(dialog.getByRole('button', { name: /微信/ }));
     expect(source).toHaveValue('mearlhq/profile-wechat');
     fireEvent.change(source, { target: { value: 'example/profiles' } });
@@ -594,7 +594,7 @@ describe('QuickSettingsMenu', () => {
     const app = screen.getByRole('button', { name: '客户端' });
     expect(app).toHaveAttribute('aria-haspopup', 'dialog');
     fireEvent.click(app);
-    expect(await screen.findByRole('dialog', { name: '添加端模拟' })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: '添加 Profile' })).toBeInTheDocument();
   });
 
   it('ignores a remembered App that arrives after its removal from the catalog', async () => {

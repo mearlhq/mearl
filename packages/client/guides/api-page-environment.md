@@ -1,8 +1,8 @@
 # Mearl 场景：页面测试环境准备
 
-需要联动设备/App、折叠屏/分屏、时区或 Cookie 时读取本文件。设备预设与端模拟列表以当前 CLI 为准，不从静态文档推断当前列表。远端/Provider 选择见[浏览器管理](./api-browser-setup.md)。
+需要联动设备/App、折叠屏/分屏、时区或 Cookie 时读取本文件。设备预设与 Profile 列表以当前 CLI 为准，不从静态文档推断当前列表。远端/Provider 选择见[浏览器管理](./api-browser-setup.md)。
 
-设备模拟直接可用。App 模拟入口由已安装的能力包提供，配置可声明 UA、JSBridge 和容器行为。先查看 `mearl set_app_profile --help` 展示的目标浏览器动态目录；需要机器可读的桥方法、可调设置与默认版本时用 SDK `mearl.getCapabilities({ app: '目录中的完整 ID' })` 或 MCP `browser_get_capabilities`。按需读取 `usage.skills` / `usage.documentation`，再执行对应动作。
+设备模拟直接可用。已安装的 Profile 提供 App 端模拟，可声明 UA、JSBridge 和容器行为。先查看 `mearl set_app_profile --help` 展示的目标浏览器动态目录；需要机器可读的桥方法、可调设置与默认版本时用 SDK `mearl.getCapabilities({ app: '目录中的完整 ID' })` 或 MCP `browser_get_capabilities`。按需读取 `usage.skills` / `usage.documentation`，再执行对应动作。
 
 ## 设备模拟与设备外壳
 
@@ -17,12 +17,12 @@ scale 只改变视觉比例，不改变页面读取的视口或 DPR。预设的�
 只有用户明确要求 App、客户端、容器、JSBridge 或容器栈模拟时启用 set_app_profile / tab_open.appProfile；普通 H5、唤端链接、客户端分支或操作失败不是启用理由。
 
 - 只注入桥：省略 emulation，保留设备状态；App 注入本身不创建根 iframe 或系统栏。
-- 完整端模拟：同一个 set_app_profile 调用传 emulation；空对象采用端模拟配置推荐的设备，设备外壳默认开启。
+- 完整端模拟：同一个 set_app_profile 调用传 emulation；空对象采用 Profile 推荐的设备，设备外壳默认开启。
 - 左右分屏：端模拟与 deviceShell=true、orientation=landscape、splitScreen=true 必须同时满足。新建页需要首屏分屏时，在 tab_open 同时传 appProfile 与该 emulation 组合。
 - 桥方法覆盖：bridgeConfig 只声明受控行为、固定 JSON 回包或成功空实现，不执行配置脚本。
 - 恢复：enabled=false 且省略 emulation 只清除 App；传 emulation={} 同时清除设备模拟。
 
-页面网络环境通过已安装预设声明的 networkControl 切换，传入其 id 和 value；省略保留当前设置，null 清除。可用控制项与取值以当前能力目录和预设文档为准。仅作用于目标 Tab，扩展模式与该 Tab 的快捷设置共享；关闭 Tab 或重启浏览器后清除。单次协议请求的参数不等于修改页面网络环境。
+页面网络环境通过已安装 Preset 声明的 networkControl 切换，传入其 id 和 value；省略保留当前设置，null 清除。可用控制项与取值以当前能力目录和 Preset 文档为准。仅作用于目标 Tab，扩展模式与该 Tab 的快捷设置共享；关闭 Tab 或重启浏览器后清除。单次协议请求的参数不等于修改页面网络环境。
 
 ## 时区
 

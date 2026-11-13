@@ -87,7 +87,7 @@ console.log(page.snapshot);
 - **操作网页**，包括读取快照、点击、输入、滚动、上传、下载和截图。
 - **调试请求**，包括查看 HTTP 请求、响应和流式事件，重发请求，设置 Mock、重定向和请求头规则。
 - **检查页面**，读取控制台日志，检查元素尺寸、样式、遮挡和滚动容器，采集和查询埋点事件。
-- **模拟环境**，包括切换设备视口、触摸、User-Agent 和时区，以及通过端模拟配置还原 App WebView。
+- **模拟环境**，包括切换设备视口、触摸、User-Agent 和时区，以及通过 Profile 还原 App WebView。
 - 用 `mearl run` **编排任务**，在 JavaScript 中组合浏览器动作和 Skill 命令。
 - 通过本机扩展、CDP、云端 Connector 或 Provider **连接浏览器**。
 
@@ -99,9 +99,8 @@ console.log(page.snapshot);
 | --- | --- | --- |
 | Skill | 为 Agent 提供操作指引，并可附带 CLI 命令和工具箱页面 | [Skills](skills/README.md) · [开发 Skill](skills/mearl-skill-creator/SKILL.md) |
 | Provider | 连接其他浏览器平台或设备，声明支持的动作与生命周期 | [Provider](packages/provider/README.md) · [开发 Provider](skills/mearl-provider-creator/SKILL.md) |
-| 端模拟 | 定义新的 App WebView 环境，包括 User-Agent、JSBridge 和容器行为，随能力包分发 | [端模拟配置](packages/app-profiles/README.md) |
-| 能力包 | 通过清单提供宿主实现和浏览器资源 | [能力包模型](docs/capability-model.md) |
-| Preset | 组合能力包、Skills 和 Providers，设置默认配置与权限需求 | [Preset](packages/preset/README.md) · [安装流程](docs/preset-installation.md) |
+| Profile | 定义 App WebView 的 User-Agent、JSBridge 和容器行为，用于端模拟 | [App Profile](packages/app-profiles/README.md) |
+| Preset | 整套安装 Profile、服务集成、Skills 和 Providers，并设置默认配置与权限需求 | [Preset](packages/preset/README.md) · [安装流程](docs/preset-installation.md) |
 
 仓库提供设计稿叠加、双语阅读、格式转换、笔记、标签页管理和图片压缩等 [可安装 Skills](skills/README.md)。
 
@@ -128,7 +127,7 @@ pnpm build
 | `packages/client` · `packages/mcp-server` | CLI、SDK 与 MCP 接入 |
 | `packages/native-host` · `packages/cloud` | 本机和远端连接 |
 | `packages/browser-core` · `packages/app-profiles` | 浏览器动作、共享协议与环境模拟 |
-| `packages/preset` · `packages/provider` | 能力包、Preset 与 Provider 合同 |
+| `packages/preset` · `packages/provider` | Preset、资源清单与 Provider 合同 |
 | `packages/agent-runtime` · `packages/daemon-core` | 模型、任务和进程运行时 |
 | `packages/setup` · `packages/website` | 安装器、产品网站和安装引导 |
 | `skills` | 可独立安装的 Skills、脚本与工具箱资源 |

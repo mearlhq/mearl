@@ -18,7 +18,7 @@ npx @mearl/setup preset uninstall
 
 带来源的 `preset apply` 从 URL 或本地文件安装或切换 preset。省略来源时，`preset apply` 用已保存的快照重试。`preset update` 重新读取当前来源并保留用户覆盖。重试时可重复使用 `--replace-skill <name>`，只授权本次替换名单中的 Skill 来源或冲突插件注册。名单必须唯一，且每项都属于当前启用的 Skill 声明。
 
-`preset uninstall` 移除本机 preset 选择、匹配的已连接扩展中的 preset，以及当前 preset 插件目录中由 setup 托管的注册。独立能力包、Skill 文件、Provider、浏览器权限及活动页面仍在使用的代码保留。扩展需要与 Native Host 保持连接才能清理其选择。仅卸载浏览器 preset 时，设置 `MEARL_SOCKET_PATH` 指定目标浏览器的本机 Socket。如果本机已卸载，而某个浏览器的结果仍为 `pending`，重新连接后用同样的方式指定浏览器再试。
+`preset uninstall` 移除本机 preset 选择、匹配的已连接扩展中的 preset，以及当前 preset 插件目录中由 setup 托管的注册。独立安装的 Profile、集成、Skill 文件、Provider、浏览器权限及活动页面仍在使用的代码保留。扩展需要与 Native Host 保持连接才能清理其选择。仅卸载浏览器 preset 时，设置 `MEARL_SOCKET_PATH` 指定目标浏览器的本机 Socket。如果本机已卸载，而某个浏览器的结果仍为 `pending`，重新连接后用同样的方式指定浏览器再试。
 
 ## 确切记录与切换
 

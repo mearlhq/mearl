@@ -630,7 +630,7 @@ export const COMMANDS = [
         name: 'appProfile',
         type: 'string',
         description:
-          '启用已安装的端模拟，ID 与限制见当前动态帮助。需要系统栏时同时传 emulation.deviceShell=true',
+          '应用已安装的 Profile，ID 与限制见当前动态帮助。需要系统栏时同时传 emulation.deviceShell=true',
       },
       {
         name: 'os',
@@ -1324,20 +1324,21 @@ export const COMMANDS = [
   {
     name: 'set_app_profile',
     description:
-      '设置目标标签页的端模拟；完整 JSBridge 由能力包提供。可同时设置已安装的网络控件，传 emulation 时联动设备模拟',
+      '为目标标签页应用 Profile，按配置启用 JSBridge 和容器行为。可同时设置已安装的网络控件，传 emulation 时联动设备模拟',
     summary: '设置或清除目标标签页的 App 容器模拟',
     params: [
       { name: 'enabled', type: 'boolean', required: true, description: 'true=启用，false=清除' },
       {
         name: 'profile',
         type: 'string',
-        description: '已安装的端模拟 ID（enabled=true 时必填）；当前动态帮助直接展示目标浏览器目录',
+        description:
+          '已安装的 Profile ID（enabled=true 时必填）；当前动态帮助直接展示目标浏览器目录',
       },
       { name: 'os', type: '"ios" | "android"', description: '容器系统，默认 ios' },
       {
         name: 'refreshDefinition',
         type: 'boolean',
-        description: '立即采用最新端模拟配置，保留用户显式设置',
+        description: '立即采用最新 Profile，保留用户显式设置',
       },
       {
         name: 'lockDefinition',
@@ -1366,14 +1367,14 @@ export const COMMANDS = [
         name: 'emulation',
         type: 'object',
         description:
-          '可选设备联动参数，字段同 set_device_emulation 去掉 enabled/reload；字段覆盖端模拟配置推荐的设备，deviceShell 默认 true，横屏时可传 splitScreen=true。省略时不设置或清除设备',
+          '可选设备联动参数，字段同 set_device_emulation 去掉 enabled/reload；字段覆盖Profile 推荐的设备，deviceShell 默认 true，横屏时可传 splitScreen=true。省略时不设置或清除设备',
       },
       { name: 'reload', type: 'boolean', description: '应用/清除后是否重载页面，默认 true' },
       { name: 'tabId', type: 'number', required: true, description: '目标标签页 ID' },
     ],
     notes: [
       '只有用户明确要求 App/客户端/容器/JSBridge 模拟时启用。移动视口或普通 H5 调试使用 set_device_emulation。',
-      'emulation={} 使用端模拟配置推荐的设备；enabled=false 时省略 emulation 只清除 App 注入，传 {} 同时清除设备模拟。',
+      'emulation={} 使用Profile 推荐的设备；enabled=false 时省略 emulation 只清除 App 注入，传 {} 同时清除设备模拟。',
       'bridgeConfig.methods 按方法声明 behavior / response / noop 三选一，可传 silent；只支持受控行为、固定 JSON 回包或成功空实现，不执行配置脚本。',
     ],
     result: [

@@ -477,7 +477,7 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
   },
   emulation: {
     en: {
-      title: 'Device and App emulation',
+      title: 'Device emulation and App Profiles',
       lead: 'Choose the environment that matches what you need to verify.',
       routes: [
         {
@@ -488,7 +488,7 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
         {
           id: 'app',
           title: 'App WebView',
-          text: 'Use WeChat emulation to test H5 pages that depend on the WeChat User-Agent, JSBridge, or WebView behavior.',
+          text: 'Use the WeChat Profile to test H5 pages that depend on the WeChat User-Agent, JSBridge, or WebView behavior.',
         },
         {
           id: 'wechat-miniprogram',
@@ -506,18 +506,18 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
         },
         {
           id: 'app',
-          title: 'Use App WebView emulation',
-          text: 'Capability packages provide App emulation configurations. Query the target browser’s profile catalog to find supported IDs and options for user agent, JSBridge behavior, and WebView setup. Bridge responses simulate page-visible behavior. Native sign-in or payments depend on separately available capabilities.',
+          title: 'Use an App Profile for WebView testing',
+          text: 'App Profiles define user agent, JSBridge behavior, and WebView settings. Query the target browser’s Profile catalog for available IDs and options. Bridge responses simulate page-visible behavior. Native sign-in or payments depend on separately available capabilities.',
           command: findProfiles,
           steps: [
             'Open the page you want to test in a regular browser and capture its layout and available actions.',
-            'Install the WeChat profile and select WeChat web page emulation. Reload the page and check the behavior that depends on the User-Agent or JSBridge.',
+            'Install the WeChat Profile and select WeChat web page emulation. Reload the page and check the behavior that depends on the User-Agent or JSBridge.',
             'With the device shell enabled, use the bottom gesture bar to switch to WeChat mini-program web page. An Agent can use set_app_profile with the ID returned by get_capabilities.',
           ],
           screenshot: ['appBrowser', 'appWebView'],
           links: [
             { label: 'WeChat H5 emulation', url: 'https://github.com/mearlhq/profile-wechat' },
-            { label: 'Capability packages', path: 'docs/capability-model.md' },
+            { label: 'Install a Profile', path: 'packages/setup/README.md' },
           ],
         },
         {
@@ -563,8 +563,8 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
           text: 'Use the mearl-profile-creator Skill to build or update emulation for an App WebView. Give your agent an existing definition, a client behavior sample, or the relevant documentation, plus the behavior your H5 page needs.',
           steps: [
             'Define the User-Agent and version. Add a page runtime to implement JSBridge callbacks or container interactions when needed.',
-            'Build a browser capability package that lists the profile under contributions.appProfiles. Add an App ID mapping if a Preset will select the implementation.',
-            'Install the package in a test browser, find its ID with mearl get_capabilities, and open a fresh tab with the profile enabled to verify first-load behavior.',
+            'List the Profile under contributions.appProfiles in bundle.json. Add an App ID mapping if a Preset will select it.',
+            'Install the Profile in a test browser, find its ID with mearl get_capabilities, and open a fresh tab with the profile enabled to verify first-load behavior.',
           ],
           command: profileCreatorInstall,
           links: [
@@ -573,8 +573,8 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
               path: 'skills/mearl-profile-creator/SKILL.md',
               shared: true,
             },
-            { label: 'App profile reference', path: 'packages/app-profiles/README.md' },
-            { label: 'Browser capability package manifest', path: 'docs/browser-bundles.md' },
+            { label: 'App Profile reference', path: 'packages/app-profiles/README.md' },
+            { label: 'Profile resource manifest', path: 'docs/browser-bundles.md' },
           ],
         },
         {
@@ -593,7 +593,7 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
       ],
     },
     'zh-CN': {
-      title: '设备与 App 模拟',
+      title: '设备模拟与 App Profile',
       lead: '先选要验证的环境，再按对应步骤操作。',
       routes: [
         {
@@ -604,7 +604,7 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
         {
           id: 'app',
           title: 'App WebView',
-          text: '使用微信端模拟验证依赖微信 User-Agent、JSBridge 或 WebView 行为的 H5 页面。',
+          text: '使用微信 Profile 验证依赖微信 User-Agent、JSBridge 或 WebView 行为的 H5 页面。',
         },
         {
           id: 'wechat-miniprogram',
@@ -622,27 +622,27 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
         },
         {
           id: 'app',
-          title: '开启 App WebView 端模拟',
-          text: '端模拟配置由能力包提供。查询目标浏览器的端模拟列表，确认可用 ID、User-Agent、JSBridge 行为和容器设置。桥接回包模拟网页能感知的行为，真实原生登录或支付依赖另行可用的能力。',
+          title: '用 Profile 开启 App 端模拟',
+          text: 'Profile 定义 User-Agent、JSBridge 行为和 WebView 容器设置。查询目标浏览器的 Profile 列表，确认可用 ID 和设置。桥接回包模拟网页能感知的行为，真实原生登录或支付依赖另行可用的能力。',
           command: findProfiles,
           steps: [
             '在普通浏览器中打开待验证的网页，记录布局和可用操作。',
-            '安装微信端模拟并选择「微信内网页」，刷新页面，检查依赖 User-Agent 或 JSBridge 的行为。',
-            '开启设备外壳后，可从底部手势条切换到「微信小程序内网页」。Agent 可通过 get_capabilities 获取配置 ID，再用 set_app_profile 切换。',
+            '安装微信 Profile 并选择「微信内网页」，刷新页面，检查依赖 User-Agent 或 JSBridge 的行为。',
+            '开启设备外壳后，可从底部手势条切换到「微信小程序内网页」。Agent 可通过 get_capabilities 获取 Profile ID，再用 set_app_profile 切换。',
           ],
           screenshot: ['appBrowser', 'appWebView'],
           links: [
             {
-              label: '微信端模拟',
+              label: '微信 Profile',
               url: 'https://github.com/mearlhq/profile-wechat/blob/main/README.zh-CN.md',
             },
-            { label: '能力包文档', path: 'docs/capability-model.md' },
+            { label: '安装 Profile', path: 'packages/setup/README.md' },
           ],
         },
         {
           id: 'wechat-miniprogram',
           title: '运行本地微信小程序',
-          text: '微信小程序 Skill 支持运行原生工程，以及 Taro、uni-app 等框架编译出的微信产物。可以在预览中切换机型、检查页面和页面栈，也可以模拟微信 API 和接口回包。每次运行编译一次并打开本地预览，修改后再次运行即可更新。验证微信里的网页时，使用微信 H5 端模拟。',
+          text: '微信小程序 Skill 支持运行原生工程，以及 Taro、uni-app 等框架编译出的微信产物。可以在预览中切换机型、检查页面和页面栈，也可以模拟微信 API 和接口回包。每次运行编译一次并打开本地预览，修改后再次运行即可更新。验证微信里的网页时，使用微信 H5 Profile。',
           steps: [
             '以 ChineseBQB-weapp 为例，安装项目依赖后运行 npm run build:weapp，生成 dist。原生小程序可以直接传入项目目录。',
             '在项目根目录执行下方的安装和启动命令。通过 Chrome 扩展连接时，按运行指南开启文件网址访问和用户脚本。',
@@ -682,8 +682,8 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
           text: '使用 mearl-profile-creator Skill 新建或更新 App WebView 端模拟。提供已有配置、客户端行为样本或相关文档，并说明 H5 页面依赖哪些行为。',
           steps: [
             '定义 User-Agent 和版本。需要实现 JSBridge 回调或容器交互时，添加页面运行时。',
-            '构建浏览器能力包，在 contributions.appProfiles 中列出配置。由 Preset 选择实现时，添加 App ID 映射。',
-            '在测试浏览器安装能力包，用 mearl get_capabilities 查询 ID，再带配置打开新标签页，验证首屏行为。',
+            '在 bundle.json 的 contributions.appProfiles 中列出 Profile。由 Preset 选择实现时，添加 App ID 映射。',
+            '在测试浏览器安装 Profile，用 mearl get_capabilities 查询 ID，再应用该 Profile 打开新标签页，验证首屏行为。',
           ],
           command: profileCreatorInstall,
           links: [
@@ -692,8 +692,8 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
               path: 'skills/mearl-profile-creator/SKILL.md',
               shared: true,
             },
-            { label: '端模拟配置参考', path: 'packages/app-profiles/README.md' },
-            { label: '浏览器能力包清单', path: 'docs/browser-bundles.md' },
+            { label: 'App Profile 参考', path: 'packages/app-profiles/README.md' },
+            { label: 'Profile 资源清单', path: 'docs/browser-bundles.md' },
           ],
         },
         {
@@ -758,7 +758,7 @@ mearl browser_control --browser '<browserId>' --payload '{"operation":"finish","
           text: 'Configure device and App emulation independently through set_device_emulation and set_app_profile. Enable deviceShell to use a device shell and root WebView. The shared native page host supplies installed App protocol and authorization services; real authorization requires user approval, and takeover cancels pending authorization. Retained pages depend on the Provider connection for emulation and host services. Clear emulation before finish when ordinary pages are needed. Extension-specific request/log entry points are not provided.',
           links: [
             { label: 'Provider contracts', path: 'packages/provider/README.en.md', shared: true },
-            { label: 'Device and App emulation', page: 'emulation' },
+            { label: 'Device emulation and App Profiles', page: 'emulation' },
           ],
         },
         {
@@ -810,10 +810,10 @@ mearl browser_control --browser '<browserId>' --payload '{"operation":"finish","
         {
           id: 'emulation',
           title: '设备外壳、WebView 与 App 服务',
-          text: '通过 set_device_emulation 和 set_app_profile 分别配置设备与 App 模拟，启用 deviceShell 可使用设备外壳和根 WebView。共享原生页面宿主提供已安装 App 的协议和授权服务；真实授权仍需用户批准，接管会取消待授权会话。保留页面的模拟与宿主服务依赖 Provider 连接，需要普通页面时应在 finish 前清除模拟。不提供扩展专属请求/日志入口。',
+          text: '通过 set_device_emulation 和 set_app_profile 分别配置设备模拟与 App Profile，启用 deviceShell 可使用设备外壳和根 WebView。共享原生页面宿主提供已安装 App 的协议和授权服务；真实授权仍需用户批准，接管会取消待授权会话。保留页面的模拟与宿主服务依赖 Provider 连接，需要普通页面时应在 finish 前清除模拟。不提供扩展专属请求/日志入口。',
           links: [
             { label: 'Provider 接口', path: 'packages/provider/README.md', shared: true },
-            { label: '设备与 App 模拟', page: 'emulation' },
+            { label: '设备模拟与 App Profile', page: 'emulation' },
           ],
         },
         {
@@ -914,7 +914,7 @@ mearl browser_control --browser '<browserId>' --payload '{"operation":"finish","
         {
           id: 'distribute',
           title: 'Distribute a Skill',
-          text: 'Publish the complete skills/<name> directory with its SKILL.md, scripts, and bundled assets. A standard Skills manager can discover the directory. For a Skill that includes a Mearl plugin, use setup plugin install to install the Skill and register its commands together. Use a Preset to distribute a set of Skills, Providers, and capability packages together.',
+          text: 'Publish the complete skills/<name> directory with its SKILL.md, scripts, and bundled assets. A standard Skills manager can discover the directory. For a Skill that includes a Mearl plugin, use setup plugin install to install the Skill and register its commands together. Use a Preset to distribute Skills, Providers, Profiles, and integrations together.',
           links: [
             { label: 'Release guide', path: 'docs/releases.md' },
             { label: 'Preset reference', page: 'reference/presets' },
@@ -1001,7 +1001,7 @@ mearl browser_control --browser '<browserId>' --payload '{"operation":"finish","
         {
           id: 'distribute',
           title: '分发 Skill',
-          text: '分发完整的 skills/<name> 目录，包含 SKILL.md、脚本和打包后的资源。标准 Skills 工具可以发现该目录。带 Mearl 插件的 Skill 用 setup plugin install 一次完成安装和命令注册。需要一起分发多项 Skills、Providers 和能力包时，可以用 Preset 组合安装。',
+          text: '分发完整的 skills/<name> 目录，包含 SKILL.md、脚本和打包后的资源。标准 Skills 工具可以发现该目录。带 Mearl 插件的 Skill 用 setup plugin install 一次完成安装和命令注册。要一起分发 Skills、Providers、Profile 和集成，可以用 Preset 组合安装。',
           links: [
             { label: '发布说明', path: 'docs/releases.md' },
             { label: 'Preset 参考', page: 'reference/presets' },

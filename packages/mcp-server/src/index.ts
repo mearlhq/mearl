@@ -2077,7 +2077,7 @@ async function main() {
     {
       name: 'browser_set_app_profile',
       description:
-        '设置目标标签页的端模拟；可用 App ID、限制和说明通过 browser_get_capabilities 查询。完整环境变量、JSBridge、桥协议和 Protocol 页面接口环境由已安装能力提供。传 emulation 时由同一个调用联动设备模拟与 iframe 系统外壳；省略 emulation 时不改变设备状态。',
+        '为目标标签页应用 Profile。用 browser_get_capabilities 查询可用 ID、限制和说明。按已安装的 Profile 和集成启用环境变量、JSBridge、桥协议和 Protocol 页面接口环境。传 emulation 时由同一个调用联动设备模拟与 iframe 系统外壳；省略 emulation 时不改变设备状态。',
       inputSchema: {
         type: 'object',
         properties: {
@@ -2087,7 +2087,7 @@ async function main() {
           },
           profile: {
             type: 'string',
-            description: '端模拟 ID（enabled=true 时必填），决定 UA/桥对象/环境判断特征',
+            description: 'Profile ID（enabled=true 时必填），决定 UA/桥对象/环境判断特征',
           },
           os: {
             type: 'string',
@@ -2096,7 +2096,7 @@ async function main() {
           },
           refreshDefinition: {
             type: 'boolean',
-            description: '立即采用最新端模拟配置，保留用户显式设置',
+            description: '立即采用最新 Profile，保留用户显式设置',
           },
           lockDefinition: {
             type: 'boolean',
@@ -2110,7 +2110,7 @@ async function main() {
           bridgeConfig: {
             type: 'object',
             description:
-              '声明式覆盖桥方法，形如 {methods:{api:{behavior|response|noop,silent?}}}；扩展会先合并同一端模拟的本地配置',
+              '声明式覆盖桥方法，形如 {methods:{api:{behavior|response|noop,silent?}}}；扩展会先合并同一 Profile 的本地配置',
           },
           networkControl: {
             type: ['object', 'null'],
@@ -2122,7 +2122,7 @@ async function main() {
           emulation: {
             type: 'object',
             description:
-              '可选设备联动参数；字段覆盖端模拟配置推荐的设备，空对象使用推荐设备，deviceShell 默认 true。省略时不设置或清除设备。',
+              '可选设备联动参数；字段覆盖Profile 推荐的设备，空对象使用推荐设备，deviceShell 默认 true。省略时不设置或清除设备。',
             properties: {
               preset: {
                 type: 'string',

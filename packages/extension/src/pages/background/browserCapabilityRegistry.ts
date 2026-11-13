@@ -464,7 +464,10 @@ export function createBrowserCapabilityRegistry(
         !contributions?.appProfiles?.length ||
         Object.keys(contributions).some(key => !['appProfiles', 'pageRuntimes'].includes(key))
       ) {
-        throw new BundleError('BUNDLE_INVALID', 'Expected an App profile bundle');
+        throw new BundleError(
+          'BUNDLE_INVALID',
+          'A standalone Profile source must declare App Profiles and may also include page runtimes.',
+        );
       }
       const installed = previous.bundles.find(entry => entry.manifest.id === id);
       const sourceKey = (url: string) =>
@@ -506,7 +509,7 @@ export function createBrowserCapabilityRegistry(
       if (!profile)
         throw new BundleError(
           'BUNDLE_INVALID',
-          'The installed browser bundle does not provide this app profile',
+          'The installed source does not provide this App Profile',
         );
       return profile;
     },

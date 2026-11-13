@@ -12,7 +12,7 @@ Use setup to install a complete cloud Agent environment: cloud-server, the unifi
 npx @mearl/setup --cloud
 ```
 
-Installed capability packages provide optional connection protocols. See [`@mearl/plugin-qoder`](../../plugin-qoder/README.en.md) for Qoder pairing; the core does not include its pairing implementation.
+Installed integrations provide optional connection protocols. See [`@mearl/plugin-qoder`](../../plugin-qoder/README.en.md) for Qoder pairing; the core does not include its pairing implementation.
 
 Install `@mearl/cloud-server` separately when only the server package is needed, such as Docker or custom process management.
 
@@ -123,7 +123,7 @@ console.log(stats);
 await server.stop();
 ```
 
-The corresponding capability package handles handshakes and forwarding for optional modes.
+The corresponding integration handles handshakes and forwarding for optional modes.
 
 ## Architecture
 

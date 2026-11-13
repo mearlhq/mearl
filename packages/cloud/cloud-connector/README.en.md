@@ -2,7 +2,7 @@
 
 [简体中文](README.md) | [English](README.en.md)
 
-A local connector forwarding cloud Agent operations to local native-host. WebSocket is built in; other protocols load from installed capability packages. Qoder credentials, pairing, and SSE are provided by the optional [`@mearl/plugin-qoder`](../../plugin-qoder/README.en.md).
+A local connector forwarding cloud Agent operations to local native-host. WebSocket is built in; installed integrations provide other protocols. Qoder credentials, pairing, and SSE are provided by the optional [`@mearl/plugin-qoder`](../../plugin-qoder/README.en.md).
 
 ## Installation
 
@@ -129,7 +129,7 @@ native-host and the daemon CLI read this registry through shared paths derived b
 
 > Foreground execution, including native-host management, logs to stdout/stderr without a separate log file. Only daemon mode writes `<hash>.log`.
 
-See the corresponding capability package documentation for optional protocol authentication and pairing. The core does not read their credentials.
+See the corresponding integration documentation for optional protocol authentication and pairing. The core does not read their credentials.
 
 ## Prerequisites
 

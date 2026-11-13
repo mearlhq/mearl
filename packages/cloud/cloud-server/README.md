@@ -12,7 +12,7 @@
 npx @mearl/setup --cloud
 ```
 
-可选连接协议由已安装能力包提供。Qoder 配对见 [`@mearl/plugin-qoder`](../../plugin-qoder/README.md)；核心不内置其配对实现。
+可选连接协议由已安装的集成提供。Qoder 配对见 [`@mearl/plugin-qoder`](../../plugin-qoder/README.md)；核心不内置其配对实现。
 
 在 Docker 或自定义进程托管等只需要 Server 包的场景，可单独安装 `@mearl/cloud-server`。
 
@@ -123,7 +123,7 @@ console.log(stats);
 await server.stop();
 ```
 
-可选 mode 的握手和转发由对应能力包负责。
+可选模式由对应的集成负责握手和转发。
 
 ## 架构
 

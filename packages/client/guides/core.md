@@ -35,7 +35,7 @@ mearl page_click --payload '{"tabId":12345,"selector":"@e3"}'
 
 移动视口、UA、触摸使用 `set_device_emulation`，首屏生效用 `tab_open.emulation`。仅在用户明确要求客户端、JSBridge 或容器时启用 App 模拟；普通 H5、唤端链接或操作失败不构成启用理由。
 
-App 可用性以当前目标的 `set_app_profile --help` 或 `get_capabilities` 为准，沿用当前 browser/session。`partial`、`unsupported` 不等于空目录，`available:false` 不可启用。按需读能力包的 usage 指引，不自动安装；方法存在不证明真实授权、支付等业务能力可用。环境准备见[设备与 App](./api-page-environment.md)。
+App 可用性以当前目标的 `set_app_profile --help` 或 `get_capabilities` 为准，沿用当前 browser/session。`partial`、`unsupported` 不等于空目录，`available:false` 不可启用。按需读 Profile 的 usage 指引，不自动安装；方法存在不证明真实授权、支付等业务能力可用。环境准备见[设备与 App](./api-page-environment.md)。
 
 已注册插件通过当前 `mearl --help` 或 SDK `mearl.help()` 发现，具体调用看插件帮助；本指南的专用 Skill 列表不代表全部已安装扩展。插件与 Provider 自己提供业务用法，核心入口不枚举它们的参数。
 

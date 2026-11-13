@@ -2,13 +2,13 @@
 
 [简体中文](README.md) | [English](README.en.md)
 
-The core includes no built-in App profiles. Installed capability packages supply App UAs, versions, bridge objects, settings, scheme routes, business responses, and container implementations. This package validates and compiles declarative profiles and applies setting overrides.
+Install an App Profile to emulate a client’s user agent, version, bridge objects, settings, scheme routes, business responses, and container behavior. This package validates and compiles Profiles and applies setting overrides.
 
-## Develop an App profile
+## Develop an App Profile
 
-Use [App Profile Creator](../../skills/mearl-profile-creator/SKILL.md) to build a profile from an existing definition, a sample of client behavior, or documentation. Register it under `contributions.appProfiles` in a [browser capability package](../../docs/browser-bundles.en.md), then open a fresh tab in a test browser to verify the initial page and bridge behavior.
+Use [App Profile Creator](../../skills/mearl-profile-creator/SKILL.md) to build a profile from an existing definition, a sample of client behavior, or documentation. Register it under `contributions.appProfiles` in the [resource manifest](../../docs/browser-bundles.en.md), then open a fresh tab in a test browser to verify the initial page and bridge behavior.
 
-## Compile a profile
+## Compile a Profile
 
 ```ts
 import { resolveAppProfileDefinition, type AppProfile } from '@mearl/app-profiles';
@@ -20,17 +20,17 @@ export function compileInstalledApp(definition: AppProfile) {
 
 Hosts can pass validated dynamic definitions to resolveAppProfile or resolveAppProfileDefinition. The compiler preserves bridge, settings, and pageRuntime descriptors without executing capability code. Definitions and options are copied and bound to a revision; plugin upgrades do not directly alter active documents.
 
-resolveAppProfileUpdate, rebuildAppProfileConfig, and updateAppProfileSetting preserve the precedence of explicit options, device appearance, and method overrides. Hosts pass preset defaults; existing user selections take priority. Installing a capability package does not mean its default configuration has been applied.
+resolveAppProfileUpdate, rebuildAppProfileConfig, and updateAppProfileSetting preserve the precedence of explicit options, device appearance, and method overrides. The host passes Preset defaults, and existing user selections take priority. After installing a Profile, you can apply its recommended settings as needed.
 
-Capability packages declare App behavior and install it into controlled pages. Page code and host handlers are linked through the [capability model](../../docs/capability-model.en.md).
+Profiles declare the App behavior to emulate in controlled pages. The resource manifest links page runtimes and host handlers. See the [runtime contracts](../../docs/capability-model.en.md).
 
-Profiles in the same browser capability package can share a `settingsGroup` to appear together in the device shell's gesture-bar settings. Each environment remains selectable by its own profile ID.
+Profiles listed in the same resource manifest can share a `settingsGroup` to appear together in the device shell's gesture-bar settings. Each environment remains selectable by its own Profile ID.
 
 ## Agent capability discovery
 
 `mearl get_capabilities`, SDK `getCapabilities()`, and MCP `browser_get_capabilities` query the target browser through the existing browser/session routing. By default they return actions, device presets, and App summaries. Pass `{ "app": "package/app" }` to expand bridge methods, adjustable settings, and default versions. A partial or unsupported catalog does not establish that an App is absent; entries with available=false cannot be enabled. Methods are grouped by declaration: responses are fixed replies, noop methods succeed without an implementation, and behaviors simulate behavior. None establishes that a real business operation is available.
 
-Each App definition may declare optional `usage` metadata. Browser bundles and Node/Skill plugins use the same format:
+Each Profile may declare optional `usage` metadata. Browser bundles and Node/Skill plugins use the same format:
 
 ```json
 {

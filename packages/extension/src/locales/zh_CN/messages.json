@@ -1,16 +1,16 @@
 {
   "appBridgeWebPageEnvironment": { "message": "网页环境" },
   "appBridgeWebPageEnvironmentReload": { "message": "切换环境会重新加载当前网页。" },
-  "appProfileInstallTitle": { "message": "添加端模拟" },
-  "appProfileInstallAction": { "message": "添加端模拟" },
-  "appProfileInstallOfficial": { "message": "官方端模拟" },
-  "appProfileInstallWeChat": { "message": "微信端模拟" },
+  "appProfileInstallTitle": { "message": "添加 Profile" },
+  "appProfileInstallAction": { "message": "添加 Profile" },
+  "appProfileInstallOfficial": { "message": "官方 Profile" },
+  "appProfileInstallWeChat": { "message": "微信 Profile" },
   "appProfileInstallDescription": {
-    "message": "从 GitHub 仓库或 HTTPS 能力包地址安装端模拟。请确认你信任此来源。"
+    "message": "输入 GitHub 仓库或 HTTPS 地址，安装用于端模拟的 Profile。请确认你信任此来源。"
   },
-  "appProfileInstallSource": { "message": "端模拟来源" },
-  "appProfileInstallPermissionDenied": { "message": "未授权读取端模拟来源。" },
-  "appProfileInstallFailed": { "message": "无法安装端模拟。" },
+  "appProfileInstallSource": { "message": "Profile 来源" },
+  "appProfileInstallPermissionDenied": { "message": "未授权读取 Profile 来源。" },
+  "appProfileInstallFailed": { "message": "无法安装 Profile。" },
   "appProfileInstallPending": { "message": "正在安装…" },
   "appProfileInstallSubmit": { "message": "安装" },
   "appProfileInstallSuccess": { "message": "已安装 $1" },
@@ -3171,7 +3171,7 @@
     "message": "Skill 管理工具已变更，正在刷新目录，请重新选择后安装。"
   },
   "presetInstallTitle": {
-    "message": "启用 Mearl 能力"
+    "message": "安装 Preset"
   },
   "presetInstallSourceNotice": {
     "message": "此网站未预先配置为安装来源。以下授权仅用于本次安装，不会将网站加入自动更新信任目录。"
@@ -3183,22 +3183,22 @@
     "message": "请求网站"
   },
   "presetInstallCatalogSource": {
-    "message": "配置目录"
+    "message": "Preset 目录"
   },
   "presetInstallPresetSource": {
-    "message": "能力配置来源"
+    "message": "Preset 来源"
   },
   "presetInstallReadSourceHint": {
-    "message": "确认来源后读取配置，下一步将展示能力名称和所需站点权限，确认安装后才会启用。"
+    "message": "确认来源后读取 Preset，下一步会显示名称和所需站点权限。"
   },
   "presetInstallReadSource": {
-    "message": "继续，读取配置"
+    "message": "继续，读取 Preset"
   },
   "presetInstallConfirmHint": {
-    "message": "请确认能力来源及其可访问的站点。安装包含的本机能力将通过已连接的 Mearl 本地服务执行；所需浏览器权限由浏览器另行确认。"
+    "message": "请确认 Preset 来源和所需站点权限。本机组件由已连接的 Mearl 本地服务安装，站点权限由浏览器另行确认。"
   },
   "presetInstallConfirmOnce": {
-    "message": "确认并安装本次配置"
+    "message": "确认并安装 Preset"
   },
   "presetInstallCancel": {
     "message": "取消"
@@ -3228,16 +3228,16 @@
     "message": "待覆盖的 Skill 状态已变化，请重新检查后再确认。"
   },
   "presetInstallSourceChanged": {
-    "message": "请求网站或配置来源不匹配。请返回原网站重新发起安装。"
+    "message": "请求网站或 Preset 来源不匹配。请返回原网站重新发起安装。"
   },
   "presetInstallDescription": {
-    "message": "一次配置，在原有工具和调试界面中使用。"
+    "message": "安装后可在 Mearl 工具和调试界面中使用。"
   },
   "presetInstallLoading": {
     "message": "正在读取安装信息…"
   },
   "presetInstallWorking": {
-    "message": "正在校验并启用能力，请稍候…"
+    "message": "正在校验并安装 Preset…"
   },
   "presetInstallPermissions": {
     "message": "启用这些能力需要访问以下站点。点击后由浏览器完成授权。"
@@ -3252,13 +3252,13 @@
     "message": "浏览器能力已启用"
   },
   "presetInstallLocalPending": {
-    "message": "此预设还包含通过本机服务提供的能力，浏览器部分已可以直接使用。"
+    "message": "此 Preset 的浏览器部分已可用，本机组件仍待安装。"
   },
   "presetInstallComplete": {
-    "message": "已可在原有 Popup、调试面板和应用模拟中使用。"
+    "message": "可在 Popup、调试面板和端模拟中使用。"
   },
   "presetInstallSetupHint": {
-    "message": "在终端运行一次安装命令，完成本机服务和关联能力配置："
+    "message": "在终端运行一次安装命令，完成本机服务和 Preset 配置。"
   },
   "presetInstallCopy": {
     "message": "复制安装命令"
@@ -3276,19 +3276,19 @@
     "message": "安装信息已过期或更新。请返回安装引导重新启用。"
   },
   "presetInstallFailed": {
-    "message": "暂时未能完成启用，请重试。当前能力配置已保留。"
+    "message": "暂时未能完成安装，请重试。当前 Preset 已保留。"
   },
   "presetInstallIntegrityFailed": {
-    "message": "安装数据未通过完整性校验，已停止启用。请检查 Mearl 安装状态；当前能力配置已保留。"
+    "message": "安装数据未通过完整性校验。请检查 Mearl 安装状态，当前 Preset 已保留。"
   },
   "presetInstallConfigurationFailed": {
-    "message": "能力配置与当前 Mearl 不兼容。请更新 Mearl 或联系能力提供方，当前能力配置已保留。"
+    "message": "此 Preset 与当前 Mearl 不兼容。请更新 Mearl 或联系 Preset 提供方。当前 Preset 已保留。"
   },
   "presetInstallNativeSync": {
-    "message": "这套能力已关联本机服务，请运行 setup 命令一并更新，保留已有配置。"
+    "message": "此 Preset 已关联本机服务。运行 setup 命令可一并更新并保留已有配置。"
   },
   "presetInstallAllReady": {
-    "message": "所选能力已全部启用"
+    "message": "Preset 已就绪"
   },
   "presetInstallLocalIncomplete": {
     "message": "部分本机能力尚未完成，可以直接重试。已经完成的组件会保留。"
@@ -3303,7 +3303,7 @@
     "message": "Preset $1 需要域名权限"
   },
   "presetPermissionsGrant": {
-    "message": "授权 preset 域名"
+    "message": "授权 Preset 所需域名"
   },
   "presetPermissionPromptDesc": {
     "message": "有 $1 个站点待授权。你可以一次申请，并在 Chrome 弹窗中确认。"
@@ -3360,10 +3360,10 @@
     "message": "安装器遇到来源冲突时会暂停整批安装。现有组件已保留，请先处理冲突后重试。"
   },
   "presetManagementTitle": {
-    "message": "能力预设"
+    "message": "Preset 管理"
   },
   "presetManagementDescription": {
-    "message": "安装团队预设，启用客户端模拟、服务集成等能力。"
+    "message": "安装团队 Preset，一次配置 Profile 和服务集成。"
   },
   "presetManagementInstall": {
     "message": "安装"
@@ -3408,10 +3408,10 @@
     "message": "请更新 $1 的 Mearl 扩展和本机服务后重试。"
   },
   "presetManagementRemoveBrowserReconnect": {
-    "message": "无法读取 $1 的预设，请重新连接后重试。"
+    "message": "无法读取 $1 的 Preset，请重新连接后重试。"
   },
   "presetManagementRemoveSelectionChanged": {
-    "message": "预设安装状态已变化，请重试。"
+    "message": "Preset 安装状态已变化，请重试。"
   },
   "presetManagementRemoveFailed": {
     "message": "卸载失败，请检查当前安装状态后重试。"

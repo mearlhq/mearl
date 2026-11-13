@@ -87,7 +87,7 @@ See the [CLI / SDK documentation](packages/client/README.en.md) for actions, con
 - **Automate pages** by reading snapshots, clicking, typing, scrolling, uploading, downloading, and taking screenshots.
 - **Debug requests** by inspecting HTTP requests, responses, and streaming events, replaying requests, and configuring mocks, redirects, and header rules.
 - **Inspect pages** by reading console logs, checking element dimensions, styles, occlusion, and scroll containers, and capturing and querying analytics events.
-- **Emulate environments** by changing the viewport, touch input, User-Agent, and time zone, or using App profiles to emulate a WebView.
+- **Emulate environments** by changing the viewport, touch input, User-Agent, and time zone, or using App Profiles to emulate a WebView.
 - **Compose tasks** with `mearl run` by combining browser actions and Skill commands in JavaScript.
 - **Connect browsers** through the local extension, CDP, a cloud Connector, or a Provider.
 
@@ -99,9 +99,8 @@ The extension provides a DevTools panel, popup, side panel, and toolbox. The CLI
 | --- | --- | --- |
 | Skill | Agent guidance, optionally with CLI commands and toolbox pages | [Skills](skills/README.en.md) · [Create a Skill](skills/mearl-skill-creator/SKILL.md) |
 | Provider | Connect browser platforms or devices and declare supported actions and lifecycle | [Provider](packages/provider/README.en.md) · [Create a Provider](skills/mearl-provider-creator/SKILL.md) |
-| App emulation | Add a new App WebView environment with a User-Agent, JSBridge, and container behavior. Distributed through a capability package. | [App emulation configuration](packages/app-profiles/README.en.md) |
-| Capability package | Supply host implementations and browser resources through a manifest | [Capability model](docs/capability-model.en.md) |
-| Preset | Compose capability packages, Skills, and Providers with default configuration and permission requirements | [Preset](packages/preset/README.en.md) · [Installation](docs/preset-installation.en.md) |
+| Profile | Emulate an App WebView with its User-Agent, JSBridge, and container behavior | [App Profile](packages/app-profiles/README.en.md) |
+| Preset | Install Profiles, integrations, Skills, and Providers together with defaults and permission requirements | [Preset](packages/preset/README.en.md) · [Installation](docs/preset-installation.en.md) |
 
 The repository includes [installable Skills](skills/README.en.md) for design overlays, bilingual reading, format conversion, notes, tab management, and image compression.
 
@@ -128,7 +127,7 @@ The pre-commit hook checks and formats staged source files. Run `pnpm lint` and 
 | `packages/client` · `packages/mcp-server` | CLI, SDK, and MCP integration |
 | `packages/native-host` · `packages/cloud` | Local and remote connections |
 | `packages/browser-core` · `packages/app-profiles` | Browser actions, shared protocols, and environment simulation |
-| `packages/preset` · `packages/provider` | Capability packages, Presets, and Provider contracts |
+| `packages/preset` · `packages/provider` | Presets, resource manifests, and Provider contracts |
 | `packages/agent-runtime` · `packages/daemon-core` | Models, tasks, and process runtime |
 | `packages/setup` · `packages/website` | Installer, product website, and installation guide |
 | `skills` | Independently installable Skills, scripts, and toolbox assets |

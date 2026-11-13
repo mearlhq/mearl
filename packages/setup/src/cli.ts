@@ -109,7 +109,7 @@ export function parseSetupArgs(argv: string[]): ParsedArgs {
       (argv.length !== 3 && !(argv.length === 5 && argv[3] === '--browser' && argv[4]))
     ) {
       throw new Error(
-        'profile requires install <GitHub owner/repo[@ref] or HTTPS bundle URL> [--browser <id-or-name>]',
+        'profile requires install <GitHub owner/repo[@ref] or HTTPS Profile manifest URL> [--browser <id-or-name>]',
       );
     }
     parseProfileSource(argv[2]);
@@ -335,11 +335,11 @@ Environment commands:
   uninstall [options]             Uninstall detected or selected environments
 
 Integration commands:
-  profile install <source>       Install one App profile bundle in a connected extension
-  preset apply [source]          Apply a URL or local file, or retry the saved snapshot
-  preset update                  Update the selected preset, preserving user overrides
+  profile install <source>       Install App Profiles from a source in a connected extension
+  preset apply [source]          Apply a Preset URL or local file, or retry the saved installation
+  preset update                  Update the selected Preset, preserving user overrides
   preset status                  Report actual readiness (exit 3 when synchronization is pending)
-  preset uninstall               Remove the preset from the local host and connected extensions
+  preset uninstall               Remove the Preset from the local host and connected extensions
   plugin install <arguments...>   Install Skills and register their CLI plugins
   plugin uninstall <name>        Uninstall one CLI plugin
   plugin [name] <path>            Register an existing plugin; name overrides metadata
@@ -357,7 +357,7 @@ Environment options:
   --cloud-mode <id>                Manage cloud packages using an installed mode
   --mcp                           Manage @mearl/mcp-server and its configuration
   --target-line <major.minor.x>   Use the latest packages in one release line
-  --preset <source>               Apply a preset after installing or updating the environment
+  --preset <source>               Apply a Preset after installing or updating the environment
   --skip-skill                    Keep the independently managed Mearl Skill unchanged
 
 Uninstall options:
@@ -440,7 +440,7 @@ async function installProfile(source: string, browser?: string): Promise<unknown
       );
     browser = extensions[0]!.browserId;
   }
-  console.error('If the bundle source needs permission, confirm it in the browser.');
+  console.error('If the Profile source needs permission, confirm it in the browser.');
   return invoke('profile_install', { source }, { browser, timeoutSec: 150 });
 }
 

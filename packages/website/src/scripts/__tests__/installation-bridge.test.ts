@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { installationBridgeCopy } from '../../lib/installation-bridge-copy';
 import { initInstallationBridge } from '../installation-bridge';
 const catalogUrl = 'https://guide.example.test/public-installation.json';
 let send: ReturnType<typeof vi.fn>;
@@ -101,7 +102,7 @@ it('does not use a preset directory when the catalog is missing after restoratio
   window.history.replaceState({}, '', '/bridge.html');
   initInstallationBridge();
   expect(button().disabled).toBe(true);
-  expect(document.body.textContent).toContain('请从安装引导选择所需能力');
+  expect(document.body.textContent).toContain(installationBridgeCopy.chooseFromGuide);
   expect(fetch).not.toHaveBeenCalled();
 });
 
@@ -169,6 +170,6 @@ it.each([true, false])(
     button().dispatchEvent(click);
     await flush();
     expect(send.mock.calls.at(-1)![1]).toMatchObject({ operation: 'open', presetId: 'two' });
-    expect(status.textContent).toContain('当前安装配置不可用');
+    expect(status.textContent).toContain(installationBridgeCopy.configurationUnavailable);
   },
 );

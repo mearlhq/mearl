@@ -3,18 +3,18 @@
   "appBridgeWebPageEnvironmentReload": {
     "message": "Switching environments reloads the current web page."
   },
-  "appProfileInstallTitle": { "message": "Add App emulation" },
-  "appProfileInstallAction": { "message": "Add App emulation" },
-  "appProfileInstallOfficial": { "message": "Official App emulation" },
-  "appProfileInstallWeChat": { "message": "WeChat emulation" },
+  "appProfileInstallTitle": { "message": "Add Profile" },
+  "appProfileInstallAction": { "message": "Add Profile" },
+  "appProfileInstallOfficial": { "message": "Official Profiles" },
+  "appProfileInstallWeChat": { "message": "WeChat Profile" },
   "appProfileInstallDescription": {
-    "message": "Install App emulation from a GitHub repository or an HTTPS bundle URL. Only install code from a source you trust."
+    "message": "Install an App Profile from a GitHub repository or HTTPS URL. Use a source you trust."
   },
-  "appProfileInstallSource": { "message": "App emulation source" },
+  "appProfileInstallSource": { "message": "Profile source" },
   "appProfileInstallPermissionDenied": {
-    "message": "Permission to read the emulation source was denied."
+    "message": "Permission to read the Profile source was denied."
   },
-  "appProfileInstallFailed": { "message": "Could not install App emulation." },
+  "appProfileInstallFailed": { "message": "Could not install the Profile." },
   "appProfileInstallPending": { "message": "Installing…" },
   "appProfileInstallSubmit": { "message": "Install" },
   "appProfileInstallSuccess": { "message": "Installed $1" },
@@ -613,7 +613,7 @@
     "message": "Services"
   },
   "appBridgeConfig": {
-    "message": "App simulation settings"
+    "message": "Profile settings"
   },
   "deviceChromeScreenshotCopied": {
     "message": "Copied"
@@ -625,7 +625,7 @@
     "message": "Capture failed"
   },
   "appBridgeCloseConfig": {
-    "message": "Close app simulation settings"
+    "message": "Close Profile settings"
   },
   "appBridgePagePaused": {
     "message": "While this panel is open, the page receives hidden events. Closing it restores the page and dispatches foreground events."
@@ -3175,7 +3175,7 @@
     "message": "The Skill manager changed. The catalog is refreshing; select the skill again to install."
   },
   "presetInstallTitle": {
-    "message": "Enable Mearl capabilities"
+    "message": "Install Preset"
   },
   "presetInstallSourceNotice": {
     "message": "This website is not a preconfigured installation source. Approval applies to this installation only and does not trust the website for automatic updates."
@@ -3187,22 +3187,22 @@
     "message": "Requesting website"
   },
   "presetInstallCatalogSource": {
-    "message": "Configuration catalog"
+    "message": "Preset catalog"
   },
   "presetInstallPresetSource": {
-    "message": "Capability configuration source"
+    "message": "Preset source"
   },
   "presetInstallReadSourceHint": {
-    "message": "Confirm the source to read its configuration. Review the capability name and required sites in the next step before confirming installation."
+    "message": "Confirm the source to read the Preset. Review its name and required sites before installing."
   },
   "presetInstallReadSource": {
-    "message": "Continue and read configuration"
+    "message": "Continue and read Preset"
   },
   "presetInstallConfirmHint": {
-    "message": "Review the capability source and sites it can access. Included local capabilities run through the connected Mearl local service. The browser separately confirms any required site permissions."
+    "message": "Review the Preset source and required sites. The connected Mearl local service installs local components, and the browser requests site permissions separately."
   },
   "presetInstallConfirmOnce": {
-    "message": "Confirm this installation"
+    "message": "Confirm and install Preset"
   },
   "presetInstallCancel": {
     "message": "Cancel"
@@ -3232,16 +3232,16 @@
     "message": "The Skills selected for replacement have changed. Refresh their status and confirm again."
   },
   "presetInstallSourceChanged": {
-    "message": "The requesting website or configuration source does not match. Return to the original website and start again."
+    "message": "The requesting website or Preset source does not match. Return to the original website and start the installation again."
   },
   "presetInstallDescription": {
-    "message": "Set up once and use capabilities in your existing tools and panels."
+    "message": "Use the installed features in your existing Mearl tools and panels."
   },
   "presetInstallLoading": {
     "message": "Reading installation details…"
   },
   "presetInstallWorking": {
-    "message": "Verifying and enabling capabilities…"
+    "message": "Verifying and installing the Preset…"
   },
   "presetInstallPermissions": {
     "message": "These capabilities need access to the following sites. Continue to grant access in your browser."
@@ -3256,13 +3256,13 @@
     "message": "Browser capabilities enabled"
   },
   "presetInstallLocalPending": {
-    "message": "This preset also includes local-service capabilities. Browser capabilities are ready to use."
+    "message": "The browser features are ready. This Preset still needs local components."
   },
   "presetInstallComplete": {
-    "message": "Use them in your existing Popup, DevTools panel, and app simulation."
+    "message": "Use the installed features in Popup, DevTools, and App emulation."
   },
   "presetInstallSetupHint": {
-    "message": "Run this setup command once in your terminal to configure the local service and related capabilities:"
+    "message": "Run this command in your terminal to set up the local service and the Preset."
   },
   "presetInstallCopy": {
     "message": "Copy setup command"
@@ -3280,19 +3280,19 @@
     "message": "Installation details expired or changed. Return to the guide and try again."
   },
   "presetInstallFailed": {
-    "message": "Could not finish setup. Retry; your current capabilities are preserved."
+    "message": "Could not complete installation. Try again. Your current Preset is preserved."
   },
   "presetInstallIntegrityFailed": {
-    "message": "Setup stopped because installation data failed integrity checks. Check your Mearl installation; your current capabilities are preserved."
+    "message": "Installation data failed integrity checks. Check your Mearl installation. Your current Preset is preserved."
   },
   "presetInstallConfigurationFailed": {
-    "message": "This capability configuration is incompatible with your Mearl version. Update Mearl or contact the capability provider; your current capabilities are preserved."
+    "message": "This Preset is incompatible with the current Mearl version. Update Mearl or contact the Preset publisher. Your current Preset is preserved."
   },
   "presetInstallNativeSync": {
-    "message": "This preset is linked to local services. Run the setup command to update all components together and keep your settings."
+    "message": "This Preset is linked to the local service. Run setup to update both and keep your settings."
   },
   "presetInstallAllReady": {
-    "message": "All selected capabilities are ready"
+    "message": "Preset ready"
   },
   "presetInstallLocalIncomplete": {
     "message": "Some local components still need attention. Retry to continue; completed components are retained."
@@ -3364,10 +3364,10 @@
     "message": "The installer pauses the batch when sources conflict. Existing components are preserved. Resolve the conflicts before retrying."
   },
   "presetManagementTitle": {
-    "message": "Capability presets"
+    "message": "Presets"
   },
   "presetManagementDescription": {
-    "message": "Install a team preset to enable app simulation, service integrations, and more."
+    "message": "Install a team Preset to set up Profiles and service integrations together."
   },
   "presetManagementInstall": {
     "message": "Install"
@@ -3379,16 +3379,16 @@
     "message": "Update"
   },
   "presetManagementCurrent": {
-    "message": "The preset is up to date."
+    "message": "The Preset is up to date."
   },
   "presetManagementUpdated": {
-    "message": "The preset was updated."
+    "message": "The Preset was updated."
   },
   "presetManagementPermission": {
     "message": "The update requires permission. Grant it on the installation confirmation page."
   },
   "presetManagementUpdateSource": {
-    "message": "Update this preset through its original installation page or installer."
+    "message": "Update this Preset through its original installation page or installer."
   },
   "presetManagementRetry": {
     "message": "The installation is changing. Try again shortly."
@@ -3403,7 +3403,7 @@
     "message": "Confirm uninstall"
   },
   "presetManagementRemoved": {
-    "message": "The preset was uninstalled."
+    "message": "The Preset was uninstalled."
   },
   "presetManagementRemovalPending": {
     "message": "Uninstallation is incomplete. Reconnect the affected browsers and check again."
@@ -3412,10 +3412,10 @@
     "message": "Update the Mearl extension and local service for $1, then retry."
   },
   "presetManagementRemoveBrowserReconnect": {
-    "message": "Could not read the preset in $1. Reconnect and retry."
+    "message": "Could not read the Preset in $1. Reconnect and retry."
   },
   "presetManagementRemoveSelectionChanged": {
-    "message": "The preset installation changed. Please retry."
+    "message": "The Preset installation changed. Please retry."
   },
   "presetManagementRemoveFailed": {
     "message": "Uninstallation failed. Check the current installation and try again."

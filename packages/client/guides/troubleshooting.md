@@ -159,7 +159,7 @@ client 会处理当前用户的 stale socket 并尝试恢复 native host；恢�
 
 ### 可选云连接协议
 
-Qoder Cloud Agent 需要在浏览器机器先安装 `@mearl/plugin-qoder` 能力，再按该包 README 和 `docs/cloud-pairing.md` 生成配对信息、配置自定义工具。普通远端 Agent 使用上述 WebSocket 模式。核心未安装对应协议时会报告能力缺失，不会自动安装或读取该协议的凭据。
+Qoder Cloud Agent 需要在浏览器机器先安装 Qoder 集成 `@mearl/plugin-qoder`，再按该包 README 和 `docs/cloud-pairing.md` 生成配对信息、配置自定义工具。普通远端 Agent 使用上述 WebSocket 模式。核心未安装对应协议时会报告能力缺失，不会自动安装或读取该协议的凭据。
 
 ### 请求超时
 

@@ -23,7 +23,7 @@ export const siteCopy = {
     debugging: 'Web debugging',
     integrations: 'Integrations',
     authenticatedRequests: 'Authenticated requests',
-    emulation: 'Device & App emulation',
+    emulation: 'Device emulation & App Profiles',
     skillPlugins: 'Develop Skill plugins',
     providerDevelopment: 'Develop Providers',
     appProfileDevelopment: 'Develop App Profiles',
@@ -68,7 +68,7 @@ export const siteCopy = {
     comparisonBrowser: 'Regular browser',
     comparisonApp: 'With App emulation',
     homeInstall: 'Install Mearl',
-    mobileGuide: 'App emulation guide',
+    mobileGuide: 'App Profile guide',
     miniProgramGuide: 'Local WeChat mini-programs',
     useCasesTitle: 'Find a workflow for your role',
     useCases: [
@@ -268,7 +268,7 @@ export const siteCopy = {
     debugging: '网页调试',
     integrations: '扩展与集成',
     authenticatedRequests: '带登录态的请求',
-    emulation: '设备与 App 模拟',
+    emulation: '设备模拟与 App Profile',
     skillPlugins: 'Skill 插件开发',
     providerDevelopment: 'Provider 开发',
     appProfileDevelopment: 'App Profile 开发',
@@ -292,8 +292,7 @@ export const siteCopy = {
     connectionLead: '选择你想用的浏览器，通过扩展、CDP 或 Provider 接入任务所需的环境。',
     comparisonTitle: '在浏览器里，',
     comparisonTitleEnd: '还原 App 运行环境',
-    comparisonLead:
-      '按需安装端模拟配置，在浏览器里检查网页进入 App 后的表现，从页面布局到原生交互。',
+    comparisonLead: '按需安装 Profile，在浏览器里检查网页进入 App 后的表现，从页面布局到原生交互。',
     comparisonFeatures: [
       { title: 'App 身份', text: '设置 User-Agent 和环境标识，验证页面的端内逻辑。' },
       { title: 'JSBridge 调用', text: '模拟配置支持的原生方法与返回数据。' },

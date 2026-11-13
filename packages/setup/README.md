@@ -30,17 +30,17 @@ npx @mearl/setup preset <update|status|uninstall>
 浏览器 Provider 独立安装和演进。安装后运行 `mearl <providerId>` 查看该版本声明的能力、
 配置和启动参数。
 
-可选云协议先通过 preset 安装对应能力，再用 `--cloud-mode <id>` 选择。Qoder 配对见 [`@mearl/plugin-qoder`](../plugin-qoder/README.md)；setup 不默认包含或安装它。
+可选云协议先通过 Preset 安装对应集成，再用 `--cloud-mode <id>` 选择。Qoder 配对见 [`@mearl/plugin-qoder`](../plugin-qoder/README.md)；setup 不默认包含或安装它。
 
-## 安装端模拟
+## 安装 Profile
 
 ```bash
 npx @mearl/setup profile install mearlhq/profile-wechat
 ```
 
-来源支持公开 GitHub 仓库的 `owner/repo`、`owner/repo@ref`，或能力包清单的完整 HTTPS 地址。GitHub 来源从解析后的提交读取根目录 `bundle.json`。命令安装能力包声明的全部端模拟配置，保留当前 Preset。有多个本地扩展连接时，用 `--browser` 选择目标。若扩展提示授权，请确认来源。
+来源支持公开 GitHub 仓库的 `owner/repo`、`owner/repo@ref`，或 Profile 清单（`bundle.json`）的完整 HTTPS 地址。GitHub 来源从解析后的提交读取根目录清单。命令安装该来源中的全部 Profile，保留当前 Preset。有多个本地扩展连接时，用 `--browser` 选择目标。若扩展提示授权，请确认来源。
 
-在扩展快捷设置的客户端下拉菜单中选择「添加端模拟」，可以选择官方端模拟或输入来源。列表为空时，点击「客户端」可直接打开安装弹窗。
+在扩展快捷设置的客户端下拉菜单中选择「添加 Profile」，可以选择官方 Profile 或输入来源。列表为空时，点击「客户端」可直接打开安装弹窗。
 
 ## 安装与注册 Skill 插件
 
@@ -53,11 +53,11 @@ mearl tabs summary
 
 安装参数传给公共 Skills CLI，使用全局共享目录。默认由 `npx` 按当前 Node.js 版本解析 `skills`。公共 CLI 的默认 symlink 和复制模式都可注册；复制模式通过 list --global --json 确认本次成功结果对应的 canonical path，不猜测目录，也不扫描其他 Skills。自定义 CLI 可通过 MEARL_SKILLS_PATH 指定。参数不接受截断后置选项的 -- 分隔符。
 
-安装宿主提供的本地插件目录决定哪些能力由 preset 管理。install/update 维护目录中的托管注册，保留用户自行注册的插件。卸载最后一个依赖环境时移除托管插件与 Mearl Skill；其他环境需要时保留。配置准备、宿主同步和实际安装状态共用 [安装合同](../../docs/preset-installation.md)。
+安装宿主提供的本地插件目录决定哪些组件由 Preset 管理。install/update 维护目录中的托管注册，保留用户自行注册的插件。卸载最后一个依赖环境时移除托管插件与 Mearl Skill；其他环境需要时保留。配置准备、宿主同步和实际安装状态共用 [安装合同](../../docs/preset-installation.md)。
 
 Native preset 批次新建的插件注册使用 setup 托管归属，后续通过 Agent 更新仍保留该归属；同目录已有的用户注册保持原归属，自定义用户别名也会保留。托管卸载遇到用户别名共用同一 Skill 时，只清除托管注册并保留 Skill 文件。
 
-GUI 和 CLI 使用同一套 preset 安装器及覆盖规则。`preset apply` 接受 URL 或本地文件路径。省略来源时使用已保存的快照重试。`preset update` 重新读取当前来源。重试时可显式重复指定 `--replace-skill`，授权本次替换这些 Skill 的来源或同名旧插件注册。
+GUI 和 CLI 使用同一套 Preset 安装器及覆盖规则。`preset apply` 接受 URL 或本地文件路径。省略来源时使用已保存的快照重试。`preset update` 重新读取当前来源。重试时可显式重复指定 `--replace-skill`，授权本次替换这些 Skill 的来源或同名旧插件注册。
 
 ```bash
 npx @mearl/setup preset apply --replace-skill example-skill --replace-skill another-skill
@@ -65,7 +65,7 @@ npx @mearl/setup preset apply --replace-skill example-skill --replace-skill anot
 
 已安装的 Skill 仅修复注册；来源冲突项重新安装。未列出的冲突仍会阻止安装，声明外的工具名与变更后的安装身份也会被拒绝。覆盖授权不会保留到后续普通修复或自动更新。缺少浏览器权限时仍需在扩展中授权。输出沿用 preset JSON，已就绪退出 `0`、仍有待完成项退出 `3`、安装失败退出 `1`，无效参数退出 `2`。
 
-运行 `preset uninstall` 清理本机 preset 和匹配的已连接扩展。卸载会移除 preset 托管的能力包和当前目录中由 setup 托管的插件注册，保留独立安装的能力、Skill 文件、Provider 和浏览器权限。[查看卸载范围](../../docs/preset-installation.md)
+运行 `preset uninstall` 清理本机 Preset 和匹配的已连接扩展。卸载会移除 Preset 管理的 Profile 和集成和当前目录中由 setup 托管的插件注册，保留独立安装的 Profile、集成、Skill 文件、Provider 和浏览器权限。[查看卸载范围](../../docs/preset-installation.md)
 
 自动注册默认使用安装目录名；入口可声明 `name` 指定简短命令名。
 重装会刷新同名绑定。JavaScript 入口必须默认导出 `register(app)`，Python 入口必须导出 `register(app)` 函数；完整协议见
@@ -127,7 +127,7 @@ npx @mearl/setup provider uninstall example-device
   `mearl-native-host`、`mearl-cloud-server`、`mearl-mcp-server` 自动检测，可同时处理
   多个已安装环境。
 - `--local`、`--cloud` 与 `--mcp` 可以组合，显式传入时只处理选中的环境；
-  `--cloud-mode <id>` 同时选择 cloud 环境，模式实现必须来自已安装能力。
+  `--cloud-mode <id>` 同时选择 cloud 环境，模式由已安装的集成提供。
 - 已有环境沿用其原包管理器和全局安装前缀；首次安装沿用启动 setup 的包管理器。
 - `uninstall` 也识别 `npm link` 或 `dev:link` 注册到 npm 全局目录的开发软链，
   通过原 npm 前缀移除包与命令链接，保留仓库源码。安装和更新的自动检测仅处理常规全局安装。

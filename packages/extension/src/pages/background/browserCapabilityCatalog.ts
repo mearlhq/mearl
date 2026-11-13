@@ -1,6 +1,28 @@
-import { appProfileRevision, APP_PROFILE_NAMES, validateAppProfileDefinition, type AppProfileCatalogEntry } from '@mearl/browser-core';
-import { mergePresetDefaults, resolveCapabilityConfig, type ResolvedPreset, type JsonObject } from '@mearl/preset';
-import { BundleError, readBundleJson, readBundleText, selectBrowserControl, selectBrowserRequestUi, selectBrowserView, selectExtensionContributions, prepareBrowserBundleSnapshot, type BrowserBundleStore, type PreparedBundle, type BrowserViewSlot } from '@mearl/preset/bundles';
+import {
+  appProfileRevision,
+  APP_PROFILE_NAMES,
+  validateAppProfileDefinition,
+  type AppProfileCatalogEntry,
+} from '@mearl/browser-core';
+import {
+  mergePresetDefaults,
+  resolveCapabilityConfig,
+  type ResolvedPreset,
+  type JsonObject,
+} from '@mearl/preset';
+import {
+  BundleError,
+  readBundleJson,
+  readBundleText,
+  selectBrowserControl,
+  selectBrowserRequestUi,
+  selectBrowserView,
+  selectExtensionContributions,
+  prepareBrowserBundleSnapshot,
+  type BrowserBundleStore,
+  type PreparedBundle,
+  type BrowserViewSlot,
+} from '@mearl/preset/bundles';
 import { validateRequestUiSetting } from '../../shared/browserRequestUiValidation';
 import { validateBrowserViewPreferences } from '../../shared/browserViewPreferences';
 import { resolveBrowserPresetSettings } from '../../shared/browserPresetSettings';
@@ -8,7 +30,12 @@ import { resolveBrowserPresetSettings } from '../../shared/browserPresetSettings
 export type BrowserBundleSelection = Awaited<ReturnType<BrowserBundleStore['list']>>;
 export const BROWSER_BUNDLE_API_VERSION = '1.0.0';
 
-export function presetSettings(preset: ResolvedPreset, overrides: JsonObject, bundles: PreparedBundle[], profiles = bundles.flatMap(profileEntries)) {
+export function presetSettings(
+  preset: ResolvedPreset,
+  overrides: JsonObject,
+  bundles: PreparedBundle[],
+  profiles = bundles.flatMap(profileEntries),
+) {
   const browserControl = selectBrowserControl(bundles);
   const settings = resolveBrowserPresetSettings(
     mergePresetDefaults(preset.defaults, overrides),
@@ -20,7 +47,15 @@ export function presetSettings(preset: ResolvedPreset, overrides: JsonObject, bu
     ]),
   );
   const declarations = selectExtensionContributions(bundles);
-  return { ...settings, extension: { ...settings.extension, operations: declarations.operations, logins: declarations.logins }, browserControl };
+  return {
+    ...settings,
+    extension: {
+      ...settings.extension,
+      operations: declarations.operations,
+      logins: declarations.logins,
+    },
+    browserControl,
+  };
 }
 
 export function browserPresetStatus(preset: ResolvedPreset, revision: string, browserReady = true) {
@@ -59,7 +94,7 @@ export function profileEntries(bundle: PreparedBundle): AppProfileCatalogEntry[]
     if (!definition.name.startsWith(`${bundle.manifest.id}/`) || ids.has(definition.name)) {
       throw new BundleError(
         'BUNDLE_INVALID',
-        'App profile names must be unique inside their bundle namespace',
+        'App Profile IDs must be unique and start with the source ID followed by a slash',
       );
     }
     if (definition.pageRuntime) {
@@ -100,7 +135,7 @@ function browserProfileCatalog(result: BrowserBundleSelection) {
     } catch (error) {
       errors.push({
         plugin: bundle.manifest.id,
-        error: error instanceof Error ? error.message : 'Invalid app profile bundle',
+        error: error instanceof Error ? error.message : 'Invalid App Profile source',
       });
     }
   }
@@ -127,21 +162,24 @@ function browserProfileCatalog(result: BrowserBundleSelection) {
   const selectedTargets = new Set(Object.values(bindings));
   const independentIds = new Map<string, number>();
   const standaloneId = (profile: AppProfileCatalogEntry) =>
-    profile.plugin && !Object.hasOwn(result.activation?.snapshot.bundleRevisions ?? {}, profile.plugin)
+    profile.plugin &&
+    !Object.hasOwn(result.activation?.snapshot.bundleRevisions ?? {}, profile.plugin)
       ? profile.definition.defaultAppId
       : undefined;
   for (const profile of profiles) {
     const id = standaloneId(profile);
     if (id) independentIds.set(id, (independentIds.get(id) ?? 0) + 1);
   }
-  const available = profiles.filter(profile => !selectedTargets.has(profile.id)).flatMap(profile => {
-    const id = standaloneId(profile);
-    if (!id) return [profile];
-    if (Object.hasOwn(bindings, id)) return [];
-    if (independentIds.get(id) !== 1) return [profile];
-    const definition = { ...profile.definition, name: id };
-    return [{ ...profile, id, definition, revision: appProfileRevision(definition) }];
-  });
+  const available = profiles
+    .filter(profile => !selectedTargets.has(profile.id))
+    .flatMap(profile => {
+      const id = standaloneId(profile);
+      if (!id) return [profile];
+      if (Object.hasOwn(bindings, id)) return [];
+      if (independentIds.get(id) !== 1) return [profile];
+      const definition = { ...profile.definition, name: id };
+      return [{ ...profile, id, definition, revision: appProfileRevision(definition) }];
+    });
   return {
     profiles: [...selected, ...available],
     errors,
@@ -165,7 +203,6 @@ function browserProfileCatalog(result: BrowserBundleSelection) {
   };
 }
 
-
 /** A catalog is derived from one verified snapshot; its lazy sections fail independently. */
 const catalogs = new WeakMap<BrowserBundleSelection, ReturnType<typeof createCatalog>>();
 function createCatalog(selection: BrowserBundleSelection) {
@@ -174,18 +211,43 @@ function createCatalog(selection: BrowserBundleSelection) {
   let runtimes: ReturnType<typeof prepareBrowserBundleSnapshot> | undefined;
   let request: { value: ReturnType<typeof selectBrowserRequestUi> } | undefined;
   const views = new Map<BrowserViewSlot, ReturnType<typeof selectBrowserView>>();
-  const profileCatalog = () => profiles ??= browserProfileCatalog(selection);
+  const profileCatalog = () => (profiles ??= browserProfileCatalog(selection));
   return {
     profiles: profileCatalog,
     settings() {
       if (!settings) {
-        const preset = selection.activation?.preset ?? { id: 'standalone', version: '0.0.0', chain: [], packages: {}, skills: {}, providers: {}, appProfiles: {}, defaults: {}, permissions: { origins: [] } };
-        settings = presetSettings(preset, selection.installation?.overrides ?? {}, selection.bundles, profileCatalog().profiles);
+        const preset = selection.activation?.preset ?? {
+          id: 'standalone',
+          version: '0.0.0',
+          chain: [],
+          packages: {},
+          skills: {},
+          providers: {},
+          appProfiles: {},
+          defaults: {},
+          permissions: { origins: [] },
+        };
+        settings = presetSettings(
+          preset,
+          selection.installation?.overrides ?? {},
+          selection.bundles,
+          profileCatalog().profiles,
+        );
       }
       return settings;
     },
-    runtimes: () => runtimes ??= prepareBrowserBundleSnapshot(selection.bundles, 'extension', BROWSER_BUNDLE_API_VERSION,
-      resolveCapabilityConfig(mergePresetDefaults(selection.activation?.preset.defaults ?? {}, selection.installation?.overrides ?? {}))),
+    runtimes: () =>
+      (runtimes ??= prepareBrowserBundleSnapshot(
+        selection.bundles,
+        'extension',
+        BROWSER_BUNDLE_API_VERSION,
+        resolveCapabilityConfig(
+          mergePresetDefaults(
+            selection.activation?.preset.defaults ?? {},
+            selection.installation?.overrides ?? {},
+          ),
+        ),
+      )),
     requestUi() {
       if (!request) {
         const value = selectBrowserRequestUi(selection.bundles, BROWSER_BUNDLE_API_VERSION);
@@ -195,13 +257,22 @@ function createCatalog(selection: BrowserBundleSelection) {
       return request.value;
     },
     view(slot: BrowserViewSlot) {
-      if (!views.has(slot)) views.set(slot, validateBrowserViewPreferences(selectBrowserView(selection.bundles, slot, BROWSER_BUNDLE_API_VERSION)));
+      if (!views.has(slot))
+        views.set(
+          slot,
+          validateBrowserViewPreferences(
+            selectBrowserView(selection.bundles, slot, BROWSER_BUNDLE_API_VERSION),
+          ),
+        );
       return views.get(slot);
     },
   };
 }
 export function browserCapabilityCatalog(selection: BrowserBundleSelection) {
   let catalog = catalogs.get(selection);
-  if (!catalog) { catalog = createCatalog(selection); catalogs.set(selection, catalog); }
+  if (!catalog) {
+    catalog = createCatalog(selection);
+    catalogs.set(selection, catalog);
+  }
   return catalog;
 }

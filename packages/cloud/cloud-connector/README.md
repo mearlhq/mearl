@@ -2,7 +2,7 @@
 
 [简体中文](README.md) | [English](README.en.md)
 
-本地连接器，用于把云端 Agent 的操作转发到本地 native-host。内置传输为 WebSocket；其他协议通过已安装的能力包加载。Qoder 的凭据、配对和 SSE 实现在可选的 [`@mearl/plugin-qoder`](../../plugin-qoder/README.md) 中。
+本地连接器，用于把云端 Agent 的操作转发到本地 native-host。内置传输为 WebSocket；其他协议由已安装的集成提供。Qoder 的凭据、配对和 SSE 实现在可选的 [`@mearl/plugin-qoder`](../../plugin-qoder/README.md) 中。
 
 ## 安装
 
@@ -129,7 +129,7 @@ native-host 与守护进程 CLI 都通过这套共享路径（由 [`@mearl/daemo
 
 > 前台运行（含 native-host 托管）时日志输出到 stdout/stderr，不写独立日志文件；只有守护进程模式才落盘到 `<hash>.log`。
 
-可选协议的认证与配对方式见对应能力包文档；核心不读取其凭据。
+可选协议的认证与配对方式见对应集成文档；核心不读取其凭据。
 
 ## 前置条件
 

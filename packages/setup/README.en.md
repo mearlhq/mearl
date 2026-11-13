@@ -32,15 +32,15 @@ configuration, and launch arguments.
 
 Install optional cloud protocols through a preset before selecting `--cloud-mode <id>`. See [`@mearl/plugin-qoder`](../plugin-qoder/README.en.md) for Qoder pairing; setup does not include or install it by default.
 
-## Install App emulation
+## Install App Profiles
 
 ```bash
 npx @mearl/setup profile install mearlhq/profile-wechat
 ```
 
-The source can be a public GitHub `owner/repo`, `owner/repo@ref`, or a full HTTPS bundle manifest URL. GitHub sources load the root `bundle.json` from the resolved commit. The command installs every App emulation configuration declared by that bundle and preserves the active Preset. When multiple local extensions are connected, select a target with `--browser`. Confirm source access in the extension if prompted.
+The source can be a public GitHub `owner/repo`, `owner/repo@ref`, or the full HTTPS URL of a Profile manifest (`bundle.json`). GitHub sources load the root manifest from the resolved commit. The command installs every App Profile from the source and preserves the active Preset. When multiple local extensions are connected, select a target with `--browser`. Confirm source access in the extension if prompted.
 
-In the extension's quick settings, open the App selector and choose **Add App emulation** to select an official option or enter a source. The App button opens the installer directly when the list is empty.
+In the extension's quick settings, open the App selector and choose **Add Profile** to select an official option or enter a source. The App button opens the installer directly when the list is empty.
 
 ## Install and register Skill plugins
 
@@ -65,7 +65,7 @@ npx @mearl/setup preset apply --replace-skill example-skill --replace-skill anot
 
 Already installed Skills receive registration repair only; source conflicts reinstall. Unlisted conflicts still block installation, and undeclared tool names or changed installation identities are rejected. Replacement authorization does not persist into later repairs or automatic updates. Missing browser permissions still require extension authorization. Output uses preset JSON: ready exits `0`, pending components `3`, installation failure `1`, and invalid arguments `2`.
 
-Run `preset uninstall` to remove the local preset and matching selections in connected extensions. Removal clears preset-managed capability packages and setup-managed registrations in the selected plugin catalog. It preserves independent capabilities, Skill files, Providers, and browser permissions. [See what preset removal covers](../../docs/preset-installation.en.md)
+Run `preset uninstall` to remove the local Preset and matching selections in connected extensions. Removal clears Profiles and integrations managed by the Preset and setup-managed registrations in the selected plugin catalog. It preserves independently installed Profiles, integrations, Skill files, Providers, and browser permissions. [See what preset removal covers](../../docs/preset-installation.en.md)
 
 Automatic registration defaults to the installation directory name; an entry can declare `name` for a shorter command.
 Reinstallation refreshes same-name bindings. JavaScript entries must default-export `register(app)`; Python entries must export a `register(app)` function. See the
