@@ -79,8 +79,19 @@ describe('stale legacy socket recovery', () => {
 
   it('auto-starts the local host without routing infrastructure calls to the selected provider', async () => {
     setDefaultBrowser('external');
-    vi.mocked(listLiveBrowsers).mockReturnValue([{ browserId: 'external', browserName: 'External', transport: 'provider', socketPath: '/external.sock', status: 'ready', capabilities: { actions: ['preset_components_install'] } }] as any);
-    const result = invokeLocalHost('preset_components_install', { installationRevision: 'a'.repeat(64) });
+    vi.mocked(listLiveBrowsers).mockReturnValue([
+      {
+        browserId: 'external',
+        browserName: 'External',
+        transport: 'provider',
+        socketPath: '/external.sock',
+        status: 'ready',
+        capabilities: { actions: ['preset_components_install'] },
+      },
+    ] as any);
+    const result = invokeLocalHost('preset_components_install', {
+      installationRevision: 'a'.repeat(64),
+    });
     await vi.runAllTimersAsync();
     await expect(result).resolves.toEqual({ tabs: [] });
     expect(createConnectionMock.mock.calls.every(([socket]) => socket === SOCKET_PATH)).toBe(true);
@@ -106,7 +117,7 @@ describe('stale legacy socket recovery', () => {
       expect(unlinkSpy).toHaveBeenCalledWith(SOCKET_PATH);
       expect(spawnMock).toHaveBeenCalledWith(
         'mearl-native-host',
-        ['--daemon'],
+        ['--daemon', '--inventory'],
         expect.objectContaining({ detached: true }),
       );
       expect(createConnectionMock).toHaveBeenCalledTimes(2);

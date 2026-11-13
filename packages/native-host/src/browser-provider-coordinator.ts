@@ -73,7 +73,7 @@ export class BrowserProviderCoordinator {
     return this.runtimes;
   }
 
-  async launch(input: BrowserLaunchParams): Promise<ManagedBrowserInfo> {
+  async launch(input: BrowserLaunchParams, deadline?: number): Promise<ManagedBrowserInfo> {
     const providerId = input.provider?.trim() || 'local';
     const runtime = this.runtimes.find(
       item => item.definition.descriptor.providerId === providerId,
@@ -93,7 +93,7 @@ export class BrowserProviderCoordinator {
         options.copyCookieDomains = { presets: ['mearl-services'] };
       return providerBrowserInfo({
         provider: providerIdentity(descriptor),
-        browser: await runtime.launch(options),
+        browser: await runtime.launch(options, { deadline }),
       });
     }
     const external = listExternalBrowserProviders().find(
@@ -199,11 +199,10 @@ export class BrowserProviderCoordinator {
         ),
       )
     ).flat();
-    return entries.filter(
-      entry =>
-        entry.browser.browserId.toLowerCase() === normalized ||
-        entry.browser.name.toLowerCase() === normalized,
-    );
+    const exact = entries.filter(entry => entry.browser.browserId.toLowerCase() === normalized);
+    return exact.length > 0
+      ? exact
+      : entries.filter(entry => entry.browser.name.toLowerCase() === normalized);
   }
 
   private async requireOne(

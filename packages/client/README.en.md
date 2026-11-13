@@ -135,7 +135,7 @@ const result = await mearl.invokePlugin('notes', {
 console.log(result);
 ```
 
-Browser APIs and plugin calls inherit script `--browser`, `--session`, `--connector`, `--local`, and `--cdp`;
+Browser APIs and plugin calls inherit script `--browser`, `--session`, `--connector`, and `--local`;
 individual `options` may override them. `--server` selects cloud-server. After `--session new` establishes a session,
 later calls use its returned ID automatically; `mearl.session` and CLI stderr report session information.
 First await a session-establishing browser call before concurrency or Skill commands. Script completion disconnects SDK connections but retains control sessions;
@@ -248,7 +248,6 @@ Mearl aggregates local and configured cloud-server browsers by default, routing 
 | ------------------------ | ------------------------------------- |
 | `--connector <id\|name>` | Restrict to one remote machine |
 | `--local` | Current machine only |
-| `--cdp` | Force local CDP; list only CDP browsers and imply `--local` |
 | `--server <url>` | Override the automatically read cloud-server URL |
 
 `browser_list --help` and `browser_launch --help` show scenario-specific host options. For connection/transport troubleshooting, use
@@ -494,11 +493,13 @@ Disambiguate repeated text through `page_click.scope` CSS/ref subtrees. Extensio
 
 `browser_list` lists ordinary, Provider, and managed browsers. `type` distinguishes
 `regular` / `managed`; `status` distinguishes `connected` / `pairing` / `running_disconnected` /
-`stopped`. Only connected browsers are ordinary operation targets. Without a connected local extension browser,
-browser_list automatically probes default CDP, even with Provider pairing records, without requiring --cdp.
-`browser_list --cdp` actively probes if no ordinary CDP browser is registered and returns CDP browsers only;
-connected extension browsers do not prevent this probe. With `MEARL_SOCKET_PATH`, inventory requests use that instance Socket.
-`check --cdp` likewise checks only those CDP browsers.
+`stopped`. Ordinary browser actions require a connected browser. To attach to a running browser with remote debugging enabled, use the CDP Provider.
+
+```bash
+mearl browser_launch --local --payload '{"provider":"cdp","providerOptions":{}}'
+```
+
+Set `providerOptions.port` to use a specific debugging port. Pass the returned `browserId` to `check --browser` or page actions. With `MEARL_SOCKET_PATH`, inventory requests use that instance socket.
 
 Call `browser_release` only on explicit user requests to end debugging, detach, or clean session resources. It releases
 debugger/CDP control and temporary session state while keeping browsers/tabs. Providers declare managed-instance launch, close, persistence,

@@ -12,7 +12,6 @@ export async function runScriptCli(args: string[], commandName: string): Promise
     .option('--browser <id-or-name>', '指定浏览器')
     .option('--connector <id-or-name>', '限制到远端 connector')
     .option('--local', '仅使用本机浏览器')
-    .option('--cdp', '强制本机 CDP')
     .option('--server <url>', '覆盖 cloud-server 地址')
     .option('--timeout <seconds>', '整个脚本的执行时限（默认 60 秒）', '60')
     .allowExcessArguments(false)
@@ -29,8 +28,7 @@ export async function runScriptCli(args: string[], commandName: string): Promise
     const timeout = Number(options.timeout);
     if (!Number.isFinite(timeout) || timeout <= 0 || timeout * 1000 > 2_147_483_647)
       throw new Error('--timeout 必须是有效范围内的大于 0 的秒数');
-    if ((options.local || options.cdp) && options.connector)
-      throw new Error('--local/--cdp 不能与 --connector 同时使用');
+    if (options.local && options.connector) throw new Error('--local 不能与 --connector 同时使用');
     if (options.file) source = await readFile(resolve(options.file), 'utf8');
     else {
       if (process.stdin.isTTY) throw new Error('通过 stdin 提交脚本，或使用 --file <path>');
@@ -63,8 +61,7 @@ export async function runScriptCli(args: string[], commandName: string): Promise
       ...(options.session ? { session: options.session } : {}),
       ...(options.browser ? { browser: options.browser } : {}),
       ...(options.connector ? { connector: options.connector } : {}),
-      ...(options.local || options.cdp ? { local: true } : {}),
-      ...(options.cdp ? { transport: 'cdp' } : {}),
+      ...(options.local ? { local: true } : {}),
       ...(options.server ? { serverUrl: options.server } : {}),
     });
     if (result.stdout) process.stdout.write(result.stdout);

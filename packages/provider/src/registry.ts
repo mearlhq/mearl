@@ -38,7 +38,7 @@ export const PROVIDER_SOCKETS_SUBDIR = 'providers/sockets';
 export const PROVIDER_DATA_SUBDIR = 'providers/data';
 export const BROWSERS_SUBDIR = 'browsers';
 export const PROVIDER_START_TOKEN_ENV = 'MEARL_PROVIDER_START_TOKEN';
-const RESERVED_PROVIDER_IDS = new Set(['local']);
+const RESERVED_PROVIDER_IDS = new Set(['local', 'cdp']);
 
 export interface LiveProviderRecord extends DaemonRecord {
   providerId: string;

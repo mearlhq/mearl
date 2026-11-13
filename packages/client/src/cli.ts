@@ -122,7 +122,6 @@ export interface ParsedArgs {
   browser?: string;
   compact: boolean;
   connector?: string;
-  forceCdp: boolean;
   json: boolean;
   local: boolean;
   updates: boolean;
@@ -145,7 +144,6 @@ interface ClientCliOptions {
   all?: boolean;
   help?: boolean;
   browser?: string;
-  cdp?: boolean;
   compact?: boolean;
   connector?: string;
   json?: boolean;
@@ -163,7 +161,6 @@ interface ClientCliOptions {
 const PLUGIN_HOST_OPTIONS = new Set([
   '--all',
   '--browser',
-  '--cdp',
   '--compact',
   '--connector',
   '--help',
@@ -407,7 +404,6 @@ function printCheckHelp(commandName: string): void {
       '  --browser <id|名称>   只检查指定浏览器',
       '  --connector <id|名称> 限制到一台远端 connector',
       '  --local               只检查当前机器，不能与 --connector 同时使用',
-      '  --cdp                 当前机器强制使用 CDP（隐含 --local）',
       '  --server <url>        覆盖 cloud-server WebSocket URL',
       '  --timeout <seconds>   单项检查超时时间，默认 5 秒',
       '  --json                输出机器可读 JSON',
@@ -543,7 +539,6 @@ export function parseClientArgs(args: string[], plugin = false): ParsedArgs {
     .option('--connector <id-or-name>')
     .option('--local')
     .option('--updates')
-    .option('--cdp')
     .option('--server <url>');
   if (plugin)
     program
@@ -584,17 +579,15 @@ export function parseClientArgs(args: string[], plugin = false): ParsedArgs {
   const parsedPayload = parsePayload(options.payload, options.payloadFile);
   const { payload, outputPath } = normalizeScreenshotOutput(action, parsedPayload, options.output);
   const fallbackTimeout = resolveActionTimeoutSec(action, payload, 60);
-  const forceCdp = options.cdp === true;
-  const local = forceCdp || options.local === true;
+  const local = options.local === true;
   const connector = options.connector;
-  if (local && connector) throw new Error('--local/--cdp 不能与 --connector 同时使用');
+  if (local && connector) throw new Error('--local 不能与 --connector 同时使用');
   return {
     action,
     payload,
     timeoutSec: parsePositiveTimeout(options.timeout, fallbackTimeout),
     ...(options.timeout !== undefined ? { timeoutOption: options.timeout } : {}),
     compact: options.compact === true || process.stdout.isTTY !== true,
-    forceCdp,
     json,
     local,
     updates: options.updates === true,
@@ -632,7 +625,6 @@ async function runPluginCli(args: string[], commandName: string): Promise<number
       ...(parsed.session ? { session: parsed.session } : {}),
       ...(parsed.connector ? { connector: parsed.connector } : {}),
       ...(parsed.local ? { local: true } : {}),
-      ...(parsed.forceCdp ? { transport: 'cdp' as const } : {}),
     };
     const plugin = await loadRegisteredPlugin(
       parsed.action,
@@ -819,7 +811,6 @@ export async function runMearlCli(args: string[], options: MearlCliOptions = {})
       ...(parsed.session ? { session: parsed.session } : {}),
       ...(parsed.connector ? { connector: parsed.connector } : {}),
       ...(parsed.local ? { local: true } : {}),
-      ...(parsed.forceCdp ? { transport: 'cdp' } : {}),
       ...(parsed.updates ? { checkUpdates: true } : {}),
     };
     if (parsed.json) {
@@ -842,7 +833,6 @@ export async function runMearlCli(args: string[], options: MearlCliOptions = {})
       ...(parsed.session ? { session: parsed.session } : {}),
       ...(parsed.connector ? { connector: parsed.connector } : {}),
       ...(parsed.local ? { local: true } : {}),
-      ...(parsed.forceCdp ? { transport: 'cdp' } : {}),
     });
     if (
       parsed.outputPath &&

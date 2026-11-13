@@ -136,6 +136,8 @@ the same `ManagedBrowserInfo` as `browser_list.browsers[]`: object-form Provider
 persistence policy, operations, and security metadata. Internal manager fields, control connections, and temporary access URLs are excluded.
 Local top-level CLI arguments are convenience inputs. External Provider arguments must use `providerOptions`; the two cannot be mixed.
 
+The built-in `cdp` Provider attaches to a running Chrome or Electron instance with debugging enabled. Set `providerOptions.port` for a specific port, `userDataDir` to read a profile's `DevToolsActivePort`, or `endpointFile` to read a private WebSocket URL. Use absolute paths on the target host. If the profile file records a port, any supplied `port` must match it. `browser_release` disconnects and leaves the browser running.
+
 Built-in browsers retain local launch interactions; external Provider inputs are generated from `browserType.inputSchema`.
 Both submit the same `providerOptions` structure.
 Top-level schema `oneOf` can declare multiple complete object constraints,

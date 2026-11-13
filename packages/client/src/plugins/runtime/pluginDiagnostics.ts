@@ -205,7 +205,6 @@ function taskProjection(
             ...(routing.session ? { session: text(routing.session) } : {}),
             ...(routing.connector ? { connector: text(routing.connector) } : {}),
             ...(routing.local !== undefined ? { local: routing.local } : {}),
-            ...(routing.transport ? { transport: routing.transport } : {}),
           },
         }
       : {}),

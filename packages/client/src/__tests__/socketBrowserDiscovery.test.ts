@@ -16,6 +16,7 @@ const { createConnectionMock, ensureProvidersMock, liveBrowsers, spawnMock } = v
   }>,
   spawnMock: vi.fn(),
 }));
+let inventoryTime = Date.now();
 
 vi.mock('node:net', () => ({
   default: {
@@ -134,9 +135,11 @@ function createNoCdpListSocket(): MockSocket {
   return socket;
 }
 
-describe('browser_list local CDP discovery', () => {
+describe('browser_list local inventory', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    inventoryTime += 5000;
+    vi.setSystemTime(inventoryTime);
     liveBrowsers.length = 0;
     createConnectionMock
       .mockImplementationOnce(() => createConnectionErrorSocket())
@@ -156,10 +159,10 @@ describe('browser_list local CDP discovery', () => {
   afterEach(() => {
     delete process.env.MEARL_SOCKET_PATH;
     vi.useRealTimers();
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
-  it('starts a discovery daemon and returns a verified CDP browser', async () => {
+  it('starts an inventory daemon and returns registered browsers', async () => {
     const resultPromise = invoke('browser_list');
     await vi.runAllTimersAsync();
 
@@ -171,13 +174,13 @@ describe('browser_list local CDP discovery', () => {
     });
     expect(spawnMock).toHaveBeenCalledWith(
       'mearl-native-host',
-      ['--daemon', '--discover-cdp'],
+      ['--daemon', '--inventory', '--skip-browser-registration'],
       expect.objectContaining({ detached: true }),
     );
     expect(ensureProvidersMock).not.toHaveBeenCalled();
   });
 
-  it('discovers CDP when only an unpaired Provider is registered', async () => {
+  it('uses the inventory daemon when only an unpaired Provider is registered', async () => {
     liveBrowsers.push({
       pid: 42,
       browserId: 'provider:example-device:device',
@@ -201,41 +204,17 @@ describe('browser_list local CDP discovery', () => {
     });
     expect(spawnMock).toHaveBeenCalledWith(
       'mearl-native-host',
-      ['--daemon', '--discover-cdp'],
+      ['--daemon', '--inventory', '--skip-browser-registration'],
       expect.objectContaining({ detached: true }),
     );
     expect(createConnectionMock).not.toHaveBeenCalledWith('/tmp/example-device.sock');
   });
 
-  it('explicitly discovers and lists only CDP while an extension is connected', async () => {
-    liveBrowsers.push({
-      pid: 84,
-      browserId: 'extension-a',
-      socketPath: '/tmp/extension-a.sock',
-      browserName: 'Chrome extension',
-      transport: 'extension',
-      status: 'connected',
-    });
-
-    const resultPromise = invoke('browser_list', {}, { transport: 'cdp' });
-    await vi.runAllTimersAsync();
-
-    await expect(resultPromise).resolves.toMatchObject({
-      count: 1,
-      connectedCount: 1,
-      defaultBrowserId: 'cdp',
-      browsers: [expect.objectContaining({ browserId: 'cdp', transport: 'cdp' })],
-    });
-    expect(createConnectionMock).toHaveBeenCalledWith(DISCOVERY_SOCKET_PATH);
-    expect(createConnectionMock).not.toHaveBeenCalledWith('/tmp/extension-a.sock');
-    expect(spawnMock).toHaveBeenCalledTimes(1);
-  });
-
-  it('routes forced CDP inventory through a configured instance socket', async () => {
+  it('routes inventory through a configured instance socket', async () => {
     process.env.MEARL_SOCKET_PATH = '/tmp/pinned-host.sock';
     createConnectionMock.mockReset().mockImplementation(() => createBrowserListSocket());
 
-    const resultPromise = invoke('browser_list', {}, { transport: 'cdp' });
+    const resultPromise = invoke('browser_list');
     await vi.runAllTimersAsync();
     await expect(resultPromise).resolves.toMatchObject({
       browsers: [expect.objectContaining({ browserId: 'cdp' })],
@@ -244,7 +223,7 @@ describe('browser_list local CDP discovery', () => {
     expect(spawnMock).not.toHaveBeenCalled();
   });
 
-  it('probes the ordinary CDP endpoint when only a managed CDP browser is registered', async () => {
+  it('loads inventory from a connected managed CDP browser', async () => {
     liveBrowsers.push({
       pid: 84,
       browserId: 'managed:account-a',
@@ -254,15 +233,15 @@ describe('browser_list local CDP discovery', () => {
       status: 'connected',
     });
 
-    const resultPromise = invoke('browser_list', {}, { transport: 'cdp' });
+    createConnectionMock.mockReset().mockImplementation(() => createBrowserListSocket());
+    const resultPromise = invoke('browser_list');
     await vi.runAllTimersAsync();
 
     await expect(resultPromise).resolves.toMatchObject({
       browsers: [expect.objectContaining({ browserId: 'cdp' })],
     });
-    expect(createConnectionMock).toHaveBeenCalledWith(DISCOVERY_SOCKET_PATH);
-    expect(createConnectionMock).not.toHaveBeenCalledWith('/tmp/managed-a.sock');
-    expect(spawnMock).toHaveBeenCalledTimes(1);
+    expect(createConnectionMock).toHaveBeenCalledWith('/tmp/managed-a.sock');
+    expect(spawnMock).not.toHaveBeenCalled();
   });
 
   it('coalesces concurrent discovery requests', async () => {
@@ -304,7 +283,7 @@ describe('browser_list local CDP discovery', () => {
     expect(createConnectionMock).not.toHaveBeenCalledWith('/tmp/late-browser.sock');
   });
 
-  it('caches a missing CDP endpoint for a short series of inventory calls', async () => {
+  it('caches empty inventory for a short series of calls', async () => {
     createConnectionMock
       .mockReset()
       .mockImplementationOnce(() => createConnectionErrorSocket())

@@ -102,7 +102,7 @@ client 会自动拉起 native host 并重试。自动恢复失败时按错误提
 
 **使用 CDP 模式：**
 
-按 `mearl-native-host --help` 或连接错误提示在 Chrome 开启调试并允许授权，确认有普通网页已打开后重试。默认在 Extension 不可用时回退 CDP；需要单独验证 CDP 链路时使用 `mearl check --cdp`。
+在 Chrome 开启调试并允许授权，通过 [CDP Provider](./api-browser-setup.md#electron-cdp) 接入，再用 `mearl check --browser '<browserId>'` 验证连接。
 
 <a id="econnrefused"></a>
 

@@ -63,9 +63,7 @@ mearl-native-host [options]
   --help, -h                                              Show help
 ```
 
-Daemon arguments apply only to the current process. Client-started discovery daemons first read the default Chrome profile's `DevToolsActivePort`, then probe local CDP port 9222. Custom ports/browser identities must be supplied on each manual startup. Discovery uses its own instance Socket rather than depending on ownership of a fixed Socket.
-
-Electron apps exposing renderer CDP can also connect with `--daemon --cdp-port <port> --browser-id <id> --browser-name <name>`. Select the instance with `browser_list` and an existing window with `tab_list`, then perform page actions. This does not cover native menus, system dialogs, or main-process `--inspect` debugging. See `mearl guide browsers` for connection steps.
+Daemon arguments apply only to the current process. Use the built-in CDP Provider to attach to a running Chrome browser or Electron app. By default it reads the Chrome profile's `DevToolsActivePort` and tries local port 9222 when needed. For Electron, set `providerOptions.port` to the renderer debugging port. See `mearl guide browsers` for connection steps.
 
 Chrome authorization mode enabled at `chrome://inspect/#remote-debugging` disables HTTP discovery. If `DevToolsActivePort` is missing/unreadable and `/json/version` returns 404, Mearl connects to `/devtools/browser` WebSocket on the same port and waits for Chrome authorization. Allow the browser prompt. This path reads no browser profile files. Failures retain discovery-file read errors to distinguish filesystem permissions, ports, and authorization issues.
 

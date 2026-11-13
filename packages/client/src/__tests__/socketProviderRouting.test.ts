@@ -67,7 +67,7 @@ vi.mock('@mearl/provider/runtime', () => ({
 }));
 
 vi.mock('@mearl/provider/host', async importOriginal => ({
-  ...await importOriginal<typeof import('@mearl/provider/host')>(),
+  ...(await importOriginal<typeof import('@mearl/provider/host')>()),
   listInstalledProviders: vi.fn(() => installedProviderIds.map(providerId => ({ providerId }))),
   ensureProviderControlHost: vi.fn(async () => ({
     socketPath: '/tmp/mearl-provider-control.sock',
@@ -100,41 +100,85 @@ afterEach(() => {
 describe('external provider routing', () => {
   it('queries only the selected Provider launch form without invoking ordinary discovery', async () => {
     const providerId = 'org.fixture_test';
-    vi.mocked(listInstalledProviders).mockReturnValueOnce([{ providerId, browserType: { dynamicLaunchForm: true } }] as any);
-    vi.mocked(readLiveProvider).mockReturnValueOnce({ providerId, providerProtocolVersion: 3, socketPath: '/selected-provider.sock' } as any);
+    vi.mocked(listInstalledProviders).mockReturnValueOnce([
+      { providerId, browserType: { dynamicLaunchForm: true } },
+    ] as any);
+    vi.mocked(readLiveProvider).mockReturnValueOnce({
+      providerId,
+      providerProtocolVersion: 3,
+      socketPath: '/selected-provider.sock',
+    } as any);
     vi.mocked(listLiveBrowsers).mockReturnValueOnce([
       { ...liveBrowsers[1]!, provider: { id: providerId } },
       { ...liveBrowsers[1]!, browserId: 'provider:other:unrelated', provider: { id: 'other' } },
     ] as any);
-    const form = { inputSchema: { type: 'object', properties: { spaceId: { type: 'string', options: [{ value: '8', label: 'Existing' }] } } }, variant: 'attach' };
+    const form = {
+      inputSchema: {
+        type: 'object',
+        properties: { spaceId: { type: 'string', options: [{ value: '8', label: 'Existing' }] } },
+      },
+      variant: 'attach',
+    };
     let request: any;
     createConnectionMock.mockImplementation(() => {
-      const socket = new EventEmitter() as MockSocket; socket.end = vi.fn();
+      const socket = new EventEmitter() as MockSocket;
+      socket.end = vi.fn();
       socket.write = vi.fn((line: string) => {
         request = JSON.parse(line);
-        queueMicrotask(() => socket.emit('data', Buffer.from(JSON.stringify({ id: request.id, success: true, data: form }) + '\n')));
+        queueMicrotask(() =>
+          socket.emit(
+            'data',
+            Buffer.from(JSON.stringify({ id: request.id, success: true, data: form }) + '\n'),
+          ),
+        );
       });
-      queueMicrotask(() => socket.emit('connect')); return socket;
+      queueMicrotask(() => socket.emit('connect'));
+      return socket;
     });
-    const result = await invoke('browser_list', { provider: providerId, launchForm: { variant: 'attach', values: { name: 'kept' } } });
+    const result = await invoke('browser_list', {
+      provider: providerId,
+      launchForm: { variant: 'attach', values: { name: 'kept' } },
+    });
     expect(result.discovery).toEqual({ provider: providerId, launchForm: form });
     expect(ensureProvidersMock).toHaveBeenCalledExactlyOnceWith([providerId]);
     expect(createConnectionMock).toHaveBeenCalledExactlyOnceWith('/selected-provider.sock');
-    expect(request).toMatchObject({ action: 'browser_providers', data: { operation: 'launch_form', variant: 'attach', values: { name: 'kept' } } });
+    expect(request).toMatchObject({
+      action: 'browser_providers',
+      data: { operation: 'launch_form', variant: 'attach', values: { name: 'kept' } },
+    });
     expect(result.browsers.every((browser: any) => browser.provider?.id === providerId)).toBe(true);
     expect(result.browsers).toHaveLength(1);
     expect(spawnMock).not.toHaveBeenCalled();
   });
 
   it('does not treat an ignored launch-form request from an older endpoint as an empty candidate list', async () => {
-    vi.mocked(listInstalledProviders).mockReturnValueOnce([{ providerId: 'fixture', browserType: { dynamicLaunchForm: true } }] as any);
-    vi.mocked(readLiveProvider).mockReturnValueOnce({ providerProtocolVersion: 3, socketPath: '/old.sock' } as any);
+    vi.mocked(listInstalledProviders).mockReturnValueOnce([
+      { providerId: 'fixture', browserType: { dynamicLaunchForm: true } },
+    ] as any);
+    vi.mocked(readLiveProvider).mockReturnValueOnce({
+      providerProtocolVersion: 3,
+      socketPath: '/old.sock',
+    } as any);
     createConnectionMock.mockImplementation(() => {
-      const socket = new EventEmitter() as MockSocket; socket.end = vi.fn();
-      socket.write = vi.fn((line: string) => { const request = JSON.parse(line); queueMicrotask(() => socket.emit('data', Buffer.from(JSON.stringify({ id: request.id, success: true, data: { browsers: [] } }) + '\n'))); });
-      queueMicrotask(() => socket.emit('connect')); return socket;
+      const socket = new EventEmitter() as MockSocket;
+      socket.end = vi.fn();
+      socket.write = vi.fn((line: string) => {
+        const request = JSON.parse(line);
+        queueMicrotask(() =>
+          socket.emit(
+            'data',
+            Buffer.from(
+              JSON.stringify({ id: request.id, success: true, data: { browsers: [] } }) + '\n',
+            ),
+          ),
+        );
+      });
+      queueMicrotask(() => socket.emit('connect'));
+      return socket;
     });
-    await expect(invoke('browser_list', { provider: 'fixture', launchForm: { values: {} } })).rejects.toThrow();
+    await expect(
+      invoke('browser_list', { provider: 'fixture', launchForm: { values: {} } }),
+    ).rejects.toThrow();
     expect(createConnectionMock).toHaveBeenCalledOnce();
   });
   it.each([undefined, 'provider:fixture:device-a'])(
@@ -144,7 +188,13 @@ describe('external provider routing', () => {
       const capabilities = target.capabilities as { controlSessionMode?: string };
       capabilities.controlSessionMode = 'external';
       try {
-        await expect(invoke('page_eval', { tabId: 7, expression: '42' }, selector ? { browser: selector } : {})).rejects.toThrow('CONTROL_SESSION_MODE_UNSUPPORTED');
+        await expect(
+          invoke(
+            'page_eval',
+            { tabId: 7, expression: '42' },
+            selector ? { browser: selector } : {},
+          ),
+        ).rejects.toThrow('CONTROL_SESSION_MODE_UNSUPPORTED');
         expect(createConnectionMock).not.toHaveBeenCalled();
         expect(spawnMock).not.toHaveBeenCalled();
       } finally {
@@ -158,8 +208,12 @@ describe('external provider routing', () => {
     const capabilities = target.capabilities as { controlSessionMode?: string };
     capabilities.controlSessionMode = 'external';
     vi.mocked(ensureProviderControlHost).mockResolvedValueOnce({
-      pid: process.pid, ready: true, token: 'test', protocolVersion: 3,
-      socketPath: '/tmp/mearl-provider-control.sock', controlSessionModes: ['mearl', 'external'],
+      pid: process.pid,
+      ready: true,
+      token: 'test',
+      protocolVersion: 3,
+      socketPath: '/tmp/mearl-provider-control.sock',
+      controlSessionModes: ['mearl', 'external'],
     });
     let envelope: Record<string, any> | undefined;
     createConnectionMock.mockImplementation(() => {
@@ -168,36 +222,65 @@ describe('external provider routing', () => {
       socket.write = vi.fn((line: string) => {
         const message = JSON.parse(line);
         envelope = message;
-        queueMicrotask(() => socket.emit('data', Buffer.from(JSON.stringify({ id: message.id, success: true, data: { value: 42 } }) + '\n')));
+        queueMicrotask(() =>
+          socket.emit(
+            'data',
+            Buffer.from(
+              JSON.stringify({ id: message.id, success: true, data: { value: 42 } }) + '\n',
+            ),
+          ),
+        );
       });
       queueMicrotask(() => socket.emit('connect'));
       return socket;
     });
     try {
-      await expect(invoke('page_eval', { tabId: 7, expression: '42' }, { browser: target.browserId })).resolves.toEqual({ value: 42 });
+      await expect(
+        invoke('page_eval', { tabId: 7, expression: '42' }, { browser: target.browserId }),
+      ).resolves.toEqual({ value: 42 });
       expect(envelope).toMatchObject({ providerTarget: target.browserId, action: 'page_eval' });
       expect(envelope).not.toHaveProperty('controlSessionId');
     } finally {
       delete capabilities.controlSessionMode;
     }
   });
-  it.each([undefined, 'provider:fixture:device-a'])('routes host-provided discovery to an ordinary Provider (%s)', async browser => {
-    let envelope: Record<string, any> | undefined;
-    createConnectionMock.mockImplementation(() => {
-      const socket = new EventEmitter() as MockSocket;
-      socket.end = vi.fn();
-      socket.write = vi.fn((line: string) => {
-        const request = JSON.parse(line);
-        envelope = request;
-        queueMicrotask(() => socket.emit('data', Buffer.from(JSON.stringify({ id: request.id, success: true, data: { apps: { status: 'unsupported', entries: [] } } }) + '\n')));
+  it.each([undefined, 'provider:fixture:device-a'])(
+    'routes host-provided discovery to an ordinary Provider (%s)',
+    async browser => {
+      let envelope: Record<string, any> | undefined;
+      createConnectionMock.mockImplementation(() => {
+        const socket = new EventEmitter() as MockSocket;
+        socket.end = vi.fn();
+        socket.write = vi.fn((line: string) => {
+          const request = JSON.parse(line);
+          envelope = request;
+          queueMicrotask(() =>
+            socket.emit(
+              'data',
+              Buffer.from(
+                JSON.stringify({
+                  id: request.id,
+                  success: true,
+                  data: { apps: { status: 'unsupported', entries: [] } },
+                }) + '\n',
+              ),
+            ),
+          );
+        });
+        queueMicrotask(() => socket.emit('connect'));
+        return socket;
       });
-      queueMicrotask(() => socket.emit('connect'));
-      return socket;
-    });
-    await expect(invoke('get_capabilities', {}, browser ? { browser } : {})).resolves.toMatchObject({ apps: { status: 'unsupported' } });
-    expect(createConnectionMock).toHaveBeenCalledWith('/tmp/mearl-provider-control.sock');
-    expect(envelope).toMatchObject({ action: 'get_capabilities', data: {}, providerTarget: 'provider:fixture:device-a' });
-  });
+      await expect(
+        invoke('get_capabilities', {}, browser ? { browser } : {}),
+      ).resolves.toMatchObject({ apps: { status: 'unsupported' } });
+      expect(createConnectionMock).toHaveBeenCalledWith('/tmp/mearl-provider-control.sock');
+      expect(envelope).toMatchObject({
+        action: 'get_capabilities',
+        data: {},
+        providerTarget: 'provider:fixture:device-a',
+      });
+    },
+  );
   it('sends the explicit caller deadline to the Provider control host', async () => {
     let envelope: Record<string, any> | undefined;
     createConnectionMock.mockImplementation(() => {
@@ -551,7 +634,7 @@ describe('external provider routing', () => {
         count: 2,
         connectedCount: 1,
         defaultBrowserId: 'provider:fixture:device-a',
-        warnings: [expect.stringContaining('Local CDP discovery could not complete: ENOENT')],
+        warnings: [expect.stringContaining('Local browser inventory could not load: ENOENT')],
         browsers: [
           expect.objectContaining({
             browserId: 'provider:fixture:waiting',
@@ -566,7 +649,7 @@ describe('external provider routing', () => {
       expect(createConnectionMock).not.toHaveBeenCalled();
       expect(spawnMock).toHaveBeenCalledWith(
         'mearl-native-host',
-        ['--daemon', '--discover-cdp'],
+        ['--daemon', '--inventory', '--skip-browser-registration'],
         expect.objectContaining({ detached: true }),
       );
       expect(ensureProvidersMock).not.toHaveBeenCalled();
@@ -633,32 +716,44 @@ describe('external provider routing', () => {
     }
   });
 
-  it('does not route forced CDP actions through a provider', async () => {
-    let request: Record<string, unknown> | undefined;
-    createConnectionMock.mockImplementation(() => {
-      const socket = new EventEmitter() as MockSocket;
-      socket.end = vi.fn();
-      socket.write = vi.fn((line: string) => {
-        request = JSON.parse(line) as Record<string, unknown>;
-        queueMicrotask(() =>
-          socket.emit(
-            'data',
-            Buffer.from(`${JSON.stringify({ id: request!.id, success: true, data: {} })}\n`),
-          ),
-        );
+  it.each([true, false])(
+    'routes CDP attachment to the Native Host (supported: %s)',
+    async supported => {
+      let request: Record<string, unknown> | undefined;
+      createConnectionMock.mockImplementation(() => {
+        const socket = new EventEmitter() as MockSocket;
+        socket.end = vi.fn();
+        socket.write = vi.fn((line: string) => {
+          request = JSON.parse(line) as Record<string, unknown>;
+          queueMicrotask(() =>
+            socket.emit(
+              'data',
+              Buffer.from(
+                `${JSON.stringify({
+                  id: request!.id,
+                  ...(supported
+                    ? { success: true, data: {} }
+                    : {
+                        success: false,
+                        error: 'Provider is not registered: cdp',
+                      }),
+                })}\n`,
+              ),
+            ),
+          );
+        });
+        queueMicrotask(() => socket.emit('connect'));
+        return socket;
       });
-      queueMicrotask(() => socket.emit('connect'));
-      return socket;
-    });
 
-    await expect(invoke('tab_list', {}, { transport: 'cdp' })).resolves.toEqual({});
-    expect(createConnectionMock).toHaveBeenCalledWith('/tmp/mearl-native-browser.sock');
-    expect(request).toMatchObject({ action: 'tab_list', transport: 'cdp' });
-
-    await expect(
-      invoke('tab_list', {}, { browser: 'provider:fixture:device-a', transport: 'cdp' }),
-    ).rejects.toThrow('does not support the CDP transport');
-  });
+      const input = { provider: 'cdp', providerOptions: { port: 9223 } };
+      const result = invoke('browser_launch', input);
+      if (supported) await expect(result).resolves.toEqual({});
+      else await expect(result).rejects.toThrow('reload the extension to restart its Native Host');
+      expect(createConnectionMock).toHaveBeenCalledWith('/tmp/mearl-native-browser.sock');
+      expect(request).toMatchObject({ action: 'browser_launch', data: input });
+    },
+  );
 });
 
 it('resolves Provider page_eval capabilities using the same registry rules as dispatch', () => {

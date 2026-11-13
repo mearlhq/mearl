@@ -17,7 +17,7 @@ mearl page_click --payload '{"tabId":12345,"selector":"@e3"}'
 
 页面动作持续复用同一浏览器与传输返回的 `tabId`。无可用页时才打开；已知 URL 优先 `reuse:"prefer"`，绑定开发页时沿用其 `openerTabId`。默认后台操作；确需可见输入时激活同一页。
 
-默认使用统一发现，不主动指定 `--local`、`--connector`、`--server` 或 `--cdp`。需要选择目标时用 `browser_list`，沿用返回的完整实例名或 `browserId`，不要另扫进程、端口。远端连接与 Provider 选择见[浏览器管理](./api-browser-setup.md)。
+默认使用统一发现。需要选择目标时用 `browser_list`，沿用返回的完整实例名或 `browserId`。远端连接与 Provider 选择见[浏览器管理](./api-browser-setup.md)。
 
 需要任务归属、并行协作或人工交接时，首次 `tab_open` / `page_snapshot` / `page_screenshot` 传 `--session new`，后续复用完整 `session.sessionId` 与 `tabId`。会话固定目标，但 Cookie/存储仍共享。目标声明由外部工具控制时（例如 Ego 任务），沿用其交接与收尾，不传 Mearl `--session`；跨工具先核验同一实例和物理页面，不能仅凭 URL/标题或直接复用 ref、label、tab ID。详见[工具协作](./browser-tool-cooperation.md)。
 

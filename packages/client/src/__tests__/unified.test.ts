@@ -67,16 +67,27 @@ afterEach(() => {
 it('preserves explicit local Provider discovery and rejects ambiguous sources before dispatch', async () => {
   const client = new UnifiedClient();
   const params = { provider: 'ego', launchForm: { variant: 'attach', values: { name: 'kept' } } };
-  for (const options of [{}, { connector: 'remote' }, { local: true, session: 'existing' }, { local: true, transport: 'cdp' as const }]) {
-    await expect(client.invoke('browser_list', params, options)).rejects.toThrow('explicit --local');
+  for (const options of [{}, { connector: 'remote' }, { local: true, session: 'existing' }]) {
+    await expect(client.invoke('browser_list', params, options)).rejects.toThrow(
+      'explicit --local',
+    );
   }
   expect(invokeLocal).not.toHaveBeenCalled();
-  const discovery = { provider: 'ego', launchForm: { inputSchema: { type: 'object', properties: {} } } };
+  const discovery = {
+    provider: 'ego',
+    launchForm: { inputSchema: { type: 'object', properties: {} } },
+  };
   invokeLocal.mockResolvedValueOnce({ browsers: [], discovery });
   expect(await client.invoke('browser_list', params, { local: true })).toMatchObject({ discovery });
-  expect(invokeLocal).toHaveBeenCalledWith('browser_list', params, expect.objectContaining({ controlSource: 'local' }));
+  expect(invokeLocal).toHaveBeenCalledWith(
+    'browser_list',
+    params,
+    expect.objectContaining({ controlSource: 'local' }),
+  );
   invokeLocal.mockResolvedValueOnce({ browsers: [] });
-  await expect(client.invoke('browser_list', params, { local: true })).rejects.toThrow('not supported');
+  await expect(client.invoke('browser_list', params, { local: true })).rejects.toThrow(
+    'not supported',
+  );
 });
 
 describe('global browser ids', () => {
@@ -371,24 +382,26 @@ describe('UnifiedClient browser routing', () => {
     await expect(logsPromise).resolves.toEqual([{ source: 'remote' }]);
   });
 
-  it('keeps browser selection local when CDP transport is forced through the SDK', async () => {
+  it('selects an attached local CDP browser with the ordinary browser selector', async () => {
     invokeLocal.mockResolvedValue({
       count: 1,
       connectedCount: 1,
       defaultBrowserId: 'local-chrome',
-      browsers: [{ browserId: 'local-chrome', name: 'Chrome', status: 'connected' }],
+      browsers: [
+        { browserId: 'local-chrome', name: 'Chrome', status: 'connected', transport: 'cdp' },
+      ],
     });
     const { client, send } = createConnectedClient();
 
     await expect(
-      client.invoke('browser_select_browser', { browser: 'Chrome' }, { transport: 'cdp' }),
+      client.invoke('browser_select_browser', { browser: 'Chrome' }, { local: true }),
     ).resolves.toMatchObject({
       selected: { browserId: 'mearl:local:local-chrome' },
     });
     expect(invokeLocal).toHaveBeenCalledWith(
       'browser_list',
       {},
-      expect.objectContaining({ timeoutSec: expect.any(Number), transport: 'cdp' }),
+      expect.objectContaining({ timeoutSec: expect.any(Number), controlSource: 'local' }),
     );
     expect(send).not.toHaveBeenCalled();
   });

@@ -41,8 +41,6 @@ export interface UnifiedInvokeOptions {
   connector?: string;
   /** Restrict the action to browsers on this machine. */
   local?: boolean;
-  /** Force CDP on this machine. Implies local routing. */
-  transport?: 'cdp';
 }
 
 export interface UnifiedClientOptions {
@@ -276,14 +274,10 @@ export class UnifiedClient {
     const discovery = action === 'browser_list' ? parseBrowserListParams(data) : undefined;
     if (
       discovery &&
-      (!options.local ||
-        options.connector ||
-        options.transport ||
-        options.session ||
-        options.controlSessionId)
+      (!options.local || options.connector || options.session || options.controlSessionId)
     )
       throw new Error(
-        'Provider discovery requires explicit --local without connector, transport, socket or session overrides',
+        'Provider discovery requires explicit --local without connector or session overrides',
       );
     if (action === 'plugin_state') {
       const { PluginStateClient } = await import('./plugins/clients/pluginState.js');
@@ -346,13 +340,10 @@ export class UnifiedClient {
       ) {
         throw new Error('The selected browser does not match the control session');
       }
-      if (options.transport && session.transport !== options.transport)
-        throw new Error('A control session cannot change transport');
       options = {
         ...options,
         browser: session.browser,
         controlSessionId: session.id,
-        ...(session.transport === 'cdp' && !pinned?.connector ? { transport: 'cdp' as const } : {}),
       };
     } else if (options.session === 'new') {
       if (!['tab_open', 'page_snapshot', 'page_screenshot'].includes(action))
@@ -454,14 +445,10 @@ export class UnifiedClient {
   ): Promise<PinnedPageEvalOptions> {
     const target = decodeBrowserTarget(options.browser);
     if (target && !options.connector) return options;
-    const local =
-      options.local ||
-      options.transport === 'cdp' ||
-      (!this.options.serverUrl && !options.connector);
+    const local = options.local || (!this.options.serverUrl && !options.connector);
     if (local) {
       const resolved = resolveLocalActionTarget('page_eval', data, {
         browser: options.browser,
-        transport: options.transport,
       });
       if (resolved?.socketPath) return { ...options, socketPath: resolved.socketPath };
       if (resolved?.browser)
@@ -495,8 +482,7 @@ export class UnifiedClient {
     const connected = listing.browsers.filter(
       browser => browser.status === 'connected' && (!local || browser.transport !== 'provider'),
     );
-    const implicitHost =
-      options.local || options.transport === 'cdp' || options.connector || !this.options.serverUrl;
+    const implicitHost = options.local || options.connector || !this.options.serverUrl;
     const automatic =
       connected.find(browser => browser.browserId === listing.defaultBrowserId) ??
       (implicitHost || connected.length === 1 ? connected[0] : undefined);
@@ -512,8 +498,6 @@ export class UnifiedClient {
     const browser = candidates[0]!;
     const pinned = { ...options, browser: browser.browserId };
     delete pinned.connector;
-    if (browser.transport === 'cdp' && !decodeBrowserTarget(browser.browserId)?.connector)
-      pinned.transport = 'cdp';
     return pinned;
   }
 
@@ -532,7 +516,6 @@ export class UnifiedClient {
         data,
         timeoutSec,
         undefined,
-        options.transport,
         options.controlSessionId,
         options.socketPath,
       );
@@ -548,8 +531,8 @@ export class UnifiedClient {
           throw new Error('Provider launch-form discovery is not supported by this host');
         return this.applyConfiguredDefault(this.decorateListing(result, { kind: 'local' }));
       }
-      if (options.local || options.transport === 'cdp') {
-        return this.listLocalBrowsers(timeoutSec, options.transport);
+      if (options.local) {
+        return this.listLocalBrowsers(timeoutSec);
       }
       const connector = options.connector ?? this.defaultConnector;
       return connector
@@ -560,7 +543,7 @@ export class UnifiedClient {
       return this.selectDefaultBrowser(data, options, timeoutSec);
     }
 
-    if (options.local || options.transport === 'cdp') {
+    if (options.local) {
       return this.invokeExplicitLocal(action, data, options, timeoutSec);
     }
 
@@ -588,7 +571,6 @@ export class UnifiedClient {
         requestData,
         timeoutSec,
         target.browser,
-        undefined,
         options.controlSessionId,
       );
     }
@@ -615,7 +597,6 @@ export class UnifiedClient {
         requestData,
         timeoutSec,
         options.browser ?? this.defaultBrowser,
-        undefined,
         options.controlSessionId,
       );
     }
@@ -659,19 +640,12 @@ export class UnifiedClient {
         ? decodeBrowserTarget(data.browser)
         : undefined;
     if (optionTarget?.connector || defaultTarget?.connector || closeTarget?.connector) {
-      throw new Error('A remote browser cannot be used together with --local or --cdp.');
+      throw new Error('A remote browser cannot be used together with --local.');
     }
     const browser =
       optionTarget?.browser ?? defaultTarget?.browser ?? options.browser ?? this.defaultBrowser;
     const requestData = closeTarget ? { ...data, browser: closeTarget.browser } : data;
-    return this.invokeLocal(
-      action,
-      requestData,
-      timeoutSec,
-      browser,
-      options.transport,
-      options.controlSessionId,
-    );
+    return this.invokeLocal(action, requestData, timeoutSec, browser, options.controlSessionId);
   }
 
   private async invokeLaunchWithoutControlBrowser(
@@ -725,7 +699,6 @@ export class UnifiedClient {
       {
         timeoutSec,
         ...(options.local ? { local: true } : {}),
-        ...(options.transport ? { transport: options.transport } : {}),
         ...(options.connector ? { connector: options.connector } : {}),
       },
     )) as BrowserListResult;
@@ -804,14 +777,11 @@ export class UnifiedClient {
     return selection.connector;
   }
 
-  private async listLocalBrowsers(
-    timeoutSec: number,
-    transport?: 'cdp',
-  ): Promise<BrowserListResult> {
+  private async listLocalBrowsers(timeoutSec: number): Promise<BrowserListResult> {
     const result = await invokeLocalBrowser(
       'browser_list',
       {},
-      { timeoutSec, ...(transport ? { transport } : {}), controlSource: 'local' },
+      { timeoutSec, controlSource: 'local' },
     );
     return this.applyConfiguredDefault(this.decorateListing(result, { kind: 'local' }));
   }
@@ -955,7 +925,6 @@ export class UnifiedClient {
     data: Record<string, any>,
     timeoutSec: number,
     browser: string | undefined,
-    transport?: 'cdp',
     controlSessionId?: string,
     socketPath?: string,
   ): Promise<any> {
@@ -963,7 +932,6 @@ export class UnifiedClient {
       timeoutSec,
       ...(this.requestDeadline === undefined ? {} : { deadline: this.requestDeadline }),
       ...(browser ? { browser } : {}),
-      ...(transport ? { transport } : {}),
       ...(socketPath ? { socketPath } : {}),
       controlSource: 'local',
       ...(controlSessionId ? { controlSessionId } : {}),
@@ -1075,9 +1043,7 @@ export class UnifiedClient {
     };
     const [local, remote] = await Promise.allSettled([
       localLookup,
-      this.options.serverUrl && !options.local && !options.transport
-        ? discover()
-        : Promise.resolve([]),
+      this.options.serverUrl && !options.local ? discover() : Promise.resolve([]),
     ]);
     const localSession = local.status === 'fulfilled' ? local.value?.session : undefined;
     const localTarget = decodeBrowserTarget(localSession?.browserId);

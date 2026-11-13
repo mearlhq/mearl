@@ -95,7 +95,9 @@ interface Identity {
   startedAt: string;
 }
 
-export function browserConnectionIdentity(browser: Pick<BrowserRecord, 'pid' | 'startedAt' | 'socketPath'>): string {
+export function browserConnectionIdentity(
+  browser: Pick<BrowserRecord, 'pid' | 'startedAt' | 'socketPath'>,
+): string {
   return JSON.stringify([browser.pid, browser.startedAt, browser.socketPath]);
 }
 
@@ -161,6 +163,11 @@ export function registerBrowser(info: {
   browserName: string;
   nativeHostVersion: string;
   transport: 'extension' | 'cdp';
+  provider?: BrowserProviderIdentity;
+  ownership?: BrowserRecord['ownership'];
+  persistence?: BrowserRecord['persistence'];
+  operations?: BrowserProviderOperation[];
+  details?: BrowserDetails;
   extensionVersion?: string;
   /** Initial focus rank. Managed headless browsers use 0 so they do not steal the default target. */
   lastFocusedAt?: number;
@@ -185,6 +192,15 @@ export function registerBrowser(info: {
         ? (info.lastFocusedAt ?? 0)
         : (previous?.lastFocusedAt ?? info.lastFocusedAt ?? Date.now()),
     extensionVersion: info.extensionVersion,
+    ...(info.provider
+      ? {
+          provider: info.provider,
+          ownership: info.ownership,
+          persistence: info.persistence,
+          operations: info.operations,
+          details: info.details,
+        }
+      : {}),
   });
   logFn(
     `browser-registry: ${registered ? 'registered' : 'registration skipped'} ${info.browserName} (${info.browserId})`,

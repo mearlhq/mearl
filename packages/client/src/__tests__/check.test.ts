@@ -100,17 +100,14 @@ describe('runUnifiedCheck', () => {
     },
   );
 
-  it.each([{ serverUrl: 'wss://example.com' }, { local: true, transport: 'cdp' as const }])(
-    'does not inspect local launchers for a different scope: %j',
-    async scope => {
-      const { dependencies } = createDependencies(async () => ({ browsers: [], connectors: [] }));
-      await runUnifiedCheck(
-        { clientVersion: '2.20.0', json: true, ...scope },
-        { ...dependencies, writeJson: () => {} },
-      );
-      expect(dependencies.inspectNativeHostInstallation).not.toHaveBeenCalled();
-    },
-  );
+  it('does not inspect local launchers for remote scope', async () => {
+    const { dependencies } = createDependencies(async () => ({ browsers: [], connectors: [] }));
+    await runUnifiedCheck(
+      { clientVersion: '2.20.0', json: true, serverUrl: 'wss://example.com' },
+      { ...dependencies, writeJson: () => {} },
+    );
+    expect(dependencies.inspectNativeHostInstallation).not.toHaveBeenCalled();
+  });
 
   it('can diagnose registrations even when browser inventory cannot reach the host', async () => {
     const { dependencies } = createDependencies(async () => {
@@ -432,6 +429,7 @@ describe('runUnifiedCheck', () => {
       if (action === 'get_versions') {
         return { nativeHost: '2.9.0', browser: '151.0.0' };
       }
+      if (action === 'tab_list') return { tabs: [] };
       throw new Error(`unexpected ${action}`);
     });
 
@@ -503,7 +501,7 @@ describe('runUnifiedCheck', () => {
     expect(writeLine).toHaveBeenCalledWith('  ⚠️  Some browser sources could not be inspected');
   });
 
-  it('keeps forced CDP routing on every browser check', async () => {
+  it('checks the selected CDP browser through its browser ID', async () => {
     const cdpBrowser = {
       browserId: 'mearl:local:cdp',
       name: '[this machine] CDP',
@@ -525,22 +523,25 @@ describe('runUnifiedCheck', () => {
     });
 
     await expect(
-      runUnifiedCheck({ clientVersion: '2.6.0', local: true, transport: 'cdp' }, dependencies),
+      runUnifiedCheck(
+        { clientVersion: '2.6.0', local: true, browser: cdpBrowser.browserId },
+        dependencies,
+      ),
     ).resolves.toBe(true);
 
     expect(client.invoke).toHaveBeenCalledWith(
       'tab_list',
       {},
-      expect.objectContaining({ transport: 'cdp' }),
+      expect.objectContaining({ browser: cdpBrowser.browserId }),
     );
     expect(client.invoke).toHaveBeenCalledWith(
       'get_versions',
       {},
-      expect.objectContaining({ transport: 'cdp' }),
+      expect.objectContaining({ browser: cdpBrowser.browserId }),
     );
   });
 
-  it('reports no CDP browser when only the extension command path is available', async () => {
+  it('reports a missing CDP browser when only the extension is connected', async () => {
     const { client, dependencies, writeLine } = createDependencies(async action => {
       if (action === 'browser_list') {
         return {
@@ -556,7 +557,10 @@ describe('runUnifiedCheck', () => {
     });
 
     await expect(
-      runUnifiedCheck({ clientVersion: '2.6.0', local: true, transport: 'cdp' }, dependencies),
+      runUnifiedCheck(
+        { clientVersion: '2.6.0', local: true, browser: 'mearl:local:cdp' },
+        dependencies,
+      ),
     ).resolves.toBe(false);
     expect(writeLine).toHaveBeenCalledWith(
       '⚠️  Mearl checks failed. See the browser or source details above.',
@@ -581,6 +585,7 @@ describe('runUnifiedCheck', () => {
         };
       }
       if (action === 'get_browser_access_url') throw new Error('session info unavailable');
+      if (action === 'tab_list') return { tabs: [] };
       throw new Error(`unexpected ${action}`);
     });
 
@@ -622,6 +627,7 @@ describe('runUnifiedCheck', () => {
           },
         };
       }
+      if (action === 'tab_list') return { tabs: [] };
       throw new Error(`unexpected ${action}`);
     });
 
@@ -652,6 +658,7 @@ describe('runUnifiedCheck', () => {
       if (action === 'browser_list') {
         return { connectedCount: 1, browsers: [sandboxBrowser] };
       }
+      if (action === 'tab_list') return { tabs: [] };
       if (action === 'get_versions') {
         return {
           nativeHost: '2.9.0',

@@ -335,7 +335,7 @@ describe('runMearlCli', () => {
     expect(help).toContain('--timeout <seconds>   单项检查超时时间，默认 5 秒');
     expect(help).toContain('--connector <id|名称>');
     expect(help).toContain('--local');
-    expect(help).toContain('--cdp');
+    expect(help).not.toContain('--cdp');
     expect(help).toContain('--server <url>');
     expect(help).toContain('--updates');
     expect(help).not.toContain('API 调试');
@@ -715,7 +715,7 @@ describe('parseClientArgs', () => {
   it('accepts plugin JSON compatibility flags and preserves underscored adapter arguments', () => {
     expect(
       parseClientArgs(
-        ['bbrowser', 'site', 'example/search', '--seller_id', '123', '--json', '--cdp'],
+        ['bbrowser', 'site', 'example/search', '--seller_id', '123', '--json', '--local'],
         true,
       ),
     ).toMatchObject({
@@ -723,9 +723,10 @@ describe('parseClientArgs', () => {
       pluginArgs: ['site', 'example/search'],
       pluginInput: { seller_id: '123' },
       json: true,
-      forceCdp: true,
+      local: true,
     });
     expect(() => parseClientArgs(['tab_list', '--seller_id', '123'])).toThrow('unknown option');
+    expect(() => parseClientArgs(['tab_list', '--cdp'])).toThrow('unknown option');
   });
 
   it('passes a bare --all flag as a boolean plugin input', () => {

@@ -28,7 +28,7 @@ export interface CdpTarget {
 // DevToolsActivePort — written by Chrome when remote debugging is active
 // ---------------------------------------------------------------------------
 
-function chromeUserDataDir(): string {
+export function chromeUserDataDir(): string {
   const platform = process.platform;
   const home = os.homedir();
   if (platform === 'darwin') {

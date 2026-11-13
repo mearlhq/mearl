@@ -79,11 +79,14 @@ describe('BrowserProviderCoordinator', () => {
       url: 'https://example.com',
       copyCookieDomains: ['example.com'],
     });
-    expect(local.launch).toHaveBeenCalledWith({
-      name: 'account-a',
-      url: 'https://example.com',
-      copyCookieDomains: { domains: ['example.com'] },
-    });
+    expect(local.launch).toHaveBeenCalledWith(
+      {
+        name: 'account-a',
+        url: 'https://example.com',
+        copyCookieDomains: { domains: ['example.com'] },
+      },
+      { deadline: undefined },
+    );
   });
 
   it('accepts structured built-in options and returns public browser metadata', async () => {
@@ -93,7 +96,7 @@ describe('BrowserProviderCoordinator', () => {
       provider: 'local',
       providerOptions: { name: 'test' },
     });
-    expect(local.launch).toHaveBeenCalledWith({ name: 'test' });
+    expect(local.launch).toHaveBeenCalledWith({ name: 'test' }, { deadline: undefined });
     expect(result).toMatchObject({
       type: 'managed',
       provider: { id: 'local', builtin: true },

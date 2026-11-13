@@ -134,6 +134,8 @@ Runtime 会统一校验 schema、状态机、操作能力和页面 action capabi
 持久化策略、操作和安全元数据）。管理器内部字段、控制连接和临时访问地址不进入该结果。
 Local 的 CLI 顶层参数是便捷输入；外部 Provider 参数必须放在 `providerOptions`，两者不得混用。
 
+内置 `cdp` Provider 接入已启用调试的 Chrome 或 Electron。`providerOptions.port` 指定端口，`userDataDir` 读取指定 Profile 的 `DevToolsActivePort`，`endpointFile` 读取私有 WebSocket 地址。文件和目录使用目标宿主上的绝对路径。若 Profile 文件记录了端口，同时传入的 `port` 须与其一致。`browser_release` 断开控制并保留浏览器。
+
 内置浏览器保留本地启动交互；外部 Provider 根据 `browserType.inputSchema` 生成输入项。
 两者提交同一结构的 `providerOptions`。
 Schema 的顶层 `oneOf` 可声明多个完整对象约束，

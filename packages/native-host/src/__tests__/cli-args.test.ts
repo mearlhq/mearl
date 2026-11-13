@@ -19,7 +19,7 @@ describe('parseNativeHostRuntimeArgs', () => {
     await expect(
       parseNativeHostRuntimeArgs([
         '--daemon',
-        '--discover-cdp',
+        '--attach-cdp',
         '--cdp-port=9333',
         '--cdp-endpoint-file',
         '/tmp/private-cdp.url',
@@ -31,7 +31,7 @@ describe('parseNativeHostRuntimeArgs', () => {
       cdpEndpointFile: '/tmp/private-cdp.url',
       cdpPort: 9333,
       daemon: true,
-      discoverCdp: true,
+      attachCdp: true,
     });
   });
 
@@ -75,14 +75,14 @@ describe('parseNativeHostRuntimeArgs', () => {
     await expect(parseNativeHostRuntimeArgs([extensionOrigin])).resolves.toMatchObject({
       daemon: false,
       cdpPort: 9222,
-      discoverCdp: false,
+      attachCdp: false,
     });
     await expect(
       parseNativeHostRuntimeArgs([extensionOrigin, '--parent-window=12345']),
     ).resolves.toMatchObject({
       daemon: false,
       cdpPort: 9222,
-      discoverCdp: false,
+      attachCdp: false,
     });
   });
 

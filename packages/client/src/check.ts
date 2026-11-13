@@ -124,7 +124,6 @@ export interface UnifiedCheckOptions {
   browser?: string;
   connector?: string;
   local?: boolean;
-  transport?: 'cdp';
   json?: boolean;
   checkUpdates?: boolean;
 }
@@ -330,10 +329,7 @@ export async function runUnifiedCheck(
     if (options.local) {
       environment.push({
         status: 'ok',
-        label:
-          options.transport === 'cdp'
-            ? 'Browser scope: this machine (forced CDP)'
-            : 'Browser scope: this machine',
+        label: 'Browser scope: this machine',
       });
     } else if (options.serverUrl) {
       const source = options.serverUrlSource ? ` (${options.serverUrlSource})` : '';
@@ -370,7 +366,6 @@ export async function runUnifiedCheck(
     const inventoryOptions: UnifiedInvokeOptions = {
       timeoutSec,
       ...(options.local ? { local: true } : {}),
-      ...(options.transport ? { transport: options.transport } : {}),
       ...(!options.local && options.connector ? { connector: options.connector } : {}),
     };
     try {
@@ -411,13 +406,10 @@ export async function runUnifiedCheck(
     }
 
     const connected = (browserList?.browsers ?? []).filter(
-      browser =>
-        browser.status === 'connected' &&
-        (options.transport !== 'cdp' || browser.transport === 'cdp'),
+      browser => browser.status === 'connected',
     );
     if (
       (options.local || !options.serverUrl) &&
-      options.transport !== 'cdp' &&
       !connected.some(browser => browser.transport === 'extension')
     ) {
       const diagnostics = (
@@ -450,11 +442,9 @@ export async function runUnifiedCheck(
     if (!options.browser && connected.length === 0 && browserList) {
       environment.push({
         status: 'error',
-        label: options.transport === 'cdp' ? 'No connected CDP browser' : 'No connected browser',
+        label: 'No connected browser',
         details: [
-          options.transport === 'cdp'
-            ? 'Enable a local CDP endpoint (see `mearl-native-host --help`) and run `mearl browser_list --cdp` to inspect discovery.'
-            : 'Open Chrome with the Mearl extension, start a managed browser, or connect a browser host.',
+          'Open Chrome with the Mearl extension, start a managed browser, or attach an existing browser with a Provider.',
           ...(!options.local && connectors.length > 0
             ? [
                 'Connectors are connected but expose no ready browser. On the browser machine, run `mearl check --local`; use `mearl connector_list` for versions and heartbeat details.',
@@ -477,26 +467,16 @@ export async function runUnifiedCheck(
     await Promise.all(
       targets.map(async browser => {
         try {
-          if (options.transport === 'cdp') {
-            await client.invoke(
-              'tab_list',
-              {},
-              {
-                timeoutSec,
-                browser: browser.browserId,
-                transport: 'cdp',
-              },
-            );
-          }
           const versions = (await client.invoke(
             'get_versions',
             {},
             {
               timeoutSec,
               browser: browser.browserId,
-              ...(options.transport ? { transport: options.transport } : {}),
             },
           )) as VersionInfo;
+          if (browser.transport === 'cdp' && options.browser)
+            await client.invoke('tab_list', {}, { timeoutSec, browser: browser.browserId });
           const publicVersions: UnifiedCheckVersions = {
             ...(versions.nativeHost ? { nativeHost: versions.nativeHost } : {}),
             ...(versions.extension !== undefined ? { extension: versions.extension } : {}),
@@ -560,9 +540,7 @@ export async function runUnifiedCheck(
               status: accessUrlWarning ? 'warning' : 'ok',
               label: accessUrlWarning
                 ? 'Browser command path ready; browser access URL unavailable'
-                : options.transport === 'cdp'
-                  ? 'CDP command path'
-                  : 'Browser command path',
+                : 'Browser command path',
               details,
             },
             versions: publicVersions,

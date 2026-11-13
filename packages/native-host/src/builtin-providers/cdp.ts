@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import net from 'node:net';
 import { keyedConfigFile } from '@mearl/daemon-core';
 import {
   shouldObservePageAction,
@@ -8,12 +7,8 @@ import {
   type PageDownloadParams,
   type PageRecordingOptions,
 } from '@mearl/browser-core';
-import { ensureDiscoverableCdpBrowser } from '../browser-inventory.js';
-import {
-  registerBrowser,
-  retireUnreachableBrowserRecord,
-  unregisterBrowser,
-} from '../browser-registry.js';
+import { ensureDiscoverableCdpBrowser, providerIdentity } from '../browser-inventory.js';
+import { registerBrowser, unregisterBrowser } from '../browser-registry.js';
 import { CdpSession } from '../cdp-backend/cdp-session.js';
 import { cdpObservedPageAction } from '../cdp-backend/composite-handlers.js';
 import { releaseControlledIndicator } from '../cdp-backend/controlled-indicator.js';
@@ -27,36 +22,18 @@ import { releaseCdpControl } from '../cdp-backend/release-control.js';
 import type { NativeHostRuntimeArgs } from '../runtimeArgs.js';
 import { NATIVE_HOST_VERSION } from '../version.js';
 import { toTimeoutMs } from './action-timeout.js';
+import { CDP_PROVIDER } from './cdp-attach.js';
 import type { HostBrowserProvider } from './host-browser-provider.js';
 
 interface CdpProviderOptions {
   args: NativeHostRuntimeArgs;
   socketPath: string;
   endpointSource: 'command-line' | 'built-in default';
+  useActivePortFile: boolean;
   log: (...args: any[]) => void;
   onPublish: () => void;
-  onDiscoveryDisconnect: () => void;
+  onAttachDisconnect: () => void;
   pluginService: ConstructorParameters<typeof CdpPluginPageHost>[1];
-}
-
-function canConnectInstanceSocket(socketPath: string): Promise<boolean> {
-  return new Promise(resolve => {
-    const socket = net.createConnection(socketPath);
-    let settled = false;
-    const timer = setTimeout(() => finish(true), 300);
-    timer.unref();
-    const finish = (reachable: boolean): void => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      socket.destroy();
-      resolve(reachable);
-    };
-    socket.once('connect', () => finish(true));
-    socket.once('error', (error: NodeJS.ErrnoException) =>
-      finish(error.code !== 'ENOENT' && error.code !== 'ECONNREFUSED'),
-    );
-  });
 }
 
 export class CdpBrowserProvider implements HostBrowserProvider {
@@ -87,13 +64,21 @@ export class CdpBrowserProvider implements HostBrowserProvider {
     return this.options.args.daemon && !this.options.args.skipBrowserRegistration;
   }
 
+  get isAttached(): boolean {
+    return this.published && this.options.args.attachCdp;
+  }
+
   private get reconnectable(): boolean {
     return Boolean(this.options.args.cdpEndpointFile) || this.browserId.startsWith('managed:');
   }
 
   async start(): Promise<void> {
     // Managed endpoints reconnect without a local Chrome authorization prompt.
-    if (!this.registrationEnabled || !this.reconnectable) return;
+    if (!this.registrationEnabled || this.options.args.attachCdp) return;
+    if (!this.reconnectable) {
+      await this.discover();
+      return;
+    }
     let checking = false;
     const refresh = async (): Promise<void> => {
       if (checking || !this.autoReconnectEnabled) return;
@@ -113,9 +98,6 @@ export class CdpBrowserProvider implements HostBrowserProvider {
   }
 
   async discover(): Promise<{ discovered: boolean; warning?: string }> {
-    if (this.options.args.discoverCdp && this.browserId === 'cdp') {
-      await retireUnreachableBrowserRecord(this.browserId, canConnectInstanceSocket);
-    }
     if (!this.registrationEnabled) return { discovered: false };
     let probeError: string | undefined;
     const discovered = await ensureDiscoverableCdpBrowser({
@@ -226,13 +208,13 @@ export class CdpBrowserProvider implements HostBrowserProvider {
 
   async release() {
     const session = this.session;
-    this.session = null;
     try {
       if (session) return await releaseCdpControl(session);
     } catch (error) {
       session?.close();
       throw error;
     } finally {
+      this.session = null;
       this.autoReconnectEnabled = false;
     }
   }
@@ -243,6 +225,7 @@ export class CdpBrowserProvider implements HostBrowserProvider {
     this.pageHost?.dispose();
     this.pageHost = undefined;
     this.session?.close();
+    this.session = null;
     this.unpublish();
   }
 
@@ -263,7 +246,13 @@ export class CdpBrowserProvider implements HostBrowserProvider {
               return url.toString();
             },
           })
-        : new CdpSession({ port: cdpPort, userDataDir: cdpUserDataDir, targetRegistryFile });
+        : new CdpSession({
+            port: cdpPort,
+            userDataDir: cdpUserDataDir,
+            useActivePortFile: this.options.useActivePortFile,
+            requireActivePortFile: this.options.args.attachCdp && this.options.useActivePortFile,
+            targetRegistryFile,
+          });
       this.session.onBrowserConnected(() => {
         this.getPageHost();
       });
@@ -300,7 +289,7 @@ export class CdpBrowserProvider implements HostBrowserProvider {
 
     if (this.registrationEnabled) {
       this.publish();
-      if (!this.reconnectable) this.monitorConnection();
+      if (this.options.args.attachCdp || !this.reconnectable) this.monitorConnection();
     }
 
     if (action === 'page_runtime') return this.getPageHost().handle(data);
@@ -313,16 +302,30 @@ export class CdpBrowserProvider implements HostBrowserProvider {
   private publish(): boolean {
     this.options.onPublish();
     if (this.published) return true;
-    const { browserName, discoverCdp } = this.options.args;
+    const { browserName, attachCdp } = this.options.args;
     this.published = registerBrowser({
       browserId: this.browserId,
       socketPath: this.options.socketPath,
       browserName,
       nativeHostVersion: NATIVE_HOST_VERSION,
       transport: 'cdp',
-      // Discovery has no focus signal, so it sorts behind connected browsers without focus.
-      lastFocusedAt: discoverCdp ? -1 : this.browserId.startsWith('managed:') ? 0 : undefined,
-      preserveFocus: !discoverCdp,
+      ...(attachCdp
+        ? {
+            provider: providerIdentity(CDP_PROVIDER),
+            ownership: 'attached',
+            persistence: 'ephemeral',
+            operations: ['detach'],
+            details: {
+              headless: this.options.args.browserHeadless,
+              ...(this.options.args.cdpEndpointFile
+                ? {}
+                : { cdpPort: this.getSession().getEffectivePort() }),
+            },
+          }
+        : {}),
+      // An attached browser has no focus signal.
+      lastFocusedAt: attachCdp ? -1 : this.browserId.startsWith('managed:') ? 0 : undefined,
+      preserveFocus: !attachCdp,
     });
     return this.published;
   }
@@ -336,11 +339,11 @@ export class CdpBrowserProvider implements HostBrowserProvider {
   private monitorConnection(): void {
     if (this.registrationTimer) return;
     this.registrationTimer = setInterval(() => {
-      if (this.getSession().hasActiveConnections()) return;
+      if (this.session?.hasActiveConnections()) return;
       this.unpublish();
       clearInterval(this.registrationTimer);
       this.registrationTimer = undefined;
-      if (this.options.args.discoverCdp) this.options.onDiscoveryDisconnect();
+      if (this.options.args.attachCdp) this.options.onAttachDisconnect();
     }, 2_000).unref();
   }
 }

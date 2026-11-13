@@ -63,9 +63,7 @@ mearl-native-host [options]
   --help, -h                                               查看帮助
 ```
 
-daemon 参数只对当前进程生效。client 自动拉起 discovery daemon 时先读取 Chrome 默认 Profile 的 `DevToolsActivePort`，再探测本地 CDP 端口 9222；自定义 CDP 端口或浏览器标识需要在每次手工启动时显式传入。发现进程使用自己的实例 Socket 接收查询，不依赖固定 Socket 的归属。
-
-Electron 应用开放渲染页面 CDP 后，也可用 `--daemon --cdp-port <port> --browser-id <id> --browser-name <name>` 接入。通过 `browser_list` 选择实例、`tab_list` 选择已有窗口，再执行页面操作；不涵盖原生菜单、系统弹窗或主进程 `--inspect` 调试。接入步骤见 `mearl guide browsers`。
+daemon 参数只对当前进程生效。用户可通过内置 CDP Provider 接入已有 Chrome 或 Electron。默认接入读取 Chrome 默认 Profile 的 `DevToolsActivePort`，并在需要时探测本机 9222 端口。Electron 使用 `providerOptions.port` 指定渲染页面的调试端口。接入步骤见 `mearl guide browsers`。
 
 通过 `chrome://inspect/#remote-debugging` 开启的 Chrome 授权模式会关闭 HTTP 发现接口。若 `DevToolsActivePort` 缺失或无法读取，且 `/json/version` 返回 404，Mearl 会连接同一端口的 `/devtools/browser` WebSocket，并等待 Chrome 的连接授权。请在 Chrome 提示时允许连接；该路径不读取浏览器 Profile 文件。连接失败时会保留发现文件的读取错误，便于区分文件权限、端口和连接授权问题。
 

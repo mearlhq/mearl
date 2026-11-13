@@ -20,7 +20,7 @@
 - `status` 为 `connected`、`pairing`、`running_disconnected` 或 `stopped`；只有 `connected` 可作为页面操作目标。
 - Provider 实例还会返回 `provider`、`ownership`、`persistence`、`operations`、`references`、`details` 和可选的 `pairing`。用 `operations` 判断当前可执行的生命周期操作。
 
-`browser_launch` 默认启动本地独立 Chrome。外部 Provider 使用以下通用结构，具体 `providerOptions` 必须通过 `mearl <providerId>` 查询：
+`browser_launch` 默认启动本地独立 Chrome。Provider 使用以下通用结构。外部 Provider 的参数可通过 `mearl <providerId>` 查询。
 
 ```bash
 mearl browser_launch --payload '{"provider":"<providerId>","providerOptions":{}}'
@@ -30,32 +30,37 @@ mearl browser_launch --payload '{"provider":"<providerId>","providerOptions":{}}
 
 `browser_close` 关闭托管实例；`deleteProfile: true` 表示同时删除 Provider 持久化数据。是否支持关闭、删除、启动、同步 Cookie、detach 或访问入口，以实例的 `operations` 和 Provider 命令帮助为准。
 
-不带 `--session` 的 `browser_release` 通过 `--browser <id|名称>` 选择普通浏览器，只在用户明确要求结束调试、退出接管或清理环境时调用。它会释放 debugger/CDP 控制，清理依赖当前调试连接的 Mock、设备/时区模拟与持续采集，保留浏览器和标签页；存在活动控制会话时拒绝浏览器级释放。用户要求的终态依赖这些效果时保持控制。会话任务的收尾见[控制会话](#control-sessions)；Provider 的 detach 或其他收尾遵循 `mearl <providerId>`。
+不带 `--session` 的 `browser_release` 通过 `--browser <id|名称>` 选择浏览器，只在用户明确要求结束调试、退出接管或清理环境时调用。它会释放 debugger/CDP 控制，清理依赖当前调试连接的 Mock、设备/时区模拟与持续采集，保留浏览器和标签页。存在活动控制会话时拒绝浏览器级释放。会话任务的收尾见[控制会话](#control-sessions)。外部 Provider 的收尾方式见 `mearl <providerId>`。
 
 浏览器访问入口不会出现在 `browser_list` 中。只有用户明确需要时才运行 `mearl check --browser <id|名称>`，并把返回的 `browserAccess.url` 按敏感信息处理，不写入日志或转发给无关方。
 
 <a id="electron-cdp"></a>
 
-## Electron 桌面应用
+## 接入已有 Chrome 或 Electron
 
-Electron 应用开放 Chromium CDP 后，可用 Mearl 操作其渲染页面，复用页面快照、点击、输入和截图。原生菜单、系统弹窗和主进程调试不在这条链路内，具体能力以目标实际响应为准。
+CDP Provider 可接入已启用远程调试的 Chrome 或 Electron，并使用已有页面和登录态。Chrome 可在 `chrome://inspect/#remote-debugging` 开启调试，有授权提示时在浏览器中允许连接。
 
-先使用应用已提供的调试端口；需要启动应用时，可按应用支持的方式传 `--remote-debugging-port=9223`（示例端口）。该参数须在应用启动时生效，已运行实例不一定接受再次启动的参数；重启前确认不会中断用户工作。不要把主进程的 `--inspect` 端口当作渲染页面端点。参见 [Electron 调试开关](https://www.electronjs.org/docs/latest/api/command-line-switches#--remote-debugging-portport)。
-
-对已确认的本机端口，在单独终端运行 CDP 宿主并保持进程运行：
+默认接入会读取 Chrome 默认 Profile 的 `DevToolsActivePort`，并在需要时探测本机 9222 端口。
 
 ```bash
-mearl-native-host --daemon --cdp-port 9223 --browser-id electron-app --browser-name "Electron App"
+mearl browser_launch --local --payload '{"provider":"cdp","providerOptions":{}}'
 ```
 
-在另一个终端用 `mearl browser_list` 找到该实例，后续沿用返回的 `browserId`：
+连接 Electron 时，传入已启用的渲染页面调试端口。若需为应用启用调试，可在启动时传入 `--remote-debugging-port=9223`。参见 [Electron 调试开关](https://www.electronjs.org/docs/latest/api/command-line-switches#--remote-debugging-portport)。
 
 ```bash
+mearl browser_launch --local --payload '{"provider":"cdp","providerOptions":{"name":"Electron App","port":9223}}'
+```
+
+使用响应里的 `browserId`，也可在 `browser_list` 中查找：
+
+```bash
+mearl check --browser '<browserId>'
 mearl tab_list --browser '<browserId>'
 mearl page_snapshot --browser '<browserId>' --payload '{"tabId":12345,"mode":"viewport"}'
 ```
 
-`tabId` 使用 `tab_list` 返回的真实值。优先操作已有应用窗口，不用 `tab_open` 导航替换应用主界面；未列出页面时先检查端点与页面目标，不把连接成功等同于应用已可操作。
+`tabId` 使用 `tab_list` 返回的真实值。Electron 的操作范围是渲染页面。结束接管时运行 `mearl browser_release --browser '<browserId>'`，浏览器和标签页继续运行。
 
 <a id="control-sessions"></a>
 
@@ -97,10 +102,9 @@ mearl page_snapshot --browser '<browserId>' --payload '{"tabId":12345,"mode":"vi
 | --- | --- | --- |
 | `--local` | 只使用当前机器 | 限定本机清单、检查，或让 `browser_launch` 落到本机 |
 | `--connector <id\|name>` | 只使用一台远端 connector | 限定远端清单、检查或启动宿主；名称或 ID 片段必须唯一 |
-| `--cdp` | 本机强制使用 CDP，并隐含 `--local` | 需要验证或绕过 Extension 控制链路时 |
 | `--server <url>` | 覆盖当前调用使用的 cloud-server URL | 自动配置不可用或临时排障时 |
 
-`--local` / `--cdp` 不能与 `--connector` 同时使用。全局远端 `browserId` 已包含 connector，普通页面 action 不重复传 `--connector`。`--server` 的解析顺序见 `mearl check --help`，连接排障见[环境安装与连接排查](./troubleshooting.md#cloud-agent)。高级诊断命令 `mearl connector_list` 只用于查看没有可列出浏览器的 connector，普通浏览器操作无需先调用它。
+`--local` 不能与 `--connector` 同时使用。全局远端 `browserId` 已包含 connector，普通页面 action 不重复传 `--connector`。`--server` 的解析顺序见 `mearl check --help`，连接排障见[环境安装与连接排查](./troubleshooting.md#cloud-agent)。高级诊断命令 `mearl connector_list` 只用于查看没有可列出浏览器的 connector，普通浏览器操作无需先调用它。
 
 <a id="browser-providers"></a>
 

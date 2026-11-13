@@ -1196,7 +1196,7 @@ async function main() {
     {
       name: 'browser_launch',
       description:
-        '启动浏览器实例。默认使用本地独立 Chrome；传已注册的 Provider ID 时，把该 Provider 声明的创建参数放在 providerOptions。配对实例会直接返回 pairing URL。具体 Provider 用法可运行 mearl <providerId> 查看。',
+        '通过 Provider 启动或接入浏览器实例。默认启动独立 Chrome。使用 cdp 接入已开启远程调试的 Chrome 或 Electron，providerOptions.port 可指定端口。配对实例会返回 pairing URL。',
       inputSchema: {
         type: 'object',
         properties: {
@@ -1206,12 +1206,12 @@ async function main() {
           },
           provider: {
             type: 'string',
-            description: '浏览器提供方，默认 local；也可传已注册的外部 Provider ID',
+            description: 'Provider ID，默认 local，可选 cdp 或已注册的 Provider',
           },
           providerOptions: {
             type: 'object',
             additionalProperties: true,
-            description: '所选外部 Provider 声明的结构化创建参数',
+            description: '所选 Provider 声明的结构化参数',
           },
           headless: {
             type: 'boolean',

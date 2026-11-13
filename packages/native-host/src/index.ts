@@ -73,6 +73,7 @@ import {
   type SandboxBrowserAccessCapability,
 } from './sandbox-browser-access.js';
 import { CdpBrowserProvider } from './builtin-providers/cdp.js';
+import { createCdpAttachProvider } from './builtin-providers/cdp-attach.js';
 import { ExtensionBrowserProvider } from './builtin-providers/extension.js';
 import { createLocalBrowserProvider } from './builtin-providers/local.js';
 import type { HostBrowserProvider } from './builtin-providers/host-browser-provider.js';
@@ -135,7 +136,6 @@ Lifecycle commands:
 
 Runtime options:
   --daemon                   Start as standalone CDP daemon (no extension needed)
-  --discover-cdp             Exit after browser_list unless local CDP is available
   --cdp-port <port>          CDP port for daemon mode (default 9222)
   --cdp-user-data-dir <dir>  Read DevToolsActivePort from this Chrome profile
   --cdp-endpoint-file <path> Read a private remote CDP WebSocket URL from a file
@@ -155,8 +155,7 @@ Connection modes (auto-detected at runtime):
   CDP mode (Chrome 145+)     No extension needed. Enable "Allow remote debugging"
                              at chrome://inspect/#remote-debugging (click Allow
                              in the Chrome dialog that appears).
-  Auto-started daemon        Uses built-in defaults; custom runtime options only
-                             apply to the manually started process, not ~/.mearl/config.json.
+  Auto-started daemon        Serves browser inventory and Provider lifecycle requests.
 
 Examples:
   mearl-native-host init
@@ -178,8 +177,9 @@ let runtimeArgs: NativeHostRuntimeArgs = {
   browserName: 'CDP',
   cdpPort: 9222,
   daemon: false,
-  discoverCdp: false,
+  attachCdp: false,
   help: false,
+  inventory: false,
   skipBrowserRegistration: false,
   version: false,
 };
@@ -202,7 +202,8 @@ if (runtimeArgs.help) {
 }
 
 const isDaemonMode = runtimeArgs.daemon;
-const discoverCdp = runtimeArgs.discoverCdp;
+const attachCdp = runtimeArgs.attachCdp;
+const inventoryOnly = runtimeArgs.inventory;
 const skipBrowserRegistration = runtimeArgs.skipBrowserRegistration;
 const BROWSER_HEADLESS = runtimeArgs.browserHeadless;
 const cdpEndpointSource = cliArgs.some(argument =>
@@ -234,7 +235,7 @@ const INSTANCE_SOCKET_PATH = socketPathFor(`-${process.pid}`);
 
 const LOG_FILE = path.join(os.tmpdir(), 'mearl-native-host.log');
 const INVENTORY_IDLE_EXIT_MS = 1000;
-const DISCOVERY_REQUEST_IDLE_EXIT_MS = 5000;
+const ATTACH_REQUEST_IDLE_EXIT_MS = 10_000;
 const MAX_SOCKET_BUFFER_SIZE = 64 * 1024 * 1024;
 
 /** Ensure the version-mismatch warning is sent to clients at most once per native-host process. */
@@ -321,11 +322,13 @@ async function getCurrentBrowserUserAgent(): Promise<string> {
     }
   }
 
-  try {
-    const result = await cdpProvider.browserInfo();
-    if (result.userAgent?.trim()) return result.userAgent;
-  } catch {
-    // Surface one provider-neutral error below.
+  if (isDaemonMode && !inventoryOnly) {
+    try {
+      const result = await cdpProvider.browserInfo();
+      if (result.userAgent?.trim()) return result.userAgent;
+    } catch {
+      // Surface one provider-neutral error below.
+    }
   }
   throw new Error('Could not determine the control browser user agent for userAgentMode=desktop');
 }
@@ -386,7 +389,7 @@ async function collectVersions(includeInstallationInfo = false): Promise<Version
     }
   }
 
-  if (!info.browser) {
+  if (!info.browser && isDaemonMode && !inventoryOnly) {
     try {
       const { product } = await cdpProvider.browserInfo();
       if (product) info.browser = extractChromeVersion(product);
@@ -681,15 +684,18 @@ function getBrowserProviderCoordinator(): BrowserProviderCoordinator {
     exportCookies,
     log,
   });
-  browserProviderCoordinator = new BrowserProviderCoordinator([local], {
+  const cdp = createCdpAttachProvider(fileURLToPath(import.meta.url), pid =>
+    socketPathFor(`-${pid}`),
+  );
+  browserProviderCoordinator = new BrowserProviderCoordinator([local, cdp], {
     exportCookies,
     getBrowserUserAgent: getCurrentBrowserUserAgent,
   });
   return browserProviderCoordinator;
 }
 
-async function launchBrowser(data: any): Promise<any> {
-  return getBrowserProviderCoordinator().launch(data);
+async function launchBrowser(data: any, deadline?: number): Promise<any> {
+  return getBrowserProviderCoordinator().launch(data, deadline);
 }
 
 async function closeBrowser(
@@ -1102,9 +1108,11 @@ const cdpProvider = new CdpBrowserProvider({
   args: runtimeArgs,
   socketPath: INSTANCE_SOCKET_PATH,
   endpointSource: cdpEndpointSource,
+  useActivePortFile:
+    Boolean(runtimeArgs.cdpUserDataDir) || cdpEndpointSource === 'built-in default',
   log,
   onPublish: cancelInventoryExit,
-  onDiscoveryDisconnect: scheduleInventoryExit,
+  onAttachDisconnect: scheduleInventoryExit,
   pluginService: (action, data) =>
     callPluginPageService(
       String(data.plugin ?? ''),
@@ -1130,12 +1138,17 @@ function defaultBrowserTransport(): 'extension' | 'cdp' {
 function browserProvider(
   transport: BrowserTransport = defaultBrowserTransport(),
 ): HostBrowserProvider {
-  return transport === 'extension' ? extensionProvider : cdpProvider;
+  if (transport === 'extension') return extensionProvider;
+  if (isDaemonMode && !inventoryOnly) return cdpProvider;
+  throw new Error(
+    'No connected browser. Run mearl browser_list or attach an existing browser with the CDP Provider.',
+  );
 }
 
 interface HostActionResult {
   data: any;
   closeConnection?: boolean;
+  closeHost?: boolean;
 }
 
 /** Structured dispatch is shared by Socket requests and scoped browser operations. */
@@ -1231,16 +1244,20 @@ async function dispatchHostRequest(request: any, managed = false): Promise<HostA
     (isBrowserCommandAction(action) ||
       (typeof action === 'string' && action.startsWith('__artifact_')))
   ) {
-    return {
-      data: await getControlSessionManager().invoke(
-        action,
-        data,
-        request.controlSessionId,
-        request.transport,
-        controlSource,
-        request.deadline,
-      ),
-    };
+    const closeHost =
+      action === 'browser_release' &&
+      request.controlSessionId === undefined &&
+      cdpProvider.isAttached;
+    const result = await getControlSessionManager().invoke(
+      action,
+      data,
+      request.controlSessionId,
+      request.transport,
+      controlSource,
+      request.deadline,
+    );
+    if (closeHost) cdpProvider.dispose();
+    return { data: result, closeHost };
   }
   if (action === 'start_cloud_connector') {
     if (!data.serverUrl || typeof data.serverUrl !== 'string')
@@ -1258,6 +1275,16 @@ async function dispatchHostRequest(request: any, managed = false): Promise<HostA
   }
   if (action === 'list_cloud_connectors') return { data: listCloudConnectors() };
   if (action === 'get_versions') return { data: await collectVersions(controlSource === 'local') };
+  if (action === '__cdp_attach' && attachCdp) {
+    cancelInventoryExit();
+    const { discovered, warning } = await cdpProvider.discover();
+    if (!discovered) {
+      if (!listRegisteredBrowsers().some(browser => browser.browserId === cdpProvider.browserId))
+        throw new Error(warning ?? 'Could not attach to the CDP browser');
+      scheduleInventoryExit();
+    }
+    return { data: { connected: true } };
+  }
   if (action === 'get_browser_access_url')
     return {
       data: {
@@ -1270,26 +1297,15 @@ async function dispatchHostRequest(request: any, managed = false): Promise<HostA
     throw new Error('Internal action is not available to clients');
   if (action === 'agent_chat_run') return { data: await getAgentChatManager().runTask(data) };
   if (action === 'browser_list') {
-    if (discoverCdp) cancelInventoryExit();
     const providerWarnings = await ensureInstalledProvidersRunning();
-    const { discovered, warning } = await cdpProvider.discover();
     const inventory = await listBrowserInventory(getBrowserProviderCoordinator().providerRuntimes);
-    const registeredCdpAvailable = inventory.browsers.some(
-      browser =>
-        browser.browserId === cdpProvider.browserId &&
-        browser.transport === 'cdp' &&
-        browser.status === 'connected',
-    );
-    const inventoryData = appendWarnings(inventory, [
-      ...providerWarnings,
-      ...(warning && !registeredCdpAvailable ? [warning] : []),
-    ]);
-    const closeConnection = skipBrowserRegistration || (discoverCdp && !discovered);
+    const inventoryData = appendWarnings(inventory, providerWarnings);
+    const closeConnection = inventoryOnly && skipBrowserRegistration;
     if (closeConnection) scheduleInventoryExit();
     return { data: inventoryData, closeConnection };
   }
   if (action === 'browser_close') return { data: await closeBrowser(data) };
-  if (action === 'browser_launch') return { data: await launchBrowser(data) };
+  if (action === 'browser_launch') return { data: await launchBrowser(data, request.deadline) };
   if (action === 'browser_release') {
     const startedAt = Date.now();
     const affectedTabIds = new Set<number>();
@@ -1300,6 +1316,7 @@ async function dispatchHostRequest(request: any, managed = false): Promise<HostA
     try {
       const releaseErrors: string[] = [];
       for (const transport of ['extension', 'cdp'] as const) {
+        if (transport === 'cdp' && (!isDaemonMode || inventoryOnly)) continue;
         try {
           const result = await browserProvider(transport).release(data);
           released = released && result?.released !== false;
@@ -1400,7 +1417,7 @@ async function handleSocketRequest(socket: net.Socket, line: string): Promise<vo
       }
     }
     const encoded = JSON.stringify(response) + '\n';
-    if (result.data?.[CLOSED_OWN_MANAGED_HOST]) {
+    if (result.closeHost || result.data?.[CLOSED_OWN_MANAGED_HOST]) {
       // A closing host owns the response socket until the receipt has been flushed.
       let shuttingDown = false;
       const shutdown = () => {
@@ -1562,7 +1579,7 @@ async function startSocketServer(): Promise<void> {
   // multiple browsers' native-hosts coexist and are each addressable.
   socketServer = await listenOn(INSTANCE_SOCKET_PATH);
   // Best-effort backward-compat endpoint for clients that predate the registry.
-  if (!skipBrowserRegistration) await tryBindLegacySocket();
+  if (!skipBrowserRegistration && !attachCdp) await tryBindLegacySocket();
 }
 
 // Cloud connector management is in ./cloud-connector.ts
@@ -1640,20 +1657,16 @@ async function main(): Promise<void> {
   // In daemon mode there is no extension stdin pipe, so skip Native Messaging input setup.
   // Otherwise the stdin 'end' handler may fire immediately and kill the detached process.
   if (isDaemonMode) {
-    const mode = skipBrowserRegistration
-      ? 'browser inventory'
-      : discoverCdp
-        ? 'CDP discovery'
-        : 'CDP';
+    const mode = inventoryOnly ? 'browser inventory' : 'CDP';
     log(
       `running in ${mode} daemon mode, pid=${process.pid}, version=${NATIVE_HOST_VERSION}, cdp=${cdpProvider.endpointDescription}`,
     );
   } else {
     extensionProvider.start();
   }
-  if (discoverCdp) scheduleInventoryExit(DISCOVERY_REQUEST_IDLE_EXIT_MS);
+  if (attachCdp) scheduleInventoryExit(ATTACH_REQUEST_IDLE_EXIT_MS);
   await startSocketServer();
-  if (!discoverCdp && !skipBrowserRegistration) {
+  if (!attachCdp && !skipBrowserRegistration && !inventoryOnly) {
     const updatePreset = createNativePresetAutoUpdater({
       directory: nativeCapabilityDirectory(),
       invoke: invokePresetHost,
@@ -1673,7 +1686,7 @@ async function main(): Promise<void> {
     }, 60 * 60_000).unref();
   }
 
-  await cdpProvider.start();
+  if (!inventoryOnly) await cdpProvider.start();
 
   process.on('SIGINT', () => cleanupAndExit(0));
   process.on('SIGTERM', () => cleanupAndExit(0));

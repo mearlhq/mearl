@@ -31,11 +31,7 @@ import { pluginHostPaths } from './pluginHostPaths.js';
 import type { PluginRevision } from './pluginRevision.js';
 import { PluginTaskStore, pluginTaskExecutionUnconfirmed } from './pluginTaskStore.js';
 import { isPluginTaskActive } from '@mearl/browser-core';
-import type {
-  PluginTask,
-  PluginTaskStartResult,
-  PluginTaskListResult,
-} from '@mearl/browser-core';
+import type { PluginTask, PluginTaskStartResult, PluginTaskListResult } from '@mearl/browser-core';
 import type {
   PluginTaskScope,
   PluginTaskStartRequest,
@@ -417,11 +413,6 @@ export class PluginTaskManager {
       throw new Error('Invalid plugin task invocation timeout');
     if (request.options.local !== undefined && typeof request.options.local !== 'boolean')
       throw new Error('Invalid plugin task local routing option');
-    if (
-      request.options.transport !== undefined &&
-      !['extension', 'cdp'].includes(request.options.transport)
-    )
-      throw new Error('Invalid plugin task transport');
     if (
       bridge.scope.bridge === 'service' &&
       request.options.browser &&
@@ -1052,8 +1043,7 @@ export class PluginTaskManager {
       const restrictedTarget = page?.target ?? documentTarget;
       let diagnosticUpdates = 0;
       let recoveryDescription:
-        | Promise<Awaited<ReturnType<PluginTaskManager['describeRevision']>>>
-        | undefined;
+        Promise<Awaited<ReturnType<PluginTaskManager['describeRevision']>>> | undefined;
       const modelOwner = page?.instanceId ?? parentIdentity?.taskId;
       const conversation =
         request.kind === 'model' &&
@@ -1291,9 +1281,7 @@ export class PluginTaskManager {
             }
             if (
               restrictedTarget &&
-              !['send_request', 'browser_list', 'connector_list'].includes(
-                action,
-              )
+              !['send_request', 'browser_list', 'connector_list'].includes(action)
             )
               throw error(
                 'PLUGIN_PAGE_TARGET_CHANGED',
@@ -1400,15 +1388,14 @@ export class PluginTaskManager {
   private assertRouting(options: PluginOptions, bound: PluginOptions): void {
     if (
       Object.keys(options).some(
-        key =>
-          !['browser', 'connector', 'session', 'local', 'transport', 'timeoutSec'].includes(key),
+        key => !['browser', 'connector', 'session', 'local', 'timeoutSec'].includes(key),
       )
     )
       throw error(
         'PLUGIN_TASK_TARGET_CHANGED',
         'Plugin task cannot override internal routing options',
       );
-    for (const key of ['browser', 'connector', 'session', 'local', 'transport'] as const)
+    for (const key of ['browser', 'connector', 'session', 'local'] as const)
       if (options[key] !== undefined && options[key] !== bound[key])
         throw error(
           'PLUGIN_TASK_TARGET_CHANGED',

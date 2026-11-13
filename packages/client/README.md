@@ -135,7 +135,7 @@ const result = await mearl.invokePlugin('notes', {
 console.log(result);
 ```
 
-脚本的 `--browser`、`--session`、`--connector`、`--local`、`--cdp` 由浏览器 API 和插件调用继承；
+脚本的 `--browser`、`--session`、`--connector`、`--local` 由浏览器 API 和插件调用继承；
 单次调用的 `options` 可覆盖。`--server` 指定 cloud-server。`--session new` 成功建立会话后，
 后续调用自动使用返回的 ID，`mearl.session` 和 CLI stderr 同时提供会话信息。
 先 await 建立会话的浏览器调用，再执行并发或 Skill 命令。脚本结束断开 SDK 连接，控制会话保留；
@@ -248,7 +248,6 @@ Mearl 默认聚合当前机器和已配置 cloud-server 下的浏览器，并通
 | ------------------------ | ------------------------------------- |
 | `--connector <id\|名称>` | 限制到一台远端机器                    |
 | `--local`                | 只使用当前机器                        |
-| `--cdp`                  | 当前机器强制使用 CDP；清单只列 CDP 浏览器，并隐含 `--local` |
 | `--server <url>`         | 覆盖自动读取的 cloud-server 地址      |
 
 `browser_list --help` 和 `browser_launch --help` 会按场景展示宿主选择参数；连接或传输排障运行
@@ -494,11 +493,13 @@ Node 插件在运行 CLI、SDK 或 MCP Server 的宿主上执行，不随浏览�
 
 `browser_list` 统一列出普通浏览器、Provider 浏览器和托管浏览器。`type` 区分
 `regular` / `managed`，`status` 区分 `connected` / `pairing` / `running_disconnected` /
-`stopped`；只有 `connected` 的浏览器可作为常规操作目标。本机没有已连接的插件浏览器时，
-`browser_list` 会自动探测默认 CDP 端点，即使已有 Provider 配对记录也无需传 `--cdp`。
-`browser_list --cdp` 在没有已注册的普通 CDP 浏览器时会主动探测该端点，并只返回 CDP 浏览器；
-插件浏览器已连接也不影响这次探测。设置 `MEARL_SOCKET_PATH` 时，清单请求沿用该实例 Socket。
-`check --cdp` 也只检查这些 CDP 浏览器。
+`stopped`；只有 `connected` 的浏览器可作为常规操作目标。用 CDP Provider 接入已开启远程调试的浏览器：
+
+```bash
+mearl browser_launch --local --payload '{"provider":"cdp","providerOptions":{}}'
+```
+
+需要指定调试端口时传入 `providerOptions.port`。用响应中的 `browserId` 执行 `check --browser` 或页面操作。设置 `MEARL_SOCKET_PATH` 时，清单请求沿用该实例 Socket。
 
 `browser_release` 仅在用户明确要求结束调试、退出接管或清理会话资源时调用；它会释放
 debugger/CDP 控制和会话级临时状态，保留浏览器及全部标签页。托管实例的启动、关闭、持久化、

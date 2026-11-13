@@ -85,15 +85,12 @@ describe('control session routing', () => {
     expect(invokeLocal.mock.calls.map(call => call[0])).toEqual(['tab_open', 'page_snapshot']);
   });
 
-  it('rejects browser/transport mismatches and only accepts new on observation or opening', async () => {
+  it('rejects browser mismatches and only accepts new on observation or opening', async () => {
     const session = 's_Aa1_-xYz';
     invokeLocal.mockResolvedValue({
       session: { sessionId: session, browserId: 'chrome', transport: 'extension' },
     });
     const client = new UnifiedClient();
-    await expect(
-      client.invoke('page_click', { tabId: 1 }, { session, transport: 'cdp' }),
-    ).rejects.toThrow('change transport');
     await expect(
       client.invoke('page_click', { tabId: 1 }, { session, browser: 'mearl:local:other' }),
     ).rejects.toThrow('does not match');
@@ -244,7 +241,6 @@ describe('control session routing', () => {
       expect(invokeLocal.mock.calls[2]![2]).toMatchObject({
         browser: 'chrome:a',
         controlSessionId: session.sessionId,
-        ...(transport === 'cdp' ? { transport: 'cdp' } : {}),
       });
     },
   );

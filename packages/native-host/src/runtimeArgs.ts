@@ -6,8 +6,9 @@ export interface NativeHostRuntimeArgs {
   cdpPort: number;
   cdpUserDataDir?: string;
   daemon: boolean;
-  discoverCdp: boolean;
+  attachCdp: boolean;
   help: boolean;
+  inventory: boolean;
   skipBrowserRegistration: boolean;
   version: boolean;
 }
@@ -54,8 +55,12 @@ export async function parseNativeHostRuntimeArgs(argv: string[]): Promise<Native
       options.daemon = true;
       continue;
     }
-    if (argument === '--discover-cdp') {
-      options.discoverCdp = true;
+    if (argument === '--attach-cdp') {
+      options.attachCdp = true;
+      continue;
+    }
+    if (argument === '--inventory') {
+      options.inventory = true;
       continue;
     }
     if (argument === '--skip-browser-registration') {
@@ -113,8 +118,9 @@ export async function parseNativeHostRuntimeArgs(argv: string[]): Promise<Native
     cdpPort: options.cdpPort ?? 9222,
     ...(options.cdpUserDataDir ? { cdpUserDataDir: options.cdpUserDataDir } : {}),
     daemon: options.daemon === true,
-    discoverCdp: options.discoverCdp === true,
+    attachCdp: options.attachCdp === true,
     help: options.help === true,
+    inventory: options.inventory === true,
     skipBrowserRegistration: options.skipBrowserRegistration === true,
     version: options.version === true,
   };

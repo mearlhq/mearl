@@ -31,7 +31,7 @@ npx @mearl/setup
 ### 2. 选择浏览器接入方式
 
 - **日常浏览器**：可选安装 [Chrome 扩展](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm)，复用已有标签页和登录态，并使用工具箱与 DevTools。
-- **浏览器 / Electron · CDP**：接入已开放远程调试的浏览器或 Electron 客户端页面，无需安装 Mearl 扩展。
+- **CDP Provider**：通过 `browser_launch` 接入已开放远程调试的 Chrome 或 Electron。用返回的 `browserId` 操作现有页面。
 - **远端浏览器或设备**：安装并配置对应 Provider，可用动作以该 Provider 声明为准。
 
 连接方式、权限和能力范围见 [CLI / SDK 文档](packages/client/README.md)。setup 准备本机工具；浏览器扩展安装和环境连接需按所选方式完成。

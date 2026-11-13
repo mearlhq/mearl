@@ -70,8 +70,6 @@ export interface InvokeOptions {
   timeoutSec?: number;
   /** Absolute cutoff for sending this request, including any routing retries. */
   deadline?: number;
-  /** Force CDP transport instead of extension */
-  transport?: 'cdp';
   /** Target a specific browser by id / name (see the browser registry). */
   browser?: string;
   /** Identifies whether browser control originated on this machine or through a remote connector. */
@@ -158,7 +156,7 @@ function browserListFromProviderRecords(browsers: LiveBrowser[]): Record<string,
   };
 }
 
-function withDiscoveryWarning(result: Record<string, any>, error: unknown): Record<string, any> {
+function withInventoryWarning(result: Record<string, any>, error: unknown): Record<string, any> {
   const cause = (error as Error & { cause?: unknown }).cause ?? error;
   const code = (cause as NodeJS.ErrnoException)?.code;
   const detail = code ?? (error instanceof Error ? error.message.split('\n')[0] : String(error));
@@ -166,19 +164,8 @@ function withDiscoveryWarning(result: Record<string, any>, error: unknown): Reco
     ...result,
     warnings: [
       ...(Array.isArray(result.warnings) ? result.warnings : []),
-      `Local CDP discovery could not complete: ${detail}`,
+      `Local browser inventory could not load: ${detail}`,
     ],
-  };
-}
-
-function cdpOnlyBrowserList(result: Record<string, any>): Record<string, any> {
-  const browsers: Record<string, any>[] = Array.isArray(result.browsers) ? result.browsers : [];
-  const cdpBrowsers = browsers.filter(browser => browser.transport === 'cdp');
-  return {
-    ...result,
-    count: cdpBrowsers.length,
-    connectedCount: cdpBrowsers.filter(browser => browser.status === 'connected').length,
-    browsers: cdpBrowsers,
   };
 }
 
@@ -188,13 +175,6 @@ function areInstalledProvidersRunning(): boolean {
 
 function isConnectedBrowser(browser: LiveBrowser): boolean {
   return browser.status === undefined || browser.status === 'connected';
-}
-
-function isOrdinaryLocalBrowser(browser: LiveBrowser): boolean {
-  return (
-    !browser.browserId.startsWith('managed:') &&
-    (browser.transport === 'extension' || browser.transport === 'cdp')
-  );
 }
 
 function supportsAction(browser: LiveBrowser, action: string, data: Record<string, any>): boolean {
@@ -236,13 +216,11 @@ function routableBrowsers(
   browsers: LiveBrowser[],
   action: string,
   data: Record<string, any>,
-  transport?: string,
 ): LiveBrowser[] {
   return browsers.filter(
     browser =>
       isConnectedBrowser(browser) &&
-      (action !== 'browser_list' || browser.transport !== 'provider') &&
-      !(transport === 'cdp' && browser.transport === 'provider') &&
+      (!['browser_list', 'browser_launch'].includes(action) || browser.transport !== 'provider') &&
       supportsAction(browser, action, data),
   );
 }
@@ -259,7 +237,7 @@ export function resolveLocalActionTarget(
   const browsers = listLiveBrowsers();
   const target = selector
     ? findBrowser(browsers, selector)
-    : routableBrowsers(browsers, action, data, options.transport)[0];
+    : routableBrowsers(browsers, action, data)[0];
   return target ? { browser: target.browserId } : undefined;
 }
 
@@ -283,16 +261,16 @@ function selectBrowserResult(data: Record<string, any>): Record<string, any> {
 
 /** Deduplicates concurrent recovery attempts in long-lived clients such as the MCP server. */
 let persistentSpawnPromise: Promise<boolean> | null = null;
-let discoveryListPromise: Promise<Record<string, any>> | null = null;
-let discoveryListCache: {
+let inventoryListPromise: Promise<Record<string, any>> | null = null;
+let inventoryListCache: {
   key: string;
   until: number;
   result?: Record<string, any>;
   error?: unknown;
 } | null = null;
-const DISCOVERY_STARTUP_TIMEOUT_MS = 3_000;
-const DISCOVERY_RETRY_INTERVAL_MS = 50;
-const DISCOVERY_MISS_CACHE_MS = 2_000;
+const INVENTORY_STARTUP_TIMEOUT_MS = 3_000;
+const INVENTORY_RETRY_INTERVAL_MS = 50;
+const INVENTORY_CACHE_MS = 2_000;
 
 function instanceSocketPath(pid: number): string {
   return process.platform === 'win32'
@@ -300,7 +278,7 @@ function instanceSocketPath(pid: number): string {
     : path.join(os.tmpdir(), `mearl-agent-${pid}.sock`);
 }
 
-function discoveryCacheKey(): string {
+function inventoryCacheKey(): string {
   const browsers = listLiveBrowsers()
     .map(browser => [
       browser.browserId,
@@ -341,7 +319,7 @@ async function trySpawnNativeHost(): Promise<boolean> {
 
   const spawnPromise = (async () => {
     try {
-      await spawnNativeHost(['--daemon']);
+      await spawnNativeHost(['--daemon', '--inventory']);
       return true;
     } catch {
       return false;
@@ -356,61 +334,45 @@ async function trySpawnNativeHost(): Promise<boolean> {
   }
 }
 
-async function discoverLocalBrowserList(
+async function loadLocalBrowserList(
   timeoutSec: number,
   controlSource: CompatibleControlSource,
 ): Promise<Record<string, any>> {
-  if (discoveryListPromise) return discoveryListPromise;
-  const cacheKey = discoveryCacheKey();
+  if (inventoryListPromise) return inventoryListPromise;
+  const cacheKey = inventoryCacheKey();
   if (
-    discoveryListCache &&
-    discoveryListCache.key === cacheKey &&
-    Date.now() < discoveryListCache.until
+    inventoryListCache &&
+    inventoryListCache.key === cacheKey &&
+    Date.now() < inventoryListCache.until
   ) {
-    if (discoveryListCache.error) throw discoveryListCache.error;
-    return discoveryListCache.result!;
+    if (inventoryListCache.error) throw inventoryListCache.error;
+    return inventoryListCache.result!;
   }
-  discoveryListCache = null;
+  inventoryListCache = null;
   const request = (async () => {
-    const pid = await spawnNativeHost(['--daemon', '--discover-cdp']);
+    const pid = await spawnNativeHost(['--daemon', '--inventory', '--skip-browser-registration']);
     if (pid === undefined) throw new Error('Native host did not report its process id');
     const socketPath = instanceSocketPath(pid);
-    const deadline = Date.now() + Math.min(timeoutSec * 1_000, DISCOVERY_STARTUP_TIMEOUT_MS);
+    const deadline = Date.now() + Math.min(timeoutSec * 1_000, INVENTORY_STARTUP_TIMEOUT_MS);
     while (true) {
       try {
-        return await invokeOnce(
-          'browser_list',
-          {},
-          timeoutSec,
-          undefined,
-          socketPath,
-          controlSource,
-        );
+        return await invokeOnce('browser_list', {}, timeoutSec, socketPath, controlSource);
       } catch (error) {
         if (!isConnError(error) || Date.now() >= deadline) throw error;
-        await new Promise(resolve => setTimeout(resolve, DISCOVERY_RETRY_INTERVAL_MS));
+        await new Promise(resolve => setTimeout(resolve, INVENTORY_RETRY_INTERVAL_MS));
       }
     }
   })();
-  discoveryListPromise = request;
+  inventoryListPromise = request;
   try {
     const result = await request;
-    if (
-      !result.browsers?.some(
-        (browser: Record<string, any>) =>
-          browser.transport === 'cdp' &&
-          browser.status === 'connected' &&
-          !browser.browserId?.startsWith('managed:'),
-      )
-    ) {
-      discoveryListCache = { key: cacheKey, result, until: Date.now() + DISCOVERY_MISS_CACHE_MS };
-    }
+    inventoryListCache = { key: cacheKey, result, until: Date.now() + INVENTORY_CACHE_MS };
     return result;
   } catch (error) {
-    discoveryListCache = { key: cacheKey, error, until: Date.now() + DISCOVERY_MISS_CACHE_MS };
+    inventoryListCache = { key: cacheKey, error, until: Date.now() + INVENTORY_CACHE_MS };
     throw error;
   } finally {
-    if (discoveryListPromise === request) discoveryListPromise = null;
+    if (inventoryListPromise === request) inventoryListPromise = null;
   }
 }
 
@@ -480,7 +442,6 @@ export function invoke(
 
   const {
     timeoutSec = resolveActionTimeoutSec(action, data),
-    transport,
     browser,
     controlSource = 'local',
   } = options;
@@ -494,14 +455,9 @@ export function invoke(
     const discovery = parseBrowserListParams(resolvedData);
     if (discovery) {
       return (async () => {
-        if (
-          transport ||
-          options.socketPath ||
-          controlSource !== 'local' ||
-          options.controlSessionId
-        )
+        if (options.socketPath || controlSource !== 'local' || options.controlSessionId)
           throw new Error(
-            'Provider discovery requires the local source without a transport, socket or session override',
+            'Provider discovery requires the local source without a socket or session override',
           );
         const provider = listInstalledProviders().find(
           provider => provider.providerId === discovery.provider,
@@ -517,7 +473,6 @@ export function invoke(
           'browser_providers',
           { operation: 'launch_form', ...discovery.launchForm },
           timeoutSec,
-          undefined,
           live.socketPath,
           'local',
         );
@@ -534,21 +489,17 @@ export function invoke(
       action,
       resolvedData,
       timeoutSec,
-      transport,
       undefined,
       controlSource,
       options.socketPath,
       options.deadline,
-    ).then(result =>
-      decorateBrowserListResult(transport === 'cdp' ? cdpOnlyBrowserList(result) : result),
-    );
+    ).then(decorateBrowserListResult);
   }
   const selector = browser ?? defaultBrowser ?? process.env.MEARL_BROWSER ?? undefined;
   return dispatchInvoke(
     action,
     resolvedData,
     timeoutSec,
-    transport,
     selector,
     controlSource,
     options.socketPath,
@@ -566,8 +517,8 @@ export function invokeLocalHost(
   const socketPath = options.socketPath ?? process.env.MEARL_SOCKET_PATH?.trim();
   const accepted = resolveFileRefs(data);
   return socketPath
-    ? invokeOnce(action, accepted, timeoutSec, undefined, socketPath, 'local')
-    : invokeViaLegacy(action, accepted, timeoutSec, undefined, 'local', false, true);
+    ? invokeOnce(action, accepted, timeoutSec, socketPath, 'local')
+    : invokeViaLegacy(action, accepted, timeoutSec, 'local', false, true);
 }
 
 /** Session ownership lives in the control hosts and survives individual CLI connections. */
@@ -592,14 +543,7 @@ async function resolveControlSession(
     : browsers.find(browser => browser.transport === 'provider');
   if (!sockets.length && !provider) sockets.push(SOCKET_PATH);
   const requests = sockets.map(socketPath =>
-    invokeOnce(
-      '__control_session_resolve',
-      { sessionId },
-      timeoutSec,
-      undefined,
-      socketPath,
-      controlSource,
-    ),
+    invokeOnce('__control_session_resolve', { sessionId }, timeoutSec, socketPath, controlSource),
   );
   if (provider) {
     requests.push(
@@ -607,7 +551,6 @@ async function resolveControlSession(
         '__control_session_resolve',
         { sessionId },
         timeoutSec,
-        undefined,
         provider.socketPath,
         controlSource,
         provider.browserId,
@@ -648,7 +591,6 @@ async function dispatchInvoke(
   action: string,
   data: Record<string, any>,
   timeoutSec: number,
-  transport: string | undefined,
   selector: string | undefined,
   controlSource: CompatibleControlSource,
   socketPath?: string,
@@ -659,7 +601,6 @@ async function dispatchInvoke(
       action,
       data,
       timeoutSec,
-      transport,
       path,
       controlSource,
       target?.transport === 'provider' ? target.browserId : undefined,
@@ -681,59 +622,14 @@ async function dispatchInvoke(
   }
 
   const browsers = listLiveBrowsers();
-  const controllableBrowsers = browsers.filter(isConnectedBrowser);
-
-  if (action === 'browser_list' && transport === 'cdp') {
-    const registeredCdp = controllableBrowsers.find(
-      browser => browser.transport === 'cdp' && isOrdinaryLocalBrowser(browser),
-    );
-    if (registeredCdp) {
-      try {
-        return await send(registeredCdp.socketPath);
-      } catch (error) {
-        if (!isConnError(error)) throw error;
-      }
-    }
-    try {
-      return await discoverLocalBrowserList(timeoutSec, controlSource);
-    } catch (error) {
-      if (
-        isUnavailableConnection(error) &&
-        browsers.some(browser => browser.transport === 'provider') &&
-        areInstalledProvidersRunning()
-      ) {
-        return withDiscoveryWarning(browserListFromProviderRecords(browsers), error);
-      }
-      throw error;
-    }
-  }
-
-  // A Provider record can keep the registry nonempty without representing a local
-  // browser transport. Let the discovery daemon probe CDP before returning that inventory.
-  if (action === 'browser_list' && !controllableBrowsers.some(isOrdinaryLocalBrowser)) {
-    try {
-      return await discoverLocalBrowserList(timeoutSec, controlSource);
-    } catch (error) {
-      if (
-        isUnavailableConnection(error) &&
-        browsers.some(browser => browser.transport === 'provider') &&
-        areInstalledProvidersRunning()
-      ) {
-        return withDiscoveryWarning(browserListFromProviderRecords(browsers), error);
-      }
-      throw error;
-    }
-  }
-
   // Explicit target: must match a live browser; do not silently fall back.
   if (selector) {
     const match = findBrowser(browsers, selector);
     if (!match) {
       throw new Error(formatNoMatchError(selector, browsers));
     }
-    if (transport === 'cdp' && match.transport === 'provider') {
-      throw new Error(`Browser ${describeBrowser(match)} does not support the CDP transport`);
-    }
+    if (action === 'browser_launch' && match.transport === 'provider')
+      return invokeViaLegacy(action, data, timeoutSec, controlSource, false, true, deadline);
     if (
       match.status === 'pairing' &&
       action !== 'get_versions' &&
@@ -760,7 +656,7 @@ async function dispatchInvoke(
 
   // No explicit target: prefer the most-recently-focused live browser; on a
   // stale socket, fall through to the legacy path + auto-spawn.
-  const candidates = routableBrowsers(browsers, action, data, transport);
+  const candidates = routableBrowsers(browsers, action, data);
   if (candidates.length > 0) {
     const target = candidates[0]!;
     try {
@@ -777,14 +673,14 @@ async function dispatchInvoke(
 
   if (action === 'browser_list') {
     try {
-      return await discoverLocalBrowserList(timeoutSec, controlSource);
+      return await loadLocalBrowserList(timeoutSec, controlSource);
     } catch (error) {
       if (
         isUnavailableConnection(error) &&
         browsers.some(browser => browser.transport === 'provider') &&
         areInstalledProvidersRunning()
       ) {
-        return withDiscoveryWarning(browserListFromProviderRecords(browsers), error);
+        return withInventoryWarning(browserListFromProviderRecords(browsers), error);
       }
       throw error;
     }
@@ -794,10 +690,9 @@ async function dispatchInvoke(
     action,
     data,
     timeoutSec,
-    transport,
     controlSource,
     false,
-    false,
+    action === 'browser_launch',
     deadline,
   );
 }
@@ -807,7 +702,6 @@ async function invokeViaLegacy(
   action: string,
   data: Record<string, any>,
   timeoutSec: number,
-  transport: string | undefined,
   controlSource: CompatibleControlSource,
   isRetry: boolean,
   localOnly = false,
@@ -819,7 +713,6 @@ async function invokeViaLegacy(
       action,
       data,
       timeoutSec,
-      transport,
       SOCKET_PATH,
       controlSource,
       undefined,
@@ -839,7 +732,6 @@ async function invokeViaLegacy(
           browser =>
             isConnectedBrowser(browser) &&
             (!localOnly || browser.transport !== 'provider') &&
-            !(transport === 'cdp' && browser.transport === 'provider') &&
             supportsAction(browser, action, data),
         );
         if (target) {
@@ -847,7 +739,6 @@ async function invokeViaLegacy(
             action,
             data,
             timeoutSec,
-            transport,
             target.socketPath,
             controlSource,
             target.transport === 'provider' ? target.browserId : undefined,
@@ -859,7 +750,6 @@ async function invokeViaLegacy(
           action,
           data,
           timeoutSec,
-          transport,
           controlSource,
           /* isRetry */ true,
           localOnly,
@@ -876,7 +766,6 @@ async function invokeOnce(
   action: string,
   data: Record<string, any>,
   timeoutSec: number,
-  transport: string | undefined,
   socketPath: string,
   controlSource: CompatibleControlSource,
   providerTarget?: string,
@@ -941,7 +830,6 @@ async function invokeOnce(
         deadline,
       };
       if ((data as any)[SESSION_OPTION]) message.controlSessionId = (data as any)[SESSION_OPTION];
-      if (transport) message.transport = transport;
       if (providerTarget) {
         message.providerTarget = providerTarget;
       }
@@ -970,8 +858,22 @@ async function invokeOnce(
             console.warn(response.versionWarning);
           }
 
-          if (response.success) settle(null, response.data);
-          else settle(new Error(response.error || 'Socket 服务端返回未知错误'));
+          if (response.success) {
+            settle(null, response.data);
+          } else if (
+            action === 'browser_launch' &&
+            typeof data.provider === 'string' &&
+            data.provider.trim() === 'cdp' &&
+            response.error === 'Provider is not registered: cdp'
+          ) {
+            settle(
+              new Error(
+                'The connected Native Host does not include the CDP Provider. Update Mearl or reload the extension to restart its Native Host, then retry.',
+              ),
+            );
+          } else {
+            settle(new Error(response.error || 'Socket 服务端返回未知错误'));
+          }
           return;
         } catch {
           settle(new Error(`无效的 JSON 响应: ${line}`));
@@ -1000,17 +902,14 @@ function formatConnectError(error: NodeJS.ErrnoException, socketPath: string): s
     return [
       `未找到 Socket: ${socketPath}`,
       'native host 自动拉起失败。先运行 mearl check --local；缺少命令时运行 npx @mearl/setup --local --yes。',
-      '自动拉起只使用默认 daemon 参数；自定义 CDP/Profile/浏览器参数需手工启动，参见 mearl-native-host --help。',
       '',
       '【方式一：浏览器插件模式】',
       `1. 确认已安装 Mearl 浏览器插件（${EXTENSION_INSTALL_URL}）`,
       '2. 确认已执行 Native Messaging 初始化（安装 @mearl/native-host 时会自动完成）',
       '3. 确认 Chrome 浏览器正在运行，如仍无法连接可在 chrome://extensions 重新加载插件',
       '',
-      '【方式二：CDP 远程调试模式（Chrome 145+，无需插件）】',
-      '  访问 chrome://inspect/#remote-debugging，勾选 "Allow remote debugging for this browser instance"',
-      '  Chrome 会弹出授权提示，点击允许，native host 自动读取 DevToolsActivePort 文件连接',
-      '  确认有普通网页已打开（非 chrome:// 页面）',
+      '【方式二：CDP Provider】',
+      '  在 Chrome 或 Electron 启用远程调试后运行 mearl guide browsers 查看接入命令。',
     ].join('\n');
   }
 

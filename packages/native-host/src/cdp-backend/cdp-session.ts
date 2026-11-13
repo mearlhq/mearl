@@ -44,6 +44,8 @@ export interface PageSession {
 export interface CdpSessionOptions {
   port?: number;
   userDataDir?: string;
+  useActivePortFile?: boolean;
+  requireActivePortFile?: boolean;
   endpointUrl?: string;
   endpointResolver?: () => Promise<string>;
   targetRegistryFile?: string;
@@ -80,6 +82,8 @@ export class CdpSession {
   readonly port: number;
   readonly userDataDir?: string;
   private readonly endpointUrl?: string;
+  private readonly useActivePortFile: boolean = true;
+  private readonly requireActivePortFile: boolean = false;
   private readonly endpointResolver?: () => Promise<string>;
   private readonly targetRegistryFile?: string;
   private browserClient: CdpClient | null = null;
@@ -104,6 +108,8 @@ export class CdpSession {
     }
     this.port = options.port ?? 9222;
     this.userDataDir = options.userDataDir;
+    this.useActivePortFile = options.useActivePortFile ?? true;
+    this.requireActivePortFile = options.requireActivePortFile ?? false;
     this.endpointUrl = options.endpointUrl;
     this.endpointResolver = options.endpointResolver;
     this.targetRegistryFile = options.targetRegistryFile;
@@ -504,7 +510,7 @@ export class CdpSession {
   private async findTargetById(targetId: string): Promise<CdpTarget | null> {
     if (this.isRemote()) return this.findTargetByIdViaCdp(targetId);
     try {
-      const targets = await discoverTargets(this.effectivePort());
+      const targets = await discoverTargets(this.getEffectivePort());
       return targets.find(t => t.id === targetId && t.webSocketDebuggerUrl) ?? null;
     } catch {
       // HTTP not available — fall back to Target.getTargets via browser WS
@@ -515,7 +521,7 @@ export class CdpSession {
   private async findDefaultPageTarget(): Promise<CdpTarget | null> {
     if (this.isRemote()) return this.findDefaultPageTargetViaCdp();
     try {
-      const targets = await discoverTargets(this.effectivePort());
+      const targets = await discoverTargets(this.getEffectivePort());
       return (
         targets.find(
           t => t.type === 'page' && t.webSocketDebuggerUrl && isImplicitlySelectablePageUrl(t.url),
@@ -530,8 +536,12 @@ export class CdpSession {
   // ── CDP-based target discovery (when HTTP /json is unavailable) ───────────
 
   /** Effective port: from DevToolsActivePort file if present, else this.port */
-  private effectivePort(): number {
-    return readDevToolsActivePort(this.userDataDir)?.port ?? this.port;
+  getEffectivePort(): number {
+    if (this.requireActivePortFile) return this.port;
+    return (
+      (this.useActivePortFile ? readDevToolsActivePort(this.userDataDir)?.port : undefined) ??
+      this.port
+    );
   }
 
   /**
@@ -550,9 +560,15 @@ export class CdpSession {
       return { url: url.toString() };
     }
     let discoveryFileError: Error | undefined;
-    const fileInfo = readDevToolsActivePort(this.userDataDir, error => {
-      discoveryFileError = error;
-    });
+    const fileInfo = this.useActivePortFile
+      ? readDevToolsActivePort(this.userDataDir, error => {
+          discoveryFileError = error;
+        })
+      : null;
+    if (this.requireActivePortFile && fileInfo?.port !== this.port)
+      throw new Error(
+        'The Chrome profile debugging port changed during attachment. Run browser_launch again.',
+      );
     if (fileInfo) {
       return { url: `ws://localhost:${fileInfo.port}${fileInfo.browserWsPath}` };
     }
@@ -584,7 +600,7 @@ export class CdpSession {
    * Used when HTTP /json is unavailable.
    */
   private pageWsUrl(targetId: string): string {
-    const port = this.effectivePort();
+    const port = this.getEffectivePort();
     return `ws://localhost:${port}/devtools/page/${targetId}`;
   }
 

@@ -504,7 +504,7 @@ export const COMMANDS = [
   },
   {
     name: 'browser_launch',
-    description: '启动本地 Chrome，或通过已注册 Provider 创建浏览器实例',
+    description: '通过 Provider 启动或接入浏览器实例',
     params: [
       {
         name: 'name',
@@ -514,7 +514,7 @@ export const COMMANDS = [
       {
         name: 'provider',
         type: 'string',
-        description: '运行环境，默认 local；可传 mearl --help 中展示的已注册 Provider ID',
+        description: '运行环境，默认 local；cdp 接入已开启远程调试的 Chromium 或 Electron',
       },
       {
         name: 'providerOptions',
@@ -546,6 +546,7 @@ export const COMMANDS = [
       },
     ],
     examples: [
+      `browser_launch --local --payload '{"provider":"cdp","providerOptions":{"name":"Electron","port":9223}}'`,
       `browser_launch --payload '{"provider":"example-device","providerOptions":{}}'`,
       `browser_launch --payload '{"name":"figma","userAgentMode":"desktop","copyCookieDomains":["figma.com"]}'`,
       `browser_launch --payload '{"name":"with-cookies","copyCookieDomains":["example.com","sub.example.org"]}'`,
