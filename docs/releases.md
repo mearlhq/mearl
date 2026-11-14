@@ -38,6 +38,12 @@ npm 发布和 GitHub Release 完成后，**Submit Chrome Web Store review** 用�
 
 GitHub 扩展附件的下载权限由仓库可见性决定。开发验证可加载本地 `packages/extension/dist_chrome`；发行验证使用同版预发布 ZIP 解压后的目录。
 
+### SkillHub
+
+在 [SkillHub API Keys](https://skillhub.cn/dashboard/keys) 用已实名认证的发布账号创建个人 API Key，并将其保存为仓库 Actions secret `SKILLHUB_TOKEN`。首次同步或补发时，在 GitHub Actions 打开 **Publish Skills to SkillHub → Run workflow**，选择 `main` 并填写已发布的正式标签，例如 `v3.1.0`。
+
+`stable` 和 `patch` 完成 npm 与 GitHub Release 发布后，自动提交该标签下 `skills/<name>/SKILL.md` 对应的全部 Skill。工作流保留各 Skill 的资源，在临时副本中加入 SkillHub 字段并统一为发行版本。提交后在 SkillHub「我的 Skill」查看审核状态。失败可重跑该 job，或手动用同一标签补发。平台确认同账号的同版本已在审核或已通过时，工作流会跳过该项。
+
 ## Windows 发行包回查
 
 `.github/workflows/windows-smoke.yml` 通过 GitHub Actions 手动运行，读取 npm 当前 beta，安装对应的官方运行包和同版 GitHub 扩展 ZIP。临时 Windows runner 使用独立 Chrome for Testing 配置，核验 Native Messaging 注册、Chrome/Native Host 同版连接、CLI 命名管道往返与注册清理，并保存 `windows-runtime-smoke` 证据附件。它检查已发布制品，不代替候选源码 CI、完整 Windows UI 或第三方服务验收。

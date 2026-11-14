@@ -38,6 +38,12 @@ Restrict the `chrome-webstore` GitHub environment to deployments from `main`. Se
 
 Repository visibility determines access to GitHub extension attachments. Development validation can load local `packages/extension/dist_chrome`; release validation uses the extracted matching prerelease ZIP.
 
+### SkillHub
+
+Create a personal API key in [SkillHub API Keys](https://skillhub.cn/dashboard/keys) under the verified publishing account and save it as the repository Actions secret `SKILLHUB_TOKEN`. For the first sync or a backfill, open **Publish Skills to SkillHub → Run workflow** in GitHub Actions, select `main`, and enter an existing stable release tag such as `v3.1.0`.
+
+After npm publishing and GitHub Release creation, `stable` and `patch` automatically submit every Skill with a `skills/<name>/SKILL.md` in that tag. The workflow preserves each Skill's resources and adds SkillHub metadata and the release version in temporary copies. Check review status under **My Skills** on SkillHub. If submission fails, rerun the job or manually submit the same tag. The workflow skips a version when SkillHub confirms it is already under review or approved for the same account.
+
 ## Windows release smoke checks
 
 Manually run `.github/workflows/windows-smoke.yml` through GitHub Actions. It reads npm's current beta and installs official runtime packages and the matching GitHub extension ZIP. A temporary Windows runner uses a separate Chrome for Testing profile to verify Native Messaging registration, matching Chrome/Native Host versions, CLI named-pipe round trips, and registration cleanup, then saves a `windows-runtime-smoke` evidence artifact. It checks published artifacts and does not replace candidate-source CI, full Windows UI validation, or third-party service acceptance.

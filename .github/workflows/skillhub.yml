@@ -1,0 +1,62 @@
+name: Publish Skills to SkillHub
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Published stable release tag
+        type: string
+        required: true
+    secrets:
+      SKILLHUB_TOKEN:
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published stable release tag, such as v3.1.0
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: skillhub-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'mearlhq/mearl' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Verify the published stable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          gh release view "$RELEASE_TAG" --json tagName,isDraft,isPrerelease |
+            jq -e --arg tag "$RELEASE_TAG" '.tagName == $tag and (.isDraft or .isPrerelease | not)'
+          git merge-base --is-ancestor "refs/tags/$RELEASE_TAG" HEAD
+      - name: Set up the pinned SkillHub CLI
+        run: |
+          curl -fsSL --retry 3 --max-time 60 \
+            https://skillhub-1388575217.cos.ap-guangzhou.myqcloud.com/install/skillhub-cli-2026.8.5.tar.gz \
+            -o "$RUNNER_TEMP/skillhub-cli.tar.gz"
+          echo "3bbe2ba15ada2eb7a94a2b760fead83be5f4164ab28a6c8b0944dbc539f7e236  $RUNNER_TEMP/skillhub-cli.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/skillhub-cli.tar.gz" -C "$RUNNER_TEMP" \
+            cli/skills_store_cli.py cli/skills_upgrade.py cli/version.json cli/metadata.json
+      - name: Preflight and submit the release Skills
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          SKILLHUB_TOKEN: ${{ secrets.SKILLHUB_TOKEN }}
+        run: node scripts/publish-skillhub.mjs --tag "$RELEASE_TAG" --cli "$RUNNER_TEMP/cli/skills_store_cli.py"

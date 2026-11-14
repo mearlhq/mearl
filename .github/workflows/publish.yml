@@ -6,12 +6,15 @@ on:
     branches: [main, codex/open-source-ready]
     paths:
       - .github/workflows/publish.yml
+      - .github/workflows/skillhub.yml
       - scripts/ci-release.mjs
       - scripts/chrome-webstore.mjs
+      - scripts/publish-skillhub.mjs
       - scripts/publish.mjs
       - scripts/bump-version.mjs
       - scripts/__tests__/ci-release.test.mjs
       - scripts/__tests__/chrome-webstore.test.mjs
+      - scripts/__tests__/publish-skillhub.test.mjs
       - scripts/__tests__/publish.test.mjs
       - scripts/__tests__/bump-version.test.mjs
   workflow_dispatch:
@@ -180,6 +183,16 @@ jobs:
     with:
       release-version: ${{ inputs.channel != 'beta' && needs.build.outputs.version || '' }}
     secrets: inherit
+
+  skillhub:
+    name: Submit Skills to SkillHub
+    needs: [build, publish]
+    if: github.repository == 'mearlhq/mearl' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && (inputs.channel == 'stable' || inputs.channel == 'patch')
+    uses: ./.github/workflows/skillhub.yml
+    with:
+      tag: v${{ needs.build.outputs.version }}
+    secrets:
+      SKILLHUB_TOKEN: ${{ secrets.SKILLHUB_TOKEN }}
 
   chrome-webstore:
     name: Submit Chrome Web Store review
