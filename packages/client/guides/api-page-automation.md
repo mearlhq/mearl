@@ -123,6 +123,8 @@ JS
 
 `files` 与 `filePaths` 互斥。确认页面显示附件或上传成功的业务状态；外部 Provider 的文件能力按其当前帮助执行。
 
+通过 Chrome 扩展连接时，`files` 支持 HTTP(S) 页面的文件输入框，分块传输合计最多 256 MiB，无需开启「允许访问文件网址」。`filePaths` 由 Chrome 直接读取宿主文件，适用于大文件或要求原生文件选择事件的站点，在扩展连接中需要开启该设置。直连 CDP 的上传无需此扩展设置。
+
 ## page_download
 
 先监听下载，再执行 `trigger` 点击并等待下载完成。`trigger` 使用不含 `tabId` 的 `page_click` 参数；目标页面由顶层 `tabId` 指定。

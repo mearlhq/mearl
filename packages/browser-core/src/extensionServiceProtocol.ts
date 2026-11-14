@@ -26,6 +26,28 @@ import {
 
 export const EXTENSION_RPC_VERSION = 1;
 
+export interface PageUploadTransfer {
+  id: string;
+  deadline: number;
+  files: Array<{ filename: string; bytes: number }>;
+}
+
+export interface PageUploadChunkRequest {
+  id: string;
+  tabId: number;
+  fileIndex: number;
+  offset: number;
+}
+
+export interface PageUploadChunk {
+  base64: string;
+  bytes: number;
+  totalBytes: number;
+}
+
+export const PAGE_UPLOAD_TRANSFER_MAX_BYTES = 256 * 1024 * 1024;
+export const PAGE_UPLOAD_FILE_TRANSFER_TIMEOUT_MS = 180_000;
+
 export type OperationRequest<M> = {
   [O in keyof M]: M[O] extends { request: infer R } ? { operation: O } & R : never;
 }[keyof M];
@@ -254,6 +276,7 @@ export function isHostToExtensionAction(value: unknown): value is keyof HostToEx
 }
 /** These services originate in the extension background, not a runtime UI message. */
 export const EXTENSION_BACKGROUND_ACTIONS = {
+  page_upload_chunk: true,
   preset_installation: true,
   preset_browser_transfer: true,
   app_profile_catalog: true,

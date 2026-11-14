@@ -19,6 +19,9 @@ import {
   clickElementBySelector,
   createPageClickResult,
   isStateAwareClickTarget,
+  isPageActionPreconditionError,
+  isPageActionDispatchUncertainError,
+  DomainPermissionError,
   describePageClickDispatchAttempt,
   dispatchPairedPageInputCommands,
   withPageActionDispatchAttempt,
@@ -77,6 +80,7 @@ import {
   type PageScrollParams,
   type PageTypeParams,
   type PageUploadParams,
+  type PageUploadTransfer,
   type PageWaitParams,
   resolvePageWaitInput,
   buildPageWaitExpression,
@@ -96,6 +100,7 @@ import {
   resolvePageInspectInput,
   unwrapPageInspectResult,
 } from '@mearl/browser-core';
+import { uploadStagedFiles, type StagedUploadSource } from './stagedPageUpload';
 // showClickIndicator → passed as func ref to chrome.scripting.executeScript (non-critical)
 import {
   acquireDebuggerLease,
@@ -2560,22 +2565,32 @@ export async function handlePageWait(
 // ─── page_upload ──────────────────────────────────────────────────────────────
 
 export async function handlePageUpload(
-  data: PageUploadParams,
+  data: PageUploadParams & { stagedUpload?: PageUploadTransfer },
   getActiveTabId: () => number | null,
+  source?: StagedUploadSource,
 ): Promise<{ uploaded: boolean; fileCount: number; tag: string }> {
-  const { selector, filePaths } = data;
+  const { selector, filePaths, stagedUpload } = data;
   const tabId = data.tabId ?? getActiveTabId();
   if (!tabId) {
     throw new Error('No active tab found. Specify tabId or focus a browser tab.');
   }
   checkPageActionPrecondition(() => validatePageElementSelector(selector, 'page_upload'));
+  if (stagedUpload && (!source || filePaths || data.files)) {
+    throw new PageActionPreconditionError('Invalid staged page upload request');
+  }
   if (
-    !Array.isArray(filePaths) ||
-    filePaths.length === 0 ||
-    filePaths.some(filePath => typeof filePath !== 'string' || filePath.length === 0)
+    !stagedUpload &&
+    (!Array.isArray(filePaths) ||
+      filePaths.length === 0 ||
+      filePaths.some(filePath => typeof filePath !== 'string' || filePath.length === 0))
   ) {
     throw new PageActionPreconditionError(
       'Invalid filePaths: must be a non-empty array of file path strings',
+    );
+  }
+  if (!stagedUpload && !(await chrome.extension.isAllowedFileSchemeAccess())) {
+    throw new PageActionPreconditionError(
+      `page_upload with filePaths requires "Allow access to file URLs" for Mearl at chrome://extensions/?id=${chrome.runtime.id}. Use files to upload without this setting.`,
     );
   }
 
@@ -2597,12 +2612,14 @@ export async function handlePageUpload(
   let objectId: string | undefined;
 
   try {
+    const contextId = stagedUpload
+      ? await getUploadExecutionContext(debugTarget, frame?.frameId)
+      : undefined;
     let backendNodeId = refEntry?.backendNodeId;
     if (!refEntry && frame) {
-      const contextId = await getFrameExecutionContextId(debugTarget, frame.frameId);
       const evaluated = (await sendPageCommand(debugTarget, 'Runtime.evaluate', {
         expression: `document.querySelector(${JSON.stringify(selector)})`,
-        contextId,
+        contextId: contextId ?? (await getFrameExecutionContextId(debugTarget, frame.frameId)),
         returnByValue: false,
       })) as {
         result?: { objectId?: string };
@@ -2644,23 +2661,27 @@ export async function handlePageUpload(
     if (!objectId) {
       const resolved = (await sendPageCommand(debugTarget, 'DOM.resolveNode', {
         backendNodeId,
+        ...(contextId !== undefined ? { executionContextId: contextId } : {}),
       })) as { object: { objectId: string } };
       objectId = resolved.object.objectId;
+    }
+
+    if (stagedUpload) {
+      await uploadStagedFiles(debugTarget, objectId, stagedUpload, source!);
+      return { uploaded: true, fileCount: stagedUpload.files.length, tag: 'input' };
     }
 
     const tagResult = (await sendPageCommand(debugTarget, 'Runtime.callFunctionOn', {
       objectId,
       functionDeclaration: `function() {
-          return this.tagName ? this.tagName.toLowerCase() : '';
+          return this.localName === 'input' && this.type === 'file';
         }`,
       returnByValue: true,
-    })) as { result: { value: string } };
+    })) as { result: { value: boolean } };
 
-    const tag = tagResult.result.value;
-
-    if (tag !== 'input') {
+    if (!tagResult.result.value) {
       throw new PageActionPreconditionError(
-        `Element <${tag}> is not a file input. selector must point to an <input type="file"> element.`,
+        'page_upload: selector must point to an <input type="file"> element.',
       );
     }
 
@@ -2670,13 +2691,41 @@ export async function handlePageUpload(
       ...(backendNodeId !== undefined ? { backendNodeId } : { objectId }),
     });
 
-    return { uploaded: true, fileCount: filePaths.length, tag };
+    return { uploaded: true, fileCount: filePaths!.length, tag: 'input' };
   } catch (error) {
     if (isRef) deleteRef(tabId, selector);
+    if (
+      stagedUpload &&
+      !(error instanceof DomainPermissionError) &&
+      !isPageActionPreconditionError(error) &&
+      !isPageActionDispatchUncertainError(error)
+    ) {
+      throw new PageActionPreconditionError(
+        error instanceof Error ? error.message : String(error),
+        {
+          cause: error,
+        },
+      );
+    }
     throw error;
   } finally {
     if (objectId)
       await sendPageCommand(debugTarget, 'Runtime.releaseObject', { objectId }).catch(() => {});
     await debuggerLease.release();
   }
+}
+
+async function getUploadExecutionContext(
+  target: { tabId: number; sessionId?: string },
+  frameId?: string,
+): Promise<number> {
+  if (!frameId) {
+    const { frameTree } = await sendPageCommand(target, 'Page.getFrameTree');
+    frameId = frameTree.frame.id;
+  }
+  const { executionContextId } = await sendPageCommand(target, 'Page.createIsolatedWorld', {
+    frameId,
+    worldName: 'mearl-page-upload',
+  });
+  return executionContextId;
 }

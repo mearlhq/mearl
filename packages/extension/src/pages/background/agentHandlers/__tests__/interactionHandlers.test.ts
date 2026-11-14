@@ -46,16 +46,35 @@ import {
 } from '../interactionHandlers';
 import { resolveRef } from '../pageRefs';
 
+const isAllowedFileSchemeAccess = vi.fn<() => Promise<boolean>>();
+
 beforeEach(() => {
   getContainerTopFrame.mockResolvedValue(undefined);
   getFrameTarget.mockResolvedValue(undefined);
   getFrameViewportTransform.mockReset();
   resolveDebuggerFrameExecutionContextId.mockReset().mockResolvedValue(17);
+  isAllowedFileSchemeAccess.mockReset().mockResolvedValue(true);
+  chrome.extension = { ...chrome.extension, isAllowedFileSchemeAccess };
 });
 
 describe('page upload', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('reports the Chrome file access requirement before acquiring the upload lease', async () => {
+    isAllowedFileSchemeAccess.mockResolvedValue(false);
+
+    await expect(
+      handlePageUpload(
+        { tabId: 1, selector: '#upload', filePaths: ['/tmp/photo.jpg'] },
+        () => null,
+      ),
+    ).rejects.toMatchObject({
+      pageActionFailureStage: 'precondition',
+      message: expect.stringContaining('Allow access to file URLs'),
+    });
+    expect(acquireDebuggerLease).not.toHaveBeenCalled();
   });
 
   it('sets file paths directly on the input', async () => {
@@ -64,7 +83,7 @@ describe('page upload', () => {
       if (method === 'DOM.querySelector') return { nodeId: 2 };
       if (method === 'DOM.describeNode') return { node: { backendNodeId: 3 } };
       if (method === 'DOM.resolveNode') return { object: { objectId: 'file-input' } };
-      if (method === 'Runtime.callFunctionOn') return { result: { value: 'input' } };
+      if (method === 'Runtime.callFunctionOn') return { result: { value: true } };
       return {};
     }) as any;
 
@@ -96,7 +115,7 @@ describe('page upload', () => {
       if (method === 'DOM.querySelector') return { nodeId: 2 };
       if (method === 'DOM.describeNode') return { node: { backendNodeId: 3 } };
       if (method === 'DOM.resolveNode') return { object: { objectId: 'file-input' } };
-      if (method === 'Runtime.callFunctionOn') return { result: { value: 'input' } };
+      if (method === 'Runtime.callFunctionOn') return { result: { value: true } };
       if (method === 'DOM.setFileInputFiles') throw uploadError;
       return {};
     }) as any;
@@ -131,7 +150,7 @@ describe('actions in the active preview WebView', () => {
       if (method === 'Runtime.evaluate') {
         return { result: params.returnByValue ? { value: true } : { objectId: 'upload-input' } };
       }
-      if (method === 'Runtime.callFunctionOn') return { result: { value: 'input' } };
+      if (method === 'Runtime.callFunctionOn') return { result: { value: true } };
       return {};
     }) as any;
     const target = { tabId: 1, sessionId: 'child' };

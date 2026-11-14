@@ -117,6 +117,7 @@ import {
   type PageDiagnosticsOptions,
   type RunActionsParams,
   type HostToExtensionActionMap,
+  type PageUploadChunkRequest,
 } from '@mearl/browser-core';
 import { isAgentDomainAuthorized } from '../../shared/proxyPermissions';
 import { getAnalyticsClientId } from '../../shared/analytics';
@@ -692,6 +693,7 @@ export class AgentBridge {
             timestamp: Date.now(),
             version: extensionVersion,
             rpcVersion: EXTENSION_RPC_VERSION,
+            pageUploadTransfer: true,
             checkForUpdates,
             browserId: identity.browserId,
             browserName: identity.browserName,
@@ -707,6 +709,7 @@ export class AgentBridge {
               timestamp: Date.now(),
               version: extensionVersion,
               rpcVersion: EXTENSION_RPC_VERSION,
+              pageUploadTransfer: true,
               checkForUpdates,
             });
           }
@@ -786,6 +789,8 @@ export class AgentBridge {
     data: any,
     trustedInternal = false,
   ): Promise<void> {
+    if (action === 'page_upload' && !trustedInternal && Object.hasOwn(data ?? {}, 'stagedUpload'))
+      throw new Error('Page upload references require a trusted native-host request');
     if (
       action === 'send_request' &&
       !trustedInternal &&
@@ -1030,7 +1035,17 @@ export class AgentBridge {
         return { ...result, ...observation.fields(result.url, full) };
       }
       case 'page_upload':
-        return handlePageUpload(data, () => this.getActiveTabId());
+        return handlePageUpload(data, () => this.getActiveTabId(), {
+          readChunk: (request: PageUploadChunkRequest) =>
+            this.requestNativeHost('page_upload_chunk', request),
+          authorizeDocument: async url => {
+            const { protocol, hostname } = new URL(url);
+            if (!['http:', 'https:'].includes(protocol) || !hostname)
+              throw new Error('Staged page uploads require an HTTP or HTTPS document');
+            await this.assertAgentDomainsAuthorized('page_upload', [hostname]);
+          },
+          signal: ctx.signal,
+        });
       case 'page_frames':
         return handlePageFrames(data, () => this.getActiveTabId());
       case '__browser_enhancement':

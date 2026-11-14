@@ -52,6 +52,7 @@ interface ExtensionBrowserInfo {
 export class ExtensionBrowserProvider implements HostBrowserProvider {
   private extensionVersion: string | null = null;
   private rpcVersion: number | null = null;
+  private uploadTransfer = false;
   private record?: Parameters<typeof registerBrowser>[0];
   private agentAllowed = false;
   private buffer = Buffer.alloc(0);
@@ -88,6 +89,10 @@ export class ExtensionBrowserProvider implements HostBrowserProvider {
 
   get protocolReady(): boolean {
     return this.connected && this.rpcVersion === EXTENSION_RPC_VERSION;
+  }
+
+  get supportsUploadTransfer(): boolean {
+    return this.protocolReady && this.uploadTransfer;
   }
 
   get browserId(): string {
@@ -150,6 +155,13 @@ export class ExtensionBrowserProvider implements HostBrowserProvider {
     return this.invokeAction(action, data, (action, payload, timeout, trusted) =>
       this.request(action, payload, timeout, trusted, controlSource),
     );
+  }
+
+  invokeStagedUpload(action: string, data: any, controlSource: ControlSource): Promise<any> {
+    const upload = action === 'run_actions' ? data.actions[0].data.stagedUpload : data.stagedUpload;
+    const timeout = upload.deadline - Date.now();
+    if (!Number.isFinite(timeout) || timeout <= 0) throw new Error('Page upload deadline exceeded');
+    return this.request(action, data, timeout, true, controlSource);
   }
 
   createPluginInvoker(interactive: boolean) {
@@ -293,6 +305,7 @@ export class ExtensionBrowserProvider implements HostBrowserProvider {
 
   private handlePing(message: any): void {
     this.rpcVersion = typeof message.rpcVersion === 'number' ? message.rpcVersion : null;
+    this.uploadTransfer = message.pageUploadTransfer === true;
     if (message.version) {
       this.extensionVersion = message.version;
       this.options.log(

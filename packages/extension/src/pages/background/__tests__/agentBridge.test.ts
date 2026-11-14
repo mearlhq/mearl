@@ -175,6 +175,7 @@ describe('AgentBridge native handshake', () => {
     await vi.waitFor(() => expect(postMessage).toHaveBeenCalledOnce());
     expect(postMessage).toHaveBeenCalledWith({
       type: 'ping',
+      pageUploadTransfer: true,
       timestamp: expect.any(Number),
       version: '2.0.0',
       rpcVersion: EXTENSION_RPC_VERSION,
@@ -197,6 +198,7 @@ describe('AgentBridge native handshake', () => {
     await vi.waitFor(() => expect(postMessage).toHaveBeenCalledTimes(2));
     expect(postMessage).toHaveBeenLastCalledWith({
       type: 'ping',
+      pageUploadTransfer: true,
       timestamp: expect.any(Number),
       version: '2.0.0',
       rpcVersion: EXTENSION_RPC_VERSION,
@@ -280,6 +282,7 @@ describe('AgentBridge native handshake', () => {
 
   it.each([
     ['send_request', { url: 'https://example.test', transferId: 'native-transfer' }],
+    ['page_upload', { tabId: 1, stagedUpload: { id: 'native-transfer', files: [] } }],
     ['run_actions', { actions: [{ action: 'page_eval', data: { tabId: 1, expression: '1' } }] }],
     ['__send_request_files', { operation: 'start', transferId: 'native-transfer' }],
     ['__send_request_files', { operation: 'chunk', transferId: 'native-transfer' }],
@@ -301,6 +304,16 @@ describe('AgentBridge native handshake', () => {
       success: false,
       error: 'Agent service is disabled',
     });
+  });
+
+  it('rejects client-supplied staged page upload references', async () => {
+    bridge = new AgentBridge(new Map());
+    await expect(
+      (bridge as any).assertAgentActionAuthorized('page_upload', {
+        tabId: 1,
+        stagedUpload: { id: 'injected-transfer' },
+      }),
+    ).rejects.toThrow('Page upload references require a trusted native-host request');
   });
 
   it.each([undefined, EXTENSION_RPC_VERSION + 1])(

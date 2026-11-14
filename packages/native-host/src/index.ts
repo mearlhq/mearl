@@ -36,6 +36,7 @@ import {
   isToolboxServiceAction,
   ExtensionRpcError,
   type HostToExtensionActionMap,
+  type PageUploadChunkRequest,
   normalizeControlSource,
   validateRequiredActionTabId,
   type AgentServiceAction,
@@ -490,12 +491,14 @@ function getControlSessionManager(): ControlSessionManager {
   return (controlSessionManager ??= new ControlSessionManager({
     browserId: () => (isDaemonMode ? cdpProvider : extensionProvider).browserId,
     transport: defaultBrowserTransport,
-    invoke: async (action, data, transport, deadline) => {
+    supportsUploadTransfer: () => extensionProvider.supportsUploadTransfer,
+    invoke: async (action, data, transport, deadline, trustedUpload) => {
       const { __mearlControlSource: origin, ...payload } = data;
       return (
         await dispatchHostRequest(
           { action, data: payload, controlSource: origin ?? 'local', transport, deadline },
           true,
+          trustedUpload,
         )
       ).data;
     },
@@ -758,6 +761,12 @@ async function handleExtensionControlMessage(
   sendToExtension: (message: Record<string, any>) => void,
 ): Promise<void> {
   const { id, action, data = {} } = message;
+  if (action === 'page_upload_chunk') {
+    if (!extensionProvider.protocolReady) throw new Error('Native Messaging protocol mismatch');
+    const chunk = await getControlSessionManager().readUploadChunk(data as PageUploadChunkRequest);
+    sendToExtension({ id, success: true, data: chunk });
+    return;
+  }
   if (action === 'preset_installation') {
     sendToExtension({ id, success: true, data: await presetInstallation.handle(data) });
     return;
@@ -1221,7 +1230,11 @@ interface HostActionResult {
 }
 
 /** Structured dispatch is shared by Socket requests and scoped browser operations. */
-async function dispatchHostRequest(request: any, managed = false): Promise<HostActionResult> {
+async function dispatchHostRequest(
+  request: any,
+  managed = false,
+  trustedUpload?: true,
+): Promise<HostActionResult> {
   const { action, data = {} } = request;
   assertBrowserRequestDeadline(request.deadline);
   const controlSource = normalizeControlSource(request.controlSource);
@@ -1450,12 +1463,10 @@ async function dispatchHostRequest(request: any, managed = false): Promise<HostA
   const startedAt = Date.now();
   try {
     validateRequiredActionTabId(action, data);
-    const result = await browserProvider(transport).invoke(
-      action,
-      data,
-      controlSource,
-      request.deadline,
-    );
+    const result =
+      trustedUpload && transport === 'extension'
+        ? await extensionProvider.invokeStagedUpload(action, data, controlSource)
+        : await browserProvider(transport).invoke(action, data, controlSource, request.deadline);
     trackAction(action, {
       success: true,
       transport,

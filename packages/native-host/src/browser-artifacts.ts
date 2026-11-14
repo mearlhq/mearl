@@ -177,6 +177,12 @@ export class BrowserArtifactStore {
     return file.path;
   }
 
+  describe(id: string, sessionId?: string): BrowserArtifact {
+    const file = this.require(id, sessionId);
+    if (!file.ready) throw new Error('Artifact is not ready');
+    return this.info(file);
+  }
+
   async read(
     id: string,
     offset: number,

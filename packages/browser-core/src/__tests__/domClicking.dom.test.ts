@@ -26,7 +26,41 @@ function bounds(element: Element, x: number, y: number, width: number, height: n
 
 afterEach(() => {
   document.body.innerHTML = '';
+  document.body.removeAttribute('style');
+  document.documentElement.removeAttribute('style');
   vi.restoreAllMocks();
+});
+
+it.each([
+  ['DOM ref', (button: Element) => clickElementViaJS.call(button)],
+  ['DOM selector', () => clickElementBySelector('#target', '')],
+  ['trusted ref', (button: Element) => getClickCoordsFromNode.call(button)],
+  ['trusted selector', () => getClickCoordsFromSelector('#target', '')],
+] as const)('does not clip viewport overflow to the scrolled body box with %s', (_, click) => {
+  document.documentElement.style.overflowX = 'visible';
+  document.documentElement.style.overflowY = 'visible';
+  document.body.style.overflowX = 'auto';
+  document.body.style.overflowY = 'auto';
+  document.body.innerHTML = '<button id="target">Attach</button>';
+  const button = document.querySelector('#target')!;
+  bounds(document.body, 0, -800, 800, 700);
+  bounds(button, 100, 120, 100, 40);
+  vi.spyOn(document, 'elementFromPoint').mockReturnValue(button);
+
+  const result = click(button);
+  expect(result).toMatchObject({ tag: 'button', text: 'Attach' });
+  expect(result?.error).toBeUndefined();
+});
+
+it('checks body clipping when the root has its own overflow setting', () => {
+  document.documentElement.style.overflowX = 'auto';
+  document.body.style.overflowY = 'hidden';
+  document.body.innerHTML = '<button id="target">Attach</button>';
+  const button = document.querySelector('#target')!;
+  bounds(document.body, 0, 0, 800, 80);
+  bounds(button, 100, 120, 100, 40);
+
+  expect(getClickCoordsFromNode.call(button)?.error).toMatch(/clipped.*body/i);
 });
 
 describe('native option selection', () => {
@@ -35,22 +69,27 @@ describe('native option selection', () => {
       ? clickElementViaJS.call(document.querySelector('#target'))
       : clickElementBySelector('#target', '');
 
-  it.each(['ref', 'selector'] as const)('selects the exact option and reports state via %s', mode => {
-    document.body.innerHTML = '<select><option value="old">Old</option><option value="same">First</option><option id="target" value="same">Second</option></select>';
-    const select = document.querySelector('select')!;
-    const events: string[] = [];
-    select.addEventListener('input', () => events.push('input'));
-    select.addEventListener('change', () => events.push('change'));
-    const result = click(mode)!;
-    expect(select.selectedIndex).toBe(2);
-    expect(events).toEqual(['input', 'change']);
-    expect(
-      createPageClickResult({ kind: 'selector', selector: '#target' }, result).selectionState,
-    ).toEqual({ valueBefore: 'old', valueAfter: 'same', selectedAfter: true });
-  });
+  it.each(['ref', 'selector'] as const)(
+    'selects the exact option and reports state via %s',
+    mode => {
+      document.body.innerHTML =
+        '<select><option value="old">Old</option><option value="same">First</option><option id="target" value="same">Second</option></select>';
+      const select = document.querySelector('select')!;
+      const events: string[] = [];
+      select.addEventListener('input', () => events.push('input'));
+      select.addEventListener('change', () => events.push('change'));
+      const result = click(mode)!;
+      expect(select.selectedIndex).toBe(2);
+      expect(events).toEqual(['input', 'change']);
+      expect(
+        createPageClickResult({ kind: 'selector', selector: '#target' }, result).selectionState,
+      ).toEqual({ valueBefore: 'old', valueAfter: 'same', selectedAfter: true });
+    },
+  );
 
   it.each(['ref', 'selector'] as const)('reports a selection reverted by the page via %s', mode => {
-    document.body.innerHTML = '<select><option value="old">Old</option><option id="target" value="new">New</option></select>';
+    document.body.innerHTML =
+      '<select><option value="old">Old</option><option id="target" value="new">New</option></select>';
     const select = document.querySelector('select')!;
     select.addEventListener('change', () => {
       select.value = 'old';
@@ -62,22 +101,30 @@ describe('native option selection', () => {
     });
   });
 
-  it.each(['select', 'option', 'optgroup'] as const)('rejects a disabled %s without events', tag => {
-    for (const mode of ['ref', 'selector'] as const) {
-      document.body.innerHTML = '<fieldset><select><option value="old">Old</option><optgroup label="Group"><option id="target" value="new">New</option></optgroup></select></fieldset>';
-      document.querySelector(tag === 'option' ? '#target' : tag)!.setAttribute('disabled', '');
-      const change = vi.fn();
-      document.querySelector('select')!.addEventListener('change', change);
-      expect(click(mode)?.error).toMatch(/disabled/);
-      expect(document.querySelector('select')!.value).toBe('old');
-      expect(change).not.toHaveBeenCalled();
-    }
-  });
+  it.each(['select', 'option', 'optgroup'] as const)(
+    'rejects a disabled %s without events',
+    tag => {
+      for (const mode of ['ref', 'selector'] as const) {
+        document.body.innerHTML =
+          '<fieldset><select><option value="old">Old</option><optgroup label="Group"><option id="target" value="new">New</option></optgroup></select></fieldset>';
+        document.querySelector(tag === 'option' ? '#target' : tag)!.setAttribute('disabled', '');
+        const change = vi.fn();
+        document.querySelector('select')!.addEventListener('change', change);
+        expect(click(mode)?.error).toMatch(/disabled/);
+        expect(document.querySelector('select')!.value).toBe('old');
+        expect(change).not.toHaveBeenCalled();
+      }
+    },
+  );
 
   it('distinguishes native options from custom ARIA options', () => {
-    expect(isStateAwareClickTarget({
-      tag: 'select', text: '', sourceTarget: { tag: 'option', text: 'New' },
-    })).toBe(true);
+    expect(
+      isStateAwareClickTarget({
+        tag: 'select',
+        text: '',
+        sourceTarget: { tag: 'option', text: 'New' },
+      }),
+    ).toBe(true);
     expect(isStateAwareClickTarget({ tag: 'div', text: 'New' })).toBe(false);
   });
 });

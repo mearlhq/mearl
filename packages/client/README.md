@@ -184,6 +184,8 @@ mearl session_manage --session '<sessionId>' --payload '{"operation":"end","clos
 
 `page_download` 先监听再点击，返回浏览器文件产物；CLI `--output` 或 SDK `saveArtifact(artifact, absolutePath, { session })` 以 256 KiB 分块导出到调用方。`page_upload.files` 接受调用方绝对路径 `{filePath}` 或浏览器 `{artifactId}`，`filePaths` 仍指浏览器宿主路径。单文件最多 256 MiB；保存到调用方的结果独立于临时产物。会话释放清理临时产物，`keepArtifactIds` 可保留指定产物；无会话产物空闲一小时回收，宿主退出清理暂存。
 
+通过 Chrome 扩展连接时，`files` 支持 HTTP(S) 页面的文件输入框，分块传输合计最多 256 MiB，无需开启「允许访问文件网址」。`filePaths` 由 Chrome 直接读取宿主文件，适用于大文件或要求原生文件选择事件的站点，在扩展连接中需要开启该设置。直连 CDP 的上传无需此扩展设置。
+
 扩展捕获下载需要匹配来源页 referrer 或明确的预期 `url`，无法归属时不会认领最近下载。CDP 只在托管浏览器中使用临时下载目录，共享浏览器保持默认目录，Chrome 未返回完成文件路径时明确报错。下载超时可能已经触发，需检查现场再决定下一步。当前会话与下载适配 Extension/CDP；直接处理页面动作的外部 Provider 对不支持的能力明确报错。
 
 ### 外部浏览器 Provider

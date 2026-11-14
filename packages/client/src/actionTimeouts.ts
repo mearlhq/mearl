@@ -1,8 +1,10 @@
-import { PAGE_ACT_ACTIONS, type PageActAction } from '@mearl/browser-core';
+import {
+  PAGE_ACT_ACTIONS,
+  PAGE_UPLOAD_FILE_TRANSFER_TIMEOUT_MS,
+  type PageActAction,
+} from '@mearl/browser-core';
 
 const SEND_REQUEST_FILE_TRANSFER_TIMEOUT_MS = 120_000;
-// Remote Providers may stage files before forwarding a page upload.
-const PAGE_UPLOAD_FILE_TRANSFER_TIMEOUT_MS = 180_000;
 // Persistent Providers may need to synchronize remote state before closing an instance.
 const BROWSER_CLOSE_TIMEOUT_SEC = 18 * 60;
 

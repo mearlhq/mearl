@@ -526,6 +526,17 @@ export function clickElementViaJS(
     let ancestor = node.parentElement;
     while (ancestor && ancestor !== document.documentElement) {
       const style = getComputedStyle(ancestor);
+      if (ancestor === document.body) {
+        // The body's overflow can apply to the viewport instead of its own box.
+        const root = getComputedStyle(document.documentElement);
+        if (
+          (!root.overflowX || root.overflowX === 'visible') &&
+          (!root.overflowY || root.overflowY === 'visible') &&
+          (!root.contain || root.contain === 'none') &&
+          (!style.contain || style.contain === 'none')
+        )
+          break;
+      }
       const clipsX = /^(auto|scroll|hidden|clip)$/.test(style.overflowX || '');
       const clipsY = /^(auto|scroll|hidden|clip)$/.test(style.overflowY || '');
       if (clipsX || clipsY) {
@@ -917,6 +928,17 @@ export function clickElementBySelector(
     let ancestor = node.parentElement;
     while (ancestor && ancestor !== document.documentElement) {
       const style = getComputedStyle(ancestor);
+      if (ancestor === document.body) {
+        // The body's overflow can apply to the viewport instead of its own box.
+        const root = getComputedStyle(document.documentElement);
+        if (
+          (!root.overflowX || root.overflowX === 'visible') &&
+          (!root.overflowY || root.overflowY === 'visible') &&
+          (!root.contain || root.contain === 'none') &&
+          (!style.contain || style.contain === 'none')
+        )
+          break;
+      }
       const clipsX = /^(auto|scroll|hidden|clip)$/.test(style.overflowX || '');
       const clipsY = /^(auto|scroll|hidden|clip)$/.test(style.overflowY || '');
       if (clipsX || clipsY) {
@@ -1302,6 +1324,17 @@ export function getClickCoordsFromSelector(
     let ancestor = node.parentElement;
     while (ancestor && ancestor !== document.documentElement) {
       const style = getComputedStyle(ancestor);
+      if (ancestor === document.body) {
+        // The body's overflow can apply to the viewport instead of its own box.
+        const root = getComputedStyle(document.documentElement);
+        if (
+          (!root.overflowX || root.overflowX === 'visible') &&
+          (!root.overflowY || root.overflowY === 'visible') &&
+          (!root.contain || root.contain === 'none') &&
+          (!style.contain || style.contain === 'none')
+        )
+          break;
+      }
       const clipsX = /^(auto|scroll|hidden|clip)$/.test(style.overflowX || '');
       const clipsY = /^(auto|scroll|hidden|clip)$/.test(style.overflowY || '');
       if (clipsX || clipsY) {
@@ -1584,6 +1617,17 @@ export function getClickCoordsFromNode(
     let ancestor = node.parentElement;
     while (ancestor && ancestor !== document.documentElement) {
       const style = getComputedStyle(ancestor);
+      if (ancestor === document.body) {
+        // The body's overflow can apply to the viewport instead of its own box.
+        const root = getComputedStyle(document.documentElement);
+        if (
+          (!root.overflowX || root.overflowX === 'visible') &&
+          (!root.overflowY || root.overflowY === 'visible') &&
+          (!root.contain || root.contain === 'none') &&
+          (!style.contain || style.contain === 'none')
+        )
+          break;
+      }
       const clipsX = /^(auto|scroll|hidden|clip)$/.test(style.overflowX || '');
       const clipsY = /^(auto|scroll|hidden|clip)$/.test(style.overflowY || '');
       if (clipsX || clipsY) {

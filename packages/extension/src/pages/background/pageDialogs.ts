@@ -23,8 +23,10 @@ function monitorPage(tabId: number): Monitor {
     if (method === 'Page.javascriptDialogOpening') {
       monitor.owner = { ...source };
       dialogs.opened(params ?? {});
-    } else if (method === 'Page.javascriptDialogClosed' &&
-      (source as any).sessionId === (monitor.owner as any)?.sessionId) {
+    } else if (
+      method === 'Page.javascriptDialogClosed' &&
+      (source as any).sessionId === (monitor.owner as any)?.sessionId
+    ) {
       monitor.owner = undefined;
       dialogs.closed();
     }
@@ -40,7 +42,8 @@ function monitorPage(tabId: number): Monitor {
   chrome.debugger.onEvent.addListener(listener);
   // Page first: a pre-existing modal must be visible before enabling other domains.
   monitor.ready = acquireDebuggerLease(tabId, {
-    consumer: 'page-dialog', domains: ['Page', 'Runtime'],
+    consumer: 'page-dialog',
+    domains: ['Page', 'Runtime'],
     onInvalidated: () => {
       chrome.debugger.onEvent.removeListener(listener);
       monitor.owner = undefined;
@@ -57,7 +60,11 @@ function monitorPage(tabId: number): Monitor {
   return monitor;
 }
 
-export async function withExtensionPageDialogs<T>(tabId: number, work: () => Promise<T>, interrupt = true): Promise<T> {
+export async function withExtensionPageDialogs<T>(
+  tabId: number,
+  work: () => Promise<T>,
+  interrupt = true,
+): Promise<T> {
   const monitor = monitorPage(tabId);
   monitor.users += 1;
   try {
@@ -67,9 +74,21 @@ export async function withExtensionPageDialogs<T>(tabId: number, work: () => Pro
         try {
           await Promise.race([
             monitor.ready,
-            new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('Page monitoring could not start. A native dialog opened before attachment may block Chrome; close it manually, then retry.')), 5000); }),
+            new Promise<never>((_, reject) => {
+              timer = setTimeout(
+                () =>
+                  reject(
+                    new Error(
+                      'Chrome did not finish starting page monitoring. If a native dialog is visible, close it manually. Check the current page state before retrying an action.',
+                    ),
+                  ),
+                5000,
+              );
+            }),
           ]);
-        } finally { if (timer !== undefined) clearTimeout(timer); }
+        } finally {
+          if (timer !== undefined) clearTimeout(timer);
+        }
       });
       return work();
     }, interrupt);
@@ -79,9 +98,18 @@ export async function withExtensionPageDialogs<T>(tabId: number, work: () => Pro
   }
 }
 
-export function sendPageCommand(target: chrome.debugger.Debuggee, method: string, params?: any, onDispatch?: () => void): Promise<any> {
-  const send = () => { onDispatch?.(); return chrome.debugger.sendCommand(target, method, params); };
-  const release = (method === 'Input.dispatchKeyEvent' && params?.type === 'keyUp') ||
+export function sendPageCommand(
+  target: chrome.debugger.Debuggee,
+  method: string,
+  params?: any,
+  onDispatch?: () => void,
+): Promise<any> {
+  const send = () => {
+    onDispatch?.();
+    return chrome.debugger.sendCommand(target, method, params);
+  };
+  const release =
+    (method === 'Input.dispatchKeyEvent' && params?.type === 'keyUp') ||
     (method === 'Input.dispatchMouseEvent' && params?.type === 'mouseReleased') ||
     (method === 'Input.dispatchTouchEvent' && params?.type === 'touchEnd');
   const dialogs = target.tabId === undefined ? undefined : getExtensionPageDialogs(target.tabId);
@@ -94,21 +122,37 @@ export function runPageScript<T>(tabId: number, work: () => Promise<T>): Promise
 }
 
 /** Called before preparation and observation; neither path evaluates page JS. */
-export async function extensionPageDialogShortcut(action: string, data: any): Promise<{ data: any } | undefined> {
+export async function extensionPageDialogShortcut(
+  action: string,
+  data: any,
+): Promise<{ data: any } | undefined> {
   const monitor = monitors.get(data?.tabId);
   if (action === 'page_press' && data?.dialogId !== undefined) {
-    if (!monitor?.owner) throw new Error('page_press: dialogId is stale or no native dialog is open. Run page_snapshot.');
-    return { data: await monitor.dialogs.press(data, async params => {
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      try {
-        return await Promise.race([
-          chrome.debugger.sendCommand(monitor.owner!, 'Page.handleJavaScriptDialog', params),
-          new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('Native dialog acknowledgement timed out')), 5000); }),
-        ]);
-      } finally { if (timer !== undefined) clearTimeout(timer); }
-    }) };
+    if (!monitor?.owner)
+      throw new Error(
+        'page_press: dialogId is stale or no native dialog is open. Run page_snapshot.',
+      );
+    return {
+      data: await monitor.dialogs.press(data, async params => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          return await Promise.race([
+            chrome.debugger.sendCommand(monitor.owner!, 'Page.handleJavaScriptDialog', params),
+            new Promise<never>((_, reject) => {
+              timer = setTimeout(
+                () => reject(new Error('Native dialog acknowledgement timed out')),
+                5000,
+              );
+            }),
+          ]);
+        } finally {
+          if (timer !== undefined) clearTimeout(timer);
+        }
+      }),
+    };
   }
-  if (action === 'page_press' && data?.promptText !== undefined) throw new Error('page_press: promptText requires dialogId.');
+  if (action === 'page_press' && data?.promptText !== undefined)
+    throw new Error('page_press: promptText requires dialogId.');
   if (action === 'page_snapshot' && monitor?.dialogs.pending) {
     const snapshot = pageDialogSnapshot(monitor.dialogs, data?.mode, data?.maxChars);
     const tab = await chrome.tabs.get(data.tabId);

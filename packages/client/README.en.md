@@ -184,6 +184,8 @@ Session release affects only that session and keeps pages/environments by defaul
 
 `page_download` listens before clicking and returns a browser artifact. CLI `--output` or SDK `saveArtifact(artifact, absolutePath, { session })` exports in 256 KiB chunks. `page_upload.files` accepts caller absolute `{filePath}` or browser `{artifactId}`; `filePaths` remains browser-host paths. Files are limited to 256 MiB. Caller-saved outputs are independent of temporary artifacts. Session release cleans temporary artifacts; `keepArtifactIds` retains selected ones. Sessionless artifacts expire after one idle hour; host exit clears staging.
 
+Through the Chrome extension, `files` transfers up to 256 MiB total per upload in chunks to file inputs in HTTP(S) documents without **Allow access to file URLs**. With `filePaths`, Chrome reads host files directly. This supports large files and sites that require native file selection events. The extension requires the setting for `filePaths`. Direct CDP uploads do not require the extension setting.
+
 Extension downloads require matching page referrers or an explicit expected `url`; unowned downloads are not guessed from recent files. CDP uses temporary directories only for managed browsers; shared browsers retain defaults and fail explicitly if Chrome provides no completed path. Timeouts may follow triggered downloads: inspect state before continuing. Session/download adapters support Extension/CDP; external action-handling Providers reject unsupported capabilities explicitly.
 
 ### External browser Providers

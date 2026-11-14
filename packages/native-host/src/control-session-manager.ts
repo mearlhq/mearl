@@ -1,14 +1,21 @@
+import { randomUUID } from 'node:crypto';
 import {
+  PAGE_UPLOAD_FILE_TRANSFER_TIMEOUT_MS,
+  PAGE_UPLOAD_TRANSFER_MAX_BYTES,
+  PageActionPreconditionError,
   runActionBatch,
   validateRequiredActionTabId,
   type BrowserReleaseParams,
   type ControlSessionInfo,
   type PageDownloadParams,
+  type PageUploadChunkRequest,
+  type PageUploadTransfer,
   type SessionManageParams,
 } from '@mearl/browser-core';
 import { assertBrowserRequestDeadline, ControlSessionRegistry } from './control-session.js';
 import { BrowserArtifactStore } from './browser-artifacts.js';
 import { PageRecordings, type OpenRecording } from './page-recordings.js';
+import { toTimeoutMs } from './builtin-providers/action-timeout.js';
 
 interface Dependencies {
   browserId: () => string;
@@ -18,6 +25,7 @@ interface Dependencies {
     data: any,
     transport: ControlSessionInfo['transport'],
     deadline?: number,
+    trustedUpload?: true,
   ) => Promise<any>;
   deactivate?: (tabs: number[], transport: ControlSessionInfo['transport']) => Promise<void>;
   cleanup: (
@@ -39,6 +47,7 @@ interface Dependencies {
   }>;
   notify: () => void;
   openRecording?: OpenRecording;
+  supportsUploadTransfer?: () => boolean;
 }
 
 export class ControlSessionManager {
@@ -46,6 +55,19 @@ export class ControlSessionManager {
   readonly artifacts = new BrowserArtifactStore();
   private recordings?: PageRecordings;
   private activityQueues = new Map<string, Promise<unknown>>();
+  private uploads = new Map<
+    string,
+    { tabId: number; sessionId?: string; artifactIds: string[]; deadline?: number }
+  >();
+
+  readUploadChunk({ id, tabId, fileIndex, offset }: PageUploadChunkRequest) {
+    const upload = this.uploads.get(id);
+    const artifactId = upload && Number.isSafeInteger(fileIndex) && upload.artifactIds[fileIndex];
+    if (!upload || upload.tabId !== tabId || !artifactId)
+      throw new Error('Unknown page upload transfer');
+    assertBrowserRequestDeadline(upload.deadline);
+    return this.artifacts.read(artifactId, offset, upload.sessionId);
+  }
 
   private async withActivity<T>(id: string, operation: () => Promise<T>): Promise<T> {
     const previous = this.activityQueues.get(id) ?? Promise.resolve();
@@ -229,13 +251,20 @@ export class ControlSessionManager {
         );
       }
     }
-    const dispatch = (name: string, payload: any) => {
+    const dispatch = (name: string, payload: any, trustedUpload?: true) => {
       assertBrowserRequestDeadline(deadline);
+      if (trustedUpload)
+        return this.dependencies.invoke(name, payload, transport, deadline, trustedUpload);
       return deadline === undefined
         ? this.dependencies.invoke(name, payload, transport)
         : this.dependencies.invoke(name, payload, transport, deadline);
     };
-    const performStep = async (name: string, payload: any, batch = false): Promise<any> => {
+    const dispatchStep = async (
+      name: string,
+      payload: any,
+      batch: boolean,
+      trustedUpload?: true,
+    ): Promise<any> => {
       assertBrowserRequestDeadline(deadline);
       if (name === 'tab_open') {
         if (sessionId && payload.closeExisting) {
@@ -251,16 +280,6 @@ export class ControlSessionManager {
         }
         payload = { ...payload, __mearlBlockedTabIds: this.registry.blockedTabs(sessionId) };
       }
-      if (name === 'page_upload' && payload.files) {
-        if (payload.filePaths) throw new Error('Use files or filePaths, not both');
-        payload = {
-          ...payload,
-          filePaths: payload.files.map((file: any) =>
-            this.artifacts.resolve(file.artifactId, sessionId),
-          ),
-        };
-        delete payload.files;
-      }
       if (batch) {
         if (transport === 'provider') {
           const result = await dispatch(name, { ...payload, __mearlControlSource: origin });
@@ -269,11 +288,15 @@ export class ControlSessionManager {
           if (result?.success === false) return { ...result, success: false };
           return { success: true, data: result };
         }
-        const result = await dispatch('run_actions', {
-          tabId: payload.tabId,
-          actions: [{ action: name, data: payload }],
-          __mearlControlSource: origin,
-        });
+        const result = await dispatch(
+          'run_actions',
+          {
+            tabId: payload.tabId,
+            actions: [{ action: name, data: payload }],
+            __mearlControlSource: origin,
+          },
+          trustedUpload,
+        );
         const outcome = result.results?.[0] ?? {
           success: false,
           error: result.error ?? 'Batch step returned no result',
@@ -284,11 +307,62 @@ export class ControlSessionManager {
           this.registry.recordResult(sessionId, name, outcome.data, payload);
         return outcome;
       }
-      const result = await dispatch(name, { ...payload, __mearlControlSource: origin });
+      const result = await dispatch(
+        name,
+        { ...payload, __mearlControlSource: origin },
+        trustedUpload,
+      );
       if (name === 'tab_close' && typeof payload.tabId === 'number')
         await this.recordings?.discard(transport, { tabIds: [payload.tabId] });
       if (sessionId) this.registry.recordResult(sessionId, name, result, payload);
       return result;
+    };
+    const performStep = async (name: string, payload: any, batch = false): Promise<any> => {
+      if (name !== 'page_upload') return dispatchStep(name, payload, batch);
+      if (Object.hasOwn(payload, 'stagedUpload'))
+        throw new PageActionPreconditionError('Page upload references are internal to native-host');
+      if (payload.files === undefined) return dispatchStep(name, payload, batch);
+      if (payload.filePaths !== undefined)
+        throw new PageActionPreconditionError('Use files or filePaths, not both');
+      if (!Array.isArray(payload.files) || !payload.files.length)
+        throw new PageActionPreconditionError('files must contain at least one file');
+      const { files, ...request } = payload;
+      const artifactIds: string[] = files.map((file: any) => file?.artifactId);
+      if (transport !== 'extension' || !this.dependencies.supportsUploadTransfer?.()) {
+        return dispatchStep(
+          name,
+          { ...request, filePaths: artifactIds.map(id => this.artifacts.resolve(id, sessionId)) },
+          batch,
+        );
+      }
+
+      const stagedUpload: PageUploadTransfer = {
+        id: randomUUID(),
+        deadline: Math.min(
+          deadline ?? Infinity,
+          Date.now() + toTimeoutMs(name, request) + PAGE_UPLOAD_FILE_TRANSFER_TIMEOUT_MS,
+        ),
+        files: artifactIds.map(id => {
+          const { filename, bytes } = this.artifacts.describe(id, sessionId);
+          return { filename, bytes };
+        }),
+      };
+      const bytes = stagedUpload.files.reduce((sum, file) => sum + file.bytes, 0);
+      if (bytes > PAGE_UPLOAD_TRANSFER_MAX_BYTES)
+        throw new PageActionPreconditionError(
+          'files exceed the 256 MiB Chrome extension upload limit',
+        );
+      this.uploads.set(stagedUpload.id, {
+        tabId: request.tabId,
+        sessionId,
+        artifactIds,
+        deadline: stagedUpload.deadline,
+      });
+      try {
+        return await dispatchStep(name, { ...request, stagedUpload }, batch, true);
+      } finally {
+        this.uploads.delete(stagedUpload.id);
+      }
     };
     const invokeStep = (name: string, payload: any, batch = false): Promise<any> => {
       if (sessionId && name === 'tab_open') {

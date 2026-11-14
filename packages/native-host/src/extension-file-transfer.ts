@@ -172,6 +172,8 @@ export async function sendRunActionsWithTransferredFiles(
         throw new Error(`Step ${index}: internal action "${action}" is not available to clients`);
       }
       if (action === 'send_request') assertPublicFileRequest(step.data);
+      if (action === 'page_upload' && Object.hasOwn(step.data ?? {}, 'stagedUpload'))
+        throw new Error('Page upload references are internal to native-host');
       if (action !== 'send_request' || !hasSendRequestFiles(step.data)) {
         actions.push(step);
         continue;

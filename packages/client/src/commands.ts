@@ -1151,9 +1151,10 @@ export const COMMANDS = [
     result: PAGE_ACTION_RESULT,
     notes: [
       '直接写入 input[type=file]，不依赖 file chooser；隐藏的文件节点也可上传。外部 Provider 的文件中转能力查询 mearl <providerId>。',
+      'Chrome 扩展连接中，files 分块传输，单次合计最多 256 MiB。filePaths 由 Chrome 直接读取，需要开启「允许访问文件网址」。直连 CDP 无需此扩展设置。',
     ],
     examples: [
-      `page_upload --payload '{"tabId":12345,"selector":"#file-input","filePaths":["/Users/me/photo.jpg"]}'`,
+      `page_upload --payload '{"tabId":12345,"selector":"#file-input","files":[{"filePath":"/Users/me/photo.jpg"}]}'`,
     ],
   },
   // ── 页面感知 ──────────────────────────────────────────────────────────────

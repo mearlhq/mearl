@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { PageUploadTransfer } from '@mearl/browser-core';
 import { randomBytes } from 'node:crypto';
 import { ControlSessionRegistry } from '../control-session.js';
 import { ControlSessionManager } from '../control-session-manager.js';
@@ -12,6 +13,60 @@ vi.mock('node:crypto', async importOriginal => {
 });
 
 describe('control sessions', () => {
+  it('scopes staged extension upload chunks to the dispatched tab, session, and request', async () => {
+    const read = vi.fn();
+    const manager = new ControlSessionManager({
+      browserId: () => 'browser',
+      transport: () => 'extension',
+      supportsUploadTransfer: () => true,
+      invoke: read,
+      cleanup: vi.fn(),
+      download: vi.fn(),
+      notify: vi.fn(),
+    });
+    try {
+      const { session } = await manager.manageSession({ operation: 'new' });
+      const sessionId = session.sessionId;
+      const { artifactId } = await manager.artifacts.create('picture.png', sessionId);
+      await manager.artifacts.write(artifactId, 0, 'YWJj', sessionId);
+      manager.artifacts.complete(artifactId, 3, sessionId);
+      const params = { tabId: 1, selector: '#upload', files: [{ artifactId }] };
+      let transferId = '';
+      read.mockImplementation(async (action, data, transport, _deadline, trusted) => {
+        expect([action, transport, trusted]).toEqual(['page_upload', 'extension', true]);
+        const transfer: PageUploadTransfer = data.stagedUpload;
+        expect(transfer.files).toEqual([{ filename: 'picture.png', bytes: 3 }]);
+        expect(data).not.toHaveProperty('filePaths');
+        transferId = transfer.id;
+        const request = { id: transferId, tabId: 1, fileIndex: 0, offset: 0 };
+        expect(() => manager.readUploadChunk({ ...request, tabId: 2 })).toThrow(
+          'Unknown page upload',
+        );
+        expect(() => manager.readUploadChunk({ ...request, fileIndex: 1 })).toThrow(
+          'Unknown page upload',
+        );
+        return manager.readUploadChunk(request);
+      });
+      await expect(manager.invoke('page_upload', params)).rejects.toThrow('ARTIFACT_NOT_FOUND');
+      expect(read).not.toHaveBeenCalled();
+      await expect(manager.invoke('page_upload', params, sessionId)).resolves.toMatchObject({
+        base64: 'YWJj',
+        bytes: 3,
+        totalBytes: 3,
+      });
+      expect(() =>
+        manager.readUploadChunk({
+          id: transferId,
+          tabId: 1,
+          fileIndex: 0,
+          offset: 0,
+        }),
+      ).toThrow('Unknown page upload');
+    } finally {
+      await manager.artifacts.dispose();
+    }
+  });
+
   it('releases the tab when its new control session cannot be returned before the deadline', async () => {
     const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
     const cleanup = vi.fn(async () => {});
