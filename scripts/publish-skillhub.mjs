@@ -26,6 +26,16 @@ export function skillHubMetadata(markdown, name, version) {
   };
 }
 
+export async function stageLicenses(directory, releaseLicense) {
+  // SkillHub requires a file extension, including for license notices.
+  for await (const file of glob(['**/LICENSE', '**/*.LICENSE'], { cwd: directory })) {
+    const source = join(directory, file);
+    await cp(source, `${source}.txt`, { force: false, errorOnExist: true });
+    await rm(source);
+  }
+  await cp(releaseLicense, join(directory, 'LICENSE.txt'), { force: false });
+}
+
 async function versionInReview(slug, version, token) {
   // The dashboard includes this account's pending versions, which the public catalog omits.
   const response = await fetch(`${host}/api/v1/dashboard/skills/${slug}/versions`, {
@@ -99,7 +109,7 @@ async function main() {
       const skill = skillHubMetadata(await readFile(file, 'utf8'), name, version);
       if (skills.some(({ slug }) => slug === skill.slug)) throw new Error(`Duplicate SkillHub slug: ${skill.slug}`);
       await writeFile(file, skill.markdown);
-      await cp(join(staging, 'LICENSE'), join(directory, 'LICENSE'), { force: false, errorOnExist: true });
+      await stageLicenses(directory, join(staging, 'LICENSE'));
       const preflight = runCli(cli, directory, ['--dry-run']);
       if (!preflight.dryRun || preflight.slug !== skill.slug || preflight.version !== version) {
         throw new Error(`Unexpected SkillHub preflight result for ${skill.slug}`);

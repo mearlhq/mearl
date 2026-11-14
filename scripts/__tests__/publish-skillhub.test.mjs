@@ -1,5 +1,8 @@
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { expect, it, vi } from 'vitest';
-import { skillHubMetadata, submitSkill } from '../publish-skillhub.mjs';
+import { skillHubMetadata, stageLicenses, submitSkill } from '../publish-skillhub.mjs';
 
 it('uses the release tag version while preserving the Skill body and Mearl metadata', () => {
   const skill = '---\nname: design-overlay\nversion: "3.1.0"\ndescription: Example\nmetadata:\n  mearl: true\n---\n# 设计稿对比\n\nversion: body\n';
@@ -15,6 +18,26 @@ it('skips a conflict only when the publishing account already submitted that ver
   const publish = () => ({ status: 409, error: 'Slug conflict' });
   await expect(submitSkill(publish, () => true)).resolves.toEqual({ status: 'already submitted' });
   await expect(submitSkill(publish, () => false)).rejects.toThrow('Slug conflict');
+});
+
+it('stages license texts with extensions that SkillHub accepts', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'skillhub-test-'));
+  try {
+    const skill = join(root, 'skill');
+    const assets = join(skill, 'assets');
+    const license = join(root, 'LICENSE');
+    const bundled = join(assets, 'lucide.LICENSE');
+    await mkdir(assets, { recursive: true });
+    await writeFile(license, 'Apache license');
+    await writeFile(bundled, 'Third-party license');
+    await stageLicenses(skill, license);
+    await expect(readFile(license, 'utf8')).resolves.toBe('Apache license');
+    await expect(readFile(join(skill, 'LICENSE.txt'), 'utf8')).resolves.toBe('Apache license');
+    await expect(readFile(`${bundled}.txt`, 'utf8')).resolves.toBe('Third-party license');
+    await expect(readFile(bundled)).rejects.toMatchObject({ code: 'ENOENT' });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 it('retries rate limits using the advertised delay, with a bounded number of attempts', async () => {
