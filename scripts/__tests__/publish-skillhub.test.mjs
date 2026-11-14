@@ -15,9 +15,14 @@ it('uses the release tag version while preserving the Skill body and Mearl metad
 });
 
 it('skips a conflict only when the publishing account already submitted that version', async () => {
-  const publish = () => ({ status: 409, error: 'Slug conflict' });
+  const publish = () => ({ ok: false, result: { status: 409, error: 'Slug conflict' } });
   await expect(submitSkill(publish, () => true)).resolves.toEqual({ status: 'already submitted' });
   await expect(submitSkill(publish, () => false)).rejects.toThrow('Slug conflict');
+});
+
+it('accepts a successful CLI exit without a top-level skill ID or review status', async () => {
+  const publish = () => ({ ok: true, result: { success: true } });
+  await expect(submitSkill(publish)).resolves.toMatchObject({ status: 'submitted' });
 });
 
 it('stages license texts with extensions that SkillHub accepts', async () => {
@@ -42,10 +47,10 @@ it('stages license texts with extensions that SkillHub accepts', async () => {
 
 it('retries rate limits using the advertised delay, with a bounded number of attempts', async () => {
   const delay = vi.fn();
-  const limited = { status: 429, body: { retryAfter: 3 }, error: 'Rate limited' };
-  const accepted = { skillId: 10, status: 'pending_review' };
+  const limited = { ok: false, result: { status: 429, body: { retryAfter: 3 }, error: 'Rate limited' } };
+  const accepted = { ok: true, result: { status: 'pending_review', publicUrl: 'https://example.com/skill' } };
   const publish = vi.fn().mockReturnValueOnce(limited).mockReturnValueOnce(accepted);
-  await expect(submitSkill(publish, null, delay)).resolves.toBe(accepted);
+  await expect(submitSkill(publish, null, delay)).resolves.toEqual(accepted.result);
   expect(delay).toHaveBeenCalledExactlyOnceWith(3000);
 
   const alwaysLimited = vi.fn().mockReturnValue(limited);

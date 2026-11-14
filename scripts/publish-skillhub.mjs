@@ -51,8 +51,16 @@ async function versionInReview(slug, version, token) {
 
 export async function submitSkill(publish, alreadySubmitted, delay = wait) {
   for (let attempt = 0; ; attempt++) {
-    const result = publish();
-    if (result.skillId && result.status) return result;
+    const { ok, result } = publish();
+    // The CLI exits successfully for an accepted submission even when the
+    // response has no top-level skillId or status.
+    if (ok) {
+      const details = result.data ?? result;
+      return {
+        status: typeof details.status === 'string' ? details.status : 'submitted',
+        publicUrl: details.publicUrl,
+      };
+    }
     if (result.status === 409 && await alreadySubmitted()) return { status: 'already submitted' };
     if (result.status !== 429 || attempt >= 2) {
       throw new Error(result.error ?? 'Unexpected response from SkillHub');
@@ -72,7 +80,8 @@ function runCli(cli, directory, args, token = '') {
   if (result.error) throw result.error;
   if (result.stdout) {
     const parsed = JSON.parse(result.stdout);
-    if (result.status === 0 || parsed.success === false) return parsed;
+    if (result.status === 0) return { ok: true, result: parsed };
+    if (parsed.success === false) return { ok: false, result: parsed };
   }
   throw new Error(result.stderr?.trim() || `SkillHub CLI exited with ${result.status ?? result.signal}`);
 }
@@ -110,8 +119,8 @@ async function main() {
       if (skills.some(({ slug }) => slug === skill.slug)) throw new Error(`Duplicate SkillHub slug: ${skill.slug}`);
       await writeFile(file, skill.markdown);
       await stageLicenses(directory, join(staging, 'LICENSE'));
-      const preflight = runCli(cli, directory, ['--dry-run']);
-      if (!preflight.dryRun || preflight.slug !== skill.slug || preflight.version !== version) {
+      const { ok, result: preflight } = runCli(cli, directory, ['--dry-run']);
+      if (!ok || !preflight.dryRun || preflight.slug !== skill.slug || preflight.version !== version) {
         throw new Error(`Unexpected SkillHub preflight result for ${skill.slug}`);
       }
       skills.push({ directory, slug: skill.slug });

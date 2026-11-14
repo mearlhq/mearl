@@ -7,7 +7,7 @@ install:
 version: "3.1.0"
 ---
 
-# Mearl bb-browser 站点适配器
+# Mearl 站点适配器
 
 通过 `mearl bbrowser site ...` 运行原始适配器，无需安装 bb-browser CLI、扩展或 daemon。浏览器操作走 Mearl，支持扩展与直连 CDP；页面 Cookie 和站点 JS 上下文属于所选浏览器。
 
