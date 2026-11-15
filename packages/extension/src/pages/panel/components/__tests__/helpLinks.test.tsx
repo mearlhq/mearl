@@ -76,7 +76,7 @@ it('uses the preset registry for both setup display and copy', async () => {
   const writeText = vi.fn().mockResolvedValue(undefined);
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
   render(<AgentStatusModal isOpen agentConnected={false} onClose={() => {}} />);
-  const command = 'npx --registry=https://registry.example.test/ @example/setup@latest';
+  const command = 'npx --registry=https://registry.example.test/ @example/setup';
   const code = screen.getByText(command);
   expect(code).toBeInTheDocument();
   fireEvent.click(code.parentElement!.querySelector('button')!);

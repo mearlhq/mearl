@@ -37,7 +37,7 @@ const CapBadge: FC<{ children: string }> = ({ children }) => (
 
 const AgentCapabilities: FC = () => (
   <div className="space-y-1">
-    <p className="font-medium text-text-primary">{t('agentAllCapabilities')}</p>
+    <p className="font-medium text-text-primary">{t('agentCommonCapabilities')}</p>
     <div className="text-2xs">
       <div className="grid grid-cols-[5rem_1fr] gap-x-2 border-b border-border py-1.5">
         <div className="text-text-secondary font-medium whitespace-nowrap leading-4">
@@ -47,8 +47,9 @@ const AgentCapabilities: FC = () => (
           <CapBadge>{t('agentCapGetRequests')}</CapBadge>
           <CapBadge>{t('agentCapGetLogs')}</CapBadge>
           <CapBadge>{t('agentCapGetEvents')}</CapBadge>
-          <CapBadge>{t('agentCapGetSelectedElement')}</CapBadge>
-          <CapBadge>{t('agentCapGetScreenshot')}</CapBadge>
+          <CapBadge>{t('agentCapPageInspect')}</CapBadge>
+          <CapBadge>{t('agentCapPageEval')}</CapBadge>
+          <CapBadge>{t('agentCapPageCapture')}</CapBadge>
         </div>
       </div>
       <div className="grid grid-cols-[5rem_1fr] gap-x-2 border-b border-border py-1.5">
@@ -56,30 +57,32 @@ const AgentCapabilities: FC = () => (
           {t('agentCapCategoryMock')}
         </div>
         <div className="flex flex-wrap gap-x-1 gap-y-0 leading-4">
-          <CapBadge>{t('agentCapSetMock')}</CapBadge>
-          <CapBadge>{t('agentCapGetMocks')}</CapBadge>
-          <CapBadge>{t('agentCapAddRule')}</CapBadge>
-          <CapBadge>{t('agentCapProxyRequest')}</CapBadge>
-          <CapBadge>{t('agentCapSendCapturedRequest')}</CapBadge>
+          <CapBadge>{t('agentCapManageMocks')}</CapBadge>
+          <CapBadge>{t('agentCapManageRules')}</CapBadge>
+          <CapBadge>{t('agentCapSendHttpRequest')}</CapBadge>
         </div>
       </div>
-      <div className="grid grid-cols-[5rem_1fr] gap-x-2 pt-1.5">
+      <div className="grid grid-cols-[5rem_1fr] gap-x-2 border-b border-border py-1.5">
         <div className="text-text-secondary font-medium whitespace-nowrap leading-4">
           {t('agentCapCategoryBrowser')}
         </div>
         <div className="flex flex-wrap gap-x-1 gap-y-0 leading-4">
           <CapBadge>{t('agentCapTabManage')}</CapBadge>
-          <CapBadge>{t('agentCapPageNavigate')}</CapBadge>
-          <CapBadge>{t('agentCapPageSnapshot')}</CapBadge>
-          <CapBadge>{t('agentCapPageClick')}</CapBadge>
-          <CapBadge>{t('agentCapPageType')}</CapBadge>
-          <CapBadge>{t('agentCapPagePress')}</CapBadge>
-          <CapBadge>{t('agentCapPageScroll')}</CapBadge>
-          <CapBadge>{t('agentCapPageEval')}</CapBadge>
+          <CapBadge>{t('agentCapPageNavigation')}</CapBadge>
+          <CapBadge>{t('agentCapPageInteract')}</CapBadge>
+          <CapBadge>{t('agentCapPageControls')}</CapBadge>
           <CapBadge>{t('agentCapPageWait')}</CapBadge>
-          <CapBadge>{t('agentCapPageUpload')}</CapBadge>
-          <CapBadge>{t('agentCapPageFrames')}</CapBadge>
+          <CapBadge>{t('agentCapPageFiles')}</CapBadge>
+        </div>
+      </div>
+      <div className="grid grid-cols-[5rem_1fr] gap-x-2 pt-1.5">
+        <div className="text-text-secondary font-medium whitespace-nowrap leading-4">
+          {t('agentCapCategoryEnvironment')}
+        </div>
+        <div className="flex flex-wrap gap-x-1 gap-y-0 leading-4">
           <CapBadge>{t('agentCapSetDeviceEmulation')}</CapBadge>
+          <CapBadge>{t('agentCapSetTimezone')}</CapBadge>
+          <CapBadge>{t('agentCapManageCookies')}</CapBadge>
         </div>
       </div>
     </div>
@@ -98,7 +101,9 @@ export const AgentStatusModal: FC<AgentStatusModalProps> = ({
 }) => {
   const settings = useBrowserUiSettings();
   const setup = useSetupManagement();
-  const skillCliCommand = setup ? setupManagementCommand(setup) : setupCommand();
+  const skillCliCommand = setup
+    ? setupManagementCommand(setup).replace(/@latest$/, '')
+    : setupCommand();
   const skillAgentPrompt = t('skillSetupAgentPrompt', settings.links?.skillSetup ?? MEARL_DOC_URL);
   const [extensionId, setExtensionId] = useState<string>(DEFAULT_EXTENSION_ID);
   const shouldShowExtensionId = extensionId !== DEFAULT_EXTENSION_ID;

@@ -1661,7 +1661,7 @@
     "message": "Agent 集成 (未连接)"
   },
   "agentDescription": {
-    "message": "允许 AI 助手（Claude、Codex、Cursor）直接访问浏览器中的请求数据和控制台日志。"
+    "message": "让 Claude、Codex、Cursor 等 AI 助手整理网页信息、操作页面和排查前端问题。"
   },
   "cloudModeDescription": {
     "message": "在云端安装 skill 后，让 agent 按云端模式完成配置，然后填写下方地址连接即可。"
@@ -1679,25 +1679,25 @@
     "message": "你可以这样问"
   },
   "agentExample1": {
-    "message": "获取 x 接口入参并生成请求代码"
+    "message": "把这页的活动时间和地点整理成表格"
   },
   "agentExample2": {
-    "message": "获取/修改 x 接口响应内容"
+    "message": "帮我下载这个月的账单 PDF"
   },
   "agentExample3": {
-    "message": "获取页面控制台中的异常日志"
+    "message": "提交表单后，定位失败的接口和控制台报错"
   },
   "agentExample4": {
-    "message": "使用代理请求获取 x 链接"
+    "message": "把商品列表接口 Mock 为空数组，检查页面空态"
   },
   "agentExample5": {
-    "message": "新增一条请求规则，把 a 域名的请求重定向到 b 域名"
+    "message": "用手机尺寸打开页面，检查底部按钮有没有被挡住"
   },
-  "agentAllCapabilities": {
-    "message": "全部可用能力"
+  "agentCommonCapabilities": {
+    "message": "常用能力"
   },
   "agentCapCategoryData": {
-    "message": "数据获取"
+    "message": "页面调试"
   },
   "agentCapGetRequests": {
     "message": "获取网络请求"
@@ -1708,68 +1708,59 @@
   "agentCapGetEvents": {
     "message": "获取埋点事件"
   },
-  "agentCapGetScreenshot": {
+  "agentCapPageCapture": {
     "message": "页面截图"
   },
-  "agentCapGetSelectedElement": {
-    "message": "获取选中元素"
+  "agentCapPageInspect": {
+    "message": "检查布局与 iframe"
   },
   "agentCapCategoryMock": {
-    "message": "Mock & 请求"
+    "message": "请求与 Mock"
   },
-  "agentCapSetMock": {
-    "message": "设置接口 Mock"
+  "agentCapManageMocks": {
+    "message": "接口响应 Mock"
   },
-  "agentCapGetMocks": {
-    "message": "查看已有 Mock"
+  "agentCapManageRules": {
+    "message": "管理请求规则"
   },
-  "agentCapAddRule": {
-    "message": "添加请求规则"
-  },
-  "agentCapProxyRequest": {
-    "message": "发送 Http 请求 (携带 Cookies)"
-  },
-  "agentCapSendCapturedRequest": {
-    "message": "发送 Protocol 请求"
+  "agentCapSendHttpRequest": {
+    "message": "发送浏览器 HTTP 请求"
   },
   "agentCapCategoryBrowser": {
     "message": "浏览器自动化"
   },
   "agentCapTabManage": {
-    "message": "标签页管理"
+    "message": "标签页与分组"
   },
-  "agentCapPageNavigate": {
-    "message": "页面导航"
+  "agentCapPageNavigation": {
+    "message": "导航与页面快照"
   },
-  "agentCapPageSnapshot": {
-    "message": "页面快照"
+  "agentCapPageInteract": {
+    "message": "点击、输入与拖拽"
   },
-  "agentCapPageClick": {
-    "message": "点击元素"
-  },
-  "agentCapPageType": {
-    "message": "输入文本"
-  },
-  "agentCapPagePress": {
-    "message": "按键操作"
-  },
-  "agentCapPageScroll": {
-    "message": "滚动页面"
+  "agentCapPageControls": {
+    "message": "悬停、滚动与按键"
   },
   "agentCapPageWait": {
-    "message": "等待加载/元素"
+    "message": "等待页面或元素"
   },
   "agentCapPageEval": {
     "message": "执行 JavaScript"
   },
-  "agentCapPageUpload": {
-    "message": "上传文件"
+  "agentCapPageFiles": {
+    "message": "文件上传与下载"
   },
-  "agentCapPageFrames": {
-    "message": "列出框架"
+  "agentCapCategoryEnvironment": {
+    "message": "测试环境"
   },
   "agentCapSetDeviceEmulation": {
-    "message": "移动端模拟"
+    "message": "设备模拟"
+  },
+  "agentCapSetTimezone": {
+    "message": "时区模拟"
+  },
+  "agentCapManageCookies": {
+    "message": "读取与设置 Cookie"
   },
   "skillQuickSetup": {
     "message": "快速配置"

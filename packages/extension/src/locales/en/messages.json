@@ -1668,7 +1668,7 @@
     "message": "Agent Integration (Disconnected)"
   },
   "agentDescription": {
-    "message": "Allow AI assistants (Claude, Codex, Cursor) to directly access browser request data and console logs."
+    "message": "Use Claude, Codex, or Cursor to extract web content, operate pages, and debug issues."
   },
   "cloudModeDescription": {
     "message": "After installing the skill in the cloud, have the agent configure cloud mode, then connect using the address below."
@@ -1686,25 +1686,25 @@
     "message": "You can ask like this"
   },
   "agentExample1": {
-    "message": "Get x API params and generate code"
+    "message": "Put the event times and venues in a table"
   },
   "agentExample2": {
-    "message": "Get/modify the response of API x"
+    "message": "Download this month's PDF statement"
   },
   "agentExample3": {
-    "message": "Get error logs from the page console"
+    "message": "Find request and console errors on submit"
   },
   "agentExample4": {
-    "message": "Fetch URL x via proxy request"
+    "message": "Mock an empty product list to test the UI"
   },
   "agentExample5": {
-    "message": "Add a rule to redirect requests from domain a to domain b"
+    "message": "Check if the bottom button is covered on mobile"
   },
-  "agentAllCapabilities": {
-    "message": "All Available Capabilities"
+  "agentCommonCapabilities": {
+    "message": "Common Capabilities"
   },
   "agentCapCategoryData": {
-    "message": "Data"
+    "message": "Page Debugging"
   },
   "agentCapGetRequests": {
     "message": "Get requests"
@@ -1715,68 +1715,59 @@
   "agentCapGetEvents": {
     "message": "Get tracking events"
   },
-  "agentCapGetScreenshot": {
-    "message": "Screenshot"
+  "agentCapPageCapture": {
+    "message": "Page screenshots"
   },
-  "agentCapGetSelectedElement": {
-    "message": "Get selected element"
+  "agentCapPageInspect": {
+    "message": "Inspect layout and iframes"
   },
   "agentCapCategoryMock": {
     "message": "Mock & Requests"
   },
-  "agentCapSetMock": {
-    "message": "Set mock"
+  "agentCapManageMocks": {
+    "message": "Mock API responses"
   },
-  "agentCapGetMocks": {
-    "message": "View mocks"
+  "agentCapManageRules": {
+    "message": "Manage request rules"
   },
-  "agentCapAddRule": {
-    "message": "Add request rule"
-  },
-  "agentCapProxyRequest": {
-    "message": "Send Http request (with Cookies)"
-  },
-  "agentCapSendCapturedRequest": {
-    "message": "Send Protocol request"
+  "agentCapSendHttpRequest": {
+    "message": "Send browser HTTP requests"
   },
   "agentCapCategoryBrowser": {
-    "message": "Browser Automation"
+    "message": "Automation"
   },
   "agentCapTabManage": {
-    "message": "Tab management"
+    "message": "Tabs and groups"
   },
-  "agentCapPageNavigate": {
-    "message": "Navigate"
+  "agentCapPageNavigation": {
+    "message": "Navigation and snapshots"
   },
-  "agentCapPageSnapshot": {
-    "message": "Page snapshot"
+  "agentCapPageInteract": {
+    "message": "Click, type, and drag"
   },
-  "agentCapPageClick": {
-    "message": "Click element"
-  },
-  "agentCapPageType": {
-    "message": "Type text"
-  },
-  "agentCapPagePress": {
-    "message": "Press key"
-  },
-  "agentCapPageScroll": {
-    "message": "Scroll page"
+  "agentCapPageControls": {
+    "message": "Hover, scroll, and press keys"
   },
   "agentCapPageWait": {
-    "message": "Wait for load/element"
+    "message": "Wait for loading or elements"
   },
   "agentCapPageEval": {
     "message": "Execute JavaScript"
   },
-  "agentCapPageUpload": {
-    "message": "Upload file"
+  "agentCapPageFiles": {
+    "message": "File uploads and downloads"
   },
-  "agentCapPageFrames": {
-    "message": "List frames"
+  "agentCapCategoryEnvironment": {
+    "message": "Test Setup"
   },
   "agentCapSetDeviceEmulation": {
     "message": "Device emulation"
+  },
+  "agentCapSetTimezone": {
+    "message": "Timezone emulation"
+  },
+  "agentCapManageCookies": {
+    "message": "Read and set cookies"
   },
   "skillQuickSetup": {
     "message": "Quick Setup"
