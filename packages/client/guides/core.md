@@ -19,7 +19,7 @@ mearl page_click --payload '{"tabId":12345,"selector":"@e3"}'
 
 默认使用统一发现。需要选择目标时用 `browser_list`，沿用返回的完整实例名或 `browserId`。远端连接与 Provider 选择见[浏览器管理](./api-browser-setup.md)。
 
-需要任务归属、并行协作或人工交接时，首次 `tab_open` / `page_snapshot` / `page_screenshot` 传 `--session new`，后续复用完整 `session.sessionId` 与 `tabId`。会话固定目标，但 Cookie/存储仍共享。目标声明由外部工具控制时（例如 Ego 任务），沿用其交接与收尾，不传 Mearl `--session`；跨工具先核验同一实例和物理页面，不能仅凭 URL/标题或直接复用 ref、label、tab ID。详见[工具协作](./browser-tool-cooperation.md)。
+多步浏览器任务默认使用会话。首次 `tab_open` / `page_snapshot` / `page_screenshot` 传 `--session new`，后续复用完整 `session.sessionId` 与 `tabId`。会话固定目标，Cookie 和存储仍共享。目标声明由外部工具控制时（例如 Ego 任务），沿用其交接与收尾，不传 Mearl `--session`；跨工具先核验同一实例和物理页面，不能仅凭 URL/标题或直接复用 ref、label、tab ID。详见[工具协作](./browser-tool-cooperation.md)。
 
 ## 观察、操作与判读
 
@@ -45,7 +45,7 @@ App 可用性以当前目标的 `set_app_profile --help` 或 `get_capabilities` 
 
 扫码、验证码或系统交互需要用户时，用 `session_manage` 的 handoff 交接，说明原因。用户接管或 `CONTROL_SESSION_PAUSED` 后停止派发；交回后重新观察，不重放未完成批次。无扩展 UI 时，须在用户明确确认交还后再 resume。
 
-会话任务用 `session_manage --session <id> --payload '{"operation":"end"}'` 释放归属，默认保留页面、Mock 和模拟环境。保留用户原有页和结果页，只有确认不需要的过程页才关闭。不带 session 的浏览器级释放仅用于用户要求结束调试或清理环境；外部工具按其自身约定收尾。具体归属与保留参数见[控制会话](./api-browser-setup.md#control-sessions)。
+核验结果后，用 `session_manage --session <id> --payload '{"operation":"end"}'` 结束会话。默认关闭会话新建的标签页，用户原有页始终保留。用户需要查看或继续使用结果页时，在 `keepTabIds` 传入相应 ID。保留页上的 Mock 和模拟环境默认保留。不带 session 的浏览器级释放仅用于用户要求结束调试或清理环境；外部工具按其自身约定收尾。详见[控制会话](./api-browser-setup.md#control-sessions)。
 
 ## 按需深入
 

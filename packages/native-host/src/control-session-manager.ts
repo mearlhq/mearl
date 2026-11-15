@@ -47,6 +47,7 @@ interface Dependencies {
   }>;
   notify: () => void;
   openRecording?: OpenRecording;
+  supportsTabClose?: () => boolean;
   supportsUploadTransfer?: () => boolean;
 }
 
@@ -188,7 +189,11 @@ export class ControlSessionManager {
     params: BrowserReleaseParams = {},
   ): Promise<ControlSessionInfo> {
     const { transport } = this.registry.info(id);
-    const session = await this.registry.release(id, params, async (tabs, close) => {
+    const releaseParams = {
+      ...params,
+      closeCreatedTabs: params.closeCreatedTabs ?? this.dependencies.supportsTabClose?.(),
+    };
+    const session = await this.registry.release(id, releaseParams, async (tabs, close) => {
       await this.recordings?.discard(transport, { sessionId: id });
       await this.recordings?.discard(transport, { tabIds: tabs });
       await this.dependencies.cleanup(tabs, transport, params.preserveEnvironment !== false);
@@ -454,7 +459,7 @@ export class ControlSessionManager {
       }
     } catch (error) {
       if (created && sessionId)
-        await this.registry.release(sessionId, {}, async tabs => {
+        await this.registry.release(sessionId, { closeCreatedTabs: false }, async tabs => {
           await this.dependencies.cleanup(tabs, transport, true);
           await this.artifacts.release(sessionId!);
         });

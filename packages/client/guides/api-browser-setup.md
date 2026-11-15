@@ -81,16 +81,16 @@ mearl page_snapshot --browser '<browserId>' --payload '{"tabId":12345,"mode":"vi
 - `CONTROL_SESSION_PAUSED`：停止派发动作，交还后重新快照或截图，根据当前状态继续，不重放未完成批次；已派发的操作可能仍然生效。
 - `CONTROL_SESSION_NOT_FOUND`：会话不存在或已失效，在原浏览器以普通调用执行 `tab_list`，获取当前 `tabId` 并检查操作结果，再按任务需要建立新会话，避免重复写操作。
 
-任务结束调用 `session_manage --session <sessionId> --payload '{"operation":"end"}'`，释放该会话的控制归属并清理临时文件，默认保留页面、Mock 与模拟环境。payload 支持以下保留与清理选项：
+任务结束调用 `session_manage --session <sessionId> --payload '{"operation":"end"}'`，释放控制归属，关闭会话新建的标签页，并清理临时文件。复用的用户页面始终保留。payload 支持以下选项：
 
 | 参数 | 行为 |
 | --- | --- |
-| `closeCreatedTabs:true` | 关闭确认不再需要的会话新建页；复用的用户页面始终保留 |
-| `keepTabIds` | 配合关闭新建页时保留结果页面 |
-| `preserveEnvironment:false` | 清理会话页面的 Mock 与模拟环境 |
+| `keepTabIds` | 保留指定结果页 |
+| `closeCreatedTabs:false` | 保留全部标签页 |
+| `preserveEnvironment:false` | 清理会话页面的 Mock 与模拟环境，保留页默认保留环境 |
 | `keepArtifactIds` | 保留指定浏览器文件产物，其他会话临时文件清理 |
 
-会话释放保留 Provider 实例；关闭、退出接管和同步 Cookie 使用原有实例操作，存在活动控制会话时先释放所属会话。
+会话释放保留 Provider 实例。未提供 `tab_close` 的 Provider 默认保留页面并释放会话。关闭、退出接管和同步 Cookie 使用原有实例操作，存在活动控制会话时先释放所属会话。
 
 <a id="cloud-connectors"></a>
 

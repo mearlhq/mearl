@@ -173,14 +173,14 @@ mearl page_snapshot --session '<sessionId>' --payload '{"tabId":12345}'
 mearl session_manage --session '<sessionId>' --payload '{"operation":"handoff","reason":"请完成扫码"}'
 mearl page_download --session '<sessionId>' --payload '{"tabId":12345,"trigger":{"selector":"#export"}}' --output /absolute/path/report.csv
 mearl page_upload --session '<sessionId>' --payload '{"tabId":12345,"selector":"input[type=file]","files":[{"filePath":"/absolute/path/report.csv"}]}'
-mearl session_manage --session '<sessionId>' --payload '{"operation":"end","closeCreatedTabs":true,"keepTabIds":[12345]}'
+mearl session_manage --session '<sessionId>' --payload '{"operation":"end","keepTabIds":[12345]}'
 ```
 
 用户在 Popup 的浏览器管理页接管、交还或结束会话。交接后排队旧请求和批次后续步骤停止；已派发动作可能仍然生效。交还后重新取快照。CDP-only 环境可在用户明确确认后用同一 `session_manage` 的 `operation:"resume"` 交还，无需额外 action。会话跨 CLI 连接保留，宿主进程退出后失效；不会根据空闲时间清理用户正在操作的会话。
 
 扩展中新开的后台页面默认加入折叠的 `Mearl` 标签组，前台新页进入展开的 `Mearl · 待操作` 组。两个管理组统一复用同一个已有窗口，同名管理组会合并；页面打开的后续标签也收进该窗口，并继承源组的展开状态。工作窗口关闭后重新选择已有窗口，不额外创建窗口。显式传入 `tab_open.group` 时使用指定分组；复用普通页面时保留原窗口和分组。接管会话只把管理组内的会话页面移入待操作组；交还后，仍在待操作组内的会话页面收回 `Mearl` 组。用户正在查看组内其他页面，或窗口没有其他可显示页面时，保留展开状态。
 
-带 Session 的释放只影响该会话，默认保留页面及环境；`closeCreatedTabs` 只关闭新建页，`keepTabIds` 保留结果页，复用的用户页面始终保留。`preserveEnvironment:false` 清理这些页面的环境。活动会话存在时，浏览器级释放与关闭会被拒绝。
+结束会话默认关闭会话新建的标签页，复用的用户页面始终保留。用 `keepTabIds` 保留指定结果页，或用 `closeCreatedTabs:false` 保留全部标签页。未提供关闭标签页能力的 Provider 默认保留页面并释放会话。保留的页面默认保留 Mock 和模拟环境，传 `preserveEnvironment:false` 可清理会话页面的环境。活动会话存在时，浏览器级释放与关闭会被拒绝。
 
 `page_download` 先监听再点击，返回浏览器文件产物；CLI `--output` 或 SDK `saveArtifact(artifact, absolutePath, { session })` 以 256 KiB 分块导出到调用方。`page_upload.files` 接受调用方绝对路径 `{filePath}` 或浏览器 `{artifactId}`，`filePaths` 仍指浏览器宿主路径。单文件最多 256 MiB；保存到调用方的结果独立于临时产物。会话释放清理临时产物，`keepArtifactIds` 可保留指定产物；无会话产物空闲一小时回收，宿主退出清理暂存。
 

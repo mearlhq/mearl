@@ -298,8 +298,9 @@ export interface ControlSessionInfo {
 }
 
 export interface BrowserReleaseParams {
-  /** Close only session-created pages; attached user pages are protected. */
+  /** Defaults to closing session-created pages. Attached pages are always kept. */
   closeCreatedTabs?: boolean;
+  /** Exempt these session-created pages from closing. */
   keepTabIds?: number[];
   /** Preserve the browser environment by default for a scoped release. */
   preserveEnvironment?: boolean;

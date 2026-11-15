@@ -615,8 +615,17 @@ async function main() {
           browser: { type: 'string' },
           sessionId: { type: 'string' },
           reason: { type: 'string' },
-          closeCreatedTabs: { type: 'boolean' },
-          keepTabIds: { type: 'array', items: { type: 'integer', minimum: 0 }, uniqueItems: true },
+          closeCreatedTabs: {
+            type: 'boolean',
+            description:
+              'end 默认关闭会话新建的标签页，传 false 保留全部。复用的用户页面始终保留。',
+          },
+          keepTabIds: {
+            type: 'array',
+            items: { type: 'integer', minimum: 0 },
+            uniqueItems: true,
+            description: 'end 时保留这些结果页。',
+          },
           preserveEnvironment: { type: 'boolean' },
           keepArtifactIds: { type: 'array', items: { type: 'string' } },
         },

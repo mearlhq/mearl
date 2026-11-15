@@ -354,11 +354,12 @@ export class ControlSessionRegistry {
     await Promise.allSettled([...(this.pending.get(id) ?? [])]);
     const tabs = record.tabs.map(tab => tab.tabId);
     const keep = new Set(params.keepTabIds ?? []);
-    const close = params.closeCreatedTabs
-      ? record.tabs
-          .filter(tab => tab.source === 'created' && !keep.has(tab.tabId))
-          .map(tab => tab.tabId)
-      : [];
+    const close =
+      params.closeCreatedTabs !== false
+        ? record.tabs
+            .filter(tab => tab.source === 'created' && !keep.has(tab.tabId))
+            .map(tab => tab.tabId)
+        : [];
     try {
       await cleanup(tabs, close);
       for (const tab of tabs) if (this.owners.get(tab) === id) this.owners.delete(tab);

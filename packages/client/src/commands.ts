@@ -529,12 +529,12 @@ export const COMMANDS = [
       {
         name: 'closeCreatedTabs',
         type: 'boolean',
-        description: 'end 时关闭会话创建的过程页，默认 false',
+        description: 'end 默认关闭会话创建的标签页，传 false 保留所有标签页',
       },
       {
         name: 'keepTabIds',
         type: 'number[]',
-        description: '保留的结果页面；复用的用户页面始终保留',
+        description: 'end 时保留这些结果页；复用的用户页面始终保留',
       },
       {
         name: 'preserveEnvironment',
@@ -553,7 +553,8 @@ export const COMMANDS = [
     ],
     examples: [
       `session_manage --browser '<browserId>' --payload '{"operation":"new"}'`,
-      `session_manage --session '<sessionId>' --payload '{"operation":"end","closeCreatedTabs":true}'`,
+      `session_manage --session '<sessionId>' --payload '{"operation":"end"}'`,
+      `session_manage --session '<sessionId>' --payload '{"operation":"end","keepTabIds":[12345]}'`,
     ],
   },
   // ── 标签页 ────────────────────────────────────────────────────────────────

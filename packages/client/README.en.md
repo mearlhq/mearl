@@ -173,14 +173,14 @@ mearl page_snapshot --session '<sessionId>' --payload '{"tabId":12345}'
 mearl session_manage --session '<sessionId>' --payload '{"operation":"handoff","reason":"Please scan the QR code"}'
 mearl page_download --session '<sessionId>' --payload '{"tabId":12345,"trigger":{"selector":"#export"}}' --output /absolute/path/report.csv
 mearl page_upload --session '<sessionId>' --payload '{"tabId":12345,"selector":"input[type=file]","files":[{"filePath":"/absolute/path/report.csv"}]}'
-mearl session_manage --session '<sessionId>' --payload '{"operation":"end","closeCreatedTabs":true,"keepTabIds":[12345]}'
+mearl session_manage --session '<sessionId>' --payload '{"operation":"end","keepTabIds":[12345]}'
 ```
 
 Users take over, return, or end sessions in Popup browser management. Handoff stops queued stale requests and later batch steps; dispatched actions may still apply. Take a fresh snapshot after return. CDP-only environments can use the same `session_manage` with `operation:"resume"` after explicit user confirmation. Sessions survive CLI connections, expire on host exit, and are not idle-cleaned while users work.
 
 New extension background tabs join a collapsed `Mearl` group; foreground tabs join the expanded `Mearl · 待操作` group. Both reuse one existing window and merge same-name managed groups. Subsequent opened tabs enter that window and inherit source-group expansion. Closing the work window selects another existing window without creating one. Explicit `tab_open.group` overrides grouping; reused ordinary pages retain windows/groups. Handoff moves only managed session pages into the pending group; return moves those still pending into `Mearl`. Groups remain expanded if users view other grouped pages or the window has no other visible page.
 
-Session release affects only that session and keeps pages/environments by default. `closeCreatedTabs` closes only created pages; `keepTabIds` retains results. Reused user pages always remain. `preserveEnvironment:false` clears those pages' environment. Active sessions block browser-wide release/close.
+Ending a session closes its created tabs by default. Reused user tabs always stay open. Set `keepTabIds` to retain specific result tabs or `closeCreatedTabs:false` to keep all tabs. Providers without tab closing support keep tabs open and release the session by default. Retained tabs keep their mocks and emulation by default. Set `preserveEnvironment:false` to clear the session tabs' environment. Active sessions block browser-wide release and close.
 
 `page_download` listens before clicking and returns a browser artifact. CLI `--output` or SDK `saveArtifact(artifact, absolutePath, { session })` exports in 256 KiB chunks. `page_upload.files` accepts caller absolute `{filePath}` or browser `{artifactId}`; `filePaths` remains browser-host paths. Files are limited to 256 MiB. Caller-saved outputs are independent of temporary artifacts. Session release cleans temporary artifacts; `keepArtifactIds` retains selected ones. Sessionless artifacts expire after one idle hour; host exit clears staging.
 

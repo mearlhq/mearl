@@ -334,10 +334,7 @@ describe('control sessions', () => {
       await expect(manager.invoke('page_snapshot', { tabId: 2 })).rejects.toThrow(
         'TAB_CONTROLLED_BY_SESSION',
       );
-      await manager.manageSession(
-        { operation: 'end', closeCreatedTabs: true },
-        opened.session.sessionId,
-      );
+      await manager.manageSession({ operation: 'end' }, opened.session.sessionId);
       expect(cleanup).toHaveBeenCalledWith([1, 2], 'extension', true);
       expect(invoke).toHaveBeenCalledWith('tab_close', { tabId: 2 }, 'extension');
     } finally {
@@ -725,7 +722,7 @@ describe('control sessions', () => {
       registry.run(undefined, 'page_snapshot', { tabId: 10 }, async () => {}),
     ).rejects.toThrow('TAB_CONTROLLED');
     const cleanup = vi.fn(async () => {});
-    await registry.release(first.sessionId, { closeCreatedTabs: true }, cleanup);
+    await registry.release(first.sessionId, {}, cleanup);
     expect(cleanup).toHaveBeenCalledWith([10, 11], [11]);
     registry.claim(second.sessionId, 10, 'attached');
     await registry.release(first.sessionId, {}, cleanup);
@@ -854,7 +851,10 @@ describe('control sessions', () => {
     await manager.artifacts.dispose();
   });
 
-  it('scoped release clears only owned resources and keeps requested result pages', async () => {
+  it.each([
+    { name: 'selected result pages', options: { keepTabIds: [1] }, closed: [3] },
+    { name: 'all created pages', options: { closeCreatedTabs: false }, closed: [] },
+  ])('scoped release keeps $name when requested', async ({ options, closed }) => {
     const cleanup = vi.fn(async () => {});
     const invoke = vi.fn(async () => ({ tabId: 1, opened: true }));
     const manager = new ControlSessionManager({
@@ -867,12 +867,12 @@ describe('control sessions', () => {
     });
     const opened = await manager.invoke('tab_open', { url: 'https://example.com' }, 'new');
     manager.registry.claim(opened.session.sessionId, 2, 'attached');
-    await manager.manageSession(
-      { operation: 'end', closeCreatedTabs: true, keepTabIds: [1] },
-      opened.session.sessionId,
+    manager.registry.claim(opened.session.sessionId, 3, 'created');
+    await manager.manageSession({ operation: 'end', ...options }, opened.session.sessionId);
+    expect(cleanup).toHaveBeenCalledWith([1, 2, 3], 'extension', true);
+    expect(invoke.mock.calls.slice(1)).toEqual(
+      closed.map(tabId => ['tab_close', { tabId }, 'extension']),
     );
-    expect(cleanup).toHaveBeenCalledWith([1, 2], 'extension', true);
-    expect(invoke).toHaveBeenCalledTimes(1);
     await manager.artifacts.dispose();
   });
 });

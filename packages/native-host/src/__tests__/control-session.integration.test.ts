@@ -746,14 +746,20 @@ describe.skipIf(process.env.MEARL_RUN_CONTROL_INTEGRATION !== '1')(
         );
         await client.invoke('session_manage', { operation: 'resume' }, options);
         await client.invoke('page_snapshot', { tabId }, options);
+        const processTab = await client.invoke(
+          'tab_open',
+          { url: 'about:blank', reuse: 'never' },
+          options,
+        );
         const keep = await client.invoke(
           'session_manage',
-          { operation: 'end', closeCreatedTabs: true, keepTabIds: [tabId] },
+          { operation: 'end', keepTabIds: [tabId] },
           options,
         );
         assert.equal(keep.session.status, 'released');
         const tabs = await client.invoke('tab_list', {}, { browser });
         assert(tabs.tabs.some((t: any) => t.tabId === tabId));
+        assert(!tabs.tabs.some((t: any) => t.tabId === processTab.tabId));
         await assert.rejects(
           client.invoke(
             '__artifact_read',

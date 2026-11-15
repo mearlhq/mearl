@@ -603,7 +603,7 @@ describe('Mearl control over ordinary Provider actions', () => {
     await service.invoke(
       browser.browserId,
       'session_manage',
-      { operation: 'end', closeCreatedTabs: true, keepTabIds: [8] },
+      { operation: 'end', keepTabIds: [8] },
       id,
     );
     expect(request.mock.calls.map(call => call[1])).toEqual(['page_snapshot', 'tab_open']);
@@ -618,7 +618,7 @@ describe('Mearl control over ordinary Provider actions', () => {
     );
   });
 
-  it('closes only created process pages and clears environment only when requested', async () => {
+  it('closes only created process pages by default and clears environment when requested', async () => {
     const { service, browser, request } = fixture();
     const opened = await service.invoke(browser.browserId, 'page_snapshot', { tabId: 7 }, 'new');
     const id = opened.session.sessionId;
@@ -631,7 +631,7 @@ describe('Mearl control over ordinary Provider actions', () => {
     await service.invoke(
       browser.browserId,
       'session_manage',
-      { operation: 'end', closeCreatedTabs: true, preserveEnvironment: false },
+      { operation: 'end', preserveEnvironment: false },
       id,
     );
     const closed = request.mock.calls.filter(call => call[1] === 'tab_close');
@@ -641,6 +641,54 @@ describe('Mearl control over ordinary Provider actions', () => {
       { tabId: 8, apiName: 'api.example', enabled: false },
     ]);
     expect(request.mock.calls.some(call => call[1] === 'browser_instances')).toBe(false);
+  });
+
+  it('releases sessions by default when the Provider only supports opening tabs', async () => {
+    const { service, browser, request } = fixture();
+    const capabilities = browser.capabilities!;
+    capabilities.actions = capabilities.actions.filter(action => action !== 'tab_close');
+    const opened = await service.invoke(
+      browser.browserId,
+      'tab_open',
+      { url: 'https://process.example', reuse: 'never' },
+      'new',
+    );
+    const id = opened.session.sessionId;
+    await expect(
+      service.invoke(browser.browserId, 'session_manage', { operation: 'end' }, id),
+    ).resolves.toMatchObject({ session: { status: 'released' } });
+    expect(request.mock.calls.map(call => call[1])).toEqual(['tab_open']);
+    await expect(
+      service.invoke(browser.browserId, 'page_snapshot', { tabId: opened.tabId }),
+    ).resolves.toMatchObject({ tabId: opened.tabId });
+  });
+
+  it('releases ownership when the first Provider action returns after its deadline', async () => {
+    const { service, browser, request } = fixture();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
+    request.mockImplementationOnce(async () => {
+      clock.mockReturnValue(2000);
+      return { tabId: 8, opened: true };
+    });
+    try {
+      await expect(
+        service.invoke(
+          browser.browserId,
+          'tab_open',
+          { url: 'https://process.example', reuse: 'never' },
+          'new',
+          'local',
+          undefined,
+          2000,
+        ),
+      ).rejects.toThrow('deadline exceeded before returning the control session');
+      expect(service.list()).toEqual([]);
+      await expect(
+        service.invoke(browser.browserId, 'page_snapshot', { tabId: 8 }),
+      ).resolves.toMatchObject({ tabId: 8 });
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   it('checks reuse before dispatch so opening cannot mutate another task page', async () => {

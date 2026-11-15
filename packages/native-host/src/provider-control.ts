@@ -116,6 +116,8 @@ export class ProviderControlService {
       manager: new ControlSessionManager({
         browserId: () => browser.browserId,
         transport: () => 'provider',
+        supportsTabClose: () =>
+          this.browser(browser.browserId).capabilities?.actions.includes('tab_close') === true,
         invoke: async (action, payload) => {
           const current = this.browser(browser.browserId);
           if (identity(current) !== control.identity) throw new Error('CONTROL_SESSION_NOT_FOUND');
