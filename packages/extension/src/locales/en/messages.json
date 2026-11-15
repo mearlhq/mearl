@@ -2339,7 +2339,10 @@
     "message": "An agent is requesting access to the following domain. Once granted, the agent will be able to send requests with your cookies:"
   },
   "agentPermRequestAllow": {
-    "message": "Allow"
+    "message": "Only this site"
+  },
+  "agentPermRequestAllowAll": {
+    "message": "Allow all sites"
   },
   "agentPermRequestDeny": {
     "message": "Deny"
@@ -2349,6 +2352,9 @@
   },
   "agentPermRequestBrowserDenied": {
     "message": "Browser denied the permission. Please try again or add the domain manually in the extension options."
+  },
+  "agentPermRequestAllBrowserDenied": {
+    "message": "All Domains is enabled in settings. The browser declined site access. You can try again."
   },
   "sourceTrace": {
     "message": "Source Trace"

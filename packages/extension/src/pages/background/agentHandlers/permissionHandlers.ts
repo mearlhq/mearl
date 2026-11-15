@@ -2,6 +2,7 @@
 
 import type { RequestPermissionParams } from '@mearl/browser-core';
 import {
+  enableAgentAllDomains,
   normalizeDomainInputToOrigin,
   grantAgentOriginPermission,
 } from '../../../shared/proxyPermissions';
@@ -25,7 +26,7 @@ async function requestInPopup(
   let granting = false;
   const popupUrl = chrome.runtime.getURL('src/pages/popup/index.html');
   const allowListener = (
-    message: { type?: string; requestId?: string },
+    message: { type?: string; requestId?: string; allSites?: boolean },
     sender: chrome.runtime.MessageSender,
     sendResponse: (response: DomainPermissionDecision) => void,
   ) => {
@@ -42,7 +43,9 @@ async function requestInPopup(
       granting = true;
       // The click's message carries the user gesture; request before any async work.
       // Keep the browser callback and storage write alive if the toolbar popup closes.
-      grantRequest = grantAgentOriginPermission(origin)
+      const request =
+        message.allSites === true ? enableAgentAllDomains() : grantAgentOriginPermission(origin);
+      grantRequest = request
         .then(granted => ({ granted, ...(granted ? { origin } : {}) }))
         .catch(error => ({
           granted: false,

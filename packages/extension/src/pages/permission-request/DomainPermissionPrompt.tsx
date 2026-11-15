@@ -1,6 +1,7 @@
 import { Globe } from 'lucide-react';
 import { t } from '../panel/utils/i18n';
 import {
+  enableAgentAllDomains,
   normalizeDomainInputToOrigin,
   grantAgentOriginPermission,
 } from '../../shared/proxyPermissions';
@@ -11,6 +12,7 @@ interface DomainPermissionPromptProps {
   onDecision: (granted: boolean, origin?: string) => void;
   onBusyChange?: (busy: boolean) => void;
   grantPermission?: (origin: string) => Promise<boolean>;
+  grantAllDomains?: () => Promise<boolean>;
 }
 
 export function DomainPermissionPrompt({
@@ -18,6 +20,7 @@ export function DomainPermissionPrompt({
   onDecision,
   onBusyChange,
   grantPermission = grantAgentOriginPermission,
+  grantAllDomains = enableAgentAllDomains,
 }: DomainPermissionPromptProps) {
   const origin = normalizeDomainInputToOrigin(domain);
 
@@ -30,6 +33,11 @@ export function DomainPermissionPrompt({
         if (origin) return grantPermission(origin);
         onDecision(false);
         return Promise.resolve(false);
+      }}
+      alternative={{
+        label: t('agentPermRequestAllowAll'),
+        requestPermission: grantAllDomains,
+        browserDeniedMessage: t('agentPermRequestAllBrowserDenied'),
       }}
       onDecision={granted => onDecision(granted, granted ? (origin ?? undefined) : undefined)}
       onBusyChange={onBusyChange}

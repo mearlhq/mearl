@@ -134,6 +134,14 @@ export function requestAgentAllDomainsPermission(): Promise<boolean> {
   return requestAgentOriginPermission(ALL_URLS_ORIGIN);
 }
 
+export async function enableAgentAllDomains(): Promise<boolean> {
+  // Save the Agent setting independently and request host access in the same user gesture.
+  const saved = setAgentAllowAllDomains(true);
+  const request = requestAgentAllDomainsPermission();
+  const [, granted] = await Promise.all([saved, request]);
+  return granted;
+}
+
 export async function grantAgentOriginPermission(origin: string): Promise<boolean> {
   if (!(await requestAgentOriginPermission(origin))) return false;
   const current = await getAllStoredAgentOrigins();

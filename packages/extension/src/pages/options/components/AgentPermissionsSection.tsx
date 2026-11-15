@@ -6,13 +6,14 @@ import { Button } from './Button';
 import { validateInstallationOrigin } from '@mearl/preset/installation';
 import { BROWSER_REQUEST_UI_CHANGED } from '../../../shared/browserRequestUi';
 import {
+  AGENT_ALLOW_ALL_DOMAINS_STORAGE_KEY,
   DEFAULT_AGENT_ORIGINS,
+  enableAgentAllDomains,
   formatOriginHost,
   normalizeDomainInputToOrigin,
   getAllStoredAgentOrigins,
   getAgentAllowAllDomains,
   getDisabledBuiltinOrigins,
-  requestAgentAllDomainsPermission,
   requestAgentOriginPermission,
   setAgentAllowAllDomains,
   setStoredAgentOrigins,
@@ -114,6 +115,14 @@ const AgentPermissionsSection: FC = () => {
     const message = (value: { action?: string }) => {
       if (value?.action === BROWSER_REQUEST_UI_CHANGED) refresh();
     };
+    const storageChanged = (
+      changes: Record<string, chrome.storage.StorageChange>,
+      area: string,
+    ) => {
+      const change = changes[AGENT_ALLOW_ALL_DOMAINS_STORAGE_KEY];
+      if (area === 'sync' && change) setAllowAllDomains(change.newValue === true);
+      refresh();
+    };
     const added = chrome.permissions.onAdded as
       chrome.events.Event<(permissions: chrome.permissions.Permissions) => void> | undefined;
     const removed = chrome.permissions.onRemoved as
@@ -121,13 +130,13 @@ const AgentPermissionsSection: FC = () => {
     chrome.runtime.onMessage?.addListener(message);
     added?.addListener(refresh);
     removed?.addListener(refresh);
-    chrome.storage.onChanged?.addListener(refresh);
+    chrome.storage.onChanged?.addListener(storageChanged);
     return () => {
       ++presetRead.current;
       chrome.runtime.onMessage?.removeListener(message);
       added?.removeListener(refresh);
       removed?.removeListener(refresh);
-      chrome.storage.onChanged?.removeListener(refresh);
+      chrome.storage.onChanged?.removeListener(storageChanged);
     };
   }, []);
 
@@ -138,10 +147,12 @@ const AgentPermissionsSection: FC = () => {
     setAllDomainsChanging(true);
     setAllowAllDomains(nextEnabled);
     try {
-      const saved = setAgentAllowAllDomains(nextEnabled);
-      const request = nextEnabled ? requestAgentAllDomainsPermission() : Promise.resolve(true);
-      const [, granted] = await Promise.all([saved, request]);
-      if (!granted) showToast(t('agentPermissionsAllDomainsFailed'), 'error');
+      if (nextEnabled) {
+        if (!(await enableAgentAllDomains()))
+          showToast(t('agentPermissionsAllDomainsFailed'), 'error');
+      } else {
+        await setAgentAllowAllDomains(false);
+      }
     } catch {
       await refreshDomains();
       showToast(t('agentPermissionsAllDomainsFailed'), 'error');

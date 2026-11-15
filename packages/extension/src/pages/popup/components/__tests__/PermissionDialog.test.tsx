@@ -70,6 +70,25 @@ describe('popup permission dialog', () => {
     expect(respond).toHaveBeenCalledWith(expect.objectContaining({ granted: true }));
   });
 
+  it('can retry all-sites access after browser denial without approving the request', async () => {
+    vi.mocked(chrome.runtime.sendMessage).mockResolvedValueOnce({ granted: false });
+    render(<PermissionDialog />);
+    const { respond } = send();
+    fireEvent.click(await screen.findByRole('button', { name: 'agentPermRequestAllowAll' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('agentPermRequestAllBrowserDenied');
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+      type: POPUP_PERMISSION_ALLOW,
+      requestId: 'request-1',
+      allSites: true,
+    });
+    expect(respond).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'agentPermRequestAllowAll' }));
+    await waitFor(() =>
+      expect(respond).toHaveBeenCalledWith({ granted: true, origin: '*://*.example.com/*' }),
+    );
+  });
+
   it('denies without requesting browser permissions', async () => {
     render(<PermissionDialog />);
     const { respond } = send();

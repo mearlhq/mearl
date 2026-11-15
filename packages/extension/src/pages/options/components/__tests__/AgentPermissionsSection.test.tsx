@@ -60,6 +60,17 @@ describe('AgentPermissionsSection', () => {
     expect(screen.queryByText('localhost')).not.toBeInTheDocument();
   });
 
+  it('reflects all-domain access granted from another extension page', async () => {
+    render(<AgentPermissionsSection />);
+    const toggle = await screen.findByRole('button', { name: 'agentPermissionsAllDomains' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+
+    const listener = vi.mocked(chrome.storage.onChanged.addListener).mock.calls.at(-1)![0];
+    act(() => listener({ [AGENT_ALLOW_ALL_DOMAINS_STORAGE_KEY]: { newValue: true } }, 'sync'));
+
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it.each([true, false])(
     'saves all-domain access before browser permission resolves to %s',
     async granted => {

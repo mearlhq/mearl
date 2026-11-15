@@ -5,10 +5,14 @@ import {
   POPUP_PERMISSION_CANCEL,
   POPUP_PERMISSION_ALLOW,
 } from '../../../../shared/permissionRequest';
-import { grantAgentOriginPermission } from '../../../../shared/proxyPermissions';
+import {
+  enableAgentAllDomains,
+  grantAgentOriginPermission,
+} from '../../../../shared/proxyPermissions';
 
 vi.mock('../../../../shared/proxyPermissions', async importOriginal => ({
   ...(await importOriginal<typeof import('../../../../shared/proxyPermissions')>()),
+  enableAgentAllDomains: vi.fn(),
   grantAgentOriginPermission: vi.fn(),
 }));
 
@@ -17,6 +21,7 @@ const sendMessage = vi.fn();
 
 describe('domain permission confirmation routing', () => {
   beforeEach(() => {
+    vi.mocked(enableAgentAllDomains).mockReset();
     vi.mocked(grantAgentOriginPermission).mockReset();
     chrome.runtime.id = 'test-extension';
     chrome.runtime.ContextType = { POPUP: 'POPUP' } as typeof chrome.runtime.ContextType;
@@ -109,9 +114,9 @@ describe('domain permission confirmation routing', () => {
     await vi.waitFor(() => expect(sendMessage).toHaveBeenCalled());
     const requestId = sendMessage.mock.calls[0][0].requestId;
     const listener = vi.mocked(chrome.runtime.onMessage.addListener).mock.calls[0][0];
-    const allow = (respond = vi.fn()) =>
+    const allow = (respond = vi.fn(), allSites = false) =>
       listener(
-        { type: POPUP_PERMISSION_ALLOW, requestId },
+        { type: POPUP_PERMISSION_ALLOW, requestId, allSites },
         { id: chrome.runtime.id, url: chrome.runtime.getURL('src/pages/popup/index.html') },
         respond,
       );
@@ -166,6 +171,21 @@ describe('domain permission confirmation routing', () => {
     expect(chrome.windows.create).not.toHaveBeenCalled();
   });
 
+  it('finishes an all-sites grant after the toolbar popup closes', async () => {
+    vi.mocked(enableAgentAllDomains).mockResolvedValue(true);
+    const { result, allow, close } = await pendingPopupRequest();
+    expect(allow(vi.fn(), true)).toBe(true);
+    expect(enableAgentAllDomains).toHaveBeenCalledTimes(1);
+    expect(grantAgentOriginPermission).not.toHaveBeenCalled();
+    close();
+    await expect(result).resolves.toEqual({
+      granted: true,
+      domain: 'example.com',
+      origin: '*://*.example.com/*',
+    });
+    expect(chrome.windows.create).not.toHaveBeenCalled();
+  });
+
   it('reports storage errors without repeating confirmation after popup closure', async () => {
     vi.mocked(grantAgentOriginPermission).mockRejectedValue(new Error('Storage unavailable'));
     const { result, allow, close } = await pendingPopupRequest();
@@ -186,7 +206,7 @@ describe('domain permission confirmation routing', () => {
       { id: 'other-extension', url: popupUrl },
     ]) {
       expect(
-        listener({ type: POPUP_PERMISSION_ALLOW, requestId }, sender, vi.fn()),
+        listener({ type: POPUP_PERMISSION_ALLOW, requestId, allSites: true }, sender, vi.fn()),
       ).toBeUndefined();
     }
     listener(
@@ -195,6 +215,7 @@ describe('domain permission confirmation routing', () => {
       vi.fn(),
     );
     expect(grantAgentOriginPermission).not.toHaveBeenCalled();
+    expect(enableAgentAllDomains).not.toHaveBeenCalled();
     decide({ granted: false });
     await expect(result).resolves.toMatchObject({ granted: false });
   });

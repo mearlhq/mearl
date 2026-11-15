@@ -2335,7 +2335,10 @@
     "message": "Agent 正在请求访问以下域名的权限，授权后 Agent 将可携带 Cookie 向该域名发送请求："
   },
   "agentPermRequestAllow": {
-    "message": "允许"
+    "message": "仅允许此站点"
+  },
+  "agentPermRequestAllowAll": {
+    "message": "允许所有站点"
   },
   "agentPermRequestDeny": {
     "message": "拒绝"
@@ -2345,6 +2348,9 @@
   },
   "agentPermRequestBrowserDenied": {
     "message": "浏览器已拒绝授权，请重试或手动在扩展设置中添加域名"
+  },
+  "agentPermRequestAllBrowserDenied": {
+    "message": "设置中的「全部域名」已开启。浏览器未授予站点访问权限，你可以重试。"
   },
   "sourceTrace": {
     "message": "源码追溯"

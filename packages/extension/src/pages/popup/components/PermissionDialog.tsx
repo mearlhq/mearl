@@ -44,6 +44,15 @@ export function PermissionDialog() {
   }, []);
 
   const request = pending[0];
+  const grant = async (requestId: string, allSites: boolean) => {
+    const result: DomainPermissionDecision = await chrome.runtime.sendMessage({
+      type: POPUP_PERMISSION_ALLOW,
+      requestId,
+      ...(allSites ? { allSites: true } : {}),
+    });
+    if (result.error) throw new Error(result.error);
+    return result.granted;
+  };
   const decide = (granted: boolean, origin?: string) => {
     if (!request) return;
     request.respond({ granted, origin });
@@ -64,14 +73,8 @@ export function PermissionDialog() {
         <DomainPermissionPrompt
           key={request.requestId}
           domain={request.domain}
-          grantPermission={async () => {
-            const result: DomainPermissionDecision = await chrome.runtime.sendMessage({
-              type: POPUP_PERMISSION_ALLOW,
-              requestId: request.requestId,
-            });
-            if (result.error) throw new Error(result.error);
-            return result.granted;
-          }}
+          grantPermission={() => grant(request.requestId, false)}
+          grantAllDomains={() => grant(request.requestId, true)}
           onDecision={decide}
           onBusyChange={busy => {
             if (busy) busyRequest.current = request.requestId;
