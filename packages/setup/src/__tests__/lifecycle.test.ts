@@ -274,7 +274,7 @@ describe('runMearlLifecycle', () => {
         ['install', '-g', '@mearl/client@2.19.x'],
         expect.any(Object),
       );
-      expect(deps.writeLine).toHaveBeenCalledWith('update targets: client CLI');
+      expect(deps.writeLine).toHaveBeenCalledWith('Updating the Mearl CLI...');
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
@@ -391,26 +391,34 @@ describe('runMearlLifecycle', () => {
   it('defaults install to the local environment', async () => {
     const deps = dependencies(new Map());
     deps.detectPackage = vi.fn(() => detectedPackage('local', 'pnpm'));
+    deps.runCommand = vi.fn(async () => ({
+      code: 0,
+      stdout: 'Package manager progress',
+      stderr: 'Native host path and debug examples',
+    }));
 
     await expect(runMearlLifecycle({ operation: 'install' }, deps)).resolves.toBe(true);
+    expect(deps.writeLine).not.toHaveBeenCalledWith('Package manager progress');
+    expect(deps.writeLine).not.toHaveBeenCalledWith('Native host path and debug examples');
+    expect(deps.writeLine).toHaveBeenLastCalledWith(expect.stringContaining('mearl check'));
 
     expect(deps.runCommand).toHaveBeenNthCalledWith(
       1,
       '/tools/pnpm/bin/pnpm',
       ['add', '-g', '@mearl/client@latest'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runCommand).toHaveBeenNthCalledWith(
       2,
       '/tools/pnpm/bin/pnpm',
       ['add', '-g', '@mearl/native-host@latest'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runCommand).toHaveBeenNthCalledWith(
       3,
       '/tools/pnpm/bin/mearl-native-host',
       ['--init', '--mode', 'skills'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runSkillOperation).toHaveBeenCalledWith(
       'install',
@@ -511,19 +519,19 @@ describe('runMearlLifecycle', () => {
       1,
       '/tools/pnpm/bin/pnpm',
       ['add', '-g', '@mearl/client@latest'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runCommand).toHaveBeenNthCalledWith(
       2,
       '/tools/pnpm/bin/pnpm',
       ['add', '-g', '@mearl/native-host@latest'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runCommand).toHaveBeenNthCalledWith(
       4,
       '/tools/pnpm/bin/pnpm',
       ['add', '-g', '@mearl/cloud-server@latest'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runSkillOperation).toHaveBeenCalledTimes(1);
   });
@@ -555,19 +563,19 @@ describe('runMearlLifecycle', () => {
       1,
       '/tools/bun/bin/bun',
       ['add', '-g', '@mearl/client@latest'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runCommand).toHaveBeenNthCalledWith(
       2,
       '/tools/npm/bin/npm',
       ['install', '-g', '@mearl/native-host@latest'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runCommand).toHaveBeenNthCalledWith(
       4,
       '/tools/pnpm/bin/pnpm',
       ['add', '-g', '@mearl/cloud-server@latest'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
   });
 
@@ -593,19 +601,19 @@ describe('runMearlLifecycle', () => {
       1,
       '/tools/pnpm/bin/pnpm',
       ['remove', '-g', '@mearl/cloud-client'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runCommand).toHaveBeenNthCalledWith(
       2,
       '/tools/pnpm/bin/pnpm',
       ['add', '-g', '@mearl/client@latest'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runCommand).toHaveBeenNthCalledWith(
       3,
       '/tools/pnpm/bin/pnpm',
       ['add', '-g', '@mearl/cloud-server@latest'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
   });
 
@@ -629,13 +637,13 @@ describe('runMearlLifecycle', () => {
       1,
       '/tools/pnpm/bin/pnpm',
       ['remove', '-g', '@mearl/cloud-client'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runCommand).toHaveBeenNthCalledWith(
       3,
       '/tools/pnpm/bin/pnpm',
       ['remove', '-g', '@mearl/cloud-server'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runCommand.mock.calls.flatMap(call => call[1])).not.toContain('@mearl/client');
   });
@@ -654,25 +662,25 @@ describe('runMearlLifecycle', () => {
       1,
       '/tools/npm/bin/npm',
       ['install', '-g', '@mearl/client@latest'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runCommand).toHaveBeenNthCalledWith(
       2,
       '/tools/npm/bin/npm',
       ['install', '-g', '@mearl/native-host@latest'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runCommand).toHaveBeenNthCalledWith(
       3,
       '/tools/npm/bin/mearl-native-host',
       ['--init', '--mode', 'skills'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runCommand).toHaveBeenNthCalledWith(
       4,
       '/tools/pnpm/bin/pnpm',
       ['add', '-g', '@mearl/cloud-server@latest'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runCommand).toHaveBeenNthCalledWith(
       5,
@@ -700,13 +708,13 @@ describe('runMearlLifecycle', () => {
       1,
       '/tools/pnpm/bin/pnpm',
       ['add', '-g', '@mearl/client@latest'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runCommand).toHaveBeenNthCalledWith(
       2,
       '/tools/pnpm/bin/pnpm',
       ['add', '-g', '@mearl/cloud-server@latest'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runCommand).toHaveBeenNthCalledWith(
       3,
@@ -736,7 +744,7 @@ describe('runMearlLifecycle', () => {
 
     expect(deps.runCommand).toHaveBeenCalledTimes(3);
     expect(deps.writeLine).toHaveBeenCalledWith(
-      'Hook: cloud update skipped because cloud-server is not running.',
+      expect.stringContaining('mearl-cloud-server start'),
     );
   });
 
@@ -757,13 +765,13 @@ describe('runMearlLifecycle', () => {
       1,
       '/tools/pnpm/bin/pnpm',
       ['add', '-g', '@mearl/client@latest'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runCommand).toHaveBeenNthCalledWith(
       2,
       '/tools/pnpm/bin/pnpm',
       ['add', '-g', '@mearl/cloud-server@latest'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runCommand).toHaveBeenNthCalledWith(
       4,
@@ -852,13 +860,13 @@ describe('runMearlLifecycle', () => {
       2,
       '/tools/npm/bin/npm',
       ['uninstall', '-g', '@mearl/cloud-server'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runCommand).toHaveBeenNthCalledWith(
       3,
       '/tools/npm/bin/npm',
       ['uninstall', '-g', '@mearl/client'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
   });
 
@@ -882,19 +890,19 @@ describe('runMearlLifecycle', () => {
       1,
       '/tools/pnpm/bin/pnpm',
       ['add', '-g', '@mearl/client@2.4.x'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runCommand).toHaveBeenNthCalledWith(
       2,
       '/tools/pnpm/bin/pnpm',
       ['add', '-g', '@mearl/native-host@2.4.x'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runCommand).toHaveBeenNthCalledWith(
       3,
       '/tools/pnpm/bin/mearl-native-host',
       ['--init', '--mode', 'skills'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runSkillOperation).not.toHaveBeenCalled();
     expect(deps.uninstallManagedPlugins).not.toHaveBeenCalled();
@@ -940,7 +948,7 @@ describe('runMearlLifecycle', () => {
     expect(deps.runCommand).toHaveBeenCalledWith(
       '/tools/npm/bin/npm',
       ['uninstall', '-g', '@mearl/native-host'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runSkillOperation).not.toHaveBeenCalled();
     expect(deps.uninstallManagedPlugins).not.toHaveBeenCalled();
@@ -1179,7 +1187,7 @@ describe('runMearlLifecycle', () => {
       1,
       '/tools/pnpm/bin/pnpm',
       ['add', '-g', '@mearl/mcp-server@latest'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
     expect(deps.runCommand).toHaveBeenNthCalledWith(
       2,
@@ -1223,7 +1231,7 @@ describe('runMearlLifecycle', () => {
       2,
       '/tools/npm/bin/npm',
       ['uninstall', '-g', '@mearl/mcp-server'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
   });
 
@@ -1245,9 +1253,7 @@ describe('runMearlLifecycle', () => {
 
     await expect(runMearlLifecycle({ operation: 'install' }, deps)).resolves.toBe(false);
 
-    expect(deps.writeLine).toHaveBeenCalledWith(
-      'Packages (shared client): package manager unavailable',
-    );
+    expect(deps.writeLine).toHaveBeenCalledWith('Mearl CLI: package manager unavailable');
     expect(deps.runSkillOperation).not.toHaveBeenCalled();
   });
 
@@ -1258,11 +1264,14 @@ describe('runMearlLifecycle', () => {
       .fn<CommandRunner>()
       .mockResolvedValueOnce({ code: 0, stdout: '', stderr: '' })
       .mockResolvedValueOnce({ code: 0, stdout: '', stderr: '' })
-      .mockResolvedValueOnce({ code: 1, stdout: '', stderr: '' });
+      .mockResolvedValueOnce({ code: 1, stdout: '', stderr: 'Cannot write browser configuration' });
 
     await expect(runMearlLifecycle({ operation: 'install' }, deps)).resolves.toBe(false);
 
-    expect(deps.writeLine).toHaveBeenCalledWith('Hook: local install failed (exit 1).');
+    expect(deps.writeLine).toHaveBeenCalledWith('Cannot write browser configuration');
+    expect(deps.writeLine).toHaveBeenCalledWith(
+      'Browser connection: configuration failed (exit 1).',
+    );
     expect(deps.runSkillOperation).not.toHaveBeenCalled();
   });
 

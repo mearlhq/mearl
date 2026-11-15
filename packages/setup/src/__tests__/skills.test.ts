@@ -155,7 +155,7 @@ describe('runGlobalMearlSkillOperation', () => {
       1,
       '/tools/skills',
       ['add', MEARL_SKILL_SOURCE, '--skill', 'mearl', '--global', '--yes'],
-      expect.objectContaining({ capture: false }),
+      expect.objectContaining({ capture: true }),
     );
   });
 

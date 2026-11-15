@@ -282,4 +282,4 @@ install/update 在替换包前保存选中 Preset 的确切资源和期望选择
 
 发行包可设置本机进程环境变量 `MEARL_SETUP_DEFAULT_PRESET` 提供默认清单来源；默认值仅在两端均无选择时生效，插件、Provider、卸载等子命令保持原行为。安装与状态核验仍由安装器负责。
 
-发行包可设置 `MEARL_SETUP_STATUS_FORMAT=text`，让生命周期命令结束时显示警告和待处理提示。`preset status` 仍输出 JSON，退出码仍表示实际就绪情况。
+安装和更新结束时会显示结果、警告和需要完成的操作。运行 `npx @mearl/setup preset status` 可查看完整的 JSON 诊断信息。安装、更新和状态查询在 Preset 尚未就绪时返回退出码 `3`。

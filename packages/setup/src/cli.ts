@@ -338,7 +338,7 @@ Integration commands:
   profile install <source>       Install App Profiles from a source in a connected extension
   preset apply [source]          Apply a Preset URL or local file, or retry the saved installation
   preset update                  Update the selected Preset, preserving user overrides
-  preset status                  Report actual readiness (exit 3 when synchronization is pending)
+  preset status                  Report detailed readiness as JSON (exit 3 when pending)
   preset uninstall               Remove the Preset from the local host and connected extensions
   plugin install <arguments...>   Install Skills and register their CLI plugins
   plugin uninstall <name>        Uninstall one CLI plugin
@@ -414,15 +414,41 @@ async function runSetupLifecycle(
   const actual = await (dependencies.runPreset ?? runPresetCommand)('status');
   if (actual.revision !== preset.revision)
     throw new Error('The selected preset changed while setup was running');
-  const warnings = [...new Set([...(preset.warnings ?? []), ...(actual.warnings ?? [])])];
-  if (process.env.MEARL_SETUP_STATUS_FORMAT === 'text') {
-    for (const warning of warnings) console.error(warning);
-    if (!actual.ready)
-      console.error('Preset setup is pending. Run the installer with "preset status" for details.');
-  } else {
-    console.log(JSON.stringify({ ...actual, warnings }, null, 2));
+  for (const warning of new Set([...(preset.warnings ?? []), ...(actual.warnings ?? [])])) {
+    console.error(`Warning: ${warning}`);
   }
-  return actual.ready ? 0 : 3;
+  const name = actual.id ? `Preset "${actual.id}"` : 'Preset';
+  if (actual.ready) {
+    const operation = options.operation === 'update' ? 'update' : 'installation';
+    console.error(`Mearl ${operation} complete. ${name} is ready.`);
+    return 0;
+  }
+
+  console.error(`${name} needs attention before setup can finish.`);
+  const pending = actual.pending ?? [];
+  const browserSync = pending.some(item => item.reason === 'BROWSER_SYNC_REQUIRED');
+  const localSync = pending.some(item => item.reason === 'HOST_SYNC_REQUIRED');
+  const browserPermissions = actual.browsers?.some(browser =>
+    browser.error?.startsWith('PRESET_DOMAIN_PERMISSION_REQUIRED:'),
+  );
+  if (browserPermissions) {
+    console.error(
+      'Select "Authorize preset domains" in the Mearl extension and confirm site access in Chrome.',
+    );
+  } else if (browserSync) {
+    console.error('Open Chrome with the Mearl extension enabled.');
+  }
+  if (localSync) {
+    console.error('Run "mearl check" to diagnose the local connection.');
+  }
+  if (!browserPermissions && pending.some(item => item.reason === 'SETTINGS_APPLY_REQUIRED')) {
+    console.error('The browser has not applied all preset settings.');
+  }
+  if (browserSync || localSync) {
+    console.error('Run this installer with "preset apply" to retry synchronization.');
+  }
+  console.error('Run this installer with "preset status" for details.');
+  return 3;
 }
 
 async function installProfile(source: string, browser?: string): Promise<unknown> {
@@ -608,13 +634,7 @@ export async function main(
         writeLine: line => console.error(line),
       });
       if (result.loaded) {
-        console.error(
-          result.activation === 'native-host'
-            ? `Browser extension v${result.version} updated and reloaded without CDP.`
-            : `Browser extension v${result.version} installed or reloaded through CDP.`,
-        );
-        console.error(`Extension ID: ${result.extensionId}`);
-        console.error(`Extension directory: ${result.path}`);
+        console.error(`Mearl browser extension v${result.version} is ready in Chrome.`);
         extensionInstalled = true;
       } else {
         console.error(

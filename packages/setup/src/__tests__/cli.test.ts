@@ -130,17 +130,20 @@ describe('parseSetupArgs', () => {
     expect(runPreset).not.toHaveBeenCalled();
   });
   it('delegates the selected preset to environment setup and checks actual readiness', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     const revision = 'a'.repeat(64);
     const runLifecycle = vi.fn(async (_options, dependencies) => {
       dependencies.onPresetStatus({ revision, ready: true });
       return true;
     });
-    const runPreset = vi.fn().mockResolvedValue({ revision, ready: true });
+    const runPreset = vi.fn().mockResolvedValue({ revision, ready: true, id: 'team' });
     const args = ['--preset', 'https://guide.example.test/presets/team.json', '--yes'];
     expect(parseSetupArgs(args)).toMatchObject({ operation: 'install', presetSource: args[1] });
     expect(() => parseSetupArgs(['uninstall', ...args])).toThrow('--preset is not available');
     expect(await main(args, false, { runLifecycle, runPreset })).toBe(0);
+    expect(log).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith('Mearl installation complete. Preset "team" is ready.');
     expect(runLifecycle.mock.calls[0][0]).toMatchObject({ presetSource: args[1] });
     expect(runPreset.mock.calls).toEqual([['status']]);
     expect(runLifecycle.mock.invocationCallOrder[0]).toBeLessThan(
@@ -570,9 +573,7 @@ describe('parseSetupArgs', () => {
     expect(installBrowserExtension).toHaveBeenCalledWith(
       expect.objectContaining({ force: true, waitForCdpMs: 120_000 }),
     );
-    expect(error).toHaveBeenCalledWith(
-      'Browser extension v2.8.0 installed or reloaded through CDP.',
-    );
+    expect(error.mock.calls).toEqual([['Mearl browser extension v2.8.0 is ready in Chrome.']]);
 
     installBrowserExtension.mockClear();
     await expect(
@@ -704,27 +705,42 @@ describe('parseSetupArgs', () => {
   });
 });
 
-it('keeps text-mode lifecycle output concise while explicit status still returns JSON', async () => {
+it('shows the steps to finish a pending setup while explicit status returns JSON', async () => {
   const log = vi.spyOn(console, 'log').mockImplementation(() => {});
   const error = vi.spyOn(console, 'error').mockImplementation(() => {});
   const revision = 'a'.repeat(64);
-  const pending = { revision, ready: false, warnings: ['Browser synchronization pending'] };
+  const pending = {
+    revision,
+    ready: false,
+    id: 'team',
+    pending: [{ reason: 'BROWSER_SYNC_REQUIRED' }, { reason: 'BROWSER_SYNC_REQUIRED' }],
+    warnings: ['A browser stopped responding'],
+  };
   const runPreset = vi.fn().mockResolvedValue(pending);
   const runLifecycle = vi.fn(async (_options, dependencies) => {
-    dependencies.onPresetStatus({ revision, ready: false });
+    dependencies.onPresetStatus({ revision, ready: true, warnings: pending.warnings });
     return true;
   });
-  vi.stubEnv('MEARL_SETUP_STATUS_FORMAT', 'text');
-  try {
-    expect(await main(['--yes'], false, { runLifecycle, runPreset })).toBe(3);
-    expect(log).not.toHaveBeenCalled();
-    expect(error).toHaveBeenCalledWith(pending.warnings[0]);
-    expect(error).toHaveBeenCalledWith(expect.stringContaining('preset status'));
-    expect(await main(['preset', 'status'], false, { runPreset })).toBe(3);
-    expect(JSON.parse(log.mock.calls[0][0])).toEqual(pending);
-  } finally {
-    vi.unstubAllEnvs();
-  }
+  expect(await main(['--yes'], false, { runLifecycle, runPreset })).toBe(3);
+  expect(log).not.toHaveBeenCalled();
+  expect(error.mock.calls).toEqual([
+    [`Warning: ${pending.warnings[0]}`],
+    ['Preset "team" needs attention before setup can finish.'],
+    [expect.stringContaining('Open Chrome')],
+    [expect.stringContaining('preset apply')],
+    [expect.stringContaining('preset status')],
+  ]);
+  expect(await main(['preset', 'status'], false, { runPreset })).toBe(3);
+  expect(JSON.parse(log.mock.calls[0][0])).toEqual(pending);
+
+  error.mockClear();
+  runPreset.mockResolvedValueOnce({
+    ...pending,
+    browsers: [{ error: 'PRESET_DOMAIN_PERMISSION_REQUIRED: Authorize preset domains' }],
+  });
+  expect(await main(['--yes'], false, { runLifecycle, runPreset })).toBe(3);
+  expect(error).toHaveBeenCalledWith(expect.stringContaining('Authorize preset domains'));
+  expect(error).not.toHaveBeenCalledWith(expect.stringContaining('Open Chrome'));
 });
 
 it('reports actual preset readiness after the base Skill phase and rejects a replaced selection', async () => {

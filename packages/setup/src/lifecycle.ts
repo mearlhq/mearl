@@ -165,10 +165,16 @@ async function runLifecycleCommand(
   capture = false,
 ): Promise<CommandResult | null> {
   try {
-    return await runner(command, args, {
+    const result = await runner(command, args, {
       capture,
       env: prependCommandPath(command, env),
     });
+    if (capture && result.code !== 0) {
+      for (const detail of new Set([result.stdout.trim(), result.stderr.trim()])) {
+        if (detail) writeLine(detail);
+      }
+    }
+    return result;
   } catch (error) {
     writeLine(`${label}: ${error instanceof Error ? error.message : String(error)}`);
     return null;
@@ -186,7 +192,6 @@ async function runPackageOperation(
   writeLine: (line: string) => void,
 ): Promise<{ command: GlobalPackageCommand; ok: boolean }> {
   const command = buildGlobalPackageCommand(installation, operation, packages, targetLine);
-  writeLine(`${label}: ${command.manager}`);
   const result = await runLifecycleCommand(
     runner,
     command.command,
@@ -196,6 +201,7 @@ async function runPackageOperation(
       : packages.reduce((childEnv, name) => packageRegistryEnvironment(name, childEnv), env),
     label,
     writeLine,
+    true,
   );
   if (!result) return { command, ok: false };
   if (result.code !== 0) {
@@ -219,6 +225,9 @@ async function runHook(
   let executable: string | null;
   let args: string[];
   let hookEnv = env;
+  const label = { local: 'Browser connection', cloud: 'Cloud server', mcp: 'MCP configuration' }[
+    profile
+  ];
 
   if (profile === 'local' && operation !== 'uninstall') {
     executable = detected.executable;
@@ -235,7 +244,7 @@ async function runHook(
   } else if (profile === 'cloud') {
     executable = siblingExecutable(detected.executable, 'mearl-cloud-server', existsSync);
     if (!executable) {
-      writeLine(`Hook: ${profile} ${operation} command was not found.`);
+      writeLine(`${label}: command not found.`);
       return false;
     }
 
@@ -250,13 +259,13 @@ async function runHook(
         executable,
         ['status'],
         commandEnv,
-        'Hook: cloud status',
+        'Cloud server status',
         writeLine,
         true,
       );
       if (!status) return false;
       if (status.code !== 0) {
-        writeLine(`Hook: cloud status failed (exit ${status.code}).`);
+        writeLine(`Cloud server status check failed (exit ${status.code}).`);
         return false;
       }
 
@@ -265,7 +274,7 @@ async function runHook(
         Boolean(cloudMode && cloudMode !== 'websocket') ||
         /\[CloudServer\]\s+Mode:\s+(?!websocket\b)\S+/.test(status.stdout);
       if (operation === 'update' && !running && !pluginMode) {
-        writeLine('Hook: cloud update skipped because cloud-server is not running.');
+        writeLine('The cloud server is stopped. Run "mearl-cloud-server start" when you need it.');
         return true;
       }
       args = [running && !pluginMode ? 'restart' : 'start'];
@@ -275,7 +284,7 @@ async function runHook(
   }
 
   if (!executable) {
-    writeLine(`Hook: ${profile} ${operation} command was not found.`);
+    writeLine(`${label}: command not found.`);
     return false;
   }
   const result = await runLifecycleCommand(
@@ -283,12 +292,13 @@ async function runHook(
     executable,
     args,
     hookEnv,
-    `Hook: ${profile} ${operation}`,
+    label,
     writeLine,
+    profile === 'local',
   );
   if (!result) return false;
   if (result.code !== 0) {
-    writeLine(`Hook: ${profile} ${operation} failed (exit ${result.code}).`);
+    writeLine(`${label}: configuration failed (exit ${result.code}).`);
     return false;
   }
   return true;
@@ -305,10 +315,6 @@ function selectedProfiles(
   }
   if (operation === 'install') return ['local'];
   return PROFILE_ORDER.filter(profile => detected.has(profile));
-}
-
-function operationVerb(operation: MearlLifecycleOperation): string {
-  return operation === 'uninstall' ? 'uninstall' : operation === 'update' ? 'update' : 'install';
 }
 
 export async function runMearlLifecycle(
@@ -502,14 +508,14 @@ async function executeLifecycle(
   }
 
   if (lifecycleSelected.length > 0) {
-    writeLine(
-      `${operationVerb(options.operation)} targets: ${lifecycleSelected
-        .map(profile => MEARL_PROFILES[profile].label)
-        .join(', ')}`,
-    );
+    const action = { install: 'Installing', update: 'Updating', uninstall: 'Uninstalling' }[
+      options.operation
+    ];
+    const environments = lifecycleSelected.map(profile => MEARL_PROFILES[profile].label).join(', ');
+    writeLine(`${action} Mearl (${environments})...`);
   }
   if (autoUpdateClient && lifecycleSelected.length === 0) {
-    writeLine('update targets: client CLI');
+    writeLine('Updating the Mearl CLI...');
   }
 
   const selectedUsesClient =
@@ -554,17 +560,17 @@ async function executeLifecycle(
       const command = buildGlobalPackageCommand(legacyCloudClient, 'uninstall', [
         LEGACY_CLOUD_CLIENT,
       ]);
-      writeLine(`Migration (cloud): removing ${LEGACY_CLOUD_CLIENT}.`);
       const result = await runLifecycleCommand(
         runner,
         command.command,
         command.args,
         env,
-        'Migration (cloud)',
+        'Previous cloud client removal',
         writeLine,
+        true,
       );
       if (!result || result.code !== 0) {
-        if (result) writeLine(`Migration (cloud): failed (exit ${result.code}).`);
+        if (result) writeLine(`Previous cloud client removal failed (exit ${result.code}).`);
         writeLine('Mearl setup incomplete. Review the messages above.');
         return false;
       }
@@ -591,7 +597,7 @@ async function executeLifecycle(
       packageSelector(),
       runner,
       env,
-      'Packages (shared client)',
+      'Mearl CLI',
       writeLine,
     );
     if (!sharedClient.ok) {
@@ -617,8 +623,8 @@ async function executeLifecycle(
       } catch (error) {
         writeLine(`Native host: ${error instanceof Error ? error.message : String(error)}`);
       }
-      writeLine(`Native host: ${cleanupOk ? 'cleaned.' : 'cleanup failed.'}`);
       if (!cleanupOk) {
+        writeLine('Browser connection cleanup failed.');
         packagesOk = false;
         continue;
       }
@@ -654,7 +660,7 @@ async function executeLifecycle(
       packageSelector(),
       runner,
       env,
-      `Packages (${profile})`,
+      `Mearl ${config.label} packages`,
       writeLine,
     );
     if (!packageResult.ok) {
@@ -670,8 +676,12 @@ async function executeLifecycle(
         detectPackage(config.anchorPackage, config.anchorBins, {
           env: prependCommandPath(packageResult.command.command, env),
         }) ?? current;
-      if (
-        !refreshed ||
+      if (!refreshed) {
+        writeLine(
+          `Could not find ${config.anchorBins[0]} after installation. Check your PATH and retry.`,
+        );
+        packagesOk = false;
+      } else if (
         !(await runHook(
           profile,
           options.operation,
@@ -700,7 +710,7 @@ async function executeLifecycle(
         undefined,
         runner,
         env,
-        'Packages (shared client)',
+        'Mearl CLI',
         writeLine,
       );
       if (!sharedClient.ok) packagesOk = false;
@@ -777,6 +787,7 @@ async function executeLifecycle(
   ) {
     try {
       if (stagedPreset) {
+        writeLine('Applying the Mearl preset...');
         const status = await stagedPreset.activate();
         dependencies.onPresetStatus?.(status);
       } else await dependencies.prepareSkills!();
@@ -877,7 +888,15 @@ async function executeLifecycle(
         return false;
       }
     }
-    writeLine('Mearl setup complete.');
+    if (!stagedPreset) {
+      const operation = { install: 'installation', update: 'update', uninstall: 'uninstall' }[
+        options.operation
+      ];
+      writeLine(`Mearl ${operation} complete.`);
+      if (options.operation !== 'uninstall' && lifecycleSelected.includes('local')) {
+        writeLine('Run "mearl check" to verify the browser connection.');
+      }
+    }
     return true;
   }
   writeLine('Mearl setup incomplete. Review the messages above.');

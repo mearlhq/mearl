@@ -117,17 +117,16 @@ export async function captureSkillsCli(
   const managedSkills = Object.fromEntries(
     Object.entries(current.preset?.skills ?? {}).filter(([, entry]) => entry.enabled !== false),
   );
-  const backend =
-    registry.get<
-      () =>
-        | {
-            id: string;
-            cli?: SkillsCli['run'];
-            normalizeSource?: (source: string, sourceType?: string) => string;
-            readSources?: typeof readTrackedSkillSources;
-          }
-        | undefined
-    >('skills.manager')?.();
+  const backend = registry.get<
+    () =>
+      | {
+          id: string;
+          cli?: SkillsCli['run'];
+          normalizeSource?: (source: string, sourceType?: string) => string;
+          readSources?: typeof readTrackedSkillSources;
+        }
+      | undefined
+  >('skills.manager')?.();
   if (backend !== undefined) {
     if (backend?.readSources !== undefined && typeof backend.readSources !== 'function')
       throw new Error('Invalid Skill source reader');
@@ -254,7 +253,6 @@ export async function runGlobalMearlSkillOperation(
       writeLine(`Skill: preset-managed Mearl requires preset apply/update (${status.reason}).`);
       return false;
     }
-    writeLine('Skill: retained the Mearl Skill managed by the selected preset.');
     return true;
   }
   const run = async (args: string[], capture: boolean) => {
@@ -268,6 +266,8 @@ export async function runGlobalMearlSkillOperation(
       return null;
     }
   };
+  const commandDetail = (result: CommandResult) =>
+    stripAnsi(`${result.stdout}\n${result.stderr}`).trim();
   const listMearlPaths = async (): Promise<string[] | null> => {
     const listed = await run(['list', '--global', '--json'], true);
     if (!listed) return null;
@@ -285,6 +285,7 @@ export async function runGlobalMearlSkillOperation(
     }
   };
   if (operation === 'install') {
+    writeLine('Installing the Mearl Skill...');
     const installed = await run(
       [
         'add',
@@ -294,48 +295,47 @@ export async function runGlobalMearlSkillOperation(
         '--global',
         ...(options.yes ? ['--yes'] : []),
       ],
-      false,
+      options.yes === true,
     );
     if (!installed) return false;
     if (installed.code !== 0) {
+      const detail = commandDetail(installed);
+      if (detail) writeLine(detail);
       writeLine(`Skill: install failed (exit ${installed.code}).`);
       return false;
     }
     const installedPaths = await listMearlPaths();
     if (!installedPaths || installedPaths.length === 0) {
+      const detail = commandDetail(installed);
+      if (detail) writeLine(detail);
       writeLine('Skill: installation finished without a tracked global mearl skill.');
       return false;
     }
-    writeLine('Skill: installed.');
     return true;
   }
 
   const paths = await listMearlPaths();
   if (!paths) return false;
-  if (paths.length === 0) {
-    writeLine('Skill: no tracked global mearl skill found; skipped.');
-    return true;
-  }
+  if (paths.length === 0) return true;
 
-  writeLine('Skill installation:');
-  paths.forEach(skillPath => writeLine(`  ${skillPath}`));
+  writeLine(operation === 'update' ? 'Updating the Mearl Skill...' : 'Removing the Mearl Skill...');
   const args =
     operation === 'update'
       ? ['add', MEARL_SKILL_SOURCE, '--skill', 'mearl', '--global', '--yes']
       : ['remove', 'mearl', '--global', '--yes'];
   const result = await run(args, true);
   if (!result) return false;
+  const detail = commandDetail(result);
   if (result.code !== 0) {
+    if (detail) writeLine(detail);
     writeLine(`Skill: ${operation} failed (exit ${result.code}).`);
     return false;
   }
-  const detail = stripAnsi(`${result.stdout}
-${result.stderr}`).trim();
-  if (detail) writeLine(detail);
   if (
     /Failed to (?:update|remove)\s+[1-9]\d*\s+skills?/i.test(detail) ||
     (operation === 'update' && !/\bInstalled [1-9]\d* skills?\b/.test(detail))
   ) {
+    if (detail) writeLine(detail);
     writeLine(`Skill: ${operation} failed.`);
     return false;
   }
@@ -344,9 +344,9 @@ ${result.stderr}`).trim();
     !remainingPaths ||
     (operation === 'uninstall' ? remainingPaths.length !== 0 : remainingPaths.length === 0)
   ) {
+    if (detail) writeLine(detail);
     writeLine(`Skill: ${operation} did not reach the expected installation state.`);
     return false;
   }
-  writeLine(`Skill: ${operation === 'update' ? 'updated' : 'uninstalled'}.`);
   return true;
 }

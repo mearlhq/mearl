@@ -282,4 +282,4 @@ Explicit setup first reuses the local preset. Without one, after runtime initial
 
 Distributions can set local-process `MEARL_SETUP_DEFAULT_PRESET` to a default manifest source. It applies only when neither side has a selection. Plugin, Provider, removal, and other subcommands keep their behavior. Setup performs installation and verifies its status.
 
-Distributions can set `MEARL_SETUP_STATUS_FORMAT=text` to show warnings and pending-work guidance at the end of lifecycle commands. `preset status` still reports JSON, and exit codes still reflect actual readiness.
+Installation and updates report the result, warnings, and any steps you need to finish. Run `npx @mearl/setup preset status` for the full JSON diagnostic report. Installation, updates, and status checks exit with code `3` while the Preset needs attention.
