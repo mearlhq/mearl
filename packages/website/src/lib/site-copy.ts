@@ -46,26 +46,26 @@ export const siteCopy = {
       'Connect page actions, requests, logs, and environment emulation so your agent can complete tasks and check the results. Turn proven workflows into reusable Skills.',
     connectionLead:
       'Choose the browser for your task. Connect through the extension, CDP, or an environment Provider.',
-    comparisonTitle: 'Bring the App environment',
-    comparisonTitleEnd: 'to your browser',
+    comparisonTitle: 'Test mobile pages',
+    comparisonTitleEnd: 'in your browser',
     comparisonLead:
-      'Install an App profile to check how your web page behaves inside its host app, from page layout to native interactions.',
+      'Use device presets to check layouts on phones and foldables. Add an App Profile when a page depends on its host app.',
     comparisonFeatures: [
       {
-        title: 'App identity',
-        text: 'Set the User-Agent and environment signals that select the page’s App-specific behavior.',
+        title: 'Device presets',
+        text: 'Check portrait and landscape layouts, including folded and unfolded views on supported presets.',
       },
       {
-        title: 'JSBridge calls',
-        text: 'Simulate the native methods and responses supported by the profile.',
+        title: 'Device shell',
+        text: 'See how content fits around system bars and safe areas.',
       },
       {
-        title: 'Container behavior',
-        text: 'Check navigation and WebView behavior with device and timezone emulation.',
+        title: 'App Profiles',
+        text: 'Simulate the App’s User-Agent, WebView settings, and supported JSBridge calls.',
       },
     ],
     homeInstall: 'Install Mearl',
-    mobileGuide: 'App Profile guide',
+    mobileGuide: 'Device emulation guide',
     useCasesTitle: 'Find a workflow for your role',
     useCases: [
       {
@@ -287,15 +287,19 @@ export const siteCopy = {
       '把页面操作、网络请求、日志和环境模拟连接起来，让 Agent 完成任务、检查结果，再将验证过的流程沉淀为可复用的 Skill。',
     connectionLead: '选择你想用的浏览器，通过扩展、CDP 或 Provider 接入任务所需的环境。',
     comparisonTitle: '在浏览器里，',
-    comparisonTitleEnd: '还原 App 运行环境',
-    comparisonLead: '按需安装 Profile，在浏览器里检查网页进入 App 后的表现，从页面布局到原生交互。',
+    comparisonTitleEnd: '验证移动端页面',
+    comparisonLead:
+      '用设备预设检查手机和折叠屏上的页面布局。页面依赖 App 环境时，可以选用对应的 App Profile。',
     comparisonFeatures: [
-      { title: 'App 身份', text: '设置 User-Agent 和环境标识，验证页面的端内逻辑。' },
-      { title: 'JSBridge 调用', text: '模拟配置支持的原生方法与返回数据。' },
-      { title: '容器行为', text: '检查导航与 WebView 行为，配合设备、时区模拟验证。' },
+      { title: '设备预设', text: '检查横竖屏布局，并在支持的预设中切换折叠态和展开态。' },
+      { title: '设备外壳', text: '检查页面内容与系统栏、安全区的适配。' },
+      {
+        title: 'App Profile',
+        text: '模拟 App 的 User-Agent、WebView 设置和支持的 JSBridge 调用。',
+      },
     ],
     homeInstall: '安装 Mearl',
-    mobileGuide: '端模拟指南',
+    mobileGuide: '设备模拟指南',
     useCasesTitle: '按角色找到适合的用法',
     useCases: [
       {

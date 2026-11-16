@@ -136,11 +136,11 @@ const capabilities: Array<{
           {t.comparisonFeatures.map(({ title, text }) => <li><strong>{title}</strong><span>{text}</span></li>)}
         </ul>
         <div class="product-comparison-links">
-          <a href={sitePath(locale, 'emulation') + '#app'}>{t.mobileGuide}<ArrowRight size={15} aria-hidden="true" /></a>
+          <a href={sitePath(locale, 'emulation') + '#device'}>{t.mobileGuide}<ArrowRight size={15} aria-hidden="true" /></a>
         </div>
       </div>
       <div class="product-comparison-stage">
-        <ProductScreenshot screenshot="phoneEmulation" {locale} />
+        <ProductScreenshot screenshot="foldableEmulation" {locale} />
       </div>
     </section>
 
