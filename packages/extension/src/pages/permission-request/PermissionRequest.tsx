@@ -1,9 +1,14 @@
 import { DomainPermissionPrompt } from './DomainPermissionPrompt';
 import { PresetPermissionPrompt } from './PresetPermissionPrompt';
-import { PRESET_PERMISSION_REVISION_PARAM } from '../../shared/permissionRequest';
+import { SimulationSitePermissionPrompt } from './SimulationSitePermissionPrompt';
+import {
+  PRESET_PERMISSION_REVISION_PARAM,
+  SIMULATION_PERMISSION_PARAM,
+} from '../../shared/permissionRequest';
 
 export function PermissionRequest() {
   const params = new URLSearchParams(window.location.search);
+  if (params.has(SIMULATION_PERMISSION_PARAM)) return <SimulationSitePermissionPrompt />;
   const revision = params.get(PRESET_PERMISSION_REVISION_PARAM);
   const domain = params.get('domain') ?? '';
   const requestId = params.get('requestId') ?? '';

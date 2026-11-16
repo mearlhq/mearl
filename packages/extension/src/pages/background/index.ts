@@ -78,6 +78,11 @@ import {
   isCloudConnectorAction,
 } from '@mearl/browser-core';
 import { isExtensionUiSender } from './extensionMessageTrust';
+import { SIMULATION_PERMISSION_ACTION } from '../../shared/permissionRequest';
+import {
+  clearSimulationSitePermission,
+  resolveSimulationSitePermission,
+} from './simulationSitePermission';
 import { handleStartHeatmap, handleStopHeatmap, reconcileHeatmapService } from './heatmapHandler';
 import { sendTabMessageToFrameIdsSafe, sendTabMessageToFramesSafe } from './frameMessaging';
 import {
@@ -185,6 +190,7 @@ import {
   getQuickDeviceEmulationStateWithGlobalDefault,
   refreshQuickDeviceFitToWindowForWindow,
   restoreQuickDeviceEmulationForTab,
+  setQuickAppSimulation,
   setQuickDevicePhoneFrame,
 } from './quickDeviceEmulation';
 import {
@@ -757,6 +763,12 @@ const runWithRestoredQuickDevice = <T>(tabId: number, task: () => Promise<T>): P
   );
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === SIMULATION_PERMISSION_ACTION) {
+    void resolveSimulationSitePermission(sender, message.decision, tabId =>
+      setQuickAppSimulation({ tabId, profile: null, deferReload: true }),
+    ).then(sendResponse, () => sendResponse({}));
+    return true;
+  }
   if (message.action === 'quickDeviceSafeAreaChanged') {
     const tabId = sender.tab?.id;
     if (tabId === undefined || sender.id !== chrome.runtime.id || sender.frameId !== 0) return;
@@ -2543,6 +2555,7 @@ chrome.webNavigation.onCreatedNavigationTarget.addListener(details => {
 
 // 清理已关闭的 tab
 chrome.tabs.onRemoved.addListener(tabId => {
+  void clearSimulationSitePermission(tabId).catch(() => {});
   closeDevicePreviewPanel(tabId);
   void Promise.all([
     cleanupBrowserEnhancements(tabId, { closed: true }),

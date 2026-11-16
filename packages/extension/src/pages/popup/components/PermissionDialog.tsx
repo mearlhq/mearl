@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { DomainPermissionPrompt } from '../../permission-request/DomainPermissionPrompt';
-import { Modal } from '../../panel/components/modal';
+import { PermissionModal } from '../../permission-request/PermissionPrompt';
 import { t } from '../../panel/utils/i18n';
 import {
   POPUP_PERMISSION_REQUEST,
@@ -60,14 +60,12 @@ export function PermissionDialog() {
   };
 
   return (
-    <Modal
+    <PermissionModal
       isOpen={Boolean(request)}
       onClose={() => {
         if (busyRequest.current !== request?.requestId) decide(false);
       }}
-      size="default"
       ariaLabel={t('agentPermRequestTitle')}
-      contentStyle={{ maxWidth: 380, maxHeight: 'calc(100vh - 24px)', overflowY: 'auto' }}
     >
       {request && (
         <DomainPermissionPrompt
@@ -82,6 +80,6 @@ export function PermissionDialog() {
           }}
         />
       )}
-    </Modal>
+    </PermissionModal>
   );
 }

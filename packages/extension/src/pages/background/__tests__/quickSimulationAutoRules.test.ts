@@ -49,6 +49,9 @@ describe('quickSimulationAutoRules', () => {
     chrome.storage.local.set = vi.fn(async values => {
       Object.assign(stored, values);
     });
+    chrome.permissions = {
+      contains: vi.fn().mockResolvedValue(true),
+    } as unknown as typeof chrome.permissions;
     chrome.tabs = {
       get: vi.fn().mockResolvedValue({
         id: 7,

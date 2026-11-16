@@ -21,6 +21,8 @@ import {
   hydrateQuickDeviceSimulationState,
 } from './quickDeviceSimulationState';
 import { getAppProfileForTab } from './utils/appProfileRules';
+import { getSimulationSitePattern, getSimulationSiteUrl } from '../../shared/permissionRequest';
+import { hasSimulationSitePermission } from './simulationSitePermission';
 
 const STORAGE_KEY = 'quickSimulationAutoRules';
 
@@ -263,6 +265,9 @@ export function applyQuickSimulationAutoRuleForTab(
       await restoreQuickDeviceEmulationForTab(tabId);
       const rule = await getQuickSimulationAutoRuleForUrl(targetUrl);
       if (!rule) return undefined;
+      const destination = getSimulationSiteUrl(targetUrl);
+      const pattern = destination && getSimulationSitePattern(destination);
+      if (!pattern || !(await hasSimulationSitePermission(pattern))) return undefined;
       if (!(await autoRuleMatchesTab(tabId, rule))) {
         await setQuickAppSimulation({
           tabId,

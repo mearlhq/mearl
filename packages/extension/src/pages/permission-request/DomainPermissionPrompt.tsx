@@ -1,11 +1,10 @@
-import { Globe } from 'lucide-react';
 import { t } from '../panel/utils/i18n';
 import {
   enableAgentAllDomains,
   normalizeDomainInputToOrigin,
   grantAgentOriginPermission,
 } from '../../shared/proxyPermissions';
-import { PermissionPrompt } from './PermissionPrompt';
+import { PermissionPrompt, PermissionSite } from './PermissionPrompt';
 
 interface DomainPermissionPromptProps {
   domain: string;
@@ -34,18 +33,12 @@ export function DomainPermissionPrompt({
         onDecision(false);
         return Promise.resolve(false);
       }}
-      alternative={{
-        label: t('agentPermRequestAllowAll'),
-        requestPermission: grantAllDomains,
-        browserDeniedMessage: t('agentPermRequestAllBrowserDenied'),
-      }}
+      requestAllSites={grantAllDomains}
+      allSitesDeniedMessage={t('agentPermRequestAllBrowserDenied')}
       onDecision={granted => onDecision(granted, granted ? (origin ?? undefined) : undefined)}
       onBusyChange={onBusyChange}
     >
-      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-secondary border border-border">
-        <Globe className="w-4 h-4 text-text-secondary shrink-0" />
-        <span className="text-sm font-medium text-text-primary break-all">{domain}</span>
-      </div>
+      <PermissionSite domain={domain} />
     </PermissionPrompt>
   );
 }

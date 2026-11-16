@@ -2,6 +2,7 @@ import { useEffect, useReducer, useState } from 'react';
 import { Globe } from 'lucide-react';
 import { validateInstallationOrigin } from '@mearl/preset/installation';
 import { BROWSER_REQUEST_UI_CHANGED } from '../../shared/browserRequestUi';
+import { ALL_URLS_ORIGIN } from '../../shared/proxyPermissions';
 import { t } from '../panel/utils/i18n';
 import { PermissionPrompt } from './PermissionPrompt';
 
@@ -65,13 +66,13 @@ export function PresetPermissionPrompt({ revision }: { revision: string }) {
 
   const preset = typeof state === 'object' ? state : undefined;
   const request = preset?.pending.length
-    ? async () => {
+    ? async (origins: string[]) => {
         try {
           const saved = chrome.runtime.sendMessage({
             action: 'browserUiService',
             data: { operation: 'authorizePreset', presetId: preset.presetId, revision },
           });
-          const permission = chrome.permissions.request({ origins: preset.pending });
+          const permission = chrome.permissions.request({ origins });
           const [result, granted] = await Promise.all([saved, permission]);
           if (!result?.success || result.data?.revision !== revision)
             throw new Error('Preset permissions were not saved');
@@ -96,7 +97,8 @@ export function PresetPermissionPrompt({ revision }: { revision: string }) {
       description={description}
       allowLabel={t('presetPermissionsGrant')}
       dismissLabel={t('cancel')}
-      requestPermission={request}
+      requestPermission={request && preset ? () => request(preset.pending) : undefined}
+      requestAllSites={request ? () => request([ALL_URLS_ORIGIN]) : undefined}
       onDecision={() => window.close()}
     >
       {!!preset?.pending.length && (

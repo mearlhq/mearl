@@ -1,7 +1,14 @@
-vi.mock('../requestInspection', async () => { const { requestMetadataFixture } = await import('../../../test/fixtures/requestMetadata'); return { inspectBrowserRequest: vi.fn(async input => requestMetadataFixture(input)) }; });
+vi.mock('../requestInspection', async () => {
+  const { requestMetadataFixture } = await import('../../../test/fixtures/requestMetadata');
+  return { inspectBrowserRequest: vi.fn(async input => requestMetadataFixture(input)) };
+});
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { resolveAppProfile } from '../../../../../app-profiles/src/__tests__/fixtures';
-import { emptyDeviceUserAgentMetadata, resolveEmulationConfig, type DeviceEnvironmentObservation } from '@mearl/browser-core';
+import {
+  emptyDeviceUserAgentMetadata,
+  resolveEmulationConfig,
+  type DeviceEnvironmentObservation,
+} from '@mearl/browser-core';
 
 vi.mock('../appProfileRuntimeSource', async () => {
   const { buildAppProfileRuntimeCallSource } =
@@ -54,118 +61,264 @@ const mockChrome = {
 global.chrome = mockChrome as any;
 
 describe('Debugger Manager', () => {
-  it.each([false, true])('commits the final App UA and restores native identity with preserveHostPlatform=%s', async preserveHostPlatform => {
-    const tabId = preserveHostPlatform ? 99002 : 99001;
-    const dnr = chrome.declarativeNetRequest;
-    const session = chrome.storage.session, values: Record<string, unknown> = {};
-    chrome.storage.session = {
-      get: vi.fn(async (keys: string | string[]) => Object.fromEntries((Array.isArray(keys) ? keys : [keys]).map(key => [key, values[key]]))),
-      set: vi.fn(async (next: object) => { Object.assign(values, next); }),
-      remove: vi.fn(async (keys: string[]) => { keys.forEach(key => { delete values[key]; }); }),
-    } as any;
-    chrome.declarativeNetRequest = { getSessionRules: vi.fn(async () => []), updateSessionRules: vi.fn(async () => {}) } as any;
-    const previousSend = mockChrome.debugger.sendCommand.getMockImplementation();
-    const identities: Array<Record<string, unknown>> = [];
-    let physicalPlatform = 'Host';
-    let widthOffset = 0;
-    const physicalObservation = () => ({ userAgent: identities.at(-1)?.userAgent ?? 'Native', platform: physicalPlatform,
-      userAgentMetadata: identities.at(-1)?.userAgentMetadata ?? emptyDeviceUserAgentMetadata(),
-      screen: { width: device.width + widthOffset, height: device.height, deviceScaleFactor: device.deviceScaleFactor, orientation: 'portrait-primary', angle: 0 },
-      touchPoints: 5, safeAreaInsets: device.safeAreaInsets,
-    } as DeviceEnvironmentObservation);
-    mockChrome.debugger.attach.mockResolvedValue(undefined);
-    mockChrome.debugger.sendCommand.mockImplementation(async (_target, method, params) => {
-      if (method === 'Emulation.setUserAgentOverride') { identities.push(params); physicalPlatform = params.platform; }
-      if (method === 'Page.getFrameTree') return { frameTree: { frame: { id: 'root', loaderId: 'loader' } } };
-      if (method === 'Page.createIsolatedWorld') return { executionContextId: 991 };
-      if (method === 'Runtime.evaluate' && params?.expression?.includes('observeDeviceEnvironment')) return { result: { value: physicalObservation() } };
-      return {};
-    });
-    const { enableEmulationForTab, disableEmulationForTab, synchronizeAppDeviceIdentityForTab, recordHostEnvironmentObservation, prepareDeviceShellWebViewEnvironmentForTab, handleAppProfileChildTargetEvent, cleanupTab } = await import('../debuggerManager');
-    const { applyAppProfileForTab, clearAppProfileForTab } = await import('../utils/appProfileRules');
-    const { applyDeviceShellForTab, clearDeviceShellForTab } = await import('../deviceShellRules');
-    const { getDeviceChromeConfig } = await import('../../../shared/quickAppProfile');
-    const device = resolveEmulationConfig({ enabled: true, preset: 'iphone-15-pro' });
-    const app = resolveAppProfile('reader').injected;
-    const native: DeviceEnvironmentObservation = { userAgent: 'Native', platform: 'Host', userAgentMetadata: {
-      brands: [{ brand: 'Chromium', version: '156' }], fullVersionList: [{ brand: 'Chromium', version: '156.0.0.0' }],
-      platform: 'Host OS', platformVersion: '1', architecture: 'arm', model: '', mobile: false,
-    }, screen: { width: 1920, height: 1080, deviceScaleFactor: 2, orientation: 'landscape-primary', angle: 0 },
-      touchPoints: 0, safeAreaInsets: { top: 0, right: 0, bottom: 0, left: 0 } };
-    try {
-      await applyAppProfileForTab(tabId, app);
-      await applyDeviceShellForTab(tabId, getDeviceChromeConfig(device), device);
-      await enableEmulationForTab(tabId, device);
-      expect(identities.at(-1)?.userAgent).toBe(device.userAgent);
-      await synchronizeAppDeviceIdentityForTab(tabId, native, preserveHostPlatform ? { preserveHostPlatform, preserveHostInput: true } : undefined);
-      expect(identities.at(-1)).toEqual({ userAgent: app.userAgent, platform: preserveHostPlatform ? native.platform : device.platform, userAgentMetadata: emptyDeviceUserAgentMetadata() });
-      expect(mockChrome.debugger.sendCommand.mock.calls.filter(call => call[1] === 'Emulation.setEmitTouchEventsForMouse').at(-1)?.[2])
-        .toEqual(preserveHostPlatform ? { enabled: false } : { enabled: true, configuration: 'mobile' });
-      if (preserveHostPlatform) {
-        await recordHostEnvironmentObservation(tabId, physicalObservation());
-        mockChrome.debugger.sendCommand.mockClear();
-        await prepareDeviceShellWebViewEnvironmentForTab(tabId, device, app);
-        expect(identities.at(-1)).toEqual({ userAgent: app.userAgent, platform: native.platform, userAgentMetadata: emptyDeviceUserAgentMetadata() });
-        const conversions = mockChrome.debugger.sendCommand.mock.calls.filter(call => call[1] === 'Emulation.setEmitTouchEventsForMouse');
-        expect(conversions.length).toBeGreaterThan(0);
-        expect(conversions.every(call => (call[2] as any).enabled === false)).toBe(true);
-        const send = mockChrome.debugger.sendCommand.getMockImplementation()!;
-        mockChrome.debugger.sendCommand.mockImplementation(async (target, method, params) => {
-          if (target.sessionId && method === 'Page.getFrameTree') return { frameTree: { frame: { name: '__mearl_root__' } } };
-          if (!target.sessionId && method === 'Runtime.evaluate' && !params?.expression?.includes('observeDeviceEnvironment')) return { result: { value: {
-            screenWidth: device.width, deviceScaleFactor: device.deviceScaleFactor, userAgent: app.userAgent, maxTouchPoints: 5,
-          } } };
-          return send(target, method, params);
+  it.each([false, true])(
+    'commits the final App UA and restores native identity with preserveHostPlatform=%s',
+    async preserveHostPlatform => {
+      const tabId = preserveHostPlatform ? 99002 : 99001;
+      const dnr = chrome.declarativeNetRequest;
+      const session = chrome.storage.session,
+        values: Record<string, unknown> = {};
+      chrome.storage.session = {
+        get: vi.fn(async (keys: string | string[]) =>
+          Object.fromEntries((Array.isArray(keys) ? keys : [keys]).map(key => [key, values[key]])),
+        ),
+        set: vi.fn(async (next: object) => {
+          Object.assign(values, next);
+        }),
+        remove: vi.fn(async (keys: string[]) => {
+          keys.forEach(key => {
+            delete values[key];
+          });
+        }),
+      } as any;
+      chrome.declarativeNetRequest = {
+        getSessionRules: vi.fn(async () => []),
+        updateSessionRules: vi.fn(async () => {}),
+      } as any;
+      const previousSend = mockChrome.debugger.sendCommand.getMockImplementation();
+      const identities: Array<Record<string, unknown>> = [];
+      let physicalPlatform = 'Host';
+      let widthOffset = 0;
+      const physicalObservation = () =>
+        ({
+          userAgent: identities.at(-1)?.userAgent ?? 'Native',
+          platform: physicalPlatform,
+          userAgentMetadata: identities.at(-1)?.userAgentMetadata ?? emptyDeviceUserAgentMetadata(),
+          screen: {
+            width: device.width + widthOffset,
+            height: device.height,
+            deviceScaleFactor: device.deviceScaleFactor,
+            orientation: 'portrait-primary',
+            angle: 0,
+          },
+          touchPoints: 5,
+          safeAreaInsets: device.safeAreaInsets,
+        }) as DeviceEnvironmentObservation;
+      mockChrome.debugger.attach.mockResolvedValue(undefined);
+      mockChrome.debugger.sendCommand.mockImplementation(async (_target, method, params) => {
+        if (method === 'Emulation.setUserAgentOverride') {
+          identities.push(params);
+          physicalPlatform = params.platform;
+        }
+        if (method === 'Page.getFrameTree')
+          return { frameTree: { frame: { id: 'root', loaderId: 'loader' } } };
+        if (method === 'Page.createIsolatedWorld') return { executionContextId: 991 };
+        if (
+          method === 'Runtime.evaluate' &&
+          params?.expression?.includes('observeDeviceEnvironment')
+        )
+          return { result: { value: physicalObservation() } };
+        return {};
+      });
+      const {
+        enableEmulationForTab,
+        disableEmulationForTab,
+        synchronizeAppDeviceIdentityForTab,
+        recordHostEnvironmentObservation,
+        prepareDeviceShellWebViewEnvironmentForTab,
+        handleAppProfileChildTargetEvent,
+        cleanupTab,
+      } = await import('../debuggerManager');
+      const { applyAppProfileForTab, clearAppProfileForTab } =
+        await import('../utils/appProfileRules');
+      const { applyDeviceShellForTab, clearDeviceShellForTab } =
+        await import('../deviceShellRules');
+      const { getDeviceChromeConfig } = await import('../../../shared/quickAppProfile');
+      const device = resolveEmulationConfig({ enabled: true, preset: 'iphone-15-pro' });
+      const app = resolveAppProfile('reader').injected;
+      const native: DeviceEnvironmentObservation = {
+        userAgent: 'Native',
+        platform: 'Host',
+        userAgentMetadata: {
+          brands: [{ brand: 'Chromium', version: '156' }],
+          fullVersionList: [{ brand: 'Chromium', version: '156.0.0.0' }],
+          platform: 'Host OS',
+          platformVersion: '1',
+          architecture: 'arm',
+          model: '',
+          mobile: false,
+        },
+        screen: {
+          width: 1920,
+          height: 1080,
+          deviceScaleFactor: 2,
+          orientation: 'landscape-primary',
+          angle: 0,
+        },
+        touchPoints: 0,
+        safeAreaInsets: { top: 0, right: 0, bottom: 0, left: 0 },
+      };
+      try {
+        await applyAppProfileForTab(tabId, app);
+        await applyDeviceShellForTab(tabId, getDeviceChromeConfig(device), device);
+        await enableEmulationForTab(tabId, device);
+        expect(identities.at(-1)?.userAgent).toBe(device.userAgent);
+        await synchronizeAppDeviceIdentityForTab(
+          tabId,
+          native,
+          preserveHostPlatform ? { preserveHostPlatform, preserveHostInput: true } : undefined,
+        );
+        expect(identities.at(-1)).toEqual({
+          userAgent: app.userAgent,
+          platform: preserveHostPlatform ? native.platform : device.platform,
+          userAgentMetadata: emptyDeviceUserAgentMetadata(),
         });
-        mockChrome.debugger.sendCommand.mockClear();
-        await handleAppProfileChildTargetEvent(tabId, 'Target.attachedToTarget', {
-          sessionId: 'owned-webview', targetInfo: { type: 'iframe' },
-        });
-        expect(mockChrome.debugger.sendCommand.mock.calls.some(call => call[1] === 'Emulation.setUserAgentOverride' || call[1] === 'Emulation.setEmitTouchEventsForMouse')).toBe(false);
-        expect(mockChrome.debugger.sendCommand.mock.calls.some(call => call[1] === 'Emulation.setDeviceMetricsOverride' || call[1] === 'Emulation.clearDeviceMetricsOverride')).toBe(false);
-        for (const drift of ['platform', 'screen']) {
-          widthOffset = 0;
-          await synchronizeAppDeviceIdentityForTab(tabId, native, { preserveHostPlatform: true, preserveHostInput: true });
+        expect(
+          mockChrome.debugger.sendCommand.mock.calls
+            .filter(call => call[1] === 'Emulation.setEmitTouchEventsForMouse')
+            .at(-1)?.[2],
+        ).toEqual(
+          preserveHostPlatform ? { enabled: false } : { enabled: true, configuration: 'mobile' },
+        );
+        if (preserveHostPlatform) {
           await recordHostEnvironmentObservation(tabId, physicalObservation());
-          if (drift === 'platform') physicalPlatform = 'External'; else widthOffset = 1;
-          for (const suffix of ['first', 'later']) {
+          mockChrome.debugger.sendCommand.mockClear();
+          await prepareDeviceShellWebViewEnvironmentForTab(tabId, device, app);
+          expect(identities.at(-1)).toEqual({
+            userAgent: app.userAgent,
+            platform: native.platform,
+            userAgentMetadata: emptyDeviceUserAgentMetadata(),
+          });
+          const conversions = mockChrome.debugger.sendCommand.mock.calls.filter(
+            call => call[1] === 'Emulation.setEmitTouchEventsForMouse',
+          );
+          expect(conversions.length).toBeGreaterThan(0);
+          expect(conversions.every(call => (call[2] as any).enabled === false)).toBe(true);
+          const send = mockChrome.debugger.sendCommand.getMockImplementation()!;
+          mockChrome.debugger.sendCommand.mockImplementation(async (target, method, params) => {
+            if (target.sessionId && method === 'Page.getFrameTree')
+              return { frameTree: { frame: { name: '__mearl_root__' } } };
+            if (
+              !target.sessionId &&
+              method === 'Runtime.evaluate' &&
+              !params?.expression?.includes('observeDeviceEnvironment')
+            )
+              return {
+                result: {
+                  value: {
+                    screenWidth: device.width,
+                    deviceScaleFactor: device.deviceScaleFactor,
+                    userAgent: app.userAgent,
+                    maxTouchPoints: 5,
+                  },
+                },
+              };
+            return send(target, method, params);
+          });
+          mockChrome.debugger.sendCommand.mockClear();
+          await handleAppProfileChildTargetEvent(tabId, 'Target.attachedToTarget', {
+            sessionId: 'owned-webview',
+            targetInfo: { type: 'iframe' },
+          });
+          expect(
+            mockChrome.debugger.sendCommand.mock.calls.some(
+              call =>
+                call[1] === 'Emulation.setUserAgentOverride' ||
+                call[1] === 'Emulation.setEmitTouchEventsForMouse',
+            ),
+          ).toBe(false);
+          expect(
+            mockChrome.debugger.sendCommand.mock.calls.some(
+              call =>
+                call[1] === 'Emulation.setDeviceMetricsOverride' ||
+                call[1] === 'Emulation.clearDeviceMetricsOverride',
+            ),
+          ).toBe(false);
+          for (const drift of ['platform', 'screen']) {
+            widthOffset = 0;
+            await synchronizeAppDeviceIdentityForTab(tabId, native, {
+              preserveHostPlatform: true,
+              preserveHostInput: true,
+            });
+            await recordHostEnvironmentObservation(tabId, physicalObservation());
+            if (drift === 'platform') physicalPlatform = 'External';
+            else widthOffset = 1;
+            for (const suffix of ['first', 'later']) {
+              mockChrome.debugger.sendCommand.mockClear();
+              await handleAppProfileChildTargetEvent(tabId, 'Target.attachedToTarget', {
+                sessionId: drift + suffix,
+                targetInfo: { type: 'iframe' },
+              });
+              expect(physicalPlatform).toBe(drift === 'platform' ? 'External' : native.platform);
+              expect(widthOffset).toBe(drift === 'screen' ? 1 : 0);
+              expect(
+                mockChrome.debugger.sendCommand.mock.calls.some(
+                  call => !call[0].sessionId && call[1].startsWith('Emulation.'),
+                ),
+              ).toBe(false);
+              expect(
+                mockChrome.debugger.sendCommand.mock.calls.some(
+                  call => call[1] === 'Network.setUserAgentOverride',
+                ),
+              ).toBe(false);
+            }
+          }
+          widthOffset = 0;
+          mockChrome.debugger.sendCommand.mockImplementation(send);
+          const { markEnvironmentMutation } = await import('../environmentRevisions');
+          for (const [index, component] of (['app', 'device'] as const).entries()) {
+            await synchronizeAppDeviceIdentityForTab(tabId, native, {
+              preserveHostPlatform: true,
+              preserveHostInput: true,
+            });
+            await markEnvironmentMutation(tabId, component);
             mockChrome.debugger.sendCommand.mockClear();
-            await handleAppProfileChildTargetEvent(tabId, 'Target.attachedToTarget', { sessionId: drift + suffix, targetInfo: { type: 'iframe' } });
-            expect(physicalPlatform).toBe(drift === 'platform' ? 'External' : native.platform);
-            expect(widthOffset).toBe(drift === 'screen' ? 1 : 0);
-            expect(mockChrome.debugger.sendCommand.mock.calls.some(call => !call[0].sessionId && call[1].startsWith('Emulation.'))).toBe(false);
-            expect(mockChrome.debugger.sendCommand.mock.calls.some(call => call[1] === 'Network.setUserAgentOverride')).toBe(false);
+            await prepareDeviceShellWebViewEnvironmentForTab(
+              tabId,
+              { ...device, width: device.width + index + 1 },
+              app,
+            );
+            expect(identities.at(-1)?.platform).toBe(device.platform);
+            expect(
+              mockChrome.debugger.sendCommand.mock.calls
+                .filter(call => call[1] === 'Emulation.setEmitTouchEventsForMouse')
+                .at(-1)?.[2],
+            ).toEqual({ enabled: true, configuration: 'mobile' });
           }
         }
-        widthOffset = 0;
-        mockChrome.debugger.sendCommand.mockImplementation(send);
-        const { markEnvironmentMutation } = await import('../environmentRevisions');
-        for (const [index, component] of (['app', 'device'] as const).entries()) {
-          await synchronizeAppDeviceIdentityForTab(tabId, native, { preserveHostPlatform: true, preserveHostInput: true });
-          await markEnvironmentMutation(tabId, component);
-          mockChrome.debugger.sendCommand.mockClear();
-          await prepareDeviceShellWebViewEnvironmentForTab(tabId, { ...device, width: device.width + index + 1 }, app);
-          expect(identities.at(-1)?.platform).toBe(device.platform);
-          expect(mockChrome.debugger.sendCommand.mock.calls.filter(call => call[1] === 'Emulation.setEmitTouchEventsForMouse').at(-1)?.[2])
-            .toEqual({ enabled: true, configuration: 'mobile' });
-        }
+        await clearAppProfileForTab(tabId);
+        await synchronizeAppDeviceIdentityForTab(
+          tabId,
+          native,
+          preserveHostPlatform ? { preserveHostPlatform, preserveHostInput: true } : undefined,
+        );
+        expect(identities.at(-1)?.userAgent).toBe(device.userAgent);
+        expect(identities.at(-1)?.platform).toBe(
+          preserveHostPlatform ? native.platform : device.platform,
+        );
+        expect(identities.at(-1)?.userAgentMetadata).toMatchObject({
+          platform: device.platform,
+          mobile: device.mobile,
+        });
+        await clearDeviceShellForTab(tabId);
+        await disableEmulationForTab(tabId);
+        await synchronizeAppDeviceIdentityForTab(tabId, native);
+        expect(identities.at(-1)).toEqual({
+          userAgent: native.userAgent,
+          platform: native.platform,
+          userAgentMetadata: native.userAgentMetadata,
+        });
+      } finally {
+        await clearAppProfileForTab(tabId);
+        await clearDeviceShellForTab(tabId);
+        cleanupTab(tabId);
+        chrome.declarativeNetRequest = dnr;
+        await (await import('../environmentRevisions')).cleanupEnvironmentRevisions(tabId);
+        chrome.storage.session = session;
+        mockChrome.debugger.sendCommand.mockImplementation(previousSend ?? (async () => undefined));
       }
-      await clearAppProfileForTab(tabId);
-      await synchronizeAppDeviceIdentityForTab(tabId, native, preserveHostPlatform ? { preserveHostPlatform, preserveHostInput: true } : undefined);
-      expect(identities.at(-1)?.userAgent).toBe(device.userAgent);
-      expect(identities.at(-1)?.platform).toBe(preserveHostPlatform ? native.platform : device.platform);
-      expect(identities.at(-1)?.userAgentMetadata).toMatchObject({ platform: device.platform, mobile: device.mobile });
-      await clearDeviceShellForTab(tabId); await disableEmulationForTab(tabId);
-      await synchronizeAppDeviceIdentityForTab(tabId, native);
-      expect(identities.at(-1)).toEqual({ userAgent: native.userAgent, platform: native.platform, userAgentMetadata: native.userAgentMetadata });
-    } finally {
-      await clearAppProfileForTab(tabId); await clearDeviceShellForTab(tabId); cleanupTab(tabId);
-      chrome.declarativeNetRequest = dnr;
-      await (await import('../environmentRevisions')).cleanupEnvironmentRevisions(tabId);
-      chrome.storage.session = session;
-      mockChrome.debugger.sendCommand.mockImplementation(previousSend ?? (async () => undefined));
-    }
-  });
+    },
+  );
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -184,7 +337,9 @@ describe('Debugger Manager', () => {
         { tabId: 1 },
         'Fetch.enable',
         expect.objectContaining({
-          patterns: expect.arrayContaining([expect.objectContaining({ urlPattern: '*', resourceType: 'XHR' })]),
+          patterns: expect.arrayContaining([
+            expect.objectContaining({ urlPattern: '*', resourceType: 'XHR' }),
+          ]),
         }),
       );
     });
@@ -647,23 +802,47 @@ describe('Debugger Manager', () => {
       expect(selectResponseOverride(sequence, request, counts)?.responseData).toBe(2);
     });
 
-    it.each([undefined, 200])('resumes a paused request when inspection fails at status %s', async responseStatusCode => {
-      mockChrome.debugger.attach.mockResolvedValue(undefined);
-      mockChrome.debugger.sendCommand.mockResolvedValue(undefined);
-      const { setResponseOverride, handleRequestPaused, cleanupTab } = await import('../debuggerManager');
-      const { inspectBrowserRequest } = await import('../requestInspection');
-      const tabId = responseStatusCode === undefined ? 99031 : 99032;
-      await setResponseOverride(tabId, { apiName: 'example.query', responseData: { mocked: true } });
-      vi.mocked(inspectBrowserRequest).mockRejectedValueOnce(new Error('Pure browser runtime failed'));
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      mockChrome.debugger.sendCommand.mockClear();
-      try {
-        await handleRequestPaused(tabId, { requestId: 'inspection-failed', request: { method: 'GET', url: 'https://example.test/query' }, responseStatusCode });
-        expect(mockChrome.debugger.sendCommand).toHaveBeenCalledWith({ tabId }, 'Fetch.continueRequest', { requestId: 'inspection-failed' });
-        expect(mockChrome.debugger.sendCommand.mock.calls.some(call => call[1] === 'Fetch.fulfillRequest')).toBe(false);
-        expect(warn).toHaveBeenCalled();
-      } finally { warn.mockRestore(); await cleanupTab(tabId); }
-    });
+    it.each([undefined, 200])(
+      'resumes a paused request when inspection fails at status %s',
+      async responseStatusCode => {
+        mockChrome.debugger.attach.mockResolvedValue(undefined);
+        mockChrome.debugger.sendCommand.mockResolvedValue(undefined);
+        const { setResponseOverride, handleRequestPaused, cleanupTab } =
+          await import('../debuggerManager');
+        const { inspectBrowserRequest } = await import('../requestInspection');
+        const tabId = responseStatusCode === undefined ? 99031 : 99032;
+        await setResponseOverride(tabId, {
+          apiName: 'example.query',
+          responseData: { mocked: true },
+        });
+        vi.mocked(inspectBrowserRequest).mockRejectedValueOnce(
+          new Error('Pure browser runtime failed'),
+        );
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        mockChrome.debugger.sendCommand.mockClear();
+        try {
+          await handleRequestPaused(tabId, {
+            requestId: 'inspection-failed',
+            request: { method: 'GET', url: 'https://example.test/query' },
+            responseStatusCode,
+          });
+          expect(mockChrome.debugger.sendCommand).toHaveBeenCalledWith(
+            { tabId },
+            'Fetch.continueRequest',
+            { requestId: 'inspection-failed' },
+          );
+          expect(
+            mockChrome.debugger.sendCommand.mock.calls.some(
+              call => call[1] === 'Fetch.fulfillRequest',
+            ),
+          ).toBe(false);
+          expect(warn).toHaveBeenCalled();
+        } finally {
+          warn.mockRestore();
+          await cleanupTab(tabId);
+        }
+      },
+    );
 
     it('selects consecutive mock responses once per request', async () => {
       mockChrome.debugger.attach.mockResolvedValue(undefined);
@@ -716,21 +895,38 @@ describe('Debugger Manager', () => {
       const url = 'https://example.test/api/query';
       try {
         await registerRequestCollectionWebView(tabId, sessionId);
-        await setResponseOverride(tabId, { apiName: '/api/query', url, responseData: { mocked: true } });
+        await setResponseOverride(tabId, {
+          apiName: '/api/query',
+          url,
+          responseData: { mocked: true },
+        });
         expect(mockChrome.debugger.sendCommand).toHaveBeenCalledWith(target, 'Fetch.enable', {
-          patterns: expect.arrayContaining([{ urlPattern: '*', resourceType: 'Fetch', requestStage: 'Response' }]),
+          patterns: expect.arrayContaining([
+            { urlPattern: '*', resourceType: 'Fetch', requestStage: 'Response' },
+          ]),
         });
 
         const request = { requestId: 'same-id', request: { method: 'GET', url } };
-        const unrelated = { ...request, request: { method: 'GET', url: 'https://example.test/api/other' } };
+        const unrelated = {
+          ...request,
+          request: { method: 'GET', url: 'https://example.test/api/other' },
+        };
         await handleRequestPaused(tabId, request, sessionId);
         await handleRequestPaused(tabId, unrelated);
-        await handleRequestPaused(tabId, { ...request, responseStatusCode: 200, responseHeaders: [] }, sessionId);
-        expect(mockChrome.debugger.sendCommand).toHaveBeenCalledWith(target, 'Fetch.fulfillRequest', expect.objectContaining({
-          requestId: 'same-id',
-          responseCode: 200,
-          body: btoa(JSON.stringify({ mocked: true })),
-        }));
+        await handleRequestPaused(
+          tabId,
+          { ...request, responseStatusCode: 200, responseHeaders: [] },
+          sessionId,
+        );
+        expect(mockChrome.debugger.sendCommand).toHaveBeenCalledWith(
+          target,
+          'Fetch.fulfillRequest',
+          expect.objectContaining({
+            requestId: 'same-id',
+            responseCode: 200,
+            body: btoa(JSON.stringify({ mocked: true })),
+          }),
+        );
 
         await disableModificationForTab(tabId);
         expect(mockChrome.debugger.sendCommand).toHaveBeenCalledWith(target, 'Fetch.disable');
@@ -927,19 +1123,33 @@ describe('设备模拟下发', () => {
     } as unknown as typeof chrome.declarativeNetRequest;
     mockChrome.debugger.sendCommand.mockResolvedValue({});
     try {
-      await applyDeviceShellForTab(tabId, {
-        ...chromeConfig,
-        phoneFrame: { width: config.width, height: config.height },
-      }, config);
+      await applyDeviceShellForTab(
+        tabId,
+        {
+          ...chromeConfig,
+          phoneFrame: { width: config.width, height: config.height },
+        },
+        config,
+      );
       await enableEmulationForTab(tabId, config);
-      expect(mockChrome.debugger.sendCommand.mock.calls)
-        .toEqual(expect.arrayContaining([
+      expect(mockChrome.debugger.sendCommand.mock.calls).toEqual(
+        expect.arrayContaining([
           [{ tabId }, 'Emulation.clearDeviceMetricsOverride', {}],
-          [{ tabId }, 'Emulation.setDeviceMetricsOverride', expect.objectContaining({
-            width: 0, height: 0, screenWidth: config.width, screenHeight: config.height,
-            deviceScaleFactor: config.deviceScaleFactor, mobile: config.mobile, scale: 1,
-          })],
-        ]));
+          [
+            { tabId },
+            'Emulation.setDeviceMetricsOverride',
+            expect.objectContaining({
+              width: 0,
+              height: 0,
+              screenWidth: config.width,
+              screenHeight: config.height,
+              deviceScaleFactor: config.deviceScaleFactor,
+              mobile: config.mobile,
+              scale: 1,
+            }),
+          ],
+        ]),
+      );
 
       await prepareDeviceShellWebViewEnvironmentForTab(tabId, config);
       mockChrome.debugger.sendCommand.mockClear();
@@ -953,7 +1163,9 @@ describe('设备模拟下发', () => {
         sessionId: 'framed-webview',
         targetInfo: { type: 'iframe' },
       });
-      const recoveryMethods = mockChrome.debugger.sendCommand.mock.calls.map(([, method]) => method);
+      const recoveryMethods = mockChrome.debugger.sendCommand.mock.calls.map(
+        ([, method]) => method,
+      );
       expect(recoveryMethods).toContain('Emulation.setSafeAreaInsetsOverride');
       expect(recoveryMethods).not.toContain('Emulation.clearDeviceMetricsOverride');
       expect(recoveryMethods).not.toContain('Emulation.setDeviceMetricsOverride');
@@ -963,11 +1175,13 @@ describe('设备模拟下发', () => {
       await applyDeviceShellForTab(tabId, chromeConfig, config);
       await enableEmulationForTab(tabId, config);
       expect(mockChrome.debugger.sendCommand).toHaveBeenCalledWith(
-        { tabId }, 'Emulation.setDeviceMetricsOverride',
+        { tabId },
+        'Emulation.setDeviceMetricsOverride',
         expect.objectContaining({ width: config.width, height: config.height, scale: 0.75 }),
       );
       expect(mockChrome.debugger.sendCommand).toHaveBeenCalledWith(
-        { tabId }, 'Emulation.setVisibleSize',
+        { tabId },
+        'Emulation.setVisibleSize',
         { width: Math.round(config.width * 0.75), height: Math.round(config.height * 0.75) },
       );
     } finally {
@@ -1209,10 +1423,16 @@ describe('独立安全区模拟', () => {
     const shell = await import('../deviceShellRules');
     const { getDeviceChromeConfig } = await import('../../../shared/quickAppProfile');
     const {
-      cleanupTab, getTabState, prepareDeviceShellWebViewEnvironmentForTab, restorePhoneFrameSafeAreaForTab,
+      cleanupTab,
+      getTabState,
+      prepareDeviceShellWebViewEnvironmentForTab,
+      restorePhoneFrameSafeAreaForTab,
     } = await import('../debuggerManager');
     const getShell = vi.spyOn(shell, 'getDeviceShellForTab').mockResolvedValue({
-      config: { ...getDeviceChromeConfig(device), phoneFrame: { width: device.width, height: device.height } },
+      config: {
+        ...getDeviceChromeConfig(device),
+        phoneFrame: { width: device.width, height: device.height },
+      },
       emulation: device,
       splitScreen: false,
     });
@@ -1225,11 +1445,13 @@ describe('独立安全区模拟', () => {
 
       expect(chrome.debugger.sendCommand).toHaveBeenCalledTimes(2);
       expect(chrome.debugger.sendCommand).toHaveBeenCalledWith(
-        { tabId }, 'Emulation.setSafeAreaInsetsOverride',
+        { tabId },
+        'Emulation.setSafeAreaInsetsOverride',
         { insets: expect.objectContaining({ right: 0, bottom: 34 }) },
       );
       expect(chrome.debugger.sendCommand).toHaveBeenCalledWith(
-        { tabId, sessionId: 'webview' }, 'Emulation.setSafeAreaInsetsOverride',
+        { tabId, sessionId: 'webview' },
+        'Emulation.setSafeAreaInsetsOverride',
         { insets: expect.objectContaining({ right: 0, bottom: 34 }) },
       );
 
@@ -1380,8 +1602,11 @@ describe('独立安全区模拟', () => {
       );
     expect((childBootstrapCall?.[2] as { source?: string })?.source).toContain('devicePixelRatio');
     expect((childBootstrapCall?.[2] as { source?: string })?.source).toContain('Sample/10.0.9');
-    const childMethods = vi.mocked(chrome.debugger.sendCommand).mock.calls
-      .filter(call => (call[0] as { sessionId?: string }).sessionId === 'iframe-session-1')
+    const childMethods = vi
+      .mocked(chrome.debugger.sendCommand)
+      .mock.calls.filter(
+        call => (call[0] as { sessionId?: string }).sessionId === 'iframe-session-1',
+      )
       .map(call => call[1]);
     const pageEnabled = childMethods.indexOf('Page.enable');
     const bootstrapRegistered = childMethods.indexOf('Page.addScriptToEvaluateOnNewDocument');
@@ -1393,7 +1618,9 @@ describe('独立安全区模拟', () => {
     );
     expect(pageEnabled).toBeGreaterThanOrEqual(0);
     expect(pageEnabled).toBeLessThan(bootstrapRegistered);
-    expect(bootstrapRegistered).toBeLessThan(childMethods.indexOf('Runtime.runIfWaitingForDebugger'));
+    expect(bootstrapRegistered).toBeLessThan(
+      childMethods.indexOf('Runtime.runIfWaitingForDebugger'),
+    );
     expect(chrome.debugger.sendCommand).not.toHaveBeenCalledWith(
       { tabId: 4256, sessionId: 'iframe-session-1' },
       'Runtime.evaluate',
@@ -1403,9 +1630,7 @@ describe('独立安全区模拟', () => {
     vi.mocked(chrome.debugger.sendCommand).mockClear();
     vi.mocked(chrome.debugger.sendCommand).mockImplementation(
       async (_target: chrome.debugger.Debuggee, method: string) =>
-        method === 'Page.getFrameTree'
-          ? { frameTree: { frame: { name: 'ad-frame' } } }
-          : {},
+        method === 'Page.getFrameTree' ? { frameTree: { frame: { name: 'ad-frame' } } } : {},
     );
     await handleAppProfileChildTargetEvent(
       4256,
@@ -1440,30 +1665,45 @@ describe('独立安全区模拟', () => {
     cleanupTab(4256);
   });
 
-  it.each(['__mearl_root__', '__mearl_layer__', 'ad-frame'])('scopes App-only network identity to business WebViews (%s)', async frameName => {
-    const { injected } = resolveAppProfile('reader');
-    const { cleanupTab, handleAppProfileChildTargetEvent } = await import('../debuggerManager');
-    const previous = vi.mocked(chrome.debugger.sendCommand).getMockImplementation();
-    vi.mocked(chrome.debugger.sendCommand).mockImplementation(async (_target, method) =>
-      method === 'Page.getFrameTree' ? { frameTree: { frame: { name: frameName } } } : {});
-    try {
-      await handleAppProfileChildTargetEvent(4290, 'Target.attachedToTarget', {
-        sessionId: 'app-only-child', targetInfo: { type: 'iframe' },
-      }, injected);
-      const calls = vi.mocked(chrome.debugger.sendCommand).mock.calls;
-      const override = calls.find(call => call[1] === 'Network.setUserAgentOverride');
-      if (frameName === 'ad-frame') expect(override).toBeUndefined();
-      else {
-        expect(override).toEqual([{ tabId: 4290, sessionId: 'app-only-child' },
-          'Network.setUserAgentOverride', { userAgent: injected.userAgent, platform: injected.navigatorPlatform }]);
-        expect(calls.indexOf(override!)).toBeLessThan(calls.findIndex(call => call[1] === 'Runtime.runIfWaitingForDebugger'));
+  it.each(['__mearl_root__', '__mearl_layer__', 'ad-frame'])(
+    'scopes App-only network identity to business WebViews (%s)',
+    async frameName => {
+      const { injected } = resolveAppProfile('reader');
+      const { cleanupTab, handleAppProfileChildTargetEvent } = await import('../debuggerManager');
+      const previous = vi.mocked(chrome.debugger.sendCommand).getMockImplementation();
+      vi.mocked(chrome.debugger.sendCommand).mockImplementation(async (_target, method) =>
+        method === 'Page.getFrameTree' ? { frameTree: { frame: { name: frameName } } } : {},
+      );
+      try {
+        await handleAppProfileChildTargetEvent(
+          4290,
+          'Target.attachedToTarget',
+          {
+            sessionId: 'app-only-child',
+            targetInfo: { type: 'iframe' },
+          },
+          injected,
+        );
+        const calls = vi.mocked(chrome.debugger.sendCommand).mock.calls;
+        const override = calls.find(call => call[1] === 'Network.setUserAgentOverride');
+        if (frameName === 'ad-frame') expect(override).toBeUndefined();
+        else {
+          expect(override).toEqual([
+            { tabId: 4290, sessionId: 'app-only-child' },
+            'Network.setUserAgentOverride',
+            { userAgent: injected.userAgent, platform: injected.navigatorPlatform },
+          ]);
+          expect(calls.indexOf(override!)).toBeLessThan(
+            calls.findIndex(call => call[1] === 'Runtime.runIfWaitingForDebugger'),
+          );
+        }
+        expect(calls.some(call => call[1].startsWith('Emulation.'))).toBe(false);
+      } finally {
+        cleanupTab(4290);
+        vi.mocked(chrome.debugger.sendCommand).mockImplementation(previous!);
       }
-      expect(calls.some(call => call[1].startsWith('Emulation.'))).toBe(false);
-    } finally {
-      cleanupTab(4290);
-      vi.mocked(chrome.debugger.sendCommand).mockImplementation(previous!);
-    }
-  });
+    },
+  );
 
   it('resumes the preview panel without installing the App runtime when its URL is still empty', async () => {
     const { injected } = resolveAppProfile('reader');
@@ -1471,13 +1711,22 @@ describe('独立安全区模拟', () => {
     mockChrome.debugger.sendCommand.mockImplementation(async (_target, method) =>
       method === 'Page.getFrameTree'
         ? { frameTree: { frame: { name: '__mearl_preview_panel__', url: '' } } }
-        : {});
-    await handleAppProfileChildTargetEvent(4291, 'Target.attachedToTarget', {
-      sessionId: 'preview-panel', targetInfo: { type: 'iframe', url: '' },
-    }, { ...injected, pageRuntime: { id: 'example/main', sha256: 'a'.repeat(64) } });
+        : {},
+    );
+    await handleAppProfileChildTargetEvent(
+      4291,
+      'Target.attachedToTarget',
+      {
+        sessionId: 'preview-panel',
+        targetInfo: { type: 'iframe', url: '' },
+      },
+      { ...injected, pageRuntime: { id: 'example/main', sha256: 'a'.repeat(64) } },
+    );
 
     expect(mockChrome.debugger.sendCommand.mock.calls.map(call => call[1])).toEqual([
-      'Page.enable', 'Page.getFrameTree', 'Runtime.runIfWaitingForDebugger',
+      'Page.enable',
+      'Page.getFrameTree',
+      'Runtime.runIfWaitingForDebugger',
     ]);
   });
 
@@ -1603,9 +1852,7 @@ describe('独立安全区模拟', () => {
     vi.mocked(chrome.debugger.sendCommand).mockClear();
     vi.mocked(chrome.debugger.sendCommand).mockImplementation(
       async (_target: chrome.debugger.Debuggee, method: string) =>
-        method === 'Page.getFrameTree'
-          ? { frameTree: { frame: { name: '__mearl_root__' } } }
-          : {},
+        method === 'Page.getFrameTree' ? { frameTree: { frame: { name: '__mearl_root__' } } } : {},
     );
     await handleAppProfileChildTargetEvent(4258, 'Target.attachedToTarget', {
       sessionId: 'adaptive-iframe-session',
@@ -1790,6 +2037,9 @@ describe('独立安全区模拟', () => {
 describe('App profile 新文档运行时', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    chrome.permissions = {
+      contains: vi.fn().mockResolvedValue(true),
+    } as unknown as typeof chrome.permissions;
     chrome.debugger.attach = vi.fn().mockResolvedValue(undefined);
     chrome.debugger.detach = vi.fn().mockResolvedValue(undefined);
     chrome.debugger.sendCommand = vi.fn((_target: unknown, method: string) =>
@@ -1797,6 +2047,109 @@ describe('App profile 新文档运行时', () => {
         ? Promise.resolve({ identifier: 'app-profile-script-1' })
         : Promise.resolve({}),
     ) as any;
+  });
+
+  it('opens a trusted permission page before loading an unauthorized top-level GET', async () => {
+    const {
+      cleanupTab,
+      enableAppProfileDocumentBootstrapForTab,
+      handleRequestPaused,
+      updateAppProfileMainFrame,
+    } = await import('../debuggerManager');
+    const tabId = 4273;
+    const destination = 'https://unauthorized.example.test:8443/next?from=app';
+    vi.mocked(chrome.permissions.contains).mockResolvedValue(false as never);
+    chrome.storage.session = {
+      set: vi.fn().mockResolvedValue(undefined),
+    } as unknown as typeof chrome.storage.session;
+    chrome.tabs.update = vi.fn().mockResolvedValue({ id: tabId });
+    chrome.runtime.getURL = vi.fn(path => `chrome-extension://test/${path}`);
+    await enableAppProfileDocumentBootstrapForTab(tabId, resolveAppProfile('wallet').injected);
+    updateAppProfileMainFrame(tabId, { id: 'main' });
+    const request = { url: destination, urlFragment: '#part', method: 'GET', headers: {} };
+    try {
+      await handleRequestPaused(tabId, {
+        requestId: 'frame',
+        frameId: 'child',
+        resourceType: 'Document',
+        request,
+      });
+      expect(chrome.tabs.update).not.toHaveBeenCalled();
+      await handleRequestPaused(tabId, {
+        requestId: 'navigation',
+        frameId: 'main',
+        resourceType: 'Document',
+        request,
+      });
+      expect(chrome.permissions.contains).toHaveBeenCalledWith({
+        origins: ['https://unauthorized.example.test/*'],
+      });
+      expect(chrome.storage.session.set).toHaveBeenCalledWith({
+        [`simulationSitePermission:${tabId}`]: {
+          id: expect.any(String),
+          destination: destination + '#part',
+        },
+      });
+      expect(chrome.debugger.sendCommand).toHaveBeenLastCalledWith(
+        { tabId },
+        'Fetch.fulfillRequest',
+        expect.objectContaining({ requestId: 'navigation', responseCode: 204 }),
+      );
+      expect(chrome.tabs.update).toHaveBeenCalledWith(tabId, {
+        url: expect.stringContaining(
+          'chrome-extension://test/src/pages/permission-request/index.html?simulationRequest=',
+        ),
+      });
+
+      vi.mocked(chrome.debugger.sendCommand).mockRejectedValueOnce(
+        new Error('Invalid InterceptionId'),
+      );
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        await handleRequestPaused(tabId, {
+          requestId: 'superseded',
+          frameId: 'main',
+          resourceType: 'Document',
+          request: { ...request, url: 'https://superseded.example.test/' },
+        });
+      } finally {
+        warn.mockRestore();
+      }
+      expect(chrome.storage.session.set).toHaveBeenCalledTimes(1);
+      expect(chrome.tabs.update).toHaveBeenCalledTimes(1);
+    } finally {
+      cleanupTab(tabId);
+    }
+  });
+
+  it('leaves an unauthorized form navigation and its response intact', async () => {
+    const {
+      cleanupTab,
+      enableAppProfileDocumentBootstrapForTab,
+      handleRequestPaused,
+      updateAppProfileMainFrame,
+    } = await import('../debuggerManager');
+    const tabId = 4274;
+    vi.mocked(chrome.permissions.contains).mockResolvedValue(false as never);
+    await enableAppProfileDocumentBootstrapForTab(tabId, resolveAppProfile('wallet').injected);
+    updateAppProfileMainFrame(tabId, { id: 'main' });
+    const navigation = {
+      requestId: 'form',
+      frameId: 'main',
+      resourceType: 'Document',
+      request: { url: 'https://unauthorized.example.test/submit', method: 'POST', headers: {} },
+    };
+    try {
+      vi.mocked(chrome.debugger.sendCommand).mockClear();
+      await handleRequestPaused(tabId, navigation);
+      await handleRequestPaused(tabId, { ...navigation, responseStatusCode: 200 });
+      expect(vi.mocked(chrome.debugger.sendCommand).mock.calls).toEqual([
+        [{ tabId }, 'Fetch.continueRequest', { requestId: 'form' }],
+        [{ tabId }, 'Fetch.continueResponse', { requestId: 'form' }],
+      ]);
+    } finally {
+      cleanupTab(tabId);
+    }
   });
 
   it('clears request bookkeeping after delivering the top HTML response to its root WebView', async () => {

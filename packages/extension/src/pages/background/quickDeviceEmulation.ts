@@ -81,6 +81,7 @@ interface SetQuickAppSimulationParams {
   deviceSelection?: QuickDeviceSelection;
   updateGlobalDefault?: boolean;
   startWithDeviceShell?: boolean;
+  deferReload?: boolean;
 }
 
 interface ApplyQuickDeviceEmulationOptions {
@@ -537,6 +538,7 @@ export function setQuickAppSimulation({
   deviceSelection,
   updateGlobalDefault,
   startWithDeviceShell,
+  deferReload,
 }: SetQuickAppSimulationParams): Promise<Record<string, unknown>> {
   return runSerializedQuickSimulationUpdate(tabId, async () => {
     await hydrateQuickDeviceSimulationState(tabId);
@@ -641,9 +643,10 @@ export function setQuickAppSimulation({
     const device = await clearQuickDeviceEmulationInQueue(tabId, {
       clearUnownedDevice: true,
       syncProfile: false,
+      deferReload,
     });
     if (!hadDeviceShell && hadProfile) {
-      await handleSetAppProfile({ tabId, enabled: false, reload: true }, () => null);
+      await handleSetAppProfile({ tabId, enabled: false, reload: !deferReload }, () => null);
     }
     return buildQuickAppProfileResponse(tabId, null, device);
   });
@@ -862,7 +865,7 @@ export function restoreQuickDeviceEmulationForTab(tabId: number): Promise<void> 
 
 const clearQuickDeviceEmulationInQueue = async (
   tabId: number,
-  options: { clearUnownedDevice?: boolean; syncProfile?: boolean } = {},
+  options: { clearUnownedDevice?: boolean; syncProfile?: boolean; deferReload?: boolean } = {},
 ): Promise<QuickDeviceEmulationResponse> => {
   const currentSelection = getActiveSelection(tabId);
   const profile = await getAppProfileForTab(tabId);
@@ -870,6 +873,7 @@ const clearQuickDeviceEmulationInQueue = async (
     try {
       await handleSetDeviceEmulation({ tabId, enabled: false }, () => null, {
         preserveQuickDeviceOwnership: true,
+        ...(options.deferReload && { deferReload: true }),
       });
     } catch (error) {
       if (profile) {
@@ -881,13 +885,14 @@ const clearQuickDeviceEmulationInQueue = async (
     await disableSafeAreaInsetsForTab(tabId);
     const hadShell = await clearDeviceShellForTab(tabId);
     await clearDeviceShellWebViewEnvironmentForTab(tabId);
-    if (hadShell) await reloadTabInSession(tabId);
+    if (hadShell && !options.deferReload) await reloadTabInSession(tabId);
   } else if (
     options.clearUnownedDevice &&
     (getEmulationConfigForTab(tabId) || (await getDeviceShellForTab(tabId)))
   ) {
     await handleSetDeviceEmulation({ tabId, enabled: false }, () => null, {
       preserveQuickDeviceOwnership: true,
+      ...(options.deferReload && { deferReload: true }),
     });
   }
   if (options.syncProfile !== false && profile && !profileMatchesSelection(profile, null)) {

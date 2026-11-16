@@ -3,16 +3,16 @@
   "appBridgeWebPageEnvironmentReload": {
     "message": "Switching environments reloads the current web page."
   },
-  "appProfileInstallTitle": { "message": "Add Profile" },
-  "appProfileInstallAction": { "message": "Add Profile" },
+  "appProfileInstallTitle": { "message": "Add App emulation" },
+  "appProfileInstallAction": { "message": "Add App emulation" },
   "appProfileInstallDescription": {
-    "message": "Install an App Profile from a GitHub repository or HTTPS URL. Use a source you trust."
+    "message": "Install an App emulation profile from a GitHub repository or HTTPS URL. Use a source you trust."
   },
-  "appProfileInstallSource": { "message": "Profile source" },
+  "appProfileInstallSource": { "message": "App emulation source" },
   "appProfileInstallPermissionDenied": {
-    "message": "Permission to read the Profile source was denied."
+    "message": "Permission to read the emulation source was denied."
   },
-  "appProfileInstallFailed": { "message": "Could not install the Profile." },
+  "appProfileInstallFailed": { "message": "Could not install the App emulation profile." },
   "appProfileInstallPending": { "message": "Installing…" },
   "appProfileInstallSubmit": { "message": "Install" },
   "appProfileInstallSuccess": { "message": "Installed $1" },
@@ -2169,6 +2169,17 @@
   "hostPermissionGrant": {
     "message": "Grant this site"
   },
+  "simulationSitePermissionTitle": { "message": "Site access needed for emulation" },
+  "simulationSitePermissionDescription": {
+    "message": "Allow access to keep using emulation on this site."
+  },
+  "simulationSitePermissionSkip": { "message": "Continue without emulation" },
+  "simulationSitePermissionContinueFailed": {
+    "message": "Could not continue to the site. Please try again."
+  },
+  "simulationSitePermissionExpired": {
+    "message": "This request has expired. Go back to the previous page."
+  },
   "hostPermissionGranted": {
     "message": "Site permission granted"
   },
@@ -2353,6 +2364,9 @@
   },
   "agentPermRequestAllBrowserDenied": {
     "message": "All Domains is enabled in settings. The browser declined site access. You can try again."
+  },
+  "sitePermissionAllBrowserDenied": {
+    "message": "The browser did not grant access to all sites. You can try again."
   },
   "sourceTrace": {
     "message": "Source Trace"

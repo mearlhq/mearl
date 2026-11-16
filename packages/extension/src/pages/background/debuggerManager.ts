@@ -57,6 +57,11 @@ import {
   type DeviceShellEmulationConfig,
 } from './deviceShellRules';
 import { getAppProfileBootstrapHeaderForTab, getAppProfileForTab } from './utils/appProfileRules';
+import { getSimulationSitePattern, getSimulationSiteUrl } from '../../shared/permissionRequest';
+import {
+  hasSimulationSitePermission,
+  showSimulationSitePermission,
+} from './simulationSitePermission';
 import {
   listBusinessWebViewSessions,
   registerRequestCollectionWebView,
@@ -359,7 +364,10 @@ async function initializeRootWebViewNavigationForTab(
   const tree = (await chrome.debugger.sendCommand({ tabId }, 'Page.getFrameTree')) as {
     frameTree?: WebViewFrameTree;
   };
-  if (tree?.frameTree) state.rootWebViewNavigation.initialize(tree.frameTree);
+  if (tree?.frameTree) {
+    state.appProfileMainFrameId = tree.frameTree.frame.id;
+    state.rootWebViewNavigation.initialize(tree.frameTree);
+  }
 }
 
 // 设备/时区模拟是会话级 override，靠 session 持续 attach 才能生效，但它们的 lease 即用即还
@@ -1960,6 +1968,43 @@ export async function handleRequestPaused(tabId: number, params: any, sessionId?
   const requestKey = sessionId ? `${sessionId}:${requestId}` : requestId;
   const originalHeaders = request.headers;
   const state = tabStates.get(tabId);
+  if (
+    state &&
+    !sessionId &&
+    params.resourceType === 'Document' &&
+    params.frameId &&
+    params.frameId === state.appProfileMainFrameId &&
+    (state.rootWebViewNavigation || state.appProfileDocumentBootstrap)
+  ) {
+    const destination = getSimulationSiteUrl(request.url);
+    const pattern = destination && getSimulationSitePattern(destination);
+    if (
+      destination &&
+      pattern &&
+      !(await hasSimulationSitePermission(pattern).catch(() => false))
+    ) {
+      const responseStage = responseStatusCode != null || params.responseErrorReason != null;
+      if (!responseStage && request.method === 'GET') {
+        if (request.urlFragment) destination.hash = request.urlFragment;
+        try {
+          await showSimulationSitePermission(tabId, destination, () =>
+            chrome.debugger.sendCommand({ tabId }, 'Fetch.fulfillRequest', {
+              requestId,
+              responseCode: 204,
+              responseHeaders: [{ name: 'Cache-Control', value: 'no-store' }],
+            }),
+          );
+          return;
+        } catch (error) {
+          console.warn('[DeviceShell] Could not prepare the site permission page:', error);
+        }
+      }
+      // Keep submissions and other non-GET navigations intact, without a synthetic device shell.
+      await continueRequest({ tabId }, requestId, undefined, responseStage);
+      state.requestStates.delete(requestKey);
+      return;
+    }
+  }
   if (
     !sessionId &&
     !responseStatusCode &&

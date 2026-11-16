@@ -76,6 +76,31 @@ it('does not request access if the window belongs to a superseded preset', async
   expect(request).not.toHaveBeenCalled();
 });
 
+it('can request access to all sites while saving only the selected Preset authorization', async () => {
+  const request = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+  const sendMessage = vi.fn().mockResolvedValue({
+    success: true,
+    data: { presetId: 'test', revision, pending },
+  });
+  mockChrome(sendMessage, request);
+  const close = vi.spyOn(window, 'close').mockImplementation(() => {});
+  render(<PresetPermissionPrompt revision={revision} />);
+
+  const allowAll = await screen.findByRole('button', { name: 'agentPermRequestAllowAll' });
+  expect(request).not.toHaveBeenCalled();
+  fireEvent.click(allowAll);
+  expect(request).toHaveBeenCalledExactlyOnceWith({ origins: ['<all_urls>'] });
+  expect(await screen.findByRole('alert')).toHaveTextContent('sitePermissionAllBrowserDenied');
+  expect(close).not.toHaveBeenCalled();
+
+  fireEvent.click(allowAll);
+  await waitFor(() => expect(close).toHaveBeenCalledOnce());
+  expect(sendMessage).toHaveBeenLastCalledWith({
+    action: 'browserUiService',
+    data: { operation: 'authorizePreset', presetId: 'test', revision },
+  });
+});
+
 it('reloads pending sites when a preset sync reuses the window or a grant fails', async () => {
   const anotherSite = 'https://example.net/*';
   const request = vi.fn().mockResolvedValue(true);

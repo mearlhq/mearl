@@ -1,14 +1,14 @@
 {
   "appBridgeWebPageEnvironment": { "message": "网页环境" },
   "appBridgeWebPageEnvironmentReload": { "message": "切换环境会重新加载当前网页。" },
-  "appProfileInstallTitle": { "message": "添加 Profile" },
-  "appProfileInstallAction": { "message": "添加 Profile" },
+  "appProfileInstallTitle": { "message": "新增端模拟" },
+  "appProfileInstallAction": { "message": "新增端模拟" },
   "appProfileInstallDescription": {
-    "message": "输入 GitHub 仓库或 HTTPS 地址，安装用于端模拟的 Profile。请确认你信任此来源。"
+    "message": "输入 GitHub 仓库或 HTTPS 地址，安装端模拟配置。请确认你信任此来源。"
   },
-  "appProfileInstallSource": { "message": "Profile 来源" },
-  "appProfileInstallPermissionDenied": { "message": "未授权读取 Profile 来源。" },
-  "appProfileInstallFailed": { "message": "无法安装 Profile。" },
+  "appProfileInstallSource": { "message": "端模拟来源" },
+  "appProfileInstallPermissionDenied": { "message": "未授权读取端模拟来源。" },
+  "appProfileInstallFailed": { "message": "无法安装端模拟配置。" },
   "appProfileInstallPending": { "message": "正在安装…" },
   "appProfileInstallSubmit": { "message": "安装" },
   "appProfileInstallSuccess": { "message": "已安装 $1" },
@@ -2165,6 +2165,13 @@
   "hostPermissionGrant": {
     "message": "授权当前站点"
   },
+  "simulationSitePermissionTitle": { "message": "端模拟需要站点权限" },
+  "simulationSitePermissionDescription": {
+    "message": "授权后，Mearl 会在这个站点继续使用端模拟。"
+  },
+  "simulationSitePermissionSkip": { "message": "关闭模拟并继续" },
+  "simulationSitePermissionContinueFailed": { "message": "暂时无法继续浏览，请重试。" },
+  "simulationSitePermissionExpired": { "message": "本次授权请求已失效，请返回上一页。" },
   "hostPermissionGranted": {
     "message": "已授权当前站点"
   },
@@ -2349,6 +2356,9 @@
   },
   "agentPermRequestAllBrowserDenied": {
     "message": "设置中的「全部域名」已开启。浏览器未授予站点访问权限，你可以重试。"
+  },
+  "sitePermissionAllBrowserDenied": {
+    "message": "浏览器未授予所有站点的访问权限，你可以重试。"
   },
   "sourceTrace": {
     "message": "源码追溯"
