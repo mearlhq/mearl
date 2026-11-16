@@ -1,11 +1,15 @@
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { createConnectionMock, spawnMock } = vi.hoisted(() => ({
-  createConnectionMock: vi.fn(),
-  spawnMock: vi.fn(),
-}));
+const { createConnectionMock, spawnMock, socketDirectory } = vi.hoisted(() => {
+  const socketDirectory =
+    process.platform === 'win32'
+      ? undefined
+      : process.getBuiltinModule('node:fs')!.mkdtempSync('/tmp/mearl-stale-socket-');
+  if (socketDirectory) vi.stubEnv('TMPDIR', socketDirectory);
+  return { createConnectionMock: vi.fn(), spawnMock: vi.fn(), socketDirectory };
+});
 
 vi.mock('node:net', () => ({
   default: { createConnection: createConnectionMock },
@@ -23,6 +27,11 @@ vi.mock('../browserRegistry.js', () => ({
 
 import { invokeLocalHost, setDefaultBrowser, SOCKET_PATH } from '../socket.js';
 import { listLiveBrowsers } from '../browserRegistry.js';
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+  if (socketDirectory) fs.rmSync(socketDirectory, { recursive: true, force: true });
+});
 
 interface MockSocket extends EventEmitter {
   end: ReturnType<typeof vi.fn>;
@@ -53,6 +62,22 @@ function successfulSocket(): MockSocket {
   });
   queueMicrotask(() => socket.emit('connect'));
   return socket;
+}
+
+function mockSocketFile(...inodes: number[]) {
+  const lstat = fs.lstatSync;
+  const unlink = fs.unlinkSync;
+  const unlinkSocket = vi.fn();
+  vi.spyOn(fs, 'lstatSync').mockImplementation((file, options) => {
+    if (file !== SOCKET_PATH) return lstat(file, options);
+    const inode = inodes.length > 1 ? inodes.shift() : inodes[0];
+    return { dev: 1, ino: inode, isSocket: () => true, uid: process.getuid?.() } as fs.Stats;
+  });
+  vi.spyOn(fs, 'unlinkSync').mockImplementation(file => {
+    if (file === SOCKET_PATH) unlinkSocket(file);
+    else unlink(file);
+  });
+  return unlinkSocket;
 }
 
 describe('stale legacy socket recovery', () => {
@@ -102,13 +127,7 @@ describe('stale legacy socket recovery', () => {
   it.runIf(process.platform !== 'win32')(
     'removes a same-user stale socket, respawns, and transparently retries',
     async () => {
-      vi.spyOn(fs, 'lstatSync').mockReturnValue({
-        dev: 1,
-        ino: 10,
-        isSocket: () => true,
-        uid: process.getuid?.(),
-      } as fs.Stats);
-      const unlinkSpy = vi.spyOn(fs, 'unlinkSync').mockImplementation(() => undefined);
+      const unlinkSpy = mockSocketFile(10);
 
       const resultPromise = invokeLocalHost('preset_components_install');
       await vi.runAllTimersAsync();
@@ -127,20 +146,7 @@ describe('stale legacy socket recovery', () => {
   it.runIf(process.platform !== 'win32')(
     'does not unlink a replacement socket created by another recovery',
     async () => {
-      vi.spyOn(fs, 'lstatSync')
-        .mockReturnValueOnce({
-          dev: 1,
-          ino: 10,
-          isSocket: () => true,
-          uid: process.getuid?.(),
-        } as fs.Stats)
-        .mockReturnValue({
-          dev: 1,
-          ino: 11,
-          isSocket: () => true,
-          uid: process.getuid?.(),
-        } as fs.Stats);
-      const unlinkSpy = vi.spyOn(fs, 'unlinkSync').mockImplementation(() => undefined);
+      const unlinkSpy = mockSocketFile(10, 11);
 
       const resultPromise = invokeLocalHost('preset_components_install');
       await vi.runAllTimersAsync();

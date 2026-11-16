@@ -4,11 +4,7 @@
 
 import { DEFAULT_QUERY_PRESETS, type UrlQueryPreset } from './urlQueryPresets';
 import { toError } from './errors';
-import {
-  AGENT_ACCESS_PREFERENCE,
-  AGENT_ACCESS_PROVIDERS,
-  readAgentAccess,
-} from '../../../shared/agentAccess';
+import { AGENT_ACCESS_PREFERENCE, readAgentAccess } from '../../../shared/agentAccess';
 import {
   getBrowserRequestUiState,
   ensureBrowserRequestUiState,
@@ -163,8 +159,7 @@ export const onConfigChange = (
   };
   const listener = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
     if (
-      (areaName === 'local' &&
-        (changes[AGENT_ACCESS_PREFERENCE] || changes[AGENT_ACCESS_PROVIDERS])) ||
+      (areaName === 'local' && changes[AGENT_ACCESS_PREFERENCE]) ||
       (areaName === 'sync' && changes.agentEnabled)
     )
       void refreshServices();

@@ -12,6 +12,7 @@ import net from 'node:net';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { readOwnedSocketIdentity, removeStaleSocket } from '@mearl/daemon-core';
 import { CLIENT_VERSION } from './runtimePaths.js';
 import { StringDecoder } from 'node:string_decoder';
 import {
@@ -401,35 +402,6 @@ async function loadLocalBrowserList(
   }
 }
 
-interface UnixSocketIdentity {
-  dev: number;
-  ino: number;
-}
-
-function readOwnedLegacySocketIdentity(): UnixSocketIdentity | null {
-  if (process.platform === 'win32') return null;
-  try {
-    const stat = fs.lstatSync(SOCKET_PATH);
-    if (!stat.isSocket()) return null;
-    if (process.getuid && stat.uid !== process.getuid()) return null;
-    return { dev: stat.dev, ino: stat.ino };
-  } catch {
-    return null;
-  }
-}
-
-/** Remove only the same-user socket inode whose failed connection proved it stale. */
-function removeStaleLegacySocket(identity: UnixSocketIdentity | null): void {
-  if (!identity) return;
-  try {
-    const current = fs.lstatSync(SOCKET_PATH);
-    if (!current.isSocket() || current.dev !== identity.dev || current.ino !== identity.ino) return;
-    fs.unlinkSync(SOCKET_PATH);
-  } catch {
-    // Spawning and the final retry provide the authoritative recovery result.
-  }
-}
-
 /**
  * 向 native host 发送一个 action 请求并等待响应。
  *
@@ -812,7 +784,7 @@ async function invokeViaLegacy(
   localOnly = false,
   deadline?: number,
 ): Promise<any> {
-  const legacySocketIdentity = readOwnedLegacySocketIdentity();
+  const legacySocketIdentity = readOwnedSocketIdentity(SOCKET_PATH);
   try {
     return await invokeOnce(
       action,
@@ -828,7 +800,7 @@ async function invokeViaLegacy(
     const err = error as NodeJS.ErrnoException;
     const shouldAttemptSpawn = err.code === 'ENOENT' || err.code === 'ECONNREFUSED';
     if (shouldAttemptSpawn && !isRetry) {
-      if (err.code === 'ECONNREFUSED') removeStaleLegacySocket(legacySocketIdentity);
+      if (err.code === 'ECONNREFUSED') removeStaleSocket(SOCKET_PATH, legacySocketIdentity);
       const spawned = await trySpawnNativeHost();
       if (spawned) {
         await new Promise(r => setTimeout(r, 1200));

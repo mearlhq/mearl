@@ -23,7 +23,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { keyedDir, pruneOrphanLogs } from '@mearl/daemon-core';
+import {
+  keyedDir,
+  pruneOrphanLogs,
+  readOwnedSocketIdentity,
+  removeStaleSocket,
+} from '@mearl/daemon-core';
 import { ensureInstalledProvidersRunning } from '@mearl/provider/runtime';
 import { Utf8LineBuffer } from './socketLines.js';
 import {
@@ -431,6 +436,7 @@ function buildVersionWarning(clientVersion: string | undefined): string | null {
 let socketServer: ReturnType<typeof net.createServer> | null = null;
 /** Server bound to the legacy well-known socket, when we managed to acquire it. */
 let legacyServer: ReturnType<typeof net.createServer> | null = null;
+let legacyBind: Promise<void> | undefined;
 let inventoryExitTimer: ReturnType<typeof setTimeout> | null = null;
 function cancelInventoryExit(): void {
   if (!inventoryExitTimer) return;
@@ -1124,6 +1130,7 @@ const extensionProvider = new ExtensionBrowserProvider({
     setAnalyticsClientId(message.analyticsClientId);
     nativeHostUpdateCoordinator.evaluate(message.version, message.checkForUpdates);
   },
+  onDiscoveryChange: () => void syncLegacySocket(),
   getPresetInstallationRevision: () =>
     presetBrowserTransfer.selectedRevision(nativeCapabilities.status().installationRevision),
 });
@@ -1565,42 +1572,23 @@ function onSocketConnection(socket: net.Socket): void {
   });
 }
 
-/** Best-effort liveness probe: true iff a connect to `socketPath` succeeds. */
-function isPathAlive(socketPath: string): Promise<boolean> {
+function isSocketConnectionRefused(socketPath: string): Promise<boolean> {
   return new Promise(resolve => {
-    if (process.platform !== 'win32' && !fs.existsSync(socketPath)) {
-      resolve(false);
-      return;
-    }
     const client = net.createConnection(socketPath);
-    const done = (alive: boolean): void => {
-      client.removeAllListeners();
+    const done = (refused: boolean): void => {
+      clearTimeout(timer);
       client.destroy();
-      resolve(alive);
+      resolve(refused);
     };
     const timer = setTimeout(() => done(false), 500);
-    client.on('connect', () => {
-      clearTimeout(timer);
-      done(true);
-    });
-    client.on('error', () => {
-      clearTimeout(timer);
-      done(false);
-    });
+    client.once('connect', () => done(false));
+    client.once('error', (error: NodeJS.ErrnoException) => done(error.code === 'ECONNREFUSED'));
   });
 }
 
 /** Create and bind a socket server; resolves once it is listening, rejects on bind error. */
 function listenOn(socketPath: string): Promise<ReturnType<typeof net.createServer>> {
   return new Promise((resolve, reject) => {
-    // Unix domain sockets leave a stale file on disk; Named Pipes (Windows) do not.
-    if (process.platform !== 'win32' && fs.existsSync(socketPath)) {
-      try {
-        fs.unlinkSync(socketPath);
-      } catch {
-        // ignore — listen surfaces a real conflict below
-      }
-    }
     const server = net.createServer(onSocketConnection);
     server.once('error', reject);
     server.listen(socketPath, () => {
@@ -1609,11 +1597,6 @@ function listenOn(socketPath: string): Promise<ReturnType<typeof net.createServe
           fs.chmodSync(socketPath, 0o600);
         } catch (error) {
           server.close();
-          try {
-            fs.unlinkSync(socketPath);
-          } catch {
-            // ignore cleanup errors; the original chmod failure is more useful
-          }
           reject(error);
           return;
         }
@@ -1633,44 +1616,47 @@ function listenOn(socketPath: string): Promise<ReturnType<typeof net.createServe
  * rely on the registry to make us reachable.
  */
 async function tryBindLegacySocket(): Promise<void> {
-  if (await isPathAlive(LEGACY_SOCKET_PATH)) {
-    log('legacy socket already owned by a live host, skipping');
-    return;
-  }
   try {
+    const staleCandidate = readOwnedSocketIdentity(LEGACY_SOCKET_PATH);
+    if (staleCandidate && (await isSocketConnectionRefused(LEGACY_SOCKET_PATH)))
+      removeStaleSocket(LEGACY_SOCKET_PATH, staleCandidate);
     legacyServer = await listenOn(LEGACY_SOCKET_PATH);
   } catch (error) {
-    // Lost a race to bind it — fine, another host got there first.
-    log('legacy socket bind failed (raced):', String(error));
-    legacyServer = null;
+    if ((error as NodeJS.ErrnoException).code === 'EADDRINUSE')
+      log('legacy socket already owned by another host, skipping');
+    else log('legacy socket bind failed:', String(error));
   }
 }
 
-/** Stop serving the legacy socket (on a takeover request or shutdown). */
+async function syncLegacySocket(): Promise<void> {
+  if (!socketServer || skipBrowserRegistration || attachCdp) return;
+  if (!extensionProvider.discoveryAllowed) {
+    releaseLegacySocket();
+    return;
+  }
+  if (legacyServer) return;
+  legacyBind ??= tryBindLegacySocket().finally(() => {
+    legacyBind = undefined;
+    if (!socketServer || !extensionProvider.discoveryAllowed) releaseLegacySocket();
+  });
+  await legacyBind;
+}
+
+/** Stop serving the legacy socket when this host leaves discovery or shuts down. */
 function releaseLegacySocket(): void {
   if (!legacyServer) return;
   const server = legacyServer;
   legacyServer = null;
-  try {
-    server.close();
-  } catch {
-    // ignore
-  }
-  if (process.platform !== 'win32') {
-    try {
-      if (fs.existsSync(LEGACY_SOCKET_PATH)) fs.unlinkSync(LEGACY_SOCKET_PATH);
-    } catch {
-      // ignore
-    }
-  }
+  server.close();
 }
 
 async function startSocketServer(): Promise<void> {
   // Primary endpoint: this process's pid-unique socket. Never contended, so
   // multiple browsers' native-hosts coexist and are each addressable.
+  cleanupInstanceSocketFile();
   socketServer = await listenOn(INSTANCE_SOCKET_PATH);
   // Best-effort backward-compat endpoint for clients that predate the registry.
-  if (!skipBrowserRegistration && !attachCdp) await tryBindLegacySocket();
+  await syncLegacySocket();
 }
 
 // Cloud connector management is in ./cloud-connector.ts

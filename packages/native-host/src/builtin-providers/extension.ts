@@ -9,6 +9,7 @@ import {
   type BrowserReleaseParams,
   type BrowserReleaseResult,
   type ControlSource,
+  type ExtensionAgentPolicy,
   type PageDownloadParams,
   type PageRecordingOptions,
 } from '@mearl/browser-core';
@@ -18,7 +19,7 @@ import {
   detectNativeBrowserBundleId,
 } from '../browser-identity.js';
 import { registerBrowser, touchFocus, unregisterBrowser } from '../browser-registry.js';
-import { watchExtensionAgentPolicy } from '../extension-agent-policy.js';
+import { watchExtensionDiscovery } from '../extension-discovery.js';
 import {
   hasRunActionsSendRequestFiles,
   hasSendRequestFiles,
@@ -39,8 +40,11 @@ interface ExtensionProviderOptions {
   onDisconnect: (code: number) => void;
   onRequest: (message: any, respond: (response: Record<string, any>) => void) => Promise<void>;
   onPing: (message: any) => void;
+  onDiscoveryChange: () => void;
   getPresetInstallationRevision: () => Promise<string | null>;
 }
+
+const agentPolicy: ExtensionAgentPolicy = { revision: 0, providerIds: [] };
 
 interface ExtensionBrowserInfo {
   userAgent?: string | null;
@@ -64,7 +68,7 @@ export class ExtensionBrowserProvider implements HostBrowserProvider {
       timer: ReturnType<typeof setTimeout>;
     }
   >();
-  private readonly agentPolicy: ReturnType<typeof watchExtensionAgentPolicy>;
+  private readonly discovery: ReturnType<typeof watchExtensionDiscovery>;
   private readonly resolveBrowserName: ReturnType<typeof createExtensionBrowserNameResolver>;
 
   constructor(private readonly options: ExtensionProviderOptions) {
@@ -72,10 +76,9 @@ export class ExtensionBrowserProvider implements HostBrowserProvider {
     this.resolveBrowserName = createExtensionBrowserNameResolver(() =>
       browserNameForBundle(bundleId),
     );
-    this.agentPolicy = watchExtensionAgentPolicy(bundleId, policy => {
-      this.agentAllowed = false;
-      unregisterBrowser();
-      this.send({ type: 'agent_policy', policy });
+    this.discovery = watchExtensionDiscovery(bundleId, () => {
+      this.publishBrowser();
+      this.options.onDiscoveryChange();
     });
   }
 
@@ -99,6 +102,10 @@ export class ExtensionBrowserProvider implements HostBrowserProvider {
     return this.record?.browserId ?? 'default';
   }
 
+  get discoveryAllowed(): boolean {
+    return this.discovery.allowed();
+  }
+
   start(): void {
     process.stdin.on('readable', () => {
       let chunk: Buffer | null;
@@ -118,7 +125,7 @@ export class ExtensionBrowserProvider implements HostBrowserProvider {
   }
 
   dispose(): void {
-    this.agentPolicy.close();
+    this.discovery.close();
     if (this.record) unregisterBrowser();
   }
 
@@ -297,9 +304,8 @@ export class ExtensionBrowserProvider implements HostBrowserProvider {
       );
   }
 
-  private publishAccess(enabled: boolean): void {
-    this.agentAllowed = enabled;
-    if (enabled && this.record) registerBrowser(this.record);
+  private publishBrowser(): void {
+    if (this.agentAllowed && this.discoveryAllowed && this.record) registerBrowser(this.record);
     else unregisterBrowser();
   }
 
@@ -323,12 +329,8 @@ export class ExtensionBrowserProvider implements HostBrowserProvider {
       transport: 'extension',
       extensionVersion: this.version ?? undefined,
     };
-    const policy = this.agentPolicy.current();
-    this.publishAccess(
-      message.agentAccessProtocol !== 1 &&
-        policy.available !== false &&
-        policy.providerIds.length === 0,
-    );
+    this.agentAllowed = message.agentAccessProtocol !== 1;
+    this.publishBrowser();
     void this.options
       .getPresetInstallationRevision()
       .catch(error => {
@@ -343,7 +345,7 @@ export class ExtensionBrowserProvider implements HostBrowserProvider {
           rpcVersion: EXTENSION_RPC_VERSION,
           presetInstallationRevision,
           presetInstallationProtocol: PRESET_INSTALLATION_PROTOCOL,
-          agentPolicy: this.agentPolicy.current(),
+          agentPolicy,
         }),
       );
     this.options.onPing(message);
@@ -351,13 +353,10 @@ export class ExtensionBrowserProvider implements HostBrowserProvider {
 
   private handleMessage(message: any): void {
     if (message?.type === 'agent_access') {
-      const policy = this.agentPolicy.current();
-      if (
-        policy.available !== false &&
-        message.revision === policy.revision &&
-        typeof message.enabled === 'boolean'
-      )
-        this.publishAccess(message.enabled);
+      if (message.revision === agentPolicy.revision && typeof message.enabled === 'boolean') {
+        this.agentAllowed = message.enabled;
+        this.publishBrowser();
+      }
       return;
     }
     if (message?.type === 'ping') {
@@ -365,7 +364,7 @@ export class ExtensionBrowserProvider implements HostBrowserProvider {
       return;
     }
     if (message?.type === 'browser_focus') {
-      if (this.agentAllowed) touchFocus();
+      if (this.agentAllowed && this.discoveryAllowed) touchFocus();
       return;
     }
     if (!message || typeof message !== 'object' || !message.id) return;

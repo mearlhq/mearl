@@ -1,4 +1,4 @@
-import {
+import fs, {
   closeSync,
   existsSync,
   linkSync,
@@ -138,6 +138,35 @@ export function withRecordLock<T>(file: string, operation: () => T): T {
       const owner = readRecordUnlocked<RecordLockOwner>(ownerFile);
       if (owner?.token === token) rmSync(lockDir, { recursive: true, force: true });
     }
+  }
+}
+
+interface UnixSocketIdentity {
+  dev: number;
+  ino: number;
+}
+
+export function readOwnedSocketIdentity(socketPath: string): UnixSocketIdentity | null {
+  if (process.platform === 'win32') return null;
+  try {
+    const stat = fs.lstatSync(socketPath);
+    if (!stat.isSocket() || (process.getuid && stat.uid !== process.getuid())) return null;
+    return { dev: stat.dev, ino: stat.ino };
+  } catch {
+    return null;
+  }
+}
+
+/** Unlink only the socket whose connection was refused, sharing the lock with other recoveries. */
+export function removeStaleSocket(socketPath: string, identity: UnixSocketIdentity | null): void {
+  if (!identity) return;
+  try {
+    withRecordLock(socketPath, () => {
+      const current = readOwnedSocketIdentity(socketPath);
+      if (current?.dev === identity.dev && current.ino === identity.ino) fs.unlinkSync(socketPath);
+    });
+  } catch {
+    // The next bind or connection reports any remaining conflict.
   }
 }
 

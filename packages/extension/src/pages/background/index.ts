@@ -1,9 +1,5 @@
 import { handleRequestInspection, inspectBrowserRequest } from './requestInspection';
-import {
-  AGENT_ACCESS_PREFERENCE,
-  AGENT_ACCESS_PROVIDERS,
-  readAgentAccess,
-} from '../../shared/agentAccess';
+import { AGENT_ACCESS_PREFERENCE, readAgentAccess } from '../../shared/agentAccess';
 import { BROWSER_DOCUMENT_PROBE } from '../../shared/browserCapabilityMessages';
 import { cleanupBrowserEnhancements } from './browserEnhancements';
 import { cleanupEnvironmentRevisions } from './environmentRevisions';
@@ -706,7 +702,7 @@ void initEnvSwitchRules().catch(error =>
 // 监听 storage 变化，实时更新
 chrome.storage.onChanged.addListener((changes, area) => {
   if (
-    (area === 'local' && (changes[AGENT_ACCESS_PREFERENCE] || changes[AGENT_ACCESS_PROVIDERS])) ||
+    (area === 'local' && changes[AGENT_ACCESS_PREFERENCE]) ||
     (area === 'sync' && changes.agentEnabled)
   ) {
     void (async () => {
