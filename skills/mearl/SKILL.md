@@ -1,6 +1,6 @@
 ---
 name: mearl
-description: 使用 Mearl 复用浏览器登录态，操作或调试网页及已开放 CDP 的 Electron 桌面应用界面，模拟设备、时区或 App 客户端环境（含 JSBridge 与容器栈），运行和验证本地微信小程序，发送 HTTP/Protocol 请求，管理本地、远端浏览器及外部浏览器或设备 Provider；也用于把网站操作或外部浏览器平台沉淀为 Mearl Skill/Provider，安装、更新或卸载 Mearl，以及排查浏览器连接和控制问题。用户未点名 Mearl、只描述这些目标时也应触发；App 客户端或容器模拟仅在明确要求时启用。
+description: 使用 Mearl 复用浏览器登录态，操作或调试网页及已开放 CDP 的 Electron 桌面应用界面，模拟设备、时区或 App 客户端环境（含 JSBridge 与容器栈），发送 HTTP/Protocol 请求，管理本地、远端浏览器及外部浏览器或设备 Provider；也用于把网站操作或外部浏览器平台沉淀为 Mearl Skill/Provider，安装、更新或卸载 Mearl，以及排查浏览器连接和控制问题。用户未点名 Mearl、只描述这些目标时也应触发；App 客户端或容器模拟仅在明确要求时启用。
 version: "3.1.0"
 ---
 
@@ -28,4 +28,4 @@ mearl guide
 
 App、Provider 和插件的实际可用性以目标浏览器能力目录及已安装能力说明为准。仅在用户明确要求客户端、JSBridge 或容器模拟时启用 App 模式。
 
-运行本地微信小程序或使用其他专用能力时，用 `mearl guide skills` 查阅专用 Skill 的选用和安装说明。用户明确要求执行对应任务且所需插件缺失时，按指南用 Mearl 安装器补装后继续。
+使用专用能力时，用 `mearl guide skills` 查阅专用 Skill 的选用和安装说明。用户明确要求执行对应任务且所需插件缺失时，按指南用 Mearl 安装器补装后继续。

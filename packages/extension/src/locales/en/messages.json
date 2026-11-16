@@ -5,8 +5,6 @@
   },
   "appProfileInstallTitle": { "message": "Add Profile" },
   "appProfileInstallAction": { "message": "Add Profile" },
-  "appProfileInstallOfficial": { "message": "Official Profiles" },
-  "appProfileInstallWeChat": { "message": "WeChat Profile" },
   "appProfileInstallDescription": {
     "message": "Install an App Profile from a GitHub repository or HTTPS URL. Use a source you trust."
   },

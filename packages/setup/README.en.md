@@ -35,12 +35,12 @@ Install optional cloud protocols through a preset before selecting `--cloud-mode
 ## Install App Profiles
 
 ```bash
-npx @mearl/setup profile install mearlhq/profile-wechat
+npx @mearl/setup profile install https://example.com/profiles/bundle.json
 ```
 
 The source can be a public GitHub `owner/repo`, `owner/repo@ref`, or the full HTTPS URL of a Profile manifest (`bundle.json`). GitHub sources load the root manifest from the resolved commit. The command installs every App Profile from the source and preserves the active Preset. When multiple local extensions are connected, select a target with `--browser`. Confirm source access in the extension if prompted.
 
-In the extension's quick settings, open the App selector and choose **Add Profile** to select an official option or enter a source. The App button opens the installer directly when the list is empty.
+In the extension's quick settings, open the App selector, choose **Add Profile**, and enter a source. The App button opens the installer directly when the list is empty.
 
 ## Install and register Skill plugins
 

@@ -5,8 +5,6 @@ import { t } from '../../utils/i18n';
 import { Button } from '../../../options/components/Button';
 import { ModalContent, ModalHeader } from './Modal';
 
-const wechatSource = 'mearlhq/profile-wechat';
-
 export function ProfileInstallModal({
   initialSource,
   confirmation,
@@ -89,26 +87,6 @@ export function ProfileInstallModal({
       <ModalHeader title={t('appProfileInstallTitle')} onClose={close} />
       <ModalContent>
         <div className="space-y-3">
-          {!confirmation && (
-            <div className="space-y-1.5">
-              <h3 className="text-2xs font-medium text-text-secondary">
-                {t('appProfileInstallOfficial')}
-              </h3>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  setSource(wechatSource);
-                  setError('');
-                  setInstalled('');
-                }}
-                className="flex w-full items-center justify-between gap-2 rounded border border-border bg-bg-primary px-2 py-1.5 text-left text-xs text-text-primary hover:bg-bg-hover focus-visible:outline focus-visible:outline-blue-500"
-              >
-                <span>{t('appProfileInstallWeChat')}</span>
-                <span className="truncate text-2xs text-text-secondary">{wechatSource}</span>
-              </button>
-            </div>
-          )}
           <p className="text-xs text-text-secondary">{t('appProfileInstallDescription')}</p>
           <form onSubmit={event => void install(event)} className="flex gap-2">
             <input

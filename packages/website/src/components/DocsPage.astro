@@ -2,8 +2,8 @@
 import { ArrowRight, ArrowUpRight, Braces, Cable, Check, Globe, Network, ScanSearch, Smartphone, FileSpreadsheet, Terminal } from '@lucide/astro';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import CodeBlock from './CodeBlock.astro';
+import ProductScreenshot from './ProductScreenshot.astro';
 import { setupCommand, sitePath, type Locale, type Page } from '../lib/site';
-import { screenshots } from '../lib/screenshots';
 import { siteCopy } from '../lib/site-copy';
 import '../styles/home.css';
 
@@ -39,23 +39,12 @@ const capabilities: Array<{
   ] },
   { key: 'emulate', Icon: Smartphone, links: [
     { page: 'emulation', label: t.mobileGuide, anchor: '#app' },
-    { page: 'emulation', label: t.miniProgramGuide, anchor: '#wechat-miniprogram' },
   ] },
   { key: 'reuse', Icon: Braces, links: [
     { page: 'skill-plugins', label: t.reuseGuide, anchor: '#reuse-workflow' },
     { page: 'bb-browser', label: t.bbAdapters },
   ] },
 ];
-const comparison = [
-  {
-    ...screenshots.appBrowser,
-    label: t.comparisonBrowser, caption: screenshots.appBrowser[locale],
-  },
-  {
-    ...screenshots.appWebView,
-    label: t.comparisonApp, caption: screenshots.appWebView[locale],
-  },
-] as const;
 ---
 <BaseLayout title={`Mearl · ${t.tagline}`} description={t.heroLead} {locale} page="home">
   <div class="product-home docs-article">
@@ -151,18 +140,7 @@ const comparison = [
         </div>
       </div>
       <div class="product-comparison-stage">
-        <p class="product-comparison-example">{t.comparisonExample}</p>
-        <div class="product-comparison-grid">
-          {comparison.map(({ url: src, label, caption, width, height }) => (
-            <figure class="product-comparison-view">
-              <h3>{label}</h3>
-              <a href={src} aria-label={caption}>
-                <img {src} {width} {height} alt="" loading="lazy" decoding="async" />
-              </a>
-              <figcaption>{caption}</figcaption>
-            </figure>
-          ))}
-        </div>
+        <ProductScreenshot screenshot="phoneEmulation" {locale} />
       </div>
     </section>
 

@@ -35,12 +35,12 @@ npx @mearl/setup preset <update|status|uninstall>
 ## 安装 Profile
 
 ```bash
-npx @mearl/setup profile install mearlhq/profile-wechat
+npx @mearl/setup profile install https://example.com/profiles/bundle.json
 ```
 
 来源支持公开 GitHub 仓库的 `owner/repo`、`owner/repo@ref`，或 Profile 清单（`bundle.json`）的完整 HTTPS 地址。GitHub 来源从解析后的提交读取根目录清单。命令安装该来源中的全部 Profile，保留当前 Preset。有多个本地扩展连接时，用 `--browser` 选择目标。若扩展提示授权，请确认来源。
 
-在扩展快捷设置的客户端下拉菜单中选择「添加 Profile」，可以选择官方 Profile 或输入来源。列表为空时，点击「客户端」可直接打开安装弹窗。
+在扩展快捷设置的客户端下拉菜单中选择「添加 Profile」，然后输入来源。列表为空时，点击「客户端」可直接打开安装弹窗。
 
 ## 安装与注册 Skill 插件
 

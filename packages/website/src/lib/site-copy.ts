@@ -64,12 +64,8 @@ export const siteCopy = {
         text: 'Check navigation and WebView behavior with device and timezone emulation.',
       },
     ],
-    comparisonExample: 'Example · WeChat mini-program WebView',
-    comparisonBrowser: 'Regular browser',
-    comparisonApp: 'With App emulation',
     homeInstall: 'Install Mearl',
     mobileGuide: 'App Profile guide',
-    miniProgramGuide: 'Local WeChat mini-programs',
     useCasesTitle: 'Find a workflow for your role',
     useCases: [
       {
@@ -109,8 +105,8 @@ export const siteCopy = {
         text: 'Inspect requests, console logs, and tracking events. Mock responses to retest behavior, or overlay a design to compare pixels.',
       },
       emulate: {
-        title: 'Test apps and mini-programs',
-        text: 'Emulate a device, timezone, or App WebView to check JSBridge and container behavior. Run and debug local WeChat mini-programs.',
+        title: 'Test App WebViews',
+        text: 'Emulate a device, timezone, or App WebView to check JSBridge and container behavior.',
       },
       reuse: {
         title: 'Reuse tools and workflows',
@@ -298,12 +294,8 @@ export const siteCopy = {
       { title: 'JSBridge 调用', text: '模拟配置支持的原生方法与返回数据。' },
       { title: '容器行为', text: '检查导航与 WebView 行为，配合设备、时区模拟验证。' },
     ],
-    comparisonExample: '端模拟示例 · 微信小程序 WebView',
-    comparisonBrowser: '普通浏览器',
-    comparisonApp: '启用端模拟',
     homeInstall: '安装 Mearl',
     mobileGuide: '端模拟指南',
-    miniProgramGuide: '本地微信小程序',
     useCasesTitle: '按角色找到适合的用法',
     useCases: [
       {
@@ -343,8 +335,8 @@ export const siteCopy = {
         text: '查看请求、控制台日志和埋点，用 Mock 响应复测页面，或叠加设计稿对比像素差异。',
       },
       emulate: {
-        title: '验证 App 与小程序',
-        text: '模拟设备、时区和 App WebView，检查 JSBridge 与容器行为；也能运行和调试本地微信小程序。',
+        title: '验证 App WebView',
+        text: '模拟设备、时区和 App WebView，检查 JSBridge 与容器行为。',
       },
       reuse: {
         title: '复用工具与工作流',

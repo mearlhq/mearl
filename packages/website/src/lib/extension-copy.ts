@@ -33,7 +33,6 @@ export const extensionCopy = {
     pluginsTitle: 'Add tools from Skill plugins',
     pluginsText:
       'After setting up the local service, use Install tools in the Toolbox to find tools such as Notes, Format Converter, and Design Overlay. Once installed, you can put them in the toolbar alongside built-in tools.',
-    miniProgramLink: 'Run a local WeChat mini-program',
     devtoolsTitle: 'Trace a problem in DevTools',
     devtoolsText:
       'Open DevTools on the page you want to inspect and choose Mearl. If clicking Refresh leaves an order list blank, reproduce it once and use the request and console views to determine whether the response failed or the page failed to render it.',
@@ -82,7 +81,6 @@ export const extensionCopy = {
     pluginsTitle: '用 Skill 插件添加工具',
     pluginsText:
       '配置好本地服务后，在工具箱点「安装工具」，可以查找记事本、格式转换、设计稿对比等工具。安装后也能和内置工具一起放到顶部。',
-    miniProgramLink: '运行本地微信小程序',
     devtoolsTitle: '在 DevTools 追踪一次故障',
     devtoolsText:
       '在目标网页打开 DevTools，选择 Mearl。比如订单列表点刷新后变空白，可以复现一次，然后结合请求和控制台日志判断是接口返回异常，还是页面没渲染出来。',

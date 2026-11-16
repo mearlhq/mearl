@@ -75,5 +75,3 @@ mearl terminal discover 12345
 ```bash
 npx skills add mearlhq/mearl --list
 ```
-
-微信小程序 Skill 从 [WeChat Profile](https://github.com/mearlhq/profile-wechat) 安装。

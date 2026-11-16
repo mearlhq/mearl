@@ -67,22 +67,22 @@ describe('app profile settings persistence and rollback', () => {
     'switches within the active bundle with target languages $languages',
     async ({ languages, language }) => {
       rules.getAppProfileForTab.mockResolvedValue({
-        profile: 'wechat',
+        profile: 'sample/reader',
         settingsGroup: 'webview',
         binding: { explicitOptions: { language: 'en' } },
       });
       variants.catalog.mockResolvedValue({
         profiles: [
           {
-            id: 'wechat',
-            label: 'WeChat',
-            plugin: 'profile-wechat',
+            id: 'sample/reader',
+            label: 'Reader',
+            plugin: 'sample',
             definition: { settingsGroup: 'webview' },
           },
           {
-            id: 'wechat-mini',
-            label: 'Mini-program',
-            plugin: 'profile-wechat',
+            id: 'sample/embedded-reader',
+            label: 'Embedded reader',
+            plugin: 'sample',
             definition: { settingsGroup: 'webview', policies: { languages } },
           },
           {
@@ -93,14 +93,21 @@ describe('app profile settings persistence and rollback', () => {
           },
         ],
       });
-      expect(await getAppProfileVariants(7, 'wechat')).toEqual([
-        { value: 'wechat', label: 'WeChat' },
-        { value: 'wechat-mini', label: 'Mini-program' },
+      expect(await getAppProfileVariants(7, 'sample/reader')).toEqual([
+        { value: 'sample/reader', label: 'Reader' },
+        { value: 'sample/embedded-reader', label: 'Embedded reader' },
       ]);
-      await expect(selectAppProfileVariant(7, 'wechat', 'other')).rejects.toThrow('unavailable');
-      await selectAppProfileVariant(7, 'wechat', 'wechat-mini');
+      await expect(selectAppProfileVariant(7, 'sample/reader', 'other')).rejects.toThrow(
+        'unavailable',
+      );
+      await selectAppProfileVariant(7, 'sample/reader', 'sample/embedded-reader');
       expect(variants.set).toHaveBeenCalledExactlyOnceWith(
-        expect.objectContaining({ tabId: 7, enabled: true, profile: 'wechat-mini', language }),
+        expect.objectContaining({
+          tabId: 7,
+          enabled: true,
+          profile: 'sample/embedded-reader',
+          language,
+        }),
         expect.any(Function),
       );
     },

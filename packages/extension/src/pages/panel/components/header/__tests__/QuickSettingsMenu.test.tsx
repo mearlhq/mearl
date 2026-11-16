@@ -75,7 +75,6 @@ vi.mock('../../../utils/i18n', () => ({
       appSimulationChangeFailed: 'APP 模拟切换失败',
       appProfileInstallTitle: '添加 Profile',
       appProfileInstallAction: '添加 Profile',
-      appProfileInstallWeChat: '微信 Profile',
       appProfileInstallSource: 'Profile 来源',
       extensionUpdateAvailable: '发现新版本 v$1',
       extensionUpdateNow: '立即更新',
@@ -504,8 +503,8 @@ describe('QuickSettingsMenu', () => {
     fireEvent.click(within(menu).getByRole('menuitem', { name: '添加 Profile' }));
     const dialog = within(await screen.findByRole('dialog', { name: '添加 Profile' }));
     const source = dialog.getByRole('textbox', { name: 'Profile 来源' });
-    fireEvent.click(dialog.getByRole('button', { name: /微信/ }));
-    expect(source).toHaveValue('mearlhq/profile-wechat');
+    expect(source).toHaveFocus();
+    expect(source).toHaveValue('');
     fireEvent.change(source, { target: { value: 'example/profiles' } });
     expect(source).toHaveValue('example/profiles');
     const close = dialog.getByTitle('Close (ESC)');

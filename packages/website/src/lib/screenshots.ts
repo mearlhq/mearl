@@ -1,18 +1,4 @@
 export const screenshots = {
-  appBrowser: {
-    url: 'https://img.alicdn.com/imgextra/i1/O1CN01nnWgmesZVnH1dDJk_!!6000000000994-49-tps-804-1520.webp',
-    width: 804,
-    height: 1520,
-    en: 'Regular browser: the page shows both Add to cart and Buy now.',
-    'zh-CN': '普通浏览器：页面底部显示「加入购物车」和「立即购买」。',
-  },
-  appWebView: {
-    url: 'https://img.alicdn.com/imgextra/i2/O1CN01ZhW5i9Q0OsH1JhWW_!!6000000005725-49-tps-649-1227.webp',
-    width: 649,
-    height: 1227,
-    en: 'WeChat mini-program WebView: only Buy now appears.',
-    'zh-CN': '微信小程序内网页：底部只显示「立即购买」。',
-  },
   formatter: {
     url: 'https://img.alicdn.com/imgextra/i2/O1CN01SsRLkIKv2HE2lCRA_!!6000000005825-49-tps-1360-540.webp',
     width: 1360,
@@ -70,20 +56,6 @@ export const screenshots = {
     height: 1110,
     en: 'The sample order list in the iPhone 17 Pro preset. The device frame includes the status bar and a mobile viewport.',
     'zh-CN': '在 iPhone 17 Pro 预设下打开示例订单列表，可以同时核对手机外壳、状态栏和移动端布局。',
-  },
-  wechatCatalog: {
-    url: 'https://img.alicdn.com/imgextra/i3/O1CN01q19OkulgCqL0obgi_!!6000000002491-49-tps-402-874.webp',
-    width: 402,
-    height: 874,
-    en: 'ChineseBQB-weapp’s sticker catalog running in Mearl’s iPhone 17 Pro preset.',
-    'zh-CN': 'ChineseBQB-weapp 的表情包目录，运行在 Mearl 的 iPhone 17 Pro 预设中。',
-  },
-  wechatPack: {
-    url: 'https://img.alicdn.com/imgextra/i1/O1CN01l1ncizxWD5H0obgi_!!6000000000311-49-tps-402-874.webp',
-    width: 402,
-    height: 874,
-    en: 'The cat sticker pack rendered after navigating to the mini-program’s pack page.',
-    'zh-CN': '跳转到小程序详情页后，猫咪表情包的图片网格正常渲染。',
   },
 } as const;
 

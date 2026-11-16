@@ -3,8 +3,6 @@
   "appBridgeWebPageEnvironmentReload": { "message": "切换环境会重新加载当前网页。" },
   "appProfileInstallTitle": { "message": "添加 Profile" },
   "appProfileInstallAction": { "message": "添加 Profile" },
-  "appProfileInstallOfficial": { "message": "官方 Profile" },
-  "appProfileInstallWeChat": { "message": "微信 Profile" },
   "appProfileInstallDescription": {
     "message": "输入 GitHub 仓库或 HTTPS 地址，安装用于端模拟的 Profile。请确认你信任此来源。"
   },

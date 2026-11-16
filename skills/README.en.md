@@ -75,5 +75,3 @@ List the installable Skills in the repository:
 ```bash
 npx skills add mearlhq/mearl --list
 ```
-
-Install the WeChat mini-program Skill from [WeChat Profile](https://github.com/mearlhq/profile-wechat).

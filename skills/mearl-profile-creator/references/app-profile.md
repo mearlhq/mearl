@@ -1,6 +1,6 @@
 # App Profile 开发参考
 
-以目标版本的 [App Profile 编译器](https://github.com/mearlhq/mearl/blob/main/packages/app-profiles/README.md)、[浏览器能力包](https://github.com/mearlhq/mearl/blob/main/docs/browser-bundles.md)和 [Preset 激活](https://github.com/mearlhq/mearl/blob/main/docs/browser-presets.md)为准。微信项目演示了多份 WebView 定义共用页面运行时，以及从真实字节生成清单的做法。 [微信端模拟示例](https://github.com/mearlhq/profile-wechat/blob/main/scripts/build-profile.mjs)
+以目标版本的 [App Profile 编译器](https://github.com/mearlhq/mearl/blob/main/packages/app-profiles/README.md)、[浏览器能力包](https://github.com/mearlhq/mearl/blob/main/docs/browser-bundles.md)和 [Preset 激活](https://github.com/mearlhq/mearl/blob/main/docs/browser-presets.md)为准。
 
 ## 最小 UA 示例
 

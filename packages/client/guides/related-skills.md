@@ -4,7 +4,6 @@
 
 | 意图 | Skill |
 | --- | --- |
-| 运行或验证本地微信小程序，包括 uni-app / Taro 的微信产物 | wechat-miniprogram |
 | 时间戳、Base64、图片编码、URL 编解码 | format-converter |
 | 记录或检索笔记与跨会话记忆 | notes-memory |
 | 管理已有浏览器标签分组、关闭受控标签页 | browser-tab-manager |
@@ -34,22 +33,6 @@
 ```
 
 已有包含此 Skill 的本地源码时，可以直接注册其 `skills/web-terminal` 目录。安装后用 `mearl terminal discover <tabId>` 找到页面或 iframe 中的面板，用 `mearl terminal --help` 查看命令。
-
-## 运行本地微信小程序
-
-任务要运行小程序工程或已编译的微信产物时，先用 `mearl --help` 检查已注册插件中是否有 `wxa`。缺失时，从已包含此 Skill 且当前可访问的官方来源补装：
-
-```bash
-{{setup}} plugin install mearlhq/profile-wechat --github --skill wechat-miniprogram --yes
-```
-
-官方来源暂不可用且本机已有包含此 Skill 的源码时，可直接注册：
-
-```bash
-{{setup}} plugin "/path/to/profile-wechat/skills/wechat-miniprogram"
-```
-
-两种方式都会准备运行依赖并注册 `wxa`。读取对应目录中的 `wechat-miniprogram` Skill，查看 `mearl wxa run --help` 后用 `mearl wxa run <项目路径>` 编译并打开预览。框架项目先构建微信产物。看完可以直接关闭预览标签页。若安装失败，报告具体阻塞。用户只要求普通微信 H5 / WebView 模拟时，查询目标浏览器是否支持微信端模拟。
 
 ## 开发与协作指引
 
