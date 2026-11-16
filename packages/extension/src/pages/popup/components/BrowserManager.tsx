@@ -31,6 +31,7 @@ import type {
 } from '@mearl/browser-core';
 import { clsx } from 'clsx';
 import { requestBrowserManager, type BrowserProviderSummary } from '../../../shared/browserManager';
+import { readStoredBrowserId } from '../../../shared/browserIdentity';
 import { Modal, ModalContent, ModalFooter, ModalHeader } from '../../panel/components/modal';
 import {
   NativeHostUpdateGuide,
@@ -118,15 +119,7 @@ function statusText(status: BrowserInfo['status']): string {
   }
 }
 
-function BrowserBadge({ browser }: { browser: BrowserInfo }) {
-  if (browser.type === 'regular') {
-    return (
-      <span className="rounded-sm bg-bg-hover px-1.5 py-0.5 text-3xs text-text-secondary">
-        {t('browserManagerRegular')}
-      </span>
-    );
-  }
-
+function ManagedBrowserBadges({ browser }: { browser: ManagedBrowserInfo }) {
   return (
     <>
       <span className="rounded-sm bg-blue-600/10 px-1.5 py-0.5 text-3xs text-blue-600 dark:text-blue-400">
@@ -347,12 +340,19 @@ function BrowserDetails({ browser }: { browser: BrowserInfo }) {
 
 interface BrowserRowProps {
   browser: BrowserInfo;
+  isCurrent: boolean;
   busyAction: BrowserRowAction | null;
   onAction: (action: BrowserRowAction, browser: BrowserInfo) => void;
   controlSessions: ReturnType<typeof useControlSessions>;
 }
 
-function BrowserRow({ browser, busyAction, onAction, controlSessions }: BrowserRowProps) {
+function BrowserRow({
+  browser,
+  isCurrent,
+  busyAction,
+  onAction,
+  controlSessions,
+}: BrowserRowProps) {
   const sessions = controlSessions.sessions.filter(
     session => session.browserId === browser.browserId,
   );
@@ -392,7 +392,12 @@ function BrowserRow({ browser, busyAction, onAction, controlSessions }: BrowserR
           <span className="min-w-0 flex-1">
             <span className="flex min-w-0 items-center gap-1.5">
               <span className="truncate text-xs font-medium text-text-primary">{browser.name}</span>
-              <BrowserBadge browser={browser} />
+              {isCurrent && (
+                <span className="rounded-sm bg-bg-hover px-1.5 py-0.5 text-3xs text-text-secondary">
+                  {t('browserManagerCurrent')}
+                </span>
+              )}
+              {managed && <ManagedBrowserBadges browser={managed} />}
             </span>
             <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-3xs text-text-secondary">
               <span
@@ -1748,6 +1753,7 @@ export function BrowserManager({
 }: BrowserManagerProps) {
   const controlSessions = useControlSessions();
   const [browsers, setBrowsers] = useState<BrowserInfo[]>([]);
+  const [currentBrowserId, setCurrentBrowserId] = useState<string>();
   const [providers, setProviders] = useState<BrowserProviderSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [showLoading, setShowLoading] = useState(false);
@@ -1774,7 +1780,10 @@ export function BrowserManager({
     setError(null);
     try {
       const result = await requestBrowserManager('list', {});
+      // The list request starts the local handshake, which persists the ID on first use.
+      const browserId = await readStoredBrowserId().catch(() => undefined);
       setBrowsers(result.browsers);
+      setCurrentBrowserId(browserId);
       setWarnings(result.warnings ?? []);
       setNativeHostUpdate(null);
     } catch (cause) {
@@ -2032,6 +2041,7 @@ export function BrowserManager({
               <BrowserRow
                 key={browser.browserId}
                 browser={browser}
+                isCurrent={browser.browserId === currentBrowserId}
                 controlSessions={controlSessions}
                 busyAction={
                   busyAction?.browserId === browser.browserId

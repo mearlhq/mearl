@@ -2,6 +2,7 @@ import { ExtensionRpcError } from '@mearl/browser-core';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BrowserManager } from '../BrowserManager';
+import { BROWSER_ID_STORAGE_KEY } from '../../../../shared/browserIdentity';
 
 const managerMocks = vi.hoisted(() => ({
   request: vi.fn(),
@@ -649,6 +650,41 @@ describe('BrowserManager', () => {
     expect(screen.queryByText('Choose a resource')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'browserManagerLaunch' })).toBeEnabled();
   });
+
+  it.each([
+    { storedId: 'ego-profile', expectedName: 'Ego Lite' },
+    { storedId: 'chrome-profile', expectedName: 'Chrome' },
+    { storedId: 'unlisted-profile', expectedName: undefined },
+    { storedId: undefined, expectedName: undefined },
+  ])(
+    'matches the current browser to the stored profile ID ($storedId)',
+    async ({ storedId, expectedName }) => {
+      const storage: { get(keys: string[]): Promise<Record<string, unknown>> } =
+        chrome.storage.local;
+      const get = vi.spyOn(storage, 'get').mockResolvedValue({
+        [BROWSER_ID_STORAGE_KEY]: storedId,
+      });
+      managerMocks.request.mockResolvedValue({
+        defaultBrowserId: 'chrome-profile',
+        browsers: [
+          { browserId: 'chrome-profile', name: 'Chrome', type: 'regular', status: 'connected' },
+          { browserId: 'ego-profile', name: 'Ego Lite', type: 'regular', status: 'connected' },
+        ],
+      });
+      try {
+        render(<BrowserManager />);
+        await screen.findByRole('region', { name: 'Ego Lite' });
+
+        const badges = screen.queryAllByText('browserManagerCurrent');
+        expect(badges).toHaveLength(expectedName ? 1 : 0);
+        if (expectedName) {
+          expect(screen.getByRole('region', { name: expectedName })).toContainElement(badges[0]);
+        }
+      } finally {
+        get.mockRestore();
+      }
+    },
+  );
 
   it('shows tasks under their browser and routes takeover, return and release to that session', async () => {
     managerMocks.request.mockResolvedValue({

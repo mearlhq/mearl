@@ -1411,7 +1411,7 @@
   "browserManagerEmptyHint": {
     "message": "新增本地或已注册 Provider 提供的浏览器"
   },
-  "browserManagerRegular": {
+  "browserManagerCurrent": {
     "message": "当前浏览器"
   },
   "browserManagerOwned": {

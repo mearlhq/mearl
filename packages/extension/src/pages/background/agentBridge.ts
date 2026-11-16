@@ -10,6 +10,7 @@ import { getEnhancementTabUrl } from './browserEnhancementTarget';
 import { runSerializedQuickSimulationUpdate } from './quickSimulationUpdateQueue';
 import { MEARL_NATIVE_HOST_NAMES } from '@mearl/browser-core';
 import { getExtensionVersion } from '../../shared/extensionVersion';
+import { BROWSER_ID_STORAGE_KEY, readStoredBrowserId } from '../../shared/browserIdentity';
 import {
   setBackgroundPageActivity,
   releaseBackgroundPageActivities,
@@ -211,9 +212,6 @@ async function withAgentPageAction<T>(
 // One successful handshake consumes the automatic update check for this
 // extension service-worker lifetime, including bridge resets and reconnects.
 let nativeHostUpdateCheckConsumed = false;
-
-/** storage.local key for the stable per-installation browser id sent in the handshake. */
-const BROWSER_ID_KEY = 'mearl_browser_id';
 
 export class AgentBridge {
   private devtoolsPorts: Map<number, chrome.runtime.Port>;
@@ -505,11 +503,10 @@ export class AgentBridge {
     browserName: string;
   }> {
     if (this.browserIdentity) return this.browserIdentity;
-    const stored = await chrome.storage.local.get([BROWSER_ID_KEY]);
-    let browserId = stored[BROWSER_ID_KEY] as string | undefined;
+    let browserId = await readStoredBrowserId();
     if (!browserId) {
       browserId = crypto.randomUUID();
-      await chrome.storage.local.set({ [BROWSER_ID_KEY]: browserId });
+      await chrome.storage.local.set({ [BROWSER_ID_STORAGE_KEY]: browserId });
     }
     this.browserIdentity = { browserId, browserName: this.deriveBrowserName() };
     return this.browserIdentity;

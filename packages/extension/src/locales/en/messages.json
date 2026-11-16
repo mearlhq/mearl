@@ -1418,7 +1418,7 @@
   "browserManagerEmptyHint": {
     "message": "Add a local or registered Provider browser"
   },
-  "browserManagerRegular": {
+  "browserManagerCurrent": {
     "message": "Current browser"
   },
   "browserManagerOwned": {
