@@ -3171,34 +3171,37 @@
     "message": "The Skill manager changed. The catalog is refreshing; select the skill again to install."
   },
   "presetInstallTitle": {
-    "message": "Install Preset"
+    "message": "Enable additional Mearl capabilities"
   },
-  "presetInstallSourceNotice": {
-    "message": "This website is not a preconfigured installation source. Approval applies to this installation only and does not trust the website for automatic updates."
+  "presetInstallNamedTitle": {
+    "message": "Enable $1"
+  },
+  "presetInstallChoose": {
+    "message": "Choose a capability configuration"
   },
   "presetInstallSourceTitle": {
-    "message": "Confirm installation source"
+    "message": "View installation source"
   },
   "presetInstallRequestingPage": {
     "message": "Requesting website"
   },
   "presetInstallCatalogSource": {
-    "message": "Preset catalog"
+    "message": "Capability catalog"
   },
   "presetInstallPresetSource": {
-    "message": "Preset source"
+    "message": "Capability configuration"
   },
   "presetInstallReadSourceHint": {
-    "message": "Confirm the source to read the Preset. Review its name and required sites before installing."
+    "message": "Let Mearl read the installation settings from this site. You can review the capabilities and required permissions next."
   },
   "presetInstallReadSource": {
-    "message": "Continue and read Preset"
+    "message": "Read installation settings"
   },
   "presetInstallConfirmHint": {
-    "message": "Review the Preset source and required sites. The connected Mearl local service installs local components, and the browser requests site permissions separately."
+    "message": "Confirm to install and enable these capabilities in Mearl."
   },
   "presetInstallConfirmOnce": {
-    "message": "Confirm and install Preset"
+    "message": "Enable capabilities"
   },
   "presetInstallCancel": {
     "message": "Cancel"
@@ -3230,20 +3233,41 @@
   "presetInstallSourceChanged": {
     "message": "The requesting website or Preset source does not match. Return to the original website and start the installation again."
   },
-  "presetInstallDescription": {
-    "message": "Use the installed features in your existing Mearl tools and panels."
+  "presetInstallPurposeTitle": {
+    "message": "What this enables"
+  },
+  "presetInstallPreviewApps": {
+    "message": "App emulation profiles ($1)"
+  },
+  "presetInstallPreviewPackages": {
+    "message": "Capability packages ($1)"
+  },
+  "presetInstallPreviewSkills": {
+    "message": "Local Skills ($1)"
+  },
+  "presetInstallPreviewProviders": {
+    "message": "Browser connection options ($1)"
+  },
+  "presetInstallSiteAccess": {
+    "message": "Required site permissions ($1)"
   },
   "presetInstallLoading": {
     "message": "Reading installation details…"
   },
+  "presetInstallAuthorizing": {
+    "message": "Confirm site permissions in Chrome…"
+  },
   "presetInstallWorking": {
-    "message": "Verifying and installing the Preset…"
+    "message": "Installing the selected capabilities…"
   },
   "presetInstallPermissions": {
-    "message": "These capabilities need access to the following sites. Continue to grant access in your browser."
+    "message": "These capabilities need site access, so choose Allow when Chrome prompts you."
   },
   "presetInstallAllow": {
-    "message": "Allow and enable"
+    "message": "Grant access and enable"
+  },
+  "presetInstallPermissionRetry": {
+    "message": "Click the authorization button again to continue."
   },
   "presetInstallPermissionFailed": {
     "message": "Required site access was not granted. You can retry; your current configuration is preserved."
@@ -3367,6 +3391,12 @@
   },
   "presetManagementInstall": {
     "message": "Install"
+  },
+  "presetManagementNoPresets": {
+    "message": "The installation catalog has no available configurations."
+  },
+  "presetManagementOpenFailed": {
+    "message": "Could not open the installation popup. Try again."
   },
   "presetManagementLocal": {
     "message": "Includes local components"

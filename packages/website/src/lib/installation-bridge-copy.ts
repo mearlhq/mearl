@@ -1,10 +1,10 @@
 export const installationBridgeCopy = {
   connectingGuide: '正在连接安装引导…',
-  enable: '安装 Preset',
+  enable: '启用能力',
   unavailable: '安装目录暂不可用',
   chooseFromGuide: '请从安装引导选择 Preset',
   connecting: '正在连接 Mearl 扩展…',
-  connected: '扩展已连接，点击后在 Mearl 中确认 Preset。',
+  connected: '扩展已连接，可在 Mearl 中确认启用。',
   disconnected: '尚未连接到 Mearl，请确认已安装并启用扩展，然后重试。',
   configurationUnavailable: '当前 Preset 不可用，请刷新页面后重试。',
   opening: '正在打开 Mearl 安装视图…',

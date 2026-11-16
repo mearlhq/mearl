@@ -10,9 +10,9 @@ export const CUSTOM_INSTALL_PAGE_URL =
 
 export async function openInstallPage(
   reason: `${chrome.runtime.InstalledDetails['reason']}`,
-): Promise<void> {
+): Promise<string | undefined> {
   if (reason !== 'install') return;
-  const reachable =
+  const customPage =
     CUSTOM_INSTALL_PAGE_URL &&
     (await fetch(CUSTOM_INSTALL_PAGE_URL, {
       method: 'HEAD',
@@ -22,11 +22,12 @@ export async function openInstallPage(
       redirect: 'follow',
       signal: AbortSignal.timeout(5_000),
     }).then(
-      () => true,
-      () => false,
+      () => CUSTOM_INSTALL_PAGE_URL,
+      () => undefined,
     ));
   try {
-    await chrome.tabs.create({ url: reachable ? CUSTOM_INSTALL_PAGE_URL : INSTALL_PAGE_URL });
+    await chrome.tabs.create({ url: customPage ?? INSTALL_PAGE_URL });
+    return customPage;
   } catch {
     // Closing the browser must not interrupt extension installation.
   }

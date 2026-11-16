@@ -1,5 +1,6 @@
 import type { InstalledPreset, PresetAutoUpdateResult } from '../../shared/presetAutoUpdate';
 import { getExtensionVersion } from '../../shared/extensionVersion';
+import { resolvePreset, type ResolvedComponent } from '@mearl/preset';
 import {
   loadInstallationConfig,
   parseInstallationConfig,
@@ -33,8 +34,12 @@ import {
   INSTALLATION_SITE,
   INSTALLATION_BRIDGE_URL,
   INSTALLATION_VIEW_PATH,
+  SHOW_PRESET_INSTALLATION_POPUP,
+  type InstallationOpening,
+  type InstallationPreview,
   type InstallationView,
 } from '../../shared/installation';
+import { parseBrowserUiSettings } from '../../shared/browserUiSettings';
 import { isExtensionUiSender } from './extensionMessageTrust';
 import {
   BROWSER_BUNDLE_API_VERSION,
@@ -44,6 +49,7 @@ import {
 import { withCookieInjection } from './utils/dnr';
 import { synchronizeBrowserPreset } from './browserPresetSync';
 import { CUSTOM_INSTALL_PAGE_URL } from './installPage';
+import { openPermissionRequestWindow } from './permissionRequestWindow';
 
 const SESSION_PREFIX = 'mearl-installation:';
 const SESSION_LIFETIME = 15 * 60_000;
@@ -67,8 +73,12 @@ interface InstallationSession {
   expires: number;
   owner?: { tabId: number; frameId: number; documentId: string };
   viewTabId?: number;
+  viewDocumentId?: string;
+  viewUrl?: string;
   completed?: boolean;
   automatic?: boolean;
+  firstInstall?: boolean;
+  settingsViewKey?: string;
   nativeSelection?: string | null;
   nativeReceipt?: string;
   browserRequired?: boolean;
@@ -76,17 +86,47 @@ interface InstallationSession {
   catalogUrl?: string;
   requestingPage?: string;
 }
-interface InstallationSourceRequest {
+type InstallationSourceRequest = {
   kind: 'source-request';
   id: string;
-  presetId: string;
   catalogUrl: string;
   requestingPage: string;
   expires: number;
-  owner: NonNullable<InstallationSession['owner']>;
   viewTabId?: number;
+  viewDocumentId?: string;
+  viewUrl?: string;
+  settingsViewKey?: string;
+} & (
+  | (WebsiteIdentity & { presetId: string })
+  | { selection: InstallationSelection; owner?: never; presetId?: never }
+);
+interface WebsiteIdentity {
+  owner: NonNullable<InstallationSession['owner']>;
+  requestingPage: string;
 }
-type WebsiteIdentity = Pick<InstallationSourceRequest, 'owner' | 'requestingPage'>;
+type StoredInstallation = InstallationSession | InstallationSourceRequest;
+
+function ownsInlineView(stored: StoredInstallation, sender: chrome.runtime.MessageSender) {
+  return sender.documentId
+    ? sender.documentId === stored.viewDocumentId
+    : !sender.tab && Boolean(stored.viewUrl) && sender.url === stored.viewUrl;
+}
+
+function validateSiteGrant(
+  stored: StoredInstallation,
+  sender: chrome.runtime.MessageSender,
+  presetId: unknown,
+  origins: string[],
+) {
+  if (!ownsInlineView(stored, sender)) throw new Error('INSTALLATION_VIEW_REQUIRED');
+  const sourceRequest = 'kind' in stored;
+  const scopes = sourceRequest ? [`${new URL(stored.catalogUrl).origin}/*`] : stored.preset.origins;
+  if (
+    (sourceRequest ? presetId !== undefined : stored.completed || presetId !== stored.presetId) ||
+    origins.some(origin => !scopes.includes(origin))
+  )
+    throw new Error('INSTALLATION_SELECTION_CHANGED');
+}
 
 function installationPage(value: string): URL {
   const page = new URL(value);
@@ -138,7 +178,7 @@ export interface InstallationDependencies {
   now?: () => number;
 }
 
-/** Website catalogs require extension-owned confirmation before they can supply installation entries. */
+/** Binds website catalogs to the requesting document and the extension's installation view. */
 export function createInstallationService(dependencies: InstallationDependencies = {}) {
   const now = dependencies.now ?? Date.now;
   const registry = () => dependencies.registry ?? browserCapabilityRegistry();
@@ -152,6 +192,8 @@ export function createInstallationService(dependencies: InstallationDependencies
       ));
   let opening: Promise<unknown> = Promise.resolve();
   const running = new Map<string, Promise<InstallationView>>();
+  // Chrome requires the permission request to start synchronously on the click message.
+  const inlineSessions = new Map<string, StoredInstallation>();
   const nativeSessions = new Map<
     string,
     {
@@ -193,6 +235,8 @@ export function createInstallationService(dependencies: InstallationDependencies
 
   async function confirmSession(session: InstallationSession) {
     await readSession(session.id);
+    if (session.firstInstall && (await dependencies.native?.capture())?.selection != null)
+      throw new Error('INSTALLATION_SELECTION_CHANGED');
     if (!sameSelection(session.selection, await registry().captureInstallationSelection()))
       throw new Error('INSTALLATION_SELECTION_CHANGED');
     const missing = await missingPermissions(session.preset.origins);
@@ -200,18 +244,22 @@ export function createInstallationService(dependencies: InstallationDependencies
       throw new Error('INSTALLATION_PERMISSION_CHANGED');
   }
 
+  async function checkResourceAccess(session: InstallationSession, url: URL) {
+    if (
+      url.protocol !== 'https:' ||
+      url.username ||
+      url.password ||
+      !session.preset.origins.some(origin => matchesInstallationOrigin(origin, url)) ||
+      !(await chrome.permissions.contains({ origins: [`${url.origin}/*`] }))
+    )
+      throw new Error('INSTALLATION_RESOURCE_DENIED');
+  }
+
   function resourceLoader(session: InstallationSession, signal: AbortSignal): BundleLoader {
     return createBundleFetchLoader({
       fetch: async (input, init) => {
         const url = new URL(String(input));
-        if (
-          url.protocol !== 'https:' ||
-          url.username ||
-          url.password ||
-          !session.preset.origins.some(origin => matchesInstallationOrigin(origin, url)) ||
-          !(await chrome.permissions.contains({ origins: [`${url.origin}/*`] }))
-        )
-          throw new Error('INSTALLATION_RESOURCE_DENIED');
+        await checkResourceAccess(session, url);
         if ((await missingPermissions(session.preset.origins)).missingAuthorization.length)
           throw new Error('INSTALLATION_AUTHORIZATION_REQUIRED');
         return withCookieInjection(url, () =>
@@ -224,17 +272,70 @@ export function createInstallationService(dependencies: InstallationDependencies
     });
   }
 
+  async function previewPreset(session: InstallationSession): Promise<InstallationPreview> {
+    const signal = AbortSignal.timeout(5_000);
+    // A preview reads manifests with existing Chrome access and without browser cookies.
+    const load = createBundleFetchLoader({
+      fetch: async (input, init) => {
+        const url = new URL(String(input));
+        await checkResourceAccess(session, url);
+        return fetch(url, init);
+      },
+    });
+    const preset = await resolvePreset(session.preset.source, {
+      mearlApiVersion: BROWSER_BUNDLE_API_VERSION,
+      signal,
+      load: async source => {
+        const bytes = await load(source, { maxBytes: 262_144, signal });
+        return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+      },
+    });
+    if (
+      preset.id !== session.presetId ||
+      preset.permissions.origins.some(
+        origin => !installationOriginCovered(origin, session.preset.origins),
+      )
+    )
+      throw new Error('INSTALLATION_RESOURCE_DENIED');
+    const extension = preset.defaults.extension;
+    const purpose =
+      extension === undefined
+        ? undefined
+        : parseBrowserUiSettings(extension).settings.messages?.presetInstallPurpose;
+    const enabled = (entries: Record<string, ResolvedComponent>) =>
+      Object.values(entries).filter(entry => entry.enabled !== false).length;
+    return {
+      purpose,
+      appProfileCount: Object.keys(preset.appProfiles).length,
+      packageCount: enabled(preset.packages),
+      skillCount: enabled(preset.skills),
+      providerCount: enabled(preset.providers),
+    };
+  }
+
+  function rememberInlineSession(session: StoredInstallation) {
+    if (session.viewDocumentId || session.viewUrl) inlineSessions.set(session.id, session);
+  }
+
+  async function saveSession(session: StoredInstallation) {
+    inlineSessions.delete(session.id);
+    await chrome.storage.session.set({ [`${SESSION_PREFIX}${session.id}`]: session });
+    rememberInlineSession(session);
+  }
+
   async function readStoredSession(id: unknown) {
     if (!sessionId(id)) throw new Error('INVALID_INSTALLATION_SESSION');
     const key = `${SESSION_PREFIX}${id}`;
     const value = (await chrome.storage.session.get(key))[key] as
       InstallationSession | InstallationSourceRequest | undefined;
     if (!value || value.id !== id || !Number.isFinite(value.expires) || value.expires < now()) {
+      inlineSessions.delete(id);
       await chrome.storage.session.remove(key);
       throw new Error(
         value?.catalogUrl ? 'INSTALLATION_SOURCE_EXPIRED' : 'INSTALLATION_SESSION_EXPIRED',
       );
     }
+    rememberInlineSession(value);
     return value;
   }
 
@@ -408,6 +509,14 @@ export function createInstallationService(dependencies: InstallationDependencies
         (!browserRequired || state.browserReady) &&
         (session.nativeReceipt ? localStatus === 'ready' : state.localComponentCount === 0),
       needsInstall: session.completed !== true,
+      ...(!session.completed && (session.catalogUrl || session.settingsViewKey)
+        ? {
+            presetChoices: Object.entries(
+              parseInstallationConfig(JSON.parse(session.configuration), INSTALLATION_SITE.origin)
+                .presets ?? {},
+            ).map(([id, entry]) => ({ id, label: entry.label })),
+          }
+        : {}),
     };
   }
 
@@ -417,7 +526,10 @@ export function createInstallationService(dependencies: InstallationDependencies
     const expired = sessions
       .filter(([, value]) => !value || typeof value.expires !== 'number' || value.expires < now())
       .map(([key]) => key);
-    if (expired.length) await chrome.storage.session.remove(expired);
+    if (expired.length) {
+      for (const key of expired) inlineSessions.delete(key.slice(SESSION_PREFIX.length));
+      await chrome.storage.session.remove(expired);
+    }
     return sessions.filter(([, value]) => value?.expires >= now());
   }
 
@@ -440,7 +552,9 @@ export function createInstallationService(dependencies: InstallationDependencies
         (reuseViewTabId === undefined || value.viewTabId === reuseViewTabId) &&
         value.presetId === presetId &&
         value.configuration === JSON.stringify(config) &&
-        !value.owner,
+        !value.owner &&
+        !value.catalogUrl &&
+        !value.settingsViewKey,
     )?.[1] as InstallationSession | undefined;
     if (!current && sessions.length >= 16) throw new Error('INSTALLATION_SESSION_LIMIT');
     const session: InstallationSession = current ?? {
@@ -466,8 +580,10 @@ export function createInstallationService(dependencies: InstallationDependencies
     reuseViewTabId?: number,
   ) {
     if (reuseViewTabId !== undefined) {
+      delete session.viewDocumentId;
+      delete session.viewUrl;
       session.viewTabId = reuseViewTabId;
-      await chrome.storage.session.set({ [`${SESSION_PREFIX}${session.id}`]: session });
+      await saveSession(session);
       return { session: session.id };
     }
     if (session.viewTabId !== undefined) {
@@ -480,31 +596,62 @@ export function createInstallationService(dependencies: InstallationDependencies
           context => context.frameId === 0 && isInstallationView(context.documentUrl, session.id),
         );
         if (!currentView) throw new Error('Installation view navigated');
-        await chrome.storage.session.set({ [`${SESSION_PREFIX}${session.id}`]: session });
+        await saveSession(session);
         await chrome.tabs.update(session.viewTabId, { active });
+        if (active && currentView.windowId >= 0)
+          await chrome.windows.update(currentView.windowId, { focused: true });
         await chrome.tabs.reload(session.viewTabId);
         return { session: session.id };
       } catch {
         /* The user may have closed the installation tab. */
       }
     }
-    const tab = await chrome.tabs.create({ url: 'about:blank', active: false });
-    if (tab.id === undefined) throw new Error('INSTALLATION_VIEW_UNAVAILABLE');
-    session.viewTabId = tab.id;
+    if (active && (await showInToolbarPopup(session))) return { session: session.id };
+    delete session.viewDocumentId;
+    delete session.viewUrl;
+    const popup = await openPermissionRequestWindow('about:blank', 520, 560, active);
+    if (popup?.id === undefined) throw new Error('INSTALLATION_VIEW_UNAVAILABLE');
     try {
-      await chrome.storage.session.set({ [`${SESSION_PREFIX}${session.id}`]: session });
-      const websiteSource = 'kind' in session || session.catalogUrl ? '&source=website' : '';
-      await chrome.tabs.update(tab.id, {
-        url: chrome.runtime.getURL(
-          `${INSTALLATION_VIEW_PATH}?session=${session.id}${websiteSource}`,
-        ),
+      const tabId = popup.tabs?.[0]?.id ?? (await chrome.tabs.query({ windowId: popup.id }))[0]?.id;
+      if (tabId === undefined) throw new Error('INSTALLATION_VIEW_UNAVAILABLE');
+      session.viewTabId = tabId;
+      await saveSession(session);
+      const source = session.settingsViewKey
+        ? '&source=settings'
+        : 'kind' in session || session.catalogUrl
+          ? '&source=website'
+          : '';
+      await chrome.tabs.update(tabId, {
+        url: chrome.runtime.getURL(`${INSTALLATION_VIEW_PATH}?session=${session.id}${source}`),
         active,
       });
     } catch (error) {
-      await chrome.tabs.remove(tab.id).catch(() => {});
+      await chrome.windows.remove(popup.id).catch(() => {});
       throw error;
     }
     return { session: session.id };
+  }
+
+  async function showInToolbarPopup(session: InstallationSession | InstallationSourceRequest) {
+    try {
+      const url = chrome.runtime.getURL('src/pages/popup/index.html');
+      const [popup] = await chrome.runtime.getContexts({
+        contextTypes: ['POPUP' as chrome.runtime.ContextType],
+        documentUrls: [url],
+      });
+      if (!popup) return false;
+      delete session.viewTabId;
+      session.viewDocumentId = popup.documentId;
+      session.viewUrl = url;
+      await saveSession(session);
+      const response = await chrome.runtime.sendMessage({
+        action: SHOW_PRESET_INSTALLATION_POPUP,
+        session: session.id,
+      });
+      return response?.opened === true;
+    } catch {
+      return false;
+    }
   }
 
   async function websiteIdentity(sender: chrome.runtime.MessageSender) {
@@ -547,12 +694,16 @@ export function createInstallationService(dependencies: InstallationDependencies
       catalog.search
     )
       throw new Error('INSTALLATION_SOURCE_DENIED');
+    const skipSourceConfirmation =
+      identity.requestingPage === CUSTOM_INSTALL_PAGE_URL &&
+      catalog.href === new URL('public-installation.json', identity.requestingPage).href &&
+      (await chrome.permissions.contains({ origins: [`${catalog.origin}/*`] }));
     if (operation === 'status')
       return {
         connected: true,
         version: getExtensionVersion(),
         browserReady: false,
-        requiresSourceConfirmation: true,
+        requiresSourceConfirmation: !skipSourceConfirmation,
       };
     const next = opening
       .catch(() => {})
@@ -560,23 +711,33 @@ export function createInstallationService(dependencies: InstallationDependencies
         const sessions = await availableSessions();
         const current = sessions.find(
           ([, value]) =>
-            value.kind === 'source-request' &&
+            (value.kind === 'source-request' || (skipSourceConfirmation && !value.completed)) &&
             value.catalogUrl === catalog.href &&
             value.presetId === presetId &&
             value.owner?.tabId === identity.owner.tabId &&
             value.owner?.documentId === identity.owner.documentId,
-        )?.[1] as InstallationSourceRequest | undefined;
+        )?.[1] as InstallationSourceRequest | InstallationSession | undefined;
         if (!current && sessions.length >= 16) throw new Error('INSTALLATION_SESSION_LIMIT');
-        return showView(
-          current ?? {
-            kind: 'source-request',
-            id: crypto.randomUUID(),
-            presetId,
-            catalogUrl: catalog.href,
-            ...identity,
-            expires: now() + SESSION_LIFETIME,
-          },
-        );
+        if (
+          current &&
+          !('kind' in current) &&
+          (running.has(current.id) ||
+            sameSelection(current.selection, await registry().captureInstallationSelection()))
+        )
+          return showView(current);
+        const request: InstallationSourceRequest =
+          current && 'kind' in current
+            ? current
+            : {
+                kind: 'source-request',
+                id: current?.id ?? crypto.randomUUID(),
+                presetId,
+                catalogUrl: catalog.href,
+                ...identity,
+                viewTabId: current?.viewTabId,
+                expires: now() + SESSION_LIFETIME,
+              };
+        return showView(skipSourceConfirmation ? await prepareSourceSession(request) : request);
       });
     opening = next;
     return next;
@@ -586,8 +747,8 @@ export function createInstallationService(dependencies: InstallationDependencies
     const origin = `${new URL(request.catalogUrl).origin}/*`;
     return {
       session: request.id,
-      presetId: request.presetId,
-      label: request.presetId,
+      presetId: request.presetId ?? '',
+      label: request.presetId ?? new URL(request.requestingPage).hostname,
       source: request.catalogUrl,
       origins: [],
       missingOrigins: (await chrome.permissions.contains({ origins: [origin] })) ? [] : [origin],
@@ -600,36 +761,116 @@ export function createInstallationService(dependencies: InstallationDependencies
     };
   }
 
-  async function acceptSource(request: InstallationSourceRequest): Promise<InstallationView> {
-    const selection = await registry().captureInstallationSelection();
+  async function prepareSourceSession(request: InstallationSourceRequest) {
+    const selection =
+      'selection' in request ? request.selection : await registry().captureInstallationSelection();
     const config = await loadRequestedCatalog(request.catalogUrl, request.requestingPage);
-    const preset = config.presets?.[request.presetId];
-    if (!preset) throw new Error('INSTALLATION_PRESET_UNAVAILABLE');
-    const frame = await chrome.webNavigation.getFrame({ tabId: request.owner.tabId, frameId: 0 });
-    if (
-      !frame ||
-      frame.documentId !== request.owner.documentId ||
-      !samePage(frame.url, request.requestingPage)
-    )
-      throw new Error('INSTALLATION_SOURCE_CHANGED');
+    const presets = config.presets ?? {};
+    const presetId = request.presetId ?? Object.keys(presets)[0];
+    if (!presetId || !Object.hasOwn(presets, presetId))
+      throw new Error('INSTALLATION_PRESET_UNAVAILABLE');
+    if (request.owner) {
+      const frame = await chrome.webNavigation.getFrame({ tabId: request.owner.tabId, frameId: 0 });
+      if (
+        !frame ||
+        frame.documentId !== request.owner.documentId ||
+        !samePage(frame.url, request.requestingPage)
+      )
+        throw new Error('INSTALLATION_SOURCE_CHANGED');
+    } else if (
+      (!request.settingsViewKey && (await dependencies.native?.capture())?.selection != null) ||
+      !sameSelection(selection, await registry().captureInstallationSelection())
+    ) {
+      throw new Error('INSTALLATION_SELECTION_CHANGED');
+    }
     const session: InstallationSession = {
       id: request.id,
-      presetId: request.presetId,
-      preset,
+      presetId,
+      preset: presets[presetId],
       configuration: JSON.stringify(config),
       selection,
       expires: request.expires,
       owner: request.owner,
       viewTabId: request.viewTabId,
+      viewDocumentId: request.viewDocumentId,
+      viewUrl: request.viewUrl,
       catalogUrl: request.catalogUrl,
       requestingPage: request.requestingPage,
+      ...(request.settingsViewKey
+        ? { settingsViewKey: request.settingsViewKey }
+        : 'selection' in request
+          ? { firstInstall: true }
+          : {}),
     };
-    await captureNative(session);
+    if (request.owner || request.settingsViewKey) await captureNative(session);
+    return session;
+  }
+
+  async function acceptSource(request: InstallationSourceRequest): Promise<InstallationView> {
+    const session = await prepareSourceSession(request);
     const current = await readStoredSession(request.id);
     if (!('kind' in current) || JSON.stringify(current) !== JSON.stringify(request))
       throw new Error('INSTALLATION_SOURCE_CHANGED');
-    await chrome.storage.session.set({ [`${SESSION_PREFIX}${session.id}`]: session });
+    await saveSession(session);
     return view(session);
+  }
+
+  async function prepareSettingsSession(settingsViewKey: string) {
+    const selection = await registry().captureInstallationSelection();
+    const sessions = await availableSessions();
+    const current = sessions.find(
+      ([, session]) =>
+        session.settingsViewKey === settingsViewKey &&
+        !session.completed &&
+        (running.has(session.id) || sameSelection(selection, session.selection)),
+    )?.[1] as InstallationSession | InstallationSourceRequest | undefined;
+    if (current) return current;
+    if (sessions.length >= 16) throw new Error('INSTALLATION_SESSION_LIMIT');
+    const seed = {
+      id: crypto.randomUUID(),
+      selection,
+      settingsViewKey,
+      expires: now() + SESSION_LIFETIME,
+    };
+    if (CUSTOM_INSTALL_PAGE_URL) {
+      const catalog = new URL('public-installation.json', CUSTOM_INSTALL_PAGE_URL);
+      const request: InstallationSourceRequest = {
+        ...seed,
+        kind: 'source-request',
+        catalogUrl: catalog.href,
+        requestingPage: CUSTOM_INSTALL_PAGE_URL,
+      };
+      if (!(await chrome.permissions.contains({ origins: [`${catalog.origin}/*`] })))
+        return request;
+      return prepareSourceSession(request);
+    }
+
+    const config = await configuration();
+    const entry = Object.entries(config.presets ?? {})[0];
+    if (!entry) throw new Error('INSTALLATION_PRESET_UNAVAILABLE');
+    const [presetId, preset] = entry;
+    const session: InstallationSession = {
+      ...seed,
+      presetId,
+      preset,
+      configuration: JSON.stringify(config),
+    };
+    await captureNative(session);
+    return session;
+  }
+
+  async function selectPreset(session: InstallationSession, presetId: string) {
+    if (session.completed || !(session.catalogUrl || session.settingsViewKey))
+      throw new Error('INVALID_INSTALLATION_REQUEST');
+    const { presets = {} } = parseInstallationConfig(
+      JSON.parse(session.configuration),
+      INSTALLATION_SITE.origin,
+    );
+    if (!Object.hasOwn(presets, presetId)) throw new Error('INSTALLATION_PRESET_UNAVAILABLE');
+    const selected = { ...session, presetId, preset: presets[presetId] };
+    const result = await view(selected);
+    await saveSession(selected);
+    return result;
   }
 
   async function perform(
@@ -706,7 +947,7 @@ export function createInstallationService(dependencies: InstallationDependencies
       }
     }
     session.completed = true;
-    await chrome.storage.session.set({ [`${SESSION_PREFIX}${session.id}`]: session });
+    await saveSession(session);
     return view(session);
   }
 
@@ -745,8 +986,74 @@ export function createInstallationService(dependencies: InstallationDependencies
     async installedPresets(): Promise<InstalledPreset[]> {
       return (await managementState()).presets;
     },
-    async presetInstallUrl(): Promise<string | undefined> {
-      return CUSTOM_INSTALL_PAGE_URL ?? (await configuration()).guide?.url;
+    async canInstallPresets() {
+      return Boolean(
+        CUSTOM_INSTALL_PAGE_URL || Object.keys((await configuration()).presets ?? {}).length,
+      );
+    },
+    async openPresetSelector(
+      sender: chrome.runtime.MessageSender,
+      inline: boolean,
+    ): Promise<InstallationOpening> {
+      const { documentId, tab, url } = sender;
+      if (!isExtensionUiSender(sender, chrome.runtime.id) || !url)
+        throw new Error('INSTALLATION_VIEW_REQUIRED');
+      // Messages from toolbar popup frames have no tab or document ID.
+      const settingsViewKey = documentId ?? (inline && !tab ? url : undefined);
+      if (!settingsViewKey) throw new Error('INSTALLATION_VIEW_REQUIRED');
+      const next = opening
+        .catch(() => {})
+        .then(async () => {
+          const session = await prepareSettingsSession(settingsViewKey);
+          if (!inline) return showView(session);
+          delete session.viewTabId;
+          if (documentId) {
+            session.viewDocumentId = documentId;
+            delete session.viewUrl;
+          } else {
+            delete session.viewDocumentId;
+            session.viewUrl = url;
+          }
+          await saveSession(session);
+          return { session: session.id, inline: true };
+        });
+      opening = next;
+      return next;
+    },
+    async installDefaultForGuide(guide: string): Promise<void> {
+      const selection = await registry().captureInstallationSelection();
+      if (selection.activeRevision || selection.installationToken) return;
+      const native = await dependencies.native?.capture();
+      if (native?.selection != null) return;
+
+      const catalog = new URL('public-installation.json', guide);
+      const request: InstallationSourceRequest = {
+        kind: 'source-request',
+        id: crypto.randomUUID(),
+        catalogUrl: catalog.href,
+        requestingPage: guide,
+        selection,
+        expires: now() + SESSION_LIFETIME,
+      };
+      if (!(await chrome.permissions.contains({ origins: [`${catalog.origin}/*`] }))) {
+        await showView(request);
+        return;
+      }
+
+      const session = await prepareSourceSession(request);
+      const missing = await missingPermissions(session.preset.origins);
+      if (missing.missingOrigins.length || missing.missingAuthorization.length) {
+        await showView(session);
+        return;
+      }
+
+      const key = `${SESSION_PREFIX}${session.id}`;
+      await saveSession(session);
+      try {
+        await perform(session, false);
+      } finally {
+        await chrome.storage.session.remove(key);
+      }
     },
     async uninstallPreset(
       browserRevision: unknown,
@@ -812,7 +1119,7 @@ export function createInstallationService(dependencies: InstallationDependencies
         ...(attached ? { nativeSelection: native.selection } : {}),
       };
       const key = `${SESSION_PREFIX}${session.id}`;
-      await chrome.storage.session.set({ [key]: session });
+      await saveSession(session);
       try {
         const before = attached ? native.selection : session.selection.activeRevision;
         const result = await perform(session, false);
@@ -884,7 +1191,7 @@ export function createInstallationService(dependencies: InstallationDependencies
           throw new Error('INVALID_NATIVE_INSTALLATION_RESULT');
         session.nativeSelection = input.installationRevision;
         session.nativeReceipt = input.installationRevision;
-        await chrome.storage.session.set({ [`${SESSION_PREFIX}${session.id}`]: session });
+        await saveSession(session);
         const result = await synchronizeBrowserPreset(
           { operation: 'sync', installationRevision: input.installationRevision },
           transport,
@@ -896,7 +1203,7 @@ export function createInstallationService(dependencies: InstallationDependencies
             input.installationRevision,
           );
           session.nativeSelection = input.installationRevision;
-          await chrome.storage.session.set({ [`${SESSION_PREFIX}${session.id}`]: session });
+          await saveSession(session);
         }
         return result;
       }
@@ -979,15 +1286,30 @@ export function createInstallationService(dependencies: InstallationDependencies
         'action',
         'operation',
         'session',
+        'presetId',
         'authorize',
+        'origins',
         'replaceSkills',
       ]);
       if (
         input.action !== INSTALLATION_ACTION ||
-        !['inspect', 'install', 'retry', 'restart', 'confirmSource', 'cancel'].includes(
-          String(input.operation),
-        ) ||
-        (input.authorize !== undefined && typeof input.authorize !== 'boolean')
+        ![
+          'inspect',
+          'preview',
+          'selectPreset',
+          'grant',
+          'install',
+          'retry',
+          'restart',
+          'confirmSource',
+          'cancel',
+        ].includes(String(input.operation)) ||
+        ((input.operation === 'selectPreset' || input.presetId !== undefined) &&
+          (!['selectPreset', 'grant', 'install', 'retry'].includes(String(input.operation)) ||
+            typeof input.presetId !== 'string' ||
+            !/^[a-z][a-z0-9-]{0,79}$/.test(input.presetId))) ||
+        (input.authorize !== undefined && typeof input.authorize !== 'boolean') ||
+        (input.origins !== undefined && input.operation !== 'grant')
       )
         throw new Error('INVALID_INSTALLATION_REQUEST');
       if (
@@ -1003,13 +1325,38 @@ export function createInstallationService(dependencies: InstallationDependencies
           new Set(input.replaceSkills).size !== input.replaceSkills.length)
       )
         throw new Error('INVALID_INSTALLATION_REQUEST');
-      if (
-        !isExtensionUiSender(sender, chrome.runtime.id) ||
-        !samePage(sender.url, chrome.runtime.getURL(INSTALLATION_VIEW_PATH))
-      )
+      if (!isExtensionUiSender(sender, chrome.runtime.id))
         throw new Error('INSTALLATION_VIEW_REQUIRED');
-      if (input.operation === 'restart') {
-        if (typeof sender.tab?.id !== 'number' || sender.frameId !== 0)
+      let operation = input.operation;
+      let authorize = input.authorize === true;
+      let grantedOrigins: string[] | undefined;
+      if (operation === 'grant') {
+        if (
+          (!sender.documentId && sender.tab) ||
+          !sessionId(input.session) ||
+          !Array.isArray(input.origins) ||
+          !input.origins.length ||
+          input.origins.length > 64
+        )
+          throw new Error('INVALID_INSTALLATION_REQUEST');
+        grantedOrigins = input.origins.map(validateInstallationOrigin);
+        const cached = inlineSessions.get(input.session);
+        if (!cached || cached.expires < now()) {
+          const restored = await readStoredSession(input.session);
+          validateSiteGrant(restored, sender, input.presetId, grantedOrigins);
+          throw new Error('INSTALLATION_PERMISSION_RETRY');
+        }
+        validateSiteGrant(cached, sender, input.presetId, grantedOrigins);
+        if (running.has(cached.id)) throw new Error('INSTALLATION_BUSY');
+        // The popup can close as Chrome opens the permission prompt. Start the
+        // request on the click's message and keep its continuation in the worker.
+        if (!(await chrome.permissions.request({ origins: grantedOrigins })))
+          throw new Error('INSTALLATION_PERMISSION_REQUIRED');
+        authorize = true;
+      }
+      const popupView = samePage(sender.url, chrome.runtime.getURL(INSTALLATION_VIEW_PATH));
+      if (operation === 'restart') {
+        if (!popupView || typeof sender.tab?.id !== 'number' || sender.frameId !== 0)
           throw new Error('INSTALLATION_VIEW_REQUIRED');
         const browser = await registry().installationStatus();
         const native = await dependencies.native?.capture();
@@ -1025,20 +1372,28 @@ export function createInstallationService(dependencies: InstallationDependencies
         return next;
       }
       const stored = await readStoredSession(input.session);
-      if (
-        sender.tab?.id !== stored.viewTabId ||
-        new URL(sender.url!).searchParams.get('session') !== stored.id ||
-        sender.frameId !== 0
-      )
-        throw new Error('INSTALLATION_VIEW_REQUIRED');
-      if (input.operation === 'cancel') {
+      const inlineView = Boolean(stored.viewDocumentId || stored.viewUrl);
+      const ownsView = inlineView
+        ? ownsInlineView(stored, sender)
+        : popupView &&
+          typeof stored.viewTabId === 'number' &&
+          sender.tab?.id === stored.viewTabId &&
+          new URL(sender.url!).searchParams.get('session') === stored.id &&
+          sender.frameId === 0;
+      if (!ownsView) throw new Error('INSTALLATION_VIEW_REQUIRED');
+      if (grantedOrigins) {
+        validateSiteGrant(stored, sender, input.presetId, grantedOrigins);
+        operation = 'kind' in stored ? 'confirmSource' : 'install';
+      }
+      if (operation === 'cancel') {
         if (running.has(stored.id)) throw new Error('INSTALLATION_BUSY');
+        inlineSessions.delete(stored.id);
         await chrome.storage.session.remove(`${SESSION_PREFIX}${stored.id}`);
         return { cancelled: true };
       }
       if ('kind' in stored) {
-        if (input.operation === 'inspect') return sourceView(stored);
-        if (input.operation !== 'confirmSource')
+        if (operation === 'inspect') return sourceView(stored);
+        if (operation !== 'confirmSource')
           throw new Error('INSTALLATION_SOURCE_CONFIRMATION_REQUIRED');
         const current = running.get(stored.id);
         if (current) return current;
@@ -1046,49 +1401,58 @@ export function createInstallationService(dependencies: InstallationDependencies
         running.set(stored.id, next);
         return next;
       }
-      if (input.operation === 'confirmSource') return view(await readSession(input.session, false));
-      const session = await readSession(input.session, input.operation !== 'inspect');
-      if (input.operation === 'inspect') return view(session);
-      if (session.catalogUrl && !session.completed && input.authorize !== true)
-        throw new Error('INSTALLATION_AUTHORIZATION_REQUIRED');
-      if (input.operation === 'retry') {
-        if (running.has(session.id)) return running.get(session.id)!;
-        const latest = await view(session);
-        if (!latest.browserReady && latest.browserRequired !== false)
-          throw new Error('INSTALLATION_SELECTION_CHANGED');
-        if (
-          input.replaceSkills !== undefined &&
-          (!session.nativeReceipt ||
-            (input.replaceSkills as string[]).some(
-              id =>
-                !latest.localIssues?.some(
-                  issue =>
-                    issue.id === id &&
-                    [
-                      'SKILL_SOURCE_CONFLICT',
-                      'SKILL_PLUGIN_REGISTRATION_CONFLICT',
-                      'SKILL_PLUGIN_REGISTRATION_REQUIRED',
-                    ].includes(issue.reason),
-                ),
-            ))
-        )
-          throw new Error('INVALID_SKILL_REPLACEMENT_SELECTION');
-        session.completed = false;
-        if (session.nativeReceipt) session.nativeSelection = session.nativeReceipt;
-        else await captureNative(session);
-        await chrome.storage.session.set({ [`${SESSION_PREFIX}${session.id}`]: session });
+      if (operation === 'confirmSource') return view(await readSession(input.session, false));
+      if (operation === 'preview') return previewPreset(await readSession(input.session, false));
+      if (operation === 'inspect') return view(await readSession(input.session, false));
+      if (
+        operation !== 'selectPreset' &&
+        input.presetId !== undefined &&
+        input.presetId !== stored.presetId
+      )
+        throw new Error('INSTALLATION_SELECTION_CHANGED');
+      const existing = running.get(stored.id);
+      if (existing) {
+        if (operation === 'selectPreset') throw new Error('INSTALLATION_BUSY');
+        return existing;
       }
-      const missing = await missingPermissions(session.preset.origins);
-      if (missing.missingAuthorization.length && input.authorize !== true)
-        throw new Error('INSTALLATION_AUTHORIZATION_REQUIRED');
-      const existing = running.get(session.id);
-      if (existing) return existing;
-      const task = perform(
-        session,
-        input.authorize === true,
-        input.replaceSkills as string[] | undefined,
-      ).finally(() => running.delete(session.id));
-      running.set(session.id, task);
+      const task = (async () => {
+        const session = await readSession(input.session);
+        if (operation === 'selectPreset') return selectPreset(session, input.presetId as string);
+        if (session.presetId !== stored.presetId) throw new Error('INSTALLATION_SELECTION_CHANGED');
+        if ((session.catalogUrl || session.settingsViewKey) && !session.completed && !authorize)
+          throw new Error('INSTALLATION_AUTHORIZATION_REQUIRED');
+        if (operation === 'retry') {
+          const latest = await view(session);
+          if (!latest.browserReady && latest.browserRequired !== false)
+            throw new Error('INSTALLATION_SELECTION_CHANGED');
+          if (
+            input.replaceSkills !== undefined &&
+            (!session.nativeReceipt ||
+              (input.replaceSkills as string[]).some(
+                id =>
+                  !latest.localIssues?.some(
+                    issue =>
+                      issue.id === id &&
+                      [
+                        'SKILL_SOURCE_CONFLICT',
+                        'SKILL_PLUGIN_REGISTRATION_CONFLICT',
+                        'SKILL_PLUGIN_REGISTRATION_REQUIRED',
+                      ].includes(issue.reason),
+                  ),
+              ))
+          )
+            throw new Error('INVALID_SKILL_REPLACEMENT_SELECTION');
+          session.completed = false;
+          if (session.nativeReceipt) session.nativeSelection = session.nativeReceipt;
+          else await captureNative(session);
+          await saveSession(session);
+        }
+        const missing = await missingPermissions(session.preset.origins);
+        if (missing.missingAuthorization.length && !authorize)
+          throw new Error('INSTALLATION_AUTHORIZATION_REQUIRED');
+        return perform(session, authorize, input.replaceSkills as string[] | undefined);
+      })().finally(() => running.delete(stored.id));
+      running.set(stored.id, task);
       return task;
     },
   };

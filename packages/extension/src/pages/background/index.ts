@@ -404,8 +404,14 @@ chrome.runtime.onUpdateAvailable.addListener(details => {
 });
 
 chrome.runtime.onInstalled.addListener(details => {
-  void openInstallPage(details.reason);
   if (details.reason === 'install') {
+    void openInstallPage(details.reason)
+      .then(guide => {
+        if (guide) return installationService.installDefaultForGuide(guide);
+      })
+      .catch(error =>
+        console.warn('[PresetInstallation] Default installation unavailable:', error),
+      );
     void trackEvent('extension_install');
   } else if (details.reason === 'update') {
     chrome.storage.local.remove(BROWSER_EXTENSION_UPDATE_VERSION_KEY, () => {
@@ -879,8 +885,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       switch (message.operation) {
         case 'status':
           return installationService.installedPresets();
-        case 'install-url':
-          return installationService.presetInstallUrl();
+        case 'install-available':
+          return installationService.canInstallPresets();
+        case 'install':
+          return installationService.openPresetSelector(sender, message.inline === true);
         case 'update':
           return checkPresetUpdate(true);
         case 'uninstall':

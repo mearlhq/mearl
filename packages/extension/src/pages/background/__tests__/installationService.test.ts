@@ -8,6 +8,7 @@ import {
   INSTALLATION_BRIDGE_URL,
   INSTALLATION_SITE,
   INSTALLATION_VIEW_PATH,
+  SHOW_PRESET_INSTALLATION_POPUP,
 } from '../../../shared/installation';
 
 const agent = vi.hoisted(() => ({
@@ -35,6 +36,9 @@ vi.mock('../browserCapabilityRegistry', () => ({
   createBrowserCapabilityRegistry: vi.fn(),
 }));
 vi.mock('../utils/dnr', () => ({ withCookieInjection: vi.fn((_url, call) => call()) }));
+vi.mock('../installPage', () => ({
+  CUSTOM_INSTALL_PAGE_URL: 'https://configured.example.test/installed.html',
+}));
 
 let records: Record<string, any>;
 let config: ReturnType<typeof parseInstallationConfig>;
@@ -184,7 +188,7 @@ beforeEach(() => {
       id: 'installed-extension',
       getURL: (path: string) => `chrome-extension://installed-extension/${path}`,
       getManifest: () => ({ version: '3.0.0' }),
-      getContexts: vi.fn(async ({ tabIds }: { tabIds: number[] }) =>
+      getContexts: vi.fn(async ({ tabIds = [] }: { tabIds?: number[] }) =>
         tabIds.flatMap(tabId => {
           const tab = tabs.get(tabId);
           return tab?.url.startsWith('chrome-extension://installed-extension/')
@@ -192,6 +196,7 @@ beforeEach(() => {
             : [];
         }),
       ),
+      sendMessage: vi.fn(async () => undefined),
     },
     permissions: { contains: vi.fn(async () => grants) },
     storage: {
@@ -218,6 +223,15 @@ beforeEach(() => {
             }
           : frame,
       ),
+    },
+    windows: {
+      getLastFocused: vi.fn(async () => undefined),
+      create: vi.fn(async ({ url }) => {
+        const tab = await chrome.tabs.create({ url });
+        return { id: tab.id, tabs: [tab] };
+      }),
+      update: vi.fn(async () => {}),
+      remove: vi.fn(async id => tabs.delete(id)),
     },
     tabs: {
       create: vi.fn(async () => {
@@ -435,6 +449,97 @@ describe('website source confirmation', () => {
     return { service, fetcher, install, native };
   };
   afterEach(() => vi.unstubAllGlobals());
+  it.each([
+    { granted: true, catalogPath: 'public-installation.json', skips: true },
+    { granted: false, catalogPath: 'public-installation.json', skips: false },
+    { granted: true, catalogPath: 'other.json', skips: false },
+  ])(
+    'skips source confirmation for the configured catalog with Chrome access ($granted, $catalogPath)',
+    async ({ granted, catalogPath, skips }) => {
+      const f = setup();
+      topUrl = 'https://configured.example.test/installed.html';
+      config.guide = { url: topUrl };
+      grants = granted;
+      const request = { catalogUrl: new URL(catalogPath, topUrl).href };
+      await expect(f.service.website(website('status', request), sender())).resolves.toMatchObject({
+        requiresSourceConfirmation: !skips,
+      });
+      expect(f.fetcher).not.toHaveBeenCalled();
+
+      const { session } = (await f.service.website(website('open', request), sender())) as {
+        session: string;
+      };
+      const view = await f.service.internal(internal('inspect', session), uiSender(session));
+      expect(view).toMatchObject({ needsInstall: true });
+      if (skips) {
+        expect(view).toMatchObject({ presetId: 'team', source: config.presets!.team.source });
+        expect(f.fetcher).toHaveBeenCalledOnce();
+        expect(await f.service.website(website('open', request), sender())).toEqual({ session });
+        expect(chrome.windows.create).toHaveBeenCalledOnce();
+      } else {
+        expect(view).toHaveProperty('needsSourceConfirmation', true);
+        expect(f.fetcher).not.toHaveBeenCalled();
+      }
+      expect(f.install).not.toHaveBeenCalled();
+    },
+  );
+  it('previews the selected preset and inherited capabilities using existing Chrome access', async () => {
+    const { service, fetcher, install } = setup();
+    const { session } = (await service.website(website(), sender())) as { session: string };
+    const ui = uiSender(session);
+    agent.allowed = [];
+    await expect(service.internal(internal('preview', session), ui)).rejects.toThrow(
+      'INSTALLATION_SOURCE_CONFIRMATION_REQUIRED',
+    );
+    expect(fetcher).not.toHaveBeenCalled();
+    await service.internal(internal('confirmSource', session), ui);
+
+    const purpose = { en: 'Inspect and replay requests', zh_CN: '检查和回放请求' };
+    fetcher.mockResolvedValueOnce(
+      Response.json({
+        schemaVersion: 1,
+        id: 'team',
+        version: '1.0.0',
+        extends: { source: './base.json' },
+        packages: { legacy: { enabled: false } },
+        defaults: { extension: { messages: { presetInstallPurpose: purpose } } },
+      }),
+    );
+    fetcher.mockResolvedValueOnce(
+      Response.json({
+        schemaVersion: 1,
+        id: 'base',
+        version: '1.0.0',
+        appProfiles: { reader: 'runtime/reader' },
+        packages: {
+          runtime: { source: '../runtime/bundle.json' },
+          legacy: { source: '../legacy/bundle.json' },
+        },
+        skills: { reader: { source: 'example/reader' } },
+      }),
+    );
+
+    await expect(service.internal(internal('preview', session), ui)).resolves.toEqual({
+      purpose,
+      appProfileCount: 1,
+      packageCount: 1,
+      skillCount: 1,
+      providerCount: 0,
+    });
+    expect(fetcher).toHaveBeenLastCalledWith(
+      new URL('./base.json', config.presets!.team.source),
+      expect.objectContaining({ credentials: 'omit', redirect: 'error' }),
+    );
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(install).not.toHaveBeenCalled();
+    expect(agent.allowed).toEqual([]);
+
+    grants = false;
+    await expect(service.internal(internal('preview', session), ui)).rejects.toThrow(
+      'INSTALLATION_RESOURCE_DENIED',
+    );
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
   it('routes a catalog from the embedded bridge into the same source-confirmation session', async () => {
     const f = setup();
     const input = (operation: string, url = catalogUrl) => ({
@@ -1472,4 +1577,366 @@ it('does not replace a newer browser selection accepted while loading the update
   });
   expect(await service.autoUpdate()).toMatchObject({ status: 'skipped' });
   expect(install).not.toHaveBeenCalled();
+});
+
+describe('preset selection from settings', () => {
+  const settingsSender = () =>
+    ({
+      id: chrome.runtime.id,
+      url: chrome.runtime.getURL('src/pages/options/index.html?iframe=1'),
+      documentId: 'settings-document',
+      frameId: 1,
+    }) as chrome.runtime.MessageSender;
+  beforeEach(() => {
+    topUrl = 'https://configured.example.test/installed.html';
+    config.guide = { url: topUrl };
+    config.presets!.tools = {
+      label: 'Tools',
+      source: 'https://tools.example.test/presets/tools.json',
+      origins: ['https://tools.example.test/*'],
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json(config)),
+    );
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('uses the embedded settings document and the chosen preset permissions', async () => {
+    const { service, install } = make();
+    const sender = settingsSender();
+    const { session, inline } = await service.openPresetSelector(sender, true);
+    expect(inline).toBe(true);
+    expect(await service.openPresetSelector(sender, true)).toEqual({ session, inline: true });
+    expect(chrome.windows.create).not.toHaveBeenCalled();
+    await expect(
+      service.internal(internal('inspect', session), {
+        ...sender,
+        documentId: 'other-settings',
+      }),
+    ).rejects.toThrow('INSTALLATION_VIEW_REQUIRED');
+    await expect(service.internal(internal('inspect', session), sender)).resolves.toMatchObject({
+      presetId: 'team',
+      presetChoices: [
+        { id: 'team', label: 'Team' },
+        { id: 'tools', label: 'Tools' },
+      ],
+    });
+    await expect(
+      service.internal(
+        {
+          ...internal('selectPreset', session),
+          presetId: 'unlisted',
+        },
+        sender,
+      ),
+    ).rejects.toThrow('INSTALLATION_PRESET_UNAVAILABLE');
+    await expect(
+      service.internal(
+        {
+          ...internal('selectPreset', session),
+          presetId: 'tools',
+        },
+        sender,
+      ),
+    ).resolves.toMatchObject({
+      presetId: 'tools',
+      source: config.presets!.tools.source,
+      origins: config.presets!.tools.origins,
+    });
+    await expect(
+      service.internal(
+        {
+          ...internal('install', session, true),
+          presetId: 'team',
+        },
+        sender,
+      ),
+    ).rejects.toThrow('INSTALLATION_SELECTION_CHANGED');
+    expect(install).not.toHaveBeenCalled();
+    await service.internal({ ...internal('install', session, true), presetId: 'tools' }, sender);
+    expect(install).toHaveBeenCalledExactlyOnceWith(
+      config.presets!.tools.source,
+      'tools',
+      config.presets!.tools.origins,
+    );
+  });
+
+  it('binds settings in a toolbar popup without tab metadata to their own URL', async () => {
+    const { service } = make();
+    const sender = { ...settingsSender(), documentId: undefined, frameId: undefined };
+    const { session, inline } = await service.openPresetSelector(sender, true);
+    expect(inline).toBe(true);
+    expect(chrome.windows.create).not.toHaveBeenCalled();
+    const inspect = internal('inspect', session);
+    await expect(
+      service.internal(inspect, { ...sender, url: sender.url + '&tabId=7' }),
+    ).rejects.toThrow('INSTALLATION_VIEW_REQUIRED');
+    await expect(
+      service.internal(inspect, { ...sender, tab: { id: 7 } as chrome.tabs.Tab }),
+    ).rejects.toThrow('INSTALLATION_VIEW_REQUIRED');
+    await expect(service.internal(inspect, sender)).resolves.toMatchObject({
+      presetId: 'team',
+      presetChoices: [
+        { id: 'team', label: 'Team' },
+        { id: 'tools', label: 'Tools' },
+      ],
+    });
+  });
+
+  it('requests access to the configured catalog before showing its choices', async () => {
+    const { service } = make();
+    grants = false;
+    const sender = settingsSender();
+    const { session } = await service.openPresetSelector(sender, true);
+    await expect(service.internal(internal('inspect', session), sender)).resolves.toMatchObject({
+      needsSourceConfirmation: true,
+      missingOrigins: ['https://configured.example.test/*'],
+    });
+    expect(fetch).not.toHaveBeenCalled();
+    grants = true;
+    await expect(
+      service.internal(internal('confirmSource', session), sender),
+    ).resolves.toMatchObject({
+      presetId: 'team',
+      presetChoices: [
+        { id: 'team', label: 'Team' },
+        { id: 'tools', label: 'Tools' },
+      ],
+    });
+  });
+
+  it.each([true, false])(
+    'uses the open toolbar popup or falls back to an installation window (%s)',
+    async acknowledged => {
+      const { service } = make();
+      chrome.runtime.getContexts = vi.fn(async () => [
+        { documentId: 'toolbar-popup' },
+      ]) as unknown as typeof chrome.runtime.getContexts;
+      vi.mocked(chrome.runtime.sendMessage).mockResolvedValueOnce({ opened: acknowledged });
+      const { session } = await service.openPresetSelector(settingsSender(), false);
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        action: SHOW_PRESET_INSTALLATION_POPUP,
+        session,
+      });
+      expect(chrome.windows.create).toHaveBeenCalledTimes(acknowledged ? 0 : 1);
+      const sender = acknowledged
+        ? {
+            id: chrome.runtime.id,
+            url: chrome.runtime.getURL('src/pages/popup/index.html'),
+          }
+        : uiSender(session);
+      await expect(service.internal(internal('inspect', session), sender)).resolves.toMatchObject({
+        presetId: 'team',
+      });
+    },
+  );
+
+  it.each(['settings-document', undefined])(
+    'starts the site grant on the click message from settings with document ID %s',
+    async documentId => {
+      const { service, install } = make();
+      const sender = { ...settingsSender(), documentId };
+      const { session } = await service.openPresetSelector(sender, true);
+      let approve!: (approved: boolean) => void;
+      chrome.permissions.request = vi.fn(
+        () =>
+          new Promise<boolean>(resolve => {
+            approve = resolve;
+          }),
+      ) as typeof chrome.permissions.request;
+      const origins = config.presets!.team.origins;
+      const installation = service.internal(
+        {
+          ...internal('grant', session),
+          presetId: 'team',
+          origins,
+        },
+        sender,
+      );
+      expect(chrome.permissions.request).toHaveBeenCalledExactlyOnceWith({ origins });
+      expect(install).not.toHaveBeenCalled();
+      approve(true);
+      await installation;
+      expect(install).toHaveBeenCalledExactlyOnceWith(config.presets!.team.source, 'team', origins);
+    },
+  );
+
+  it('checks the session owner and selected preset before opening the Chrome prompt', async () => {
+    const { service } = make();
+    const sender = settingsSender();
+    const { session } = await service.openPresetSelector(sender, true);
+    chrome.permissions.request = vi.fn().mockResolvedValue(true);
+    const request = {
+      ...internal('grant', session),
+      presetId: 'team',
+      origins: config.presets!.team.origins,
+    };
+    await expect(
+      service.internal(request, { ...sender, documentId: 'another-settings-view' }),
+    ).rejects.toThrow('INSTALLATION_VIEW_REQUIRED');
+    await expect(
+      service.internal({ ...request, origins: ['https://unlisted.example.test/*'] }, sender),
+    ).rejects.toThrow('INSTALLATION_SELECTION_CHANGED');
+    await service.internal({ ...internal('selectPreset', session), presetId: 'tools' }, sender);
+    await expect(service.internal(request, sender)).rejects.toThrow(
+      'INSTALLATION_SELECTION_CHANGED',
+    );
+    expect(chrome.permissions.request).not.toHaveBeenCalled();
+  });
+
+  it('restores a session after the worker restarts and prompts on the next click', async () => {
+    const sender = settingsSender();
+    const { session } = await make().service.openPresetSelector(sender, true);
+    const { service } = make();
+    chrome.permissions.request = vi.fn().mockResolvedValue(false);
+    const request = {
+      ...internal('grant', session),
+      presetId: 'team',
+      origins: config.presets!.team.origins,
+    };
+    await expect(service.internal(request, sender)).rejects.toThrow(
+      'INSTALLATION_PERMISSION_RETRY',
+    );
+    expect(chrome.permissions.request).not.toHaveBeenCalled();
+    await expect(service.internal(request, sender)).rejects.toThrow(
+      'INSTALLATION_PERMISSION_REQUIRED',
+    );
+    expect(chrome.permissions.request).toHaveBeenCalledExactlyOnceWith({
+      origins: request.origins,
+    });
+  });
+});
+
+describe('default preset on first install', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json(config)),
+    );
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('goes directly to preset confirmation when the custom website is already allowed', async () => {
+    const { service, install } = make();
+    agent.allowed = [];
+    await service.installDefaultForGuide(topUrl);
+
+    const [session] = Object.values(records);
+    const view = await service.internal(internal('inspect', session.id), uiSender(session.id));
+    expect(view).toMatchObject({
+      presetId: 'team',
+      needsInstall: true,
+      missingAuthorization: config.presets!.team.origins,
+    });
+    expect(view).not.toHaveProperty('needsSourceConfirmation');
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(install).not.toHaveBeenCalled();
+  });
+
+  it('installs the first preset from the custom guide catalog when permissions are already granted', async () => {
+    const { service, install } = make();
+    config.presets!.other = { ...config.presets!.team, label: 'Other' };
+
+    await service.installDefaultForGuide(topUrl);
+
+    const preset = config.presets!.team;
+    expect(fetch).toHaveBeenCalledExactlyOnceWith(
+      new URL('public-installation.json', topUrl).href,
+      expect.objectContaining({ credentials: 'omit', redirect: 'error' }),
+    );
+    expect(install).toHaveBeenCalledExactlyOnceWith(preset.source, 'team', preset.origins);
+    expect(chrome.tabs.create).not.toHaveBeenCalled();
+    expect(Object.keys(records)).toEqual([]);
+  });
+
+  it('requests catalog access before reading and installs the default after preset approval', async () => {
+    const { service, install } = make();
+    grants = false;
+    agent.allowed = [];
+
+    await service.installDefaultForGuide(topUrl);
+
+    expect(install).not.toHaveBeenCalled();
+    expect(chrome.tabs.create).toHaveBeenCalledTimes(1);
+    expect(chrome.windows.create).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'popup', width: 520, height: 560, focused: true }),
+    );
+    expect(chrome.tabs.update).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.objectContaining({ active: true }),
+    );
+    const [session] = Object.values(records);
+    const sender = uiSender(session.id);
+    const catalogUrl = new URL('public-installation.json', topUrl).href;
+    await expect(service.internal(internal('inspect', session.id), sender)).resolves.toMatchObject({
+      needsSourceConfirmation: true,
+      missingOrigins: [`${new URL(topUrl).origin}/*`],
+      sourceRequest: { catalogUrl, requestingPage: topUrl },
+    });
+    expect(fetch).not.toHaveBeenCalled();
+
+    grants = true;
+    await expect(
+      service.internal(internal('confirmSource', session.id), sender),
+    ).resolves.toMatchObject({
+      presetId: 'team',
+      missingAuthorization: config.presets!.team.origins,
+      needsInstall: true,
+    });
+    expect(install).not.toHaveBeenCalled();
+    expect(agent.allowed).toEqual([]);
+    await service.internal(internal('install', session.id, true), sender);
+    expect(install).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(fetch).mock.calls.map(([url]) => url)).toEqual([catalogUrl, catalogUrl]);
+  });
+
+  it('uses only the custom catalog when it is unavailable or has no default', async () => {
+    const { service, install } = make();
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await expect(service.installDefaultForGuide(topUrl)).rejects.toThrow('Failed to fetch');
+    vi.mocked(fetch).mockResolvedValueOnce(Response.json({ ...config, presets: {} }));
+    await expect(service.installDefaultForGuide(topUrl)).rejects.toThrow(
+      'INSTALLATION_PRESET_UNAVAILABLE',
+    );
+
+    const catalogUrl = new URL('public-installation.json', topUrl).href;
+    expect(vi.mocked(fetch).mock.calls.map(([url]) => url)).toEqual([catalogUrl, catalogUrl]);
+    expect(install).not.toHaveBeenCalled();
+    expect(chrome.tabs.create).not.toHaveBeenCalled();
+  });
+
+  it.each(['browser', 'native', 'concurrent browser'])(
+    'preserves an existing %s selection',
+    async existing => {
+      if (existing === 'browser') selection.activeRevision = 'a'.repeat(64);
+      const install = vi.fn();
+      vi.mocked(fetch).mockImplementationOnce(async () => {
+        if (existing === 'concurrent browser') selection.activeRevision = 'b'.repeat(64);
+        return Response.json(config);
+      });
+      const service = createInstallationService({
+        registry: {
+          captureInstallationSelection: async () => structuredClone(selection),
+        } as any,
+        install,
+        native: {
+          capture: async () => ({
+            protocol: 1,
+            selection: existing === 'native' ? 'c'.repeat(64) : null,
+          }),
+          request: vi.fn(),
+        },
+      });
+
+      const attempt = service.installDefaultForGuide(topUrl);
+      if (existing === 'concurrent browser')
+        await expect(attempt).rejects.toThrow('INSTALLATION_SELECTION_CHANGED');
+      else await attempt;
+
+      expect(fetch).toHaveBeenCalledTimes(existing === 'concurrent browser' ? 1 : 0);
+      expect(install).not.toHaveBeenCalled();
+      expect(chrome.tabs.create).not.toHaveBeenCalled();
+    },
+  );
 });

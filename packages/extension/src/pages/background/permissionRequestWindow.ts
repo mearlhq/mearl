@@ -1,4 +1,9 @@
-export async function openPermissionRequestWindow(url: string, width: number, height: number) {
+export async function openPermissionRequestWindow(
+  url: string,
+  width: number,
+  height: number,
+  focused = true,
+) {
   const lastWindow = await chrome.windows
     .getLastFocused({ windowTypes: ['normal'] })
     .catch(() => undefined);
@@ -18,7 +23,7 @@ export async function openPermissionRequestWindow(url: string, width: number, he
     height,
     left,
     top,
-    focused: true,
+    focused,
     state: 'normal',
   });
 }

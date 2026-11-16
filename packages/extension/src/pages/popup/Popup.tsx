@@ -24,6 +24,7 @@ import { AccountBadge } from '../panel/components/header/AccountBadge';
 import { Banner } from '../panel/components/header/Banner';
 import { QuickSettingsMenu } from '../panel/components/header/QuickSettingsMenu';
 import { PermissionDialog } from './components/PermissionDialog';
+import { PresetInstallDialog } from './components/PresetInstallDialog';
 import { UrlQueryPresetButton } from './components/UrlQueryPresetButton';
 import { DeviceCaptureEntry } from './components/DeviceCaptureEntry';
 import { Toolbox, readStoredToolboxSelection } from './components/Toolbox';
@@ -1098,6 +1099,7 @@ export const Popup: FC<PopupProps> = ({ isSidePanel = false, bootstrapConfig, bo
       )}
 
       <PermissionDialog />
+      <PresetInstallDialog />
       <ToastContainer />
     </div>
   );

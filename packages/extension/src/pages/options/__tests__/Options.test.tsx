@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Options from '../Options';
 import { ToastContainer } from '../../panel/components/ToastContainer';
 import { PRESET_MANAGEMENT_ACTION } from '../../../shared/presetAutoUpdate';
+import { INSTALLATION_ACTION } from '../../../shared/installation';
 import {
   DEFAULT_TAB_PAGE_OVERRIDES,
   TAB_PAGE_OVERRIDES_GET_ACTION,
@@ -83,29 +84,69 @@ describe('Options settings', () => {
     );
   });
 
-  it.each([undefined, 'https://guide.example.test/installed.html'])(
-    'offers the configured install page for an empty preset list (%s)',
-    async installUrl => {
-      window.history.replaceState({}, '', '?iframe=1&tabId=7');
+  it.each([
+    { context: '?iframe=1&tabId=7', available: true },
+    { context: '', available: true },
+    { context: '?iframe=1&tabId=7', available: false },
+  ])(
+    'opens the preset installation dialog in settings ($context, $available)',
+    async ({ context, available }) => {
+      window.history.replaceState({}, '', '/' + context);
       const previous = vi.mocked(chrome.runtime.sendMessage).getMockImplementation()!;
       vi.mocked(chrome.runtime.sendMessage).mockImplementation(async (message, ...args) => {
         const request = message as { action?: string; operation?: string };
+        if (request.action === INSTALLATION_ACTION) {
+          return {
+            success: true,
+            data: {
+              session: 'preset-selector',
+              presetId: 'team',
+              label: 'Team',
+              source: 'https://example.test/team.json',
+              origins: [],
+              missingOrigins: [],
+              missingAuthorization: [],
+              needsInstall: true,
+              presetChoices: [{ id: 'team', label: 'Team' }],
+            },
+          };
+        }
         if (request.action !== PRESET_MANAGEMENT_ACTION) return previous(message, ...args);
-        return { success: true, data: request.operation === 'status' ? [] : installUrl };
+        if (request.operation === 'status') return { success: true, data: [] };
+        if (request.operation === 'install-available') return { success: true, data: true };
+        return available
+          ? { success: true, data: { session: 'preset-selector', inline: true } }
+          : { success: false, error: 'INSTALLATION_PRESET_UNAVAILABLE' };
       });
-      render(<Options />);
-      if (installUrl) {
-        const link = await screen.findByRole('link', { name: 'presetManagementInstall' });
-        expect(link).toHaveAttribute('href', installUrl);
-        expect(link).toHaveAttribute('target', '_blank');
-      } else {
-        await waitFor(() =>
-          expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
-            action: PRESET_MANAGEMENT_ACTION,
-            operation: 'install-url',
-          }),
+      render(
+        <>
+          <Options />
+          <ToastContainer />
+        </>,
+      );
+      const install = await screen.findByRole('button', { name: 'presetManagementInstall' });
+      fireEvent.click(install);
+      await waitFor(() =>
+        expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+          action: PRESET_MANAGEMENT_ACTION,
+          operation: 'install',
+          inline: true,
+        }),
+      );
+      if (available) {
+        expect(await screen.findByRole('dialog')).toContainElement(
+          await screen.findByRole('button', { name: 'presetInstallConfirmOnce' }),
         );
-        expect(screen.queryByRole('region', { name: 'presetManagementTitle' })).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: 'presetInstallCancel' }));
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+        await waitFor(() => expect(install).toHaveFocus());
+        expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+          action: INSTALLATION_ACTION,
+          operation: 'cancel',
+          session: 'preset-selector',
+        });
+      } else {
+        expect(await screen.findByText('presetManagementNoPresets')).toBeVisible();
       }
     },
   );
@@ -150,7 +191,6 @@ describe('Options settings', () => {
           installed = false;
           return { success: true, data: { ready: true } };
         }
-        if (request.operation === 'install-url') return { success: true, data: undefined };
         return { success: true, data: installed ? [preset] : [] };
       });
       render(
@@ -160,9 +200,10 @@ describe('Options settings', () => {
         </>,
       );
       expect(await screen.findByText(preset.id)).toBeVisible();
+      expect(screen.getByRole('button', { name: 'presetManagementInstall' })).toBeEnabled();
       expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith({
         action: PRESET_MANAGEMENT_ACTION,
-        operation: 'install-url',
+        operation: 'install',
       });
       expect(screen.getByText('v1.0.0')).toBeVisible();
       const updateButton = screen.getByRole('button', { name: 'presetManagementUpdate' });

@@ -11,7 +11,7 @@ describe('installation welcome page', () => {
   });
   afterEach(() => vi.unstubAllGlobals());
   it('opens the public welcome page without depending on network reachability', async () => {
-    await openInstallPage('install');
+    await expect(openInstallPage('install')).resolves.toBeUndefined();
     expect(createTab).toHaveBeenCalledExactlyOnceWith({ url: INSTALL_PAGE_URL });
     expect(INSTALL_PAGE_URL).toBe('https://mearlhq.github.io/mearl/installed.html');
     expect(fetchPage).not.toHaveBeenCalled();
@@ -44,9 +44,9 @@ describe('installation welcome page', () => {
             : new TypeError('Failed to fetch'),
         );
 
-      await openCustomPage('install');
-
       const welcome = 'https://team.example.test/mearl/installed.html';
+      await expect(openCustomPage('install')).resolves.toBe(reachable ? welcome : undefined);
+
       expect(fetchPage).toHaveBeenCalledExactlyOnceWith(
         welcome,
         expect.objectContaining({

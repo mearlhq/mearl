@@ -64,4 +64,8 @@ MEARL_WEBSITE_URL=https://team.example.com/mearl/ pnpm --filter @mearl/extension
 
 本地可在 `packages/extension/.env.local` 中设置 `MEARL_WEBSITE_URL`；该文件不提交。发布工作流读取同名 GitHub 仓库变量。进程环境变量优先于本地配置。
 
-首次安装时，扩展向该目录下的 `installed.html` 发送不带凭据的 `no-cors HEAD` 请求，跟随重定向。五秒内完成请求时打开团队欢迎页，否则打开公网欢迎页。探测不依赖团队官网的 Manifest 主机权限，不读取响应内容或 HTTP 状态；不透明响应也表示网络可达。用户可以在官网手动启用 Preset，或运行 setup 命令。
+首次安装时，扩展向该目录下的 `installed.html` 发送不带凭据的 `no-cors HEAD` 请求，跟随重定向。五秒内完成请求时打开团队欢迎页，否则打开公网欢迎页。探测不依赖团队官网的 Manifest 主机权限，不读取响应内容或 HTTP 状态；不透明响应也表示网络可达。
+
+团队欢迎页打开后，如果浏览器与可连接的本机服务均未选择 Preset，扩展从该欢迎页同目录下的 `public-installation.json` 选择第一项。读取目录需要团队官网的 Chrome 站点权限。权限不足时，扩展在安装弹窗中请求读取目录或启用所选能力所需的权限。现有权限齐全时，直接安装浏览器组件。用户也可以在团队官网手动选择 Preset，或运行 setup 命令。
+
+团队构建在 Manifest 中声明配置官网的 HTTPS 站点权限。Chrome 已授予该权限时，首次自动安装和从该欢迎页手动启用都直接读取该站的能力目录。手动启用仍需在弹窗确认，所选能力的其他站点权限按需申请。

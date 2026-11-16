@@ -1,12 +1,22 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi, type Mock } from 'vitest';
 import { Installation } from '../Installation';
-import { setupPresetCommand, type InstallationView } from '../../../shared/installation';
-vi.mock('../../panel/utils/i18n', () => ({ t: (key: string) => key }));
+import {
+  setupPresetCommand,
+  type InstallationPreview,
+  type InstallationView,
+} from '../../../shared/installation';
+vi.mock('../../panel/utils/i18n', () => ({
+  t: (key: string) => key,
+  getCurrentLanguage: () => 'zh_CN',
+}));
 let state: InstallationView;
-let send: ReturnType<typeof vi.fn>;
+let preview: InstallationPreview | undefined;
+type SendInstallationMessage = (input: { operation: string }) => Promise<unknown>;
+let send: Mock<SendInstallationMessage>;
 afterEach(() => vi.unstubAllGlobals());
 beforeEach(() => {
+  preview = undefined;
   state = {
     session: 'test',
     presetId: 'team',
@@ -19,14 +29,15 @@ beforeEach(() => {
     needsInstall: true,
     localComponentCount: 1,
   };
-  send = vi.fn(async input => ({
+  send = vi.fn<SendInstallationMessage>(async input => ({
     success: true,
     data:
       input.operation === 'inspect'
         ? structuredClone(state)
         : { ...state, browserReady: true, needsInstall: false },
   }));
-  chrome.runtime.sendMessage = send as any;
+  chrome.runtime.sendMessage = (async (input: { operation: string }) =>
+    input.operation === 'preview' ? { success: true, data: preview } : send(input)) as any;
   chrome.permissions = { request: vi.fn(async () => true) } as any;
 });
 it('restarts an expired automatic view and navigates to its fresh session', async () => {
@@ -101,7 +112,7 @@ it('requests missing Chrome scopes directly during the click and retains permiss
 it('authorizes only Agent scopes without opening an unnecessary Chrome prompt', async () => {
   state.missingAuthorization = state.origins;
   render(<Installation />);
-  fireEvent.click(await screen.findByText('presetInstallAllow'));
+  fireEvent.click(await screen.findByText('presetInstallConfirmOnce'));
   await screen.findByText('presetInstallBrowserReady');
   expect(chrome.permissions.request).not.toHaveBeenCalled();
 });
@@ -163,6 +174,78 @@ it('does not automatically install an accepted website source after refreshing i
   render(<Installation />);
   await screen.findByText('presetInstallConfirmOnce');
   expect(send.mock.calls.map(([message]) => message.operation)).toEqual(['inspect']);
+});
+
+it('shows the selected preset purpose and keeps the source links collapsed', async () => {
+  state.sourceRequest = {
+    catalogUrl: 'https://example.test/catalog.json',
+    requestingPage: 'https://example.test/installed.html',
+  };
+  preview = {
+    purpose: { en: 'Inspect requests', zh_CN: '检查接口请求' },
+    appProfileCount: 0,
+    packageCount: 1,
+    skillCount: 0,
+    providerCount: 0,
+  };
+
+  render(<Installation />);
+
+  expect(await screen.findByText('检查接口请求')).toBeVisible();
+  const source = screen.getByText(state.sourceRequest.catalogUrl).closest('details');
+  expect(source).not.toHaveAttribute('open');
+  expect(screen.getByRole('button', { name: 'presetInstallConfirmOnce' })).toBeVisible();
+});
+
+it('updates the preview and requests permissions for the preset selected in the popup', async () => {
+  state.presetChoices = [
+    { id: 'team', label: 'Team' },
+    { id: 'tools', label: 'Tools' },
+  ];
+  const origins = ['https://tools.example.test/*'];
+  send.mockImplementation(async input => {
+    if (input.operation === 'selectPreset') {
+      state = { ...state, presetId: 'tools', label: 'Tools', origins, missingOrigins: origins };
+      preview = {
+        purpose: { en: 'Replay requests' },
+        appProfileCount: 0,
+        packageCount: 1,
+        skillCount: 0,
+        providerCount: 0,
+      };
+    }
+    return {
+      success: true,
+      data:
+        input.operation === 'install'
+          ? { ...state, needsInstall: false, browserReady: true }
+          : structuredClone(state),
+    };
+  });
+  render(<Installation />);
+
+  const team = await screen.findByRole('button', { name: 'Team' });
+  const tools = screen.getByRole('button', { name: 'Tools' });
+  expect(team).toHaveAttribute('aria-pressed', 'true');
+  expect(tools).toHaveAttribute('aria-pressed', 'false');
+  fireEvent.click(tools);
+  expect(await screen.findByText('Replay requests')).toBeVisible();
+  expect(team).toHaveAttribute('aria-pressed', 'false');
+  expect(tools).toHaveAttribute('aria-pressed', 'true');
+  expect(chrome.permissions.request).not.toHaveBeenCalled();
+  expect(send.mock.calls.map(([message]) => message.operation)).toEqual([
+    'inspect',
+    'selectPreset',
+  ]);
+
+  fireEvent.click(screen.getByRole('button', { name: 'presetInstallAllow' }));
+  expect(chrome.permissions.request).toHaveBeenCalledWith({ origins });
+  await screen.findByText('presetInstallBrowserReady');
+  expect(send.mock.calls.at(-1)![0]).toMatchObject({
+    operation: 'install',
+    presetId: 'tools',
+    authorize: true,
+  });
 });
 it.each([
   [

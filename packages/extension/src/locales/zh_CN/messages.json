@@ -3167,34 +3167,37 @@
     "message": "Skill 管理工具已变更，正在刷新目录，请重新选择后安装。"
   },
   "presetInstallTitle": {
-    "message": "安装 Preset"
+    "message": "启用 Mearl 扩展能力"
   },
-  "presetInstallSourceNotice": {
-    "message": "此网站未预先配置为安装来源。以下授权仅用于本次安装，不会将网站加入自动更新信任目录。"
+  "presetInstallNamedTitle": {
+    "message": "启用「$1」"
+  },
+  "presetInstallChoose": {
+    "message": "选择能力配置"
   },
   "presetInstallSourceTitle": {
-    "message": "确认安装来源"
+    "message": "查看安装来源"
   },
   "presetInstallRequestingPage": {
     "message": "请求网站"
   },
   "presetInstallCatalogSource": {
-    "message": "Preset 目录"
+    "message": "能力目录"
   },
   "presetInstallPresetSource": {
-    "message": "Preset 来源"
+    "message": "能力配置"
   },
   "presetInstallReadSourceHint": {
-    "message": "确认来源后读取 Preset，下一步会显示名称和所需站点权限。"
+    "message": "先允许 Mearl 读取此站点的安装配置。接下来可以查看要启用的能力和所需权限。"
   },
   "presetInstallReadSource": {
-    "message": "继续，读取 Preset"
+    "message": "读取安装配置"
   },
   "presetInstallConfirmHint": {
-    "message": "请确认 Preset 来源和所需站点权限。本机组件由已连接的 Mearl 本地服务安装，站点权限由浏览器另行确认。"
+    "message": "确认后，Mearl 会安装并启用这套能力。"
   },
   "presetInstallConfirmOnce": {
-    "message": "确认并安装 Preset"
+    "message": "启用能力"
   },
   "presetInstallCancel": {
     "message": "取消"
@@ -3226,20 +3229,41 @@
   "presetInstallSourceChanged": {
     "message": "请求网站或 Preset 来源不匹配。请返回原网站重新发起安装。"
   },
-  "presetInstallDescription": {
-    "message": "安装后可在 Mearl 工具和调试界面中使用。"
+  "presetInstallPurposeTitle": {
+    "message": "启用后可以使用"
+  },
+  "presetInstallPreviewApps": {
+    "message": "$1 种 App 模拟"
+  },
+  "presetInstallPreviewPackages": {
+    "message": "$1 个能力包"
+  },
+  "presetInstallPreviewSkills": {
+    "message": "$1 项本机 Skill"
+  },
+  "presetInstallPreviewProviders": {
+    "message": "$1 个浏览器接入方式"
+  },
+  "presetInstallSiteAccess": {
+    "message": "所需站点权限（$1）"
   },
   "presetInstallLoading": {
     "message": "正在读取安装信息…"
   },
+  "presetInstallAuthorizing": {
+    "message": "请在 Chrome 提示中确认站点权限…"
+  },
   "presetInstallWorking": {
-    "message": "正在校验并安装 Preset…"
+    "message": "正在安装所选能力…"
   },
   "presetInstallPermissions": {
-    "message": "启用这些能力需要访问以下站点。点击后由浏览器完成授权。"
+    "message": "启用这套能力需要站点权限，继续后请在 Chrome 提示中选择「允许」。"
   },
   "presetInstallAllow": {
-    "message": "允许并启用"
+    "message": "授权并启用"
+  },
+  "presetInstallPermissionRetry": {
+    "message": "请再次点击授权按钮继续。"
   },
   "presetInstallPermissionFailed": {
     "message": "浏览器尚未允许所需站点。可以重新授权后继续，当前配置已保留。"
@@ -3363,6 +3387,12 @@
   },
   "presetManagementInstall": {
     "message": "安装"
+  },
+  "presetManagementNoPresets": {
+    "message": "安装目录中暂无可用的能力配置。"
+  },
+  "presetManagementOpenFailed": {
+    "message": "暂时无法打开安装弹窗，请重试。"
   },
   "presetManagementLocal": {
     "message": "含本机组件"

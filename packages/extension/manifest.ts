@@ -142,6 +142,7 @@ const manifest: ManifestV3Export = {
     'https://skills.sh/*',
     'https://api.github.com/*',
     installationOrigin,
+    ...(customWebsite ? [`https://${customWebsite.hostname}/*`] : []),
   ],
   optional_host_permissions: ['<all_urls>'],
 };

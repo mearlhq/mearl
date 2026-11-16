@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, X } from 'lucide-react';
 import type { PresetUninstallResult } from '@mearl/preset/installation';
+import { BROWSER_REQUEST_UI_CHANGED } from '../../../shared/browserRequestUi';
+import type { InstallationOpening } from '../../../shared/installation';
 import {
   PRESET_MANAGEMENT_ACTION,
   type InstalledPreset,
@@ -8,12 +11,17 @@ import {
 } from '../../../shared/presetAutoUpdate';
 import { t } from '../../panel/utils/i18n';
 import { showToast } from '../../panel/utils/toast';
+import { Installation } from '../../installation/Installation';
 import { Button } from './Button';
 
-async function request<T>(operation: string, preset?: InstalledPreset): Promise<T> {
+async function request<T>(
+  operation: string,
+  { preset, inline }: { preset?: InstalledPreset; inline?: boolean } = {},
+): Promise<T> {
   const response = await chrome.runtime.sendMessage({
     action: PRESET_MANAGEMENT_ACTION,
     operation,
+    ...(inline !== undefined ? { inline } : {}),
     ...(preset && {
       browserRevision: preset.browserRevision,
       nativeRevision: preset.nativeRevision,
@@ -61,25 +69,48 @@ function showUninstallResult({ ready, blocker }: PresetUninstallResult) {
   }
 }
 
+function installationDialogContainer() {
+  // The settings iframe shares the extension origin with the Popup.
+  try {
+    return window.parent.document.body ?? document.body;
+  } catch {
+    return document.body;
+  }
+}
+
 export function InstalledPresets() {
   const [presets, setPresets] = useState<InstalledPreset[]>();
-  const [installUrl, setInstallUrl] = useState<string>();
+  const [canInstall, setCanInstall] = useState(false);
   const [selected, setSelected] = useState<InstalledPreset>();
+  const [installationSession, setInstallationSession] = useState<string>();
+  const installTrigger = useRef<HTMLButtonElement | null>(null);
   const [pending, setPending] = useState<{
-    operation: 'update' | 'uninstall';
+    operation: 'install' | 'update' | 'uninstall';
     preset?: InstalledPreset;
   }>();
 
   useEffect(() => {
-    let active = true;
-    void request<InstalledPreset[]>('status').then(
-      result => {
-        if (active && Array.isArray(result)) setPresets(result);
-      },
-      () => {},
-    );
+    let mounted = true;
+    let version = 0;
+    const refresh = () => {
+      const current = ++version;
+      void request<InstalledPreset[]>('status').then(
+        result => {
+          if (mounted && current === version && Array.isArray(result)) setPresets(result);
+        },
+        () => {},
+      );
+    };
+    const onMessage = (message: { action?: string }) => {
+      if (message?.action === BROWSER_REQUEST_UI_CHANGED) refresh();
+    };
+    refresh();
+    window.addEventListener('focus', refresh);
+    chrome.runtime.onMessage.addListener(onMessage);
     return () => {
-      active = false;
+      mounted = false;
+      window.removeEventListener('focus', refresh);
+      chrome.runtime.onMessage.removeListener(onMessage);
     };
   }, []);
 
@@ -87,16 +118,45 @@ export function InstalledPresets() {
   useEffect(() => {
     if (!isEmpty) return;
     let active = true;
-    void request<string | undefined>('install-url').then(
-      url => {
-        if (active) setInstallUrl(url);
+    void request<boolean>('install-available').then(
+      available => {
+        if (active) setCanInstall(available === true);
       },
-      () => {},
+      () => {
+        if (active) setCanInstall(false);
+      },
     );
     return () => {
       active = false;
     };
   }, [isEmpty]);
+
+  useLayoutEffect(() => {
+    if (installationSession) return;
+    installTrigger.current?.focus({ preventScroll: true });
+    installTrigger.current = null;
+  }, [installationSession]);
+
+  async function openInstall(trigger: HTMLButtonElement) {
+    setPending({ operation: 'install' });
+    try {
+      const opened = await request<InstallationOpening>('install', { inline: true });
+      if (opened.inline) {
+        installTrigger.current = trigger;
+        setInstallationSession(opened.session);
+      }
+    } catch (error) {
+      const unavailable =
+        error instanceof Error && error.message.includes('INSTALLATION_PRESET_UNAVAILABLE');
+      if (!unavailable) console.warn('[Installation] Could not open the preset selector', error);
+      showToast(
+        unavailable ? t('presetManagementNoPresets') : t('presetManagementOpenFailed'),
+        'error',
+      );
+    } finally {
+      setPending(undefined);
+    }
+  }
 
   async function manage(operation: 'update' | 'uninstall', preset?: InstalledPreset) {
     setPending({ operation, preset });
@@ -105,7 +165,7 @@ export function InstalledPresets() {
       if (operation === 'update') {
         showUpdateResult(await request<PresetAutoUpdateResult | undefined>('update'));
       } else {
-        showUninstallResult(await request<PresetUninstallResult>('uninstall', preset));
+        showUninstallResult(await request<PresetUninstallResult>('uninstall', { preset }));
       }
     } catch {
       showToast(
@@ -121,9 +181,38 @@ export function InstalledPresets() {
     }
   }
 
-  if (!presets?.length) {
-    if (!isEmpty || !installUrl) return null;
-    return (
+  if (!presets || (isEmpty && !canInstall && !installationSession)) return null;
+  const installer =
+    installationSession &&
+    createPortal(
+      <Installation
+        key={installationSession}
+        embeddedSession={installationSession}
+        onClose={() => {
+          setInstallationSession(undefined);
+          void request<InstalledPreset[]>('status')
+            .then(result => {
+              if (Array.isArray(result)) setPresets(result);
+            })
+            .catch(() => {});
+        }}
+      />,
+      installationDialogContainer(),
+    );
+  const installButton = (
+    <Button
+      type="button"
+      size="sm"
+      className="min-w-14 shrink-0"
+      disabled={Boolean(pending || selected)}
+      loading={pending?.operation === 'install'}
+      onClick={event => void openInstall(event.currentTarget)}
+    >
+      {t('presetManagementInstall')}
+    </Button>
+  );
+  const management =
+    presets.length === 0 ? (
       <section
         id="installed-presets"
         aria-label={t('presetManagementTitle')}
@@ -135,109 +224,106 @@ export function InstalledPresets() {
           </h2>
           <p className="text-xs text-text-secondary">{t('presetManagementDescription')}</p>
         </div>
-        <a
-          href={installUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="min-w-14 shrink-0 rounded border border-border bg-bg-primary px-2 py-0.5 text-center text-xs text-text-primary transition-colors hover:border-blue-400"
-        >
-          {t('presetManagementInstall')}
-        </a>
+        {installButton}
       </section>
-    );
-  }
-
-  return (
-    <section id="installed-presets" className="space-y-3" aria-label={t('presetManagementTitle')}>
-      {presets.map((preset, index) => (
-        <div
-          key={preset.nativeRevision ?? preset.browserRevision}
-          className="rounded border border-border bg-bg-secondary p-4"
-        >
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <h2 className="mb-1.5 truncate text-xs font-medium text-text-primary">
-                {index === 0 ? t('presetManagementTitle') : preset.id}
-              </h2>
-              <div className="flex items-baseline gap-x-1.5 text-xs text-text-secondary">
-                {index === 0 && (
-                  <span className="max-w-[50%] shrink-0 truncate" title={preset.id}>
-                    {preset.id}
+    ) : (
+      <section id="installed-presets" className="space-y-3" aria-label={t('presetManagementTitle')}>
+        {presets.map((preset, index) => (
+          <div
+            key={preset.nativeRevision ?? preset.browserRevision}
+            className="rounded border border-border bg-bg-secondary p-4"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <h2 className="mb-1.5 truncate text-xs font-medium text-text-primary">
+                  {index === 0 ? t('presetManagementTitle') : preset.id}
+                </h2>
+                <div className="flex items-baseline gap-x-1.5 text-xs text-text-secondary">
+                  {index === 0 && (
+                    <span className="max-w-[50%] shrink-0 truncate" title={preset.id}>
+                      {preset.id}
+                    </span>
+                  )}
+                  {preset.version && <span className="shrink-0">v{preset.version}</span>}
+                  {preset.nativeRevision && (
+                    <span className="min-w-0 truncate" title={t('presetManagementLocal')}>
+                      {t('presetManagementLocal')}
+                    </span>
+                  )}
+                  <span className="min-h-lh min-w-0 flex-1 truncate" title={preset.source}>
+                    {preset.source}
                   </span>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
+                {selected === preset ? (
+                  <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      aria-label={t('presetManagementConfirm')}
+                      title={t('presetManagementConfirm')}
+                      className="relative min-w-14 text-red-600 dark:text-red-400"
+                      onClick={() => void manage('uninstall', preset)}
+                    >
+                      <span className="invisible" aria-hidden="true">
+                        {index === 0 ? t('presetManagementUpdate') : t('presetManagementRemove')}
+                      </span>
+                      <Check className="absolute inset-0 m-auto size-4" aria-hidden="true" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      aria-label={t('cancel')}
+                      title={t('cancel')}
+                      className="relative min-w-14"
+                      onClick={() => setSelected(undefined)}
+                    >
+                      <span className="invisible" aria-hidden="true">
+                        {t('presetManagementRemove')}
+                      </span>
+                      <X className="absolute inset-0 m-auto size-4" aria-hidden="true" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    {index === 0 && installButton}
+                    {index === 0 && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="min-w-14"
+                        disabled={Boolean(pending || selected)}
+                        loading={pending?.operation === 'update'}
+                        onClick={() => void manage('update')}
+                      >
+                        {t('presetManagementUpdate')}
+                      </Button>
+                    )}
+                    {preset.canUninstall && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="min-w-14"
+                        disabled={Boolean(pending || selected)}
+                        loading={pending?.preset === preset}
+                        onClick={() => setSelected(preset)}
+                      >
+                        {t('presetManagementRemove')}
+                      </Button>
+                    )}
+                  </>
                 )}
-                {preset.version && <span className="shrink-0">v{preset.version}</span>}
-                {preset.nativeRevision && (
-                  <span className="min-w-0 truncate" title={t('presetManagementLocal')}>
-                    {t('presetManagementLocal')}
-                  </span>
-                )}
-                <span className="min-h-lh min-w-0 flex-1 truncate" title={preset.source}>
-                  {preset.source}
-                </span>
               </div>
             </div>
-            <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
-              {selected === preset ? (
-                <>
-                  <Button
-                    type="button"
-                    size="sm"
-                    aria-label={t('presetManagementConfirm')}
-                    title={t('presetManagementConfirm')}
-                    className="relative min-w-14 text-red-600 dark:text-red-400"
-                    onClick={() => void manage('uninstall', preset)}
-                  >
-                    <span className="invisible" aria-hidden="true">
-                      {index === 0 ? t('presetManagementUpdate') : t('presetManagementRemove')}
-                    </span>
-                    <Check className="absolute inset-0 m-auto size-4" aria-hidden="true" />
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    aria-label={t('cancel')}
-                    title={t('cancel')}
-                    className="relative min-w-14"
-                    onClick={() => setSelected(undefined)}
-                  >
-                    <span className="invisible" aria-hidden="true">
-                      {t('presetManagementRemove')}
-                    </span>
-                    <X className="absolute inset-0 m-auto size-4" aria-hidden="true" />
-                  </Button>
-                </>
-              ) : (
-                <>
-                  {index === 0 && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="min-w-14"
-                      disabled={Boolean(pending || selected)}
-                      loading={pending?.operation === 'update'}
-                      onClick={() => void manage('update')}
-                    >
-                      {t('presetManagementUpdate')}
-                    </Button>
-                  )}
-                  {preset.canUninstall && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="min-w-14"
-                      disabled={Boolean(pending || selected)}
-                      loading={pending?.preset === preset}
-                      onClick={() => setSelected(preset)}
-                    >
-                      {t('presetManagementRemove')}
-                    </Button>
-                  )}
-                </>
-              )}
-            </div>
           </div>
-        </div>
-      ))}
-    </section>
+        ))}
+      </section>
+    );
+  return (
+    <>
+      {management}
+      {installer}
+    </>
   );
 }
