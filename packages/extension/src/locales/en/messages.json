@@ -838,8 +838,7 @@
   "deviceSimulationEnableFromPage": { "message": "Enable app simulation" },
   "deviceSimulationDisableFromPage": { "message": "Disable app simulation" },
   "deviceSimulationNoApp": { "message": "No app" },
-  "deviceSimulationDisableApp": { "message": "Turn off app simulation" },
-  "deviceSimulationDisable": { "message": "Turn off device simulation" },
+  "deviceSimulationDisable": { "message": "Turn off" },
   "devicePreviewCapturing": { "message": "Capturing" },
   "devicePreviewCaptureUnavailable": { "message": "Capture unavailable" },
   "devicePreviewPanelResize": { "message": "Resize debug panel" },
@@ -2169,11 +2168,12 @@
   "hostPermissionGrant": {
     "message": "Grant this site"
   },
-  "simulationSitePermissionTitle": { "message": "Site access needed for emulation" },
+  "simulationSitePermissionTitle": { "message": "Site access for emulation" },
   "simulationSitePermissionDescription": {
-    "message": "Allow access to keep using emulation on this site."
+    "message": "Allow site access to keep emulation on."
   },
-  "simulationSitePermissionSkip": { "message": "Continue without emulation" },
+  "simulationSitePermissionAllow": { "message": "Allow this site" },
+  "simulationSitePermissionSkip": { "message": "Skip emulation" },
   "simulationSitePermissionContinueFailed": {
     "message": "Could not continue to the site. Please try again."
   },

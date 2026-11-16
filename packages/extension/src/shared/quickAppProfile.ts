@@ -22,37 +22,35 @@ export const QUICK_DEVICE_PHONE_FRAME_SET_ACTION = 'quickDevicePhoneFrameSet';
 export const QUICK_SIMULATION_AUTO_RULE_GET_ACTION = 'quickSimulationAutoRuleGet';
 export const QUICK_SIMULATION_AUTO_RULE_SET_ACTION = 'quickSimulationAutoRuleSet';
 
-export const QUICK_DEVICE_PRESET_NAMES = [
-  'ios-adaptive',
-  'android-adaptive',
-  'iphone-17-pro',
-  'iphone-17e',
-  'ipad-mini-a17-pro',
-  'pixel-11',
-  'galaxy-s26',
-  'pura-x-max',
-  'iphone-duo-folded',
-  'iphone-duo-unfolded',
-] as const;
+export const QUICK_DEVICE_PRESET_GROUPS = [
+  { adaptive: 'android-adaptive', fixed: ['pixel-11', 'galaxy-s26', 'pura-x-max'] },
+  {
+    adaptive: 'ios-adaptive',
+    fixed: [
+      'iphone-17-pro',
+      'iphone-17e',
+      'ipad-mini-a17-pro',
+      'iphone-duo-folded',
+      'iphone-duo-unfolded',
+    ],
+  },
+] as const satisfies readonly { adaptive: string; fixed: readonly BrowserDevicePresetName[] }[];
 
-export const QUICK_ADAPTIVE_DEVICE_PRESET_NAMES = ['ios-adaptive', 'android-adaptive'] as const;
+export type QuickFixedDevicePresetName =
+  (typeof QUICK_DEVICE_PRESET_GROUPS)[number]['fixed'][number];
 
-export const QUICK_FIXED_DEVICE_PRESET_NAMES = [
-  'iphone-17-pro',
-  'iphone-17e',
-  'ipad-mini-a17-pro',
-  'pixel-11',
-  'galaxy-s26',
-  'pura-x-max',
-  'iphone-duo-folded',
-  'iphone-duo-unfolded',
-] as const satisfies readonly BrowserDevicePresetName[];
+const QUICK_ADAPTIVE_DEVICE_PRESET_NAMES = QUICK_DEVICE_PRESET_GROUPS.map(group => group.adaptive);
+const QUICK_FIXED_DEVICE_PRESET_NAMES =
+  QUICK_DEVICE_PRESET_GROUPS.flatMap<QuickFixedDevicePresetName>(group => group.fixed);
+const QUICK_DEVICE_PRESET_NAMES = [
+  ...QUICK_ADAPTIVE_DEVICE_PRESET_NAMES,
+  ...QUICK_FIXED_DEVICE_PRESET_NAMES,
+];
 
 export type QuickAppProfileName = AppProfileName;
 export type QuickAppProfileOs = 'ios' | 'android';
 export type QuickDevicePresetName = (typeof QUICK_DEVICE_PRESET_NAMES)[number];
 export type QuickAdaptiveDevicePresetName = (typeof QUICK_ADAPTIVE_DEVICE_PRESET_NAMES)[number];
-export type QuickFixedDevicePresetName = (typeof QUICK_FIXED_DEVICE_PRESET_NAMES)[number];
 export type QuickDeviceOrientation = 'portrait' | 'landscape';
 
 export function getQuickDevicePresetLabel(
@@ -60,16 +58,26 @@ export function getQuickDevicePresetLabel(
   getMessage: (key: string) => string,
 ): string {
   switch (preset) {
-    case 'ios-adaptive': return getMessage('deviceSimulationIosAdaptive');
-    case 'android-adaptive': return getMessage('deviceSimulationAndroidAdaptive');
-    case 'iphone-17-pro': return getMessage('deviceSimulationIphone17Pro');
-    case 'iphone-17e': return getMessage('deviceSimulationIphone17e');
-    case 'ipad-mini-a17-pro': return getMessage('deviceSimulationIpadMiniA17Pro');
-    case 'pixel-11': return getMessage('deviceSimulationPixel11');
-    case 'galaxy-s26': return getMessage('deviceSimulationGalaxyS26');
-    case 'pura-x-max': return getMessage('deviceSimulationPuraXMax');
-    case 'iphone-duo-folded': return getMessage('deviceSimulationIphoneDuoFolded');
-    case 'iphone-duo-unfolded': return getMessage('deviceSimulationIphoneDuoUnfolded');
+    case 'ios-adaptive':
+      return getMessage('deviceSimulationIosAdaptive');
+    case 'android-adaptive':
+      return getMessage('deviceSimulationAndroidAdaptive');
+    case 'iphone-17-pro':
+      return getMessage('deviceSimulationIphone17Pro');
+    case 'iphone-17e':
+      return getMessage('deviceSimulationIphone17e');
+    case 'ipad-mini-a17-pro':
+      return getMessage('deviceSimulationIpadMiniA17Pro');
+    case 'pixel-11':
+      return getMessage('deviceSimulationPixel11');
+    case 'galaxy-s26':
+      return getMessage('deviceSimulationGalaxyS26');
+    case 'pura-x-max':
+      return getMessage('deviceSimulationPuraXMax');
+    case 'iphone-duo-folded':
+      return getMessage('deviceSimulationIphoneDuoFolded');
+    case 'iphone-duo-unfolded':
+      return getMessage('deviceSimulationIphoneDuoUnfolded');
   }
 }
 

@@ -52,7 +52,7 @@ export function SimulationSitePermissionPrompt() {
       <PermissionPrompt
         title={t('simulationSitePermissionTitle')}
         description={t('simulationSitePermissionDescription')}
-        allowLabel={t('agentPermRequestAllow')}
+        allowLabel={t('simulationSitePermissionAllow')}
         dismissLabel={t('simulationSitePermissionSkip')}
         decisionErrorMessage={t('simulationSitePermissionContinueFailed')}
         onBusyChange={value => {

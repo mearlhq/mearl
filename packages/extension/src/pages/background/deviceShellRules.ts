@@ -16,6 +16,7 @@ import {
 import { assertDeviceShellSupported } from '../../shared/chromiumVersion';
 import { markEnvironmentMutation } from './environmentRevisions';
 import { closeDevicePreviewPanel } from './devicePreviewPanel';
+import { getDevicePreviewLocale } from './devicePreviewLocale';
 import { getAppProfileForTab } from './utils/appProfileRules';
 import {
   DEVICE_PREVIEW_PANEL_OPEN,
@@ -232,17 +233,19 @@ export async function getDeviceShellBootstrapHeaderForTab(tabId: number, forDocu
   if (!current) return undefined;
   const { ruleId: _ruleId, ...payload } = current;
   if (forDocument && payload.config.phoneFrame) {
-    const [preferences, tab, profile] = await Promise.all([
-      chrome.storage.local
-        .get([
-          DEVICE_PREVIEW_PANEL_OPEN,
-          DEVICE_PREVIEW_PANEL_WIDTH,
-          DEVICE_PREVIEW_TOOLBAR_COLLAPSED,
-        ])
-        .catch(() => null),
-      chrome.tabs.get(tabId).catch(() => null),
-      getAppProfileForTab(tabId).catch(() => undefined),
-    ]);
+    const [preferences, tab, profile, { language, message, labels: toolbarLabels }] =
+      await Promise.all([
+        chrome.storage.local
+          .get([
+            DEVICE_PREVIEW_PANEL_OPEN,
+            DEVICE_PREVIEW_PANEL_WIDTH,
+            DEVICE_PREVIEW_TOOLBAR_COLLAPSED,
+          ])
+          .catch(() => null),
+        chrome.tabs.get(tabId).catch(() => null),
+        getAppProfileForTab(tabId).catch(() => undefined),
+        getDevicePreviewLocale(),
+      ]);
     if (preferences) {
       const width = preferences[DEVICE_PREVIEW_PANEL_WIDTH];
       const panelOpen = preferences[DEVICE_PREVIEW_PANEL_OPEN];
@@ -258,16 +261,15 @@ export async function getDeviceShellBootstrapHeaderForTab(tabId: number, forDocu
               profile: profile
                 ? {
                     id: profile.profile,
-                    label: labels
-                      ? browserUiText(labels, chrome.i18n.getUILanguage())
-                      : profile.label,
+                    label: labels ? browserUiText(labels, language) : profile.label,
                   }
                 : null,
               preset: {
                 id: preset,
-                label: getQuickDevicePresetLabel(preset, key => chrome.i18n.getMessage(key)),
+                label: getQuickDevicePresetLabel(preset, message),
               },
               orientation: payload.emulation.orientation,
+              labels: toolbarLabels,
             }
           : undefined,
       };

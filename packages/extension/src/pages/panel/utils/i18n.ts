@@ -5,7 +5,7 @@ import { ensureBrowserUiSettings, getBrowserUiSettings } from './browserUiSettin
 let currentLanguage: string | null = null;
 
 // messages 缓存
-let messagesCache: Record<string, any> = {};
+let messagesCache: Record<string, Record<string, { message: string }>> = {};
 
 /**
  * 设置当前语言
@@ -25,7 +25,7 @@ export function getCurrentLanguage(): string {
 /**
  * 加载指定语言的 messages.json
  */
-async function loadMessages(locale: string): Promise<Record<string, any>> {
+export async function loadMessages(locale: string): Promise<Record<string, { message: string }>> {
   if (messagesCache[locale]) {
     return messagesCache[locale];
   }
@@ -51,10 +51,17 @@ async function loadMessages(locale: string): Promise<Record<string, any>> {
 export function t(key: string, substitutions?: string | string[]): string {
   const entry = getBrowserUiSettings().messages?.[key];
   const language = getCurrentLanguage().replace('-', '_');
-  const override = entry && (language.startsWith('zh') ? entry.zh_CN ?? entry.en : entry.en);
+  const override = entry && (language.startsWith('zh') ? (entry.zh_CN ?? entry.en) : entry.en);
   if (override !== undefined) {
-    const values = Array.isArray(substitutions) ? substitutions : substitutions === undefined ? [] : [substitutions];
-    return override.replace(/\$(\d+)/g, (token, index: string) => values[Number(index) - 1] ?? token);
+    const values = Array.isArray(substitutions)
+      ? substitutions
+      : substitutions === undefined
+        ? []
+        : [substitutions];
+    return override.replace(
+      /\$(\d+)/g,
+      (token, index: string) => values[Number(index) - 1] ?? token,
+    );
   }
   // 如果用户设置了语言，从对应的 messages.json 中读取
   if (currentLanguage) {
@@ -65,7 +72,10 @@ export function t(key: string, substitutions?: string | string[]): string {
       // 处理占位符
       if (substitutions) {
         const subs = Array.isArray(substitutions) ? substitutions : [substitutions];
-        message = message.replace(/\$(\d+)/g, (token: string, index: string) => subs[Number(index) - 1] ?? token);
+        message = message.replace(
+          /\$(\d+)/g,
+          (token: string, index: string) => subs[Number(index) - 1] ?? token,
+        );
       }
 
       return message;
@@ -86,7 +96,10 @@ export function getCurrentLocale(): string {
 /**
  * 初始化国际化，加载用户配置的语言
  */
-export async function initI18n(language?: string, options: { localOnly?: boolean } = {}): Promise<void> {
+export async function initI18n(
+  language?: string,
+  options: { localOnly?: boolean } = {},
+): Promise<void> {
   if (!options.localOnly) await ensureBrowserUiSettings().catch(() => {});
   if (language) {
     currentLanguage = language;

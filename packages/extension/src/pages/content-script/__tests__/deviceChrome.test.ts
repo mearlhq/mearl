@@ -397,6 +397,98 @@ describe('Quick device chrome', () => {
     },
   );
 
+  it('updates the open preview toolbar when the extension language changes', async () => {
+    const attachShadow = vi.spyOn(Element.prototype, 'attachShadow');
+    const previousRuntime = chrome.runtime;
+    const sendMessage = vi.fn().mockResolvedValue({
+      success: true,
+      state: {
+        profile: null,
+        profiles: [{ id: 'shop', label: 'Shop' }],
+        preset: 'iphone-duo-folded',
+        presetGroups: [{ fixed: [{ id: 'iphone-duo-folded', label: 'iPhone Duo (Folded)' }] }],
+        orientation: 'portrait',
+        labels: {
+          deviceSimulationApp: 'App',
+          deviceSimulationNoApp: 'No app',
+          deviceSimulationDisable: 'Turn off',
+          devicePreviewToolbar: 'Device toolbar',
+        },
+      },
+    });
+    chrome.runtime = { ...previousRuntime, id: 'fixture', sendMessage };
+    try {
+      manager.destroy();
+      manager = createQuickDeviceChromeManager({
+        previewPanel: {
+          label: 'Debug',
+          resizeLabel: 'Resize',
+          unavailableLabel: 'Unavailable',
+          retryLabel: 'Retry',
+          loadingLabel: 'Loading',
+          toolbarLabel: '设备工具条',
+          initialLayout: {
+            panelOpen: false,
+            toolbar: {
+              profile: null,
+              preset: { id: 'iphone-duo-folded', label: 'iPhone Duo（折叠）' },
+              orientation: 'portrait',
+            },
+          },
+          requestToken: vi.fn().mockResolvedValue(null),
+          url: () => 'about:blank',
+          subscribeReady: () => () => {},
+          loadLayout: async () => ({}),
+          savePanelOpen: vi.fn(),
+          saveWidth: vi.fn(),
+          saveToolbarCollapsed: vi.fn(),
+        },
+      });
+      manager.update({ ...iosConfig, phoneFrame: { width: 402, height: 874 } });
+      const previewRoot = attachShadow.mock.results
+        .map(result => result.value as ShadowRoot)
+        .find(root => root.querySelector('.toolbar-toggle'))!;
+      const selector = previewRoot.querySelector('[aria-controls="device-preview-preset"]');
+      expect(selector).toHaveTextContent('iPhone Duo（折叠）');
+      await vi.waitFor(() => expect(selector).toHaveTextContent('iPhone Duo (Folded)'));
+
+      sendMessage.mockResolvedValue({
+        success: true,
+        state: {
+          profile: null,
+          profiles: [{ id: 'shop', label: '商店' }],
+          preset: 'iphone-duo-folded',
+          presetGroups: [{ fixed: [{ id: 'iphone-duo-folded', label: 'iPhone Duo（折叠）' }] }],
+          orientation: 'portrait',
+          labels: {
+            deviceSimulationApp: '客户端',
+            deviceSimulationNoApp: '无客户端',
+            deviceSimulationDisable: '关闭模拟',
+            devicePreviewToolbar: '设备工具条',
+          },
+        },
+      });
+      const onLanguageChange = vi
+        .mocked(chrome.storage.onChanged.addListener)
+        .mock.calls.at(-1)![0];
+      onLanguageChange({ language: { newValue: 'zh_CN', oldValue: 'en' } }, 'sync');
+
+      await vi.waitFor(() => expect(selector).toHaveTextContent('iPhone Duo（折叠）'));
+      expect(previewRoot.querySelector('[aria-controls="device-preview-app"]')).toHaveTextContent(
+        '无客户端',
+      );
+      expect(
+        previewRoot.querySelector('#device-preview-preset button[value=""]'),
+      ).toHaveTextContent('关闭模拟');
+      expect(previewRoot.querySelector('.toolbar-toggle')).toHaveAttribute(
+        'aria-label',
+        '设备工具条',
+      );
+    } finally {
+      chrome.runtime = previousRuntime;
+    }
+  });
+
   it('opens the preview panel only in wide windows and reuses it after collapsing', async () => {
     let width = 639;
     vi.spyOn(document.documentElement, 'clientWidth', 'get').mockImplementation(() => width);

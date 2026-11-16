@@ -337,7 +337,10 @@ function createPreviewControls(
   divider.setAttribute('aria-orientation', 'vertical');
   divider.setAttribute('aria-label', options.resizeLabel);
   divider.setAttribute('aria-valuemin', String(MIN_PANEL_WIDTH));
-  const toolbar = createDevicePreviewToolbar(initialLayout?.toolbar);
+  const toolbar = createDevicePreviewToolbar(initialLayout?.toolbar, label => {
+    toolbarButton.title = label || options.toolbarLabel;
+    toolbarButton.setAttribute('aria-label', toolbarButton.title);
+  });
   root.append(style, toolbar.element, button, toolbarButton, status, divider);
   let frame: HTMLIFrameElement | null = null;
   let viewer: string | null = null;
@@ -568,6 +571,13 @@ function createPreviewControls(
     showStatus();
   });
   window.addEventListener('message', receivePanelMessage);
+  const onLanguageChange = (
+    changes: Record<string, chrome.storage.StorageChange>,
+    area: string,
+  ) => {
+    if (area === 'sync' && changes.language) void toolbar.refresh();
+  };
+  chrome.storage?.onChanged?.addListener(onLanguageChange);
   resize();
   if (open) void request(true);
   else if (panelOpen === false) void request(false);
@@ -581,6 +591,7 @@ function createPreviewControls(
       destroyed = true;
       window.clearTimeout(loadingTimer);
       window.removeEventListener('message', receivePanelMessage);
+      chrome.storage?.onChanged?.removeListener(onLanguageChange);
       unsubscribeReady();
       removeFrame();
       host.remove();

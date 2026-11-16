@@ -53,8 +53,7 @@ import {
   QUICK_DEVICE_SPLIT_SCREEN_SET_ACTION,
   QUICK_SIMULATION_AUTO_RULE_GET_ACTION,
   QUICK_SIMULATION_AUTO_RULE_SET_ACTION,
-  QUICK_ADAPTIVE_DEVICE_PRESET_NAMES,
-  QUICK_FIXED_DEVICE_PRESET_NAMES,
+  QUICK_DEVICE_PRESET_GROUPS,
   getQuickDevicePresetDefaultOrientation,
   getQuickDevicePresetLabel,
   isQuickAdaptiveDevicePresetName,
@@ -1527,22 +1526,20 @@ export const QuickSettingsMenu: FC<QuickSettingsMenuProps> = ({
                         role="menu"
                         aria-label={t('deviceSimulationMobileDevice')}
                       >
-                        <div className="min-w-32 border-r border-border pr-1">
-                          <div className="mb-1 border-b border-border pb-1">
-                            {renderDevicePresetOption(QUICK_ADAPTIVE_DEVICE_PRESET_NAMES[1])}
+                        {QUICK_DEVICE_PRESET_GROUPS.map(({ adaptive, fixed }, index) => (
+                          <div
+                            key={adaptive}
+                            className={clsx(
+                              'min-w-32',
+                              index === 0 ? 'border-r border-border pr-1' : 'pl-1',
+                            )}
+                          >
+                            <div className="mb-1 border-b border-border pb-1">
+                              {renderDevicePresetOption(adaptive)}
+                            </div>
+                            {fixed.map(renderDevicePresetOption)}
                           </div>
-                          {QUICK_FIXED_DEVICE_PRESET_NAMES.filter(
-                            preset => !preset.startsWith('iphone-') && !preset.startsWith('ipad-'),
-                          ).map(renderDevicePresetOption)}
-                        </div>
-                        <div className="min-w-32 pl-1">
-                          <div className="mb-1 border-b border-border pb-1">
-                            {renderDevicePresetOption(QUICK_ADAPTIVE_DEVICE_PRESET_NAMES[0])}
-                          </div>
-                          {QUICK_FIXED_DEVICE_PRESET_NAMES.filter(
-                            preset => preset.startsWith('iphone-') || preset.startsWith('ipad-'),
-                          ).map(renderDevicePresetOption)}
-                        </div>
+                        ))}
                       </div>
                     </div>
                   </div>

@@ -5,10 +5,15 @@ import {
   isQuickAppProfileName,
   isQuickDevicePresetName,
   normalizeQuickDeviceFitToWindow,
-  QUICK_DEVICE_PRESET_NAMES,
+  QUICK_DEVICE_PRESET_GROUPS,
+  type QuickDevicePresetName,
 } from '../../shared/quickAppProfile';
-import type { QuickDeviceToolbarOperation, QuickDeviceToolbarState } from '../../shared/quickDeviceToolbar';
+import type {
+  QuickDeviceToolbarOperation,
+  QuickDeviceToolbarState,
+} from '../../shared/quickDeviceToolbar';
 import { getAppProfileCatalog } from './appProfileCatalog';
+import { getDevicePreviewLocale } from './devicePreviewLocale';
 import { getDeviceShellForTab } from './deviceShellRules';
 import {
   getQuickDeviceEmulationStateWithGlobalDefault,
@@ -25,7 +30,8 @@ export async function handleQuickDeviceToolbar(
   tabId: number,
   operation?: QuickDeviceToolbarOperation,
 ): Promise<QuickDeviceToolbarState | undefined> {
-  if (!(await getDeviceShellForTab(tabId))?.config.phoneFrame) throw new Error('Device preview is unavailable');
+  if (!(await getDeviceShellForTab(tabId))?.config.phoneFrame)
+    throw new Error('Device preview is unavailable');
   await restoreQuickDeviceEmulationForTab(tabId);
   if (operation?.type === 'phoneFrame') {
     await setQuickDevicePhoneFrame(tabId, false);
@@ -42,11 +48,20 @@ export async function handleQuickDeviceToolbar(
   };
 
   if (operation?.type === 'app') {
-    if (operation.profile !== null && !isQuickAppProfileName(operation.profile)) throw new Error('Invalid client');
-    await setQuickAppSimulationWithAutoRuleSync({ tabId, profile: operation.profile, deviceSelection: selection });
+    if (operation.profile !== null && !isQuickAppProfileName(operation.profile))
+      throw new Error('Invalid client');
+    await setQuickAppSimulationWithAutoRuleSync({
+      tabId,
+      profile: operation.profile,
+      deviceSelection: selection,
+    });
     return;
   }
-  if (operation?.type === 'preset' || operation?.type === 'orientation' || operation?.type === 'shell') {
+  if (
+    operation?.type === 'preset' ||
+    operation?.type === 'orientation' ||
+    operation?.type === 'shell'
+  ) {
     if (operation.type === 'preset') {
       if (operation.preset === null) {
         await setQuickDeviceSimulationWithAutoRuleSync({ tabId, deviceSelection: null });
@@ -55,7 +70,10 @@ export async function handleQuickDeviceToolbar(
       if (!isQuickDevicePresetName(operation.preset)) throw new Error('Invalid device');
       selection.preset = operation.preset;
       selection.orientation = getQuickDevicePresetDefaultOrientation(selection.preset);
-      selection.fitToWindow = normalizeQuickDeviceFitToWindow(selection.preset, device.fixedFitToWindow ?? selection.fitToWindow);
+      selection.fitToWindow = normalizeQuickDeviceFitToWindow(
+        selection.preset,
+        device.fixedFitToWindow ?? selection.fitToWindow,
+      );
       selection.splitScreen = false;
     } else if (operation.type === 'orientation') {
       selection.orientation = selection.orientation === 'portrait' ? 'landscape' : 'portrait';
@@ -67,20 +85,29 @@ export async function handleQuickDeviceToolbar(
   }
 
   if (operation) throw new Error('Invalid toolbar operation');
-  const [profile, { profiles }] = await Promise.all([
+  const [profile, { profiles }, { language, message, labels }] = await Promise.all([
     getAppProfileForTab(tabId),
     getAppProfileCatalog({ refresh: false }),
+    getDevicePreviewLocale(),
   ]);
-  const locale = chrome.i18n.getUILanguage();
+  const localizePreset = (id: QuickDevicePresetName) => ({
+    id,
+    label: getQuickDevicePresetLabel(id, message),
+  });
   return {
     profile: profile?.profile ?? null,
-    profiles: profiles.filter(item => item.available !== false).map(({ id, label, definition }) => ({
-      id, label: definition.labels ? browserUiText(definition.labels, locale) : label,
-    })),
+    profiles: profiles
+      .filter(item => item.available !== false)
+      .map(({ id, label, definition }) => ({
+        id,
+        label: definition.labels ? browserUiText(definition.labels, language) : label,
+      })),
     preset: selection.preset,
-    presets: QUICK_DEVICE_PRESET_NAMES.map(id => ({
-      id, label: getQuickDevicePresetLabel(id, key => chrome.i18n.getMessage(key)),
+    presetGroups: QUICK_DEVICE_PRESET_GROUPS.map(({ adaptive, fixed }) => ({
+      adaptive: localizePreset(adaptive),
+      fixed: fixed.map(localizePreset),
     })),
     orientation: selection.orientation,
+    labels,
   };
 }

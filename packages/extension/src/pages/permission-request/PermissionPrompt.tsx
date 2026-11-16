@@ -115,7 +115,9 @@ export function PermissionPrompt({
             {status === 'requesting-alternative' ? '...' : t('agentPermRequestAllowAll')}
           </button>
         )}
-        <div className={`flex min-w-0 gap-2 ${requestAllSites ? 'ml-auto' : 'flex-1 *:flex-1'}`}>
+        <div
+          className={`flex min-w-0 gap-2 ${requestAllSites ? 'ml-auto flex-wrap justify-end' : 'flex-1 *:flex-1'}`}
+        >
           <button
             type="button"
             onClick={() => {

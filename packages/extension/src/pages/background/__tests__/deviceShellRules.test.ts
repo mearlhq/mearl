@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveEmulationConfig } from '@mearl/browser-core';
 import { getQuickDeviceChromeConfig } from '../../../shared/quickAppProfile';
+import english from '../../../locales/en/messages.json';
+import chinese from '../../../locales/zh_CN/messages.json';
 
 describe('deviceShellRules', () => {
   beforeEach(() => {
@@ -42,7 +44,7 @@ describe('deviceShellRules', () => {
     const { applyDeviceShellForTab, getDeviceShellBootstrapHeaderForTab } =
       await import('../deviceShellRules');
     const tabId = 31;
-    const fixed = resolveEmulationConfig({ enabled: true, preset: 'iphone-17-pro' });
+    const fixed = resolveEmulationConfig({ enabled: true, preset: 'iphone-duo-folded' });
     const storage: { get(keys: string[]): Promise<Record<string, unknown>> } = chrome.storage.local;
     const readPreferences = vi.spyOn(storage, 'get').mockResolvedValue({
       'device-preview-panel-width': 410,
@@ -50,43 +52,62 @@ describe('deviceShellRules', () => {
       'device-preview-toolbar-collapsed': true,
     });
     const previousTabs = chrome.tabs;
-    const previousI18n = chrome.i18n;
+    const previousSync = chrome.storage.sync;
+    const readLanguage = vi.fn().mockResolvedValue({ language: 'en' });
+    chrome.storage.sync = { get: readLanguage } as unknown as typeof chrome.storage.sync;
+    const loadMessages = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async url =>
+        ({
+          json: async () => (String(url).includes('/en/') ? english : chinese),
+        }) as Response,
+    );
     chrome.tabs = {
       get: vi.fn().mockResolvedValue({ width: 1200, height: 848 }),
     } as unknown as typeof chrome.tabs;
-    chrome.i18n = {
-      getMessage: (key: string) => (key === 'deviceSimulationIphone17Pro' ? 'iPhone 17 Pro' : ''),
-    } as typeof chrome.i18n;
     try {
       await applyDeviceShellForTab(
         tabId,
         {
-          ...getQuickDeviceChromeConfig('iphone-17-pro'),
+          ...getQuickDeviceChromeConfig('iphone-duo-folded'),
           phoneFrame: { width: fixed.width, height: fixed.height },
         },
         fixed,
       );
       const decode = (header: { value: string } | undefined) =>
-        JSON.parse(atob(header!.value.split('"')[1]!));
+        JSON.parse(Buffer.from(header!.value.split('"')[1]!, 'base64').toString('utf8'));
       expect(decode(await getDeviceShellBootstrapHeaderForTab(tabId))).not.toHaveProperty(
         'previewLayout',
       );
       expect(readPreferences).not.toHaveBeenCalled();
-      expect(decode(await getDeviceShellBootstrapHeaderForTab(tabId, true)).previewLayout).toEqual({
+      expect(
+        decode(await getDeviceShellBootstrapHeaderForTab(tabId, true)).previewLayout,
+      ).toMatchObject({
         width: 410,
         toolbarCollapsed: true,
         panelOpen: false,
         viewport: { width: 1200, height: 848 },
         toolbar: {
           profile: null,
-          preset: { id: 'iphone-17-pro', label: 'iPhone 17 Pro' },
+          preset: {
+            id: 'iphone-duo-folded',
+            label: english.deviceSimulationIphoneDuoFolded.message,
+          },
           orientation: 'portrait',
+          labels: { deviceSimulationDisable: english.deviceSimulationDisable.message },
         },
+      });
+      readLanguage.mockResolvedValue({ language: 'zh_CN' });
+      expect(
+        decode(await getDeviceShellBootstrapHeaderForTab(tabId, true)).previewLayout.toolbar,
+      ).toMatchObject({
+        preset: { label: chinese.deviceSimulationIphoneDuoFolded.message },
+        labels: { deviceSimulationDisable: chinese.deviceSimulationDisable.message },
       });
     } finally {
       readPreferences.mockRestore();
+      loadMessages.mockRestore();
       chrome.tabs = previousTabs;
-      chrome.i18n = previousI18n;
+      chrome.storage.sync = previousSync;
     }
   });
 });

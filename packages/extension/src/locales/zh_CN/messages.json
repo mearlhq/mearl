@@ -831,8 +831,7 @@
   "deviceSimulationEnableFromPage": { "message": "开启端模拟" },
   "deviceSimulationDisableFromPage": { "message": "关闭端模拟" },
   "deviceSimulationNoApp": { "message": "无客户端" },
-  "deviceSimulationDisableApp": { "message": "关闭客户端模拟" },
-  "deviceSimulationDisable": { "message": "关闭设备模拟" },
+  "deviceSimulationDisable": { "message": "关闭模拟" },
   "devicePreviewCapturing": { "message": "采集中" },
   "devicePreviewCaptureUnavailable": { "message": "采集不可用" },
   "devicePreviewPanelResize": { "message": "调整调试面板宽度" },
@@ -2169,6 +2168,7 @@
   "simulationSitePermissionDescription": {
     "message": "授权后，Mearl 会在这个站点继续使用端模拟。"
   },
+  "simulationSitePermissionAllow": { "message": "仅允许此站点" },
   "simulationSitePermissionSkip": { "message": "关闭模拟并继续" },
   "simulationSitePermissionContinueFailed": { "message": "暂时无法继续浏览，请重试。" },
   "simulationSitePermissionExpired": { "message": "本次授权请求已失效，请返回上一页。" },
