@@ -45,7 +45,7 @@ import {
   createBrowserCapabilityRegistry,
 } from './browserCapabilityRegistry';
 import { withCookieInjection } from './utils/dnr';
-import { synchronizeBrowserPreset } from './browserPresetSync';
+import { presetPermissionPromptActive, synchronizeBrowserPreset } from './browserPresetSync';
 import { CUSTOM_INSTALL_PAGE_URL } from './installPage';
 import { openPermissionRequestWindow } from './permissionRequestWindow';
 
@@ -1077,13 +1077,24 @@ export function createInstallationService(dependencies: InstallationDependencies
       const preset = trustedInstallationPreset(config, id, source);
       if (!preset) return { status: 'untrusted', id, source };
       const attached = native?.selection != null && native.id === id && native.source === source;
-      if (browser.installationRevision && !attached)
+      if (
+        (browser.installationRevision && !attached) ||
+        (attached && native.browserRequired === true && !browser.browserRevision)
+      )
         return { status: 'waiting-native', id, source };
       if (!sameSelection(accepted, await registry().captureInstallationSelection()))
         return { status: 'skipped' };
       const missing = await missingPermissions(preset.origins);
       if (missing.missingOrigins.length || missing.missingAuthorization.length) {
         const origins = [...new Set([...missing.missingOrigins, ...missing.missingAuthorization])];
+        if (
+          attached &&
+          browser.installationRevision &&
+          browser.installationRevision === native.selection &&
+          origins.every(origin => browser.permissionPending.includes(origin)) &&
+          (await presetPermissionPromptActive(browser.installationRevision))
+        )
+          return { status: 'permission-required', id, source, origins };
         const notice = JSON.stringify({ id, source, origins });
         const key = 'presetAutoUpdatePermissionNotice';
         if ((await chrome.storage.local.get(key))[key] !== notice) {
@@ -1180,7 +1191,7 @@ export function createInstallationService(dependencies: InstallationDependencies
           { operation: 'sync', installationRevision: input.installationRevision },
           transport,
           registry(),
-          { expected: session.selection, confirm: () => confirmSession(session) },
+          { accepted: { expected: session.selection, confirm: () => confirmSession(session) } },
         );
         if (result.ready) {
           session.selection = await registry().captureInstallationSelection(

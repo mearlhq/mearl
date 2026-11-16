@@ -39,6 +39,7 @@ export interface BrowserUiSettings extends Omit<ExtensionContributions, 'schemaV
   linkTemplates?: Record<string, { template: string; title: BrowserUiText }>;
   installers?: Record<string, string>;
   accountState?: AccountStateStorage;
+  accountPermissionOrigins?: string[];
   captureState?: { namespace: string };
 }
 const namePattern = /^[a-z][a-zA-Z0-9_.-]{0,95}$/;

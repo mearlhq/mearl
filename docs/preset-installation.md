@@ -141,7 +141,7 @@ Native 批次安装或修复新插件注册时使用 setup 托管归属，供既
 
 ## 声明域名与界面内容
 
-preset 的 `permissions.origins` 声明该配置所需的明确 HTTP/HTTPS 主机范围，继承时取并集，最多 64 项，不接受全站通配。声明本身不会授予权限。本机 CLI 同步到已连接的扩展后，如果仍缺权限，Mearl 会打开权限申请小窗并列出待授权站点。点击“授权 preset 域名”即可一次申请，Chrome 需要确认时会显示原生弹窗。批准后，扩展登记 Agent 域名权限并关闭小窗。也可以在扩展设置中补授权限。在账号面板遇到站点权限错误时，点击“重试”可申请当前账号站点的权限，批准后自动重新加载列表。Preset 在全部声明的域名授权前保持 pending，撤权后状态也会恢复 pending。
+preset 的 `permissions.origins` 声明该配置所需的明确 HTTP/HTTPS 主机范围，继承时取并集，最多 64 项，不接受全站通配。声明本身不会授予权限。本机 CLI 同步到已连接的扩展后，如果仍缺权限，Mearl 会打开权限申请小窗并列出待授权站点。先用 CLI 安装 preset、后安装扩展时，扩展首次同步本机已选 preset 后也会打开该小窗。点击“授权 preset 域名”即可一次申请，Chrome 需要确认时会显示原生弹窗。批准后，扩展登记 Agent 域名权限并关闭小窗。也可以在扩展设置中补授权限。在账号面板遇到站点权限错误时，点击“重试”会申请 preset 中覆盖当前账号站点的范围，包含匹配的父域通配。没有匹配声明时申请当前站点。批准后自动重新加载列表。Preset 在全部声明的域名授权前保持 pending，撤权后状态也会恢复 pending。
 
 `defaults.extension.messages` 可按现有消息 key 提供 `{ en, zh_CN? }`，随 preset 继承覆盖，保留原来的参数替换规则。`defaults.extension.rulePresets` 按 ID 提供 `{ name, description: { en, zh_CN? }, rules }`，其中 `rules` 为既有规则编辑器表单。模板只填入编辑器，保存、应用和域名授权仍走原有流程。切换或卸载 preset 会刷新所选字典与模板，已保存的用户规则保留。
 

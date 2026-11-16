@@ -7,12 +7,29 @@ import {
 } from '../../shared/permissionRequest';
 import { openPermissionRequestWindow } from './permissionRequestWindow';
 
-async function openPresetPermissions(revision: string) {
-  const url = chrome.runtime.getURL(
+const openingPresetPrompts = new Set<string>();
+
+function presetPermissionUrl(revision: string) {
+  return chrome.runtime.getURL(
     `${PERMISSION_REQUEST_PAGE}?${PRESET_PERMISSION_REVISION_PARAM}=${revision}`,
   );
+}
+
+async function findPresetPermissionWindow(url: string) {
   const contexts = await chrome.runtime.getContexts({ documentUrls: [url] }).catch(() => []);
-  const existing = contexts.find(context => context.frameId === 0 && context.windowId >= 0);
+  return contexts.find(context => context.frameId === 0 && context.windowId >= 0);
+}
+
+export async function presetPermissionPromptActive(revision: string) {
+  return (
+    openingPresetPrompts.has(revision) ||
+    Boolean(await findPresetPermissionWindow(presetPermissionUrl(revision)))
+  );
+}
+
+async function openPresetPermissions(revision: string) {
+  const url = presetPermissionUrl(revision);
+  const existing = await findPresetPermissionWindow(url);
   if (existing) {
     const focused = await chrome.windows
       .update(existing.windowId, { focused: true })
@@ -26,9 +43,12 @@ export async function synchronizeBrowserPreset(
   input: HostToExtensionActionMap['__preset_browser']['request'],
   transport: PresetTransferTransport,
   registry = browserCapabilityRegistry(),
-  accepted?: {
-    expected: Awaited<ReturnType<typeof registry.captureInstallationSelection>>;
-    confirm: () => Promise<void>;
+  options?: {
+    accepted?: {
+      expected: Awaited<ReturnType<typeof registry.captureInstallationSelection>>;
+      confirm: () => Promise<void>;
+    };
+    showPermissionsOnFirstSync?: boolean;
   },
 ) {
   if (input.operation === 'status') return registry.installationStatus(true);
@@ -48,12 +68,19 @@ export async function synchronizeBrowserPreset(
     !/^[a-f0-9]{64}$/.test(input.installationRevision)
   )
     throw new Error('Expected a preset installation revision');
+  const accepted = options?.accepted;
   const previous = accepted?.expected ?? (await registry.captureInstallationSelection());
+  const showPermissions =
+    input.showPermissions === true ||
+    (options?.showPermissionsOnFirstSync &&
+      !previous.activeRevision &&
+      !previous.installationToken);
   const current = await registry.installationStatus();
   if (current.ready && current.installationRevision === input.installationRevision) {
     await accepted?.confirm();
     return current;
   }
+  if (showPermissions) openingPresetPrompts.add(input.installationRevision);
   try {
     const received = await receiveBrowserPreset(input.installationRevision, {
       transport,
@@ -70,7 +97,7 @@ export async function synchronizeBrowserPreset(
         },
       });
       if (
-        input.showPermissions === true &&
+        showPermissions &&
         status.installationRevision === input.installationRevision &&
         status.permissionPending.length
       ) {
@@ -90,5 +117,7 @@ export async function synchronizeBrowserPreset(
       accepted: false,
       error: error instanceof Error ? error.message : 'Browser preset synchronization failed',
     };
+  } finally {
+    if (showPermissions) openingPresetPrompts.delete(input.installationRevision);
   }
 }

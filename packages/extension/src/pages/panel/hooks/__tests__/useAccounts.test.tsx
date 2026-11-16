@@ -27,12 +27,10 @@ vi.mock('../../utils/accounts', () => ({
 }));
 beforeEach(() => {
   fixture.settings = {};
-  fixture.permissions
-    .mockReset()
-    .mockResolvedValue({
-      missingOrigins: ['https://accounts.example.test/*'],
-      missingAuthorization: [],
-    });
+  fixture.permissions.mockReset().mockResolvedValue({
+    missingOrigins: ['https://accounts.example.test/*'],
+    missingAuthorization: [],
+  });
   chrome.permissions = { onAdded: { addListener: vi.fn(), removeListener: vi.fn() } } as any;
   vi.mocked(chrome.storage.onChanged.addListener).mockClear();
   fixture.fetch.mockReset();
@@ -252,4 +250,39 @@ it('does not request a different host from a capability error', async () => {
   });
   expect(chrome.runtime.sendMessage).not.toHaveBeenCalled();
   expect(fixture.fetch).toHaveBeenCalledTimes(2);
+});
+
+it('treats an existing subdomain-only grant as incomplete and retries with the preset parent scope', async () => {
+  const origin = 'https://accounts.example.test';
+  const origins = ['*://*.example.test/*'];
+  fixture.settings = {
+    logins: { accounts: { url: `${origin}/` } },
+    accountPermissionOrigins: origins,
+  };
+  fixture.permissions.mockImplementation(async (scopes: string[]) => ({
+    missingOrigins: scopes.includes(origins[0]) ? origins : [],
+    missingAuthorization: [],
+  }));
+  const { result } = renderHook(() => useAccounts());
+  await act(async () => {
+    await result.current.requestAccounts();
+  });
+  expect(result.current.error).toBe('accountsPermissionRequired');
+  expect(fixture.fetch).not.toHaveBeenCalled();
+
+  const send = vi.mocked(chrome.runtime.sendMessage);
+  send.mockImplementation(async () => {
+    fixture.permissions.mockResolvedValue({ missingOrigins: [], missingAuthorization: [] });
+    return { success: true };
+  });
+  fixture.fetch.mockResolvedValue({ success: true, data: { accountList: [{ id: 1 }] } });
+  await act(async () => {
+    await result.current.retryAccounts({ requestPermission: true });
+  });
+  expect(send).toHaveBeenCalledExactlyOnceWith({
+    action: 'browserUiService',
+    data: { operation: 'authorizeAccounts', origin, origins },
+  });
+  await waitFor(() => expect(result.current.accounts).toEqual([{ id: 1 }]));
+  expect(result.current.error).toBe('');
 });

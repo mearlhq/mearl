@@ -9,6 +9,7 @@ import {
   type SelectedBrowserControl,
 } from '@mearl/preset/bundles';
 import { parseAppProfileMenu, type AppProfileMenuEntry } from '../../../shared/appProfileMenu';
+import { validateInstallationOrigin } from '@mearl/preset/installation';
 
 let settings: BrowserUiSettings = {};
 let cacheScope: string | undefined;
@@ -43,6 +44,13 @@ export function refreshBrowserUiSettings(): Promise<BrowserUiSettings> {
         response.contributions ?? { schemaVersion: 1 },
       );
       const nextSettings = { ...parseBrowserUiSettings(response.data).settings, ...contributions };
+      if (
+        Array.isArray(response.accountPermissionOrigins) &&
+        response.accountPermissionOrigins.length
+      )
+        nextSettings.accountPermissionOrigins = response.accountPermissionOrigins.map(
+          validateInstallationOrigin,
+        );
       const nextProfiles = parseAppProfileMenu(response.appProfiles ?? []).filter(
         profile => profile.available !== false,
       );

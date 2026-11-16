@@ -1,5 +1,6 @@
 import { invalidateRequestInspection } from './requestInspection';
 import { missingPresetPermissions } from '../../shared/presetPermissions';
+import { matchesInstallationOrigin } from '@mearl/preset/installation';
 import { invalidateBrowserTracking } from './browserTracking';
 import {
   appProfileRevision,
@@ -259,6 +260,7 @@ export function createBrowserCapabilityRegistry(
         cacheScope: string;
         browserControl?: SelectedBrowserControl;
         appProfiles: AppProfileCatalogEntry[];
+        accountPermissionOrigins?: string[];
       }
     > {
       const current = selection ?? (await store.list());
@@ -274,8 +276,17 @@ export function createBrowserCapabilityRegistry(
           'The selected browser settings graph is unavailable',
         );
       const catalog = browserCapabilityCatalog(current);
+      const settings = catalog.settings();
+      const accountLogin = settings.extension?.logins?.accounts;
+      const accountUrl = accountLogin && new URL(accountLogin.url);
+      const accountPermissionOrigins = accountUrl
+        ? current.activation?.preset.permissions.origins.filter(scope =>
+            matchesInstallationOrigin(scope, accountUrl),
+          )
+        : undefined;
       return {
-        ...catalog.settings(),
+        ...settings,
+        ...(accountPermissionOrigins?.length ? { accountPermissionOrigins } : {}),
         appProfiles: catalog.profiles().profiles,
         cacheScope: JSON.stringify([
           current.activeRevision,

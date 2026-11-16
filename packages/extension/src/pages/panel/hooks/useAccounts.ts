@@ -8,7 +8,10 @@ import {
 import { useLocalStorage } from './useLocalStorage';
 import { t } from '../utils/i18n';
 import { accountStateStorageKeys } from '../../../shared/browserUiSettings';
-import { accountPermissionUrl } from '../../../shared/browserCapabilityPermissions';
+import {
+  accountPermissionUrl,
+  browserHostPermissionError,
+} from '../../../shared/browserCapabilityPermissions';
 import { useBrowserUiSettings } from '../utils/browserUiSettings';
 import { missingPresetPermissions } from '../../../shared/presetPermissions';
 import {
@@ -43,7 +46,9 @@ export function useAccounts(): UseAccountsResult {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fetched, setFetched] = useState(false);
-  const permissionUrl = accountPermissionUrl(settings.logins?.accounts?.url, error);
+  const accountLogin = settings.logins?.accounts?.url;
+  const accountPermissionOrigins = settings.accountPermissionOrigins;
+  const permissionUrl = accountPermissionUrl(accountLogin, error);
   const permissionOrigin = permissionUrl?.origin;
   useEffect(() => {
     generation.current++;
@@ -90,10 +95,23 @@ export function useAccounts(): UseAccountsResult {
           const result = await chrome.runtime
             .sendMessage({
               action: 'browserUiService',
-              data: { operation: 'authorizeAccounts', origin },
+              data: {
+                operation: 'authorizeAccounts',
+                origin,
+                ...(accountPermissionOrigins ? { origins: accountPermissionOrigins } : {}),
+              },
             })
             .catch(() => null);
           if (accepted !== generation.current || !result?.success) return;
+        }
+        if (accountLogin && accountPermissionOrigins) {
+          const missing = await missingPresetPermissions(accountPermissionOrigins);
+          if (accepted !== generation.current) return;
+          if (missing.missingOrigins.length || missing.missingAuthorization.length) {
+            setError(browserHostPermissionError(new URL(accountLogin)));
+            setFetched(true);
+            return;
+          }
         }
         setError('');
         const { result } = await withAccountAutoLogin(() => fetchAccounts(1));
@@ -118,7 +136,7 @@ export function useAccounts(): UseAccountsResult {
         }
       }
     },
-    [setAccounts],
+    [accountLogin, accountPermissionOrigins, setAccounts],
   );
 
   const requestAccounts = useCallback(async () => {
@@ -131,7 +149,9 @@ export function useAccounts(): UseAccountsResult {
     let active = true;
     const recover = async () => {
       try {
-        const missing = await missingPresetPermissions([`${permissionOrigin}/*`]);
+        const missing = await missingPresetPermissions(
+          accountPermissionOrigins ?? [`${permissionOrigin}/*`],
+        );
         if (active && !missing.missingOrigins.length && !missing.missingAuthorization.length)
           await doFetch();
       } catch {
@@ -162,7 +182,7 @@ export function useAccounts(): UseAccountsResult {
       added.removeListener(onAdded);
       chrome.storage.onChanged.removeListener(onChanged);
     };
-  }, [permissionOrigin, doFetch]);
+  }, [permissionOrigin, accountPermissionOrigins, doFetch]);
 
   const retryAccounts = useCallback(
     async ({ requestPermission = false } = {}) => {

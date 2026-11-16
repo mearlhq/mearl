@@ -230,6 +230,29 @@ async function registryFixture(name = 'simulation/reader', withRuntime = false) 
 }
 
 describe('browser app profile bundles', () => {
+  it('selects the declared parent scope for the account login from the installed preset', async () => {
+    const f = await registryFixture();
+    const accountOrigins = ['*://*.example.com/*'];
+    Object.assign(f.preset, {
+      permissions: { origins: [...accountOrigins, 'https://other.example.test/*'] },
+    });
+    const bytes = new TextEncoder().encode(
+      JSON.stringify({
+        schemaVersion: 1,
+        logins: { accounts: { url: 'https://accounts.example.com/', title: { en: 'Accounts' } } },
+      }),
+    );
+    f.manifest.resources['extension.json'] = {
+      sha256: await bundleDigest(bytes),
+      byteLength: bytes.byteLength,
+    };
+    f.manifest.contributions!.extension = 'extension.json';
+    const load = f.load.getMockImplementation()!;
+    f.load.mockImplementation(async url => (url.endsWith('/extension.json') ? bytes : load(url)));
+    await f.registry.applyPreset({ source: presetSource, expectedRevision: null });
+    expect((await f.registry.settings()).accountPermissionOrigins).toEqual(accountOrigins);
+  });
+
   it('installs every profile in a bundle without changing the active Preset', async () => {
     const f = await registryFixture();
     const profilesSource = 'https://example.com/portable/bundle.json';
@@ -1033,7 +1056,7 @@ it('captures only the browser selection associated with the accepted Native revi
   expect(await f.registry.captureInstallationSelection(replacement)).not.toEqual(selection);
 });
 
-it('reports missing preset authorization without disabling installed browser capabilities', async () => {
+it('prompts for pending domains on first Native sync and on explicit request', async () => {
   const f = await registryFixture('simulation/reader', true);
   Object.assign(f.preset.appProfiles, { shop: 'simulation/reader' });
   Object.assign(f.preset, { permissions: { origins: ['https://accounts.example.test/*'] } });
@@ -1067,18 +1090,20 @@ it('reports missing preset authorization without disabling installed browser cap
     },
     windows: { create, update, getLastFocused: vi.fn().mockResolvedValue({}) },
   });
-  expect(await synchronizeBrowserPreset(input, transport, f.registry)).toMatchObject({
+  const handshake = { showPermissionsOnFirstSync: true };
+  expect(await synchronizeBrowserPreset(input, transport, f.registry, handshake)).toMatchObject({
     browserReady: true,
     ready: false,
     settingsReady: false,
     permissionPending: ['https://accounts.example.test/*'],
   });
-  expect(create).not.toHaveBeenCalled();
-  await synchronizeBrowserPreset({ ...input, showPermissions: true }, transport, f.registry);
   expect(create).toHaveBeenCalledExactlyOnceWith(
     expect.objectContaining({ url, type: 'popup', focused: true }),
   );
   getContexts.mockResolvedValue([{ frameId: 0, windowId: 42 }]);
+  await synchronizeBrowserPreset(input, transport, f.registry, handshake);
+  expect(create).toHaveBeenCalledOnce();
+  expect(update).not.toHaveBeenCalled();
   await synchronizeBrowserPreset({ ...input, showPermissions: true }, transport, f.registry);
   expect(create).toHaveBeenCalledOnce();
   expect(update).toHaveBeenCalledExactlyOnceWith(42, { focused: true });

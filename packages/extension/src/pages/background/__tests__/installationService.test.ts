@@ -1272,8 +1272,8 @@ describe('attached native installation', () => {
     let failed = false;
     const sync = vi
       .spyOn(module, 'synchronizeBrowserPreset')
-      .mockImplementation(async (_input, _transport, _registry, accepted) => {
-        await accepted?.confirm();
+      .mockImplementation(async (_input, _transport, _registry, options) => {
+        await options?.accepted?.confirm();
         if (!failed) {
           failed = true;
           return { ...status, ready: false, accepted: false, error: 'temporarily unavailable' };
@@ -1462,6 +1462,52 @@ describe('trusted automatic preset updates', () => {
     const f = make();
     expect(await f.service.autoUpdate()).toMatchObject({ status: 'waiting-native' });
     expect(f.install).not.toHaveBeenCalled();
+  });
+  it('lets the first Native sync prompt for the saved preset before checking updates', async () => {
+    grants = false;
+    const { source, origins } = config.presets!.team;
+    const revision = 'c'.repeat(64);
+    const native = {
+      capture: vi.fn(async () => ({
+        protocol: 1 as const,
+        selection: revision,
+        id: 'team',
+        source,
+        browserRequired: true,
+      })),
+      request: vi.fn(),
+    };
+    const service = createInstallationService({
+      configuration: async () => config,
+      registry: {
+        installationStatus: async () => status,
+        captureInstallationSelection: async () => structuredClone(selection),
+      } as any,
+      native,
+    });
+    expect(await service.autoUpdate()).toMatchObject({ status: 'waiting-native' });
+    installed();
+    status = {
+      ...status,
+      browserRevision: selection.activeRevision,
+      installationRevision: revision,
+      permissionPending: [...origins],
+    };
+    vi.mocked(chrome.runtime.getContexts).mockImplementationOnce(async () => [
+      {
+        contextId: 'preset-prompt',
+        contextType: 'TAB' as chrome.runtime.ContextType,
+        frameId: 0,
+        tabId: 42,
+        windowId: 42,
+        incognito: false,
+      },
+    ]);
+    expect(await service.autoUpdate()).toMatchObject({ status: 'permission-required', origins });
+    expect(chrome.tabs.create).not.toHaveBeenCalled();
+    expect(await service.autoUpdate()).toMatchObject({ status: 'permission-required', origins });
+    expect(chrome.tabs.create).toHaveBeenCalledOnce();
+    expect(native.request).not.toHaveBeenCalled();
   });
   it('stops before installation for new grants and opens one background authorization view', async () => {
     installed();

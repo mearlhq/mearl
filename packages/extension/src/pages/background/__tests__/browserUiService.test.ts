@@ -85,7 +85,7 @@ it('includes only installed App presentation data in the startup settings', asyn
     ],
   });
   const response = await handleBrowserUiService({ operation: 'settings' }, sender);
-  expect(response.appProfiles).toEqual([
+  expect(response).toHaveProperty('appProfiles', [
     {
       id: 'example/app',
       label: 'Example',
@@ -259,4 +259,35 @@ it('requests the account origin immediately and registers only the approved, cur
   expect(await handleBrowserUiService(input, sender)).toEqual({ success: true });
   expect(mocks.grant).toHaveBeenCalledExactlyOnceWith([`${origin}/*`]);
   vi.unstubAllGlobals();
+});
+
+it('uses the existing Chrome permission request for the declared account parent scope', async () => {
+  const origin = 'https://accounts.example.test';
+  const origins = ['*://*.example.test/*'];
+  mocks.settings.mockResolvedValue({
+    extension: { logins: { accounts: { url: `${origin}/`, title: { en: 'Accounts' } } } },
+    accountPermissionOrigins: origins,
+  });
+  const settings = await handleBrowserUiService({ operation: 'settings' }, sender);
+  const send = vi.spyOn(chrome.runtime, 'sendMessage').mockResolvedValue(settings);
+  try {
+    expect((await refreshBrowserUiSettings()).accountPermissionOrigins).toEqual(origins);
+  } finally {
+    send.mockRestore();
+  }
+  const request = vi.fn().mockResolvedValue(true);
+  vi.stubGlobal('chrome', { ...chrome, permissions: { request } });
+  try {
+    const input = { operation: 'authorizeAccounts', origin };
+    await expect(
+      handleBrowserUiService({ ...input, origins: ['*://*.other.test/*'] }, sender),
+    ).resolves.toMatchObject({ success: false });
+    expect(request).not.toHaveBeenCalled();
+    const granted = handleBrowserUiService({ ...input, origins }, sender);
+    expect(request).toHaveBeenCalledExactlyOnceWith({ origins });
+    await expect(granted).resolves.toEqual({ success: true });
+    expect(mocks.grant).toHaveBeenCalledExactlyOnceWith(origins);
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

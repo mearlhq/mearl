@@ -6,6 +6,7 @@ import { isExtensionUiSender } from './extensionMessageTrust';
 import { isExternalServiceEnabled } from './externalServices';
 import { BROWSER_UI_OPERATION_PORT } from '../../shared/browserCapabilityMessages';
 import { parseAppProfileMenu } from '../../shared/appProfileMenu';
+import { matchesInstallationOrigin, validateInstallationOrigin } from '@mearl/preset/installation';
 
 export function initializeBrowserUiOperations() {
   chrome.runtime.onConnect.addListener(port => {
@@ -65,12 +66,25 @@ export async function handleBrowserUiService(
         url.hostname.includes('*')
       )
         throw new Error('Expected an HTTP(S) account origin');
-      const origins = [`${url.origin}/*`];
+      let origins = [`${url.origin}/*`];
+      if (value.origins !== undefined) {
+        if (!Array.isArray(value.origins) || !value.origins.length || value.origins.length > 64)
+          throw new Error('Invalid account permission scopes');
+        origins = [...new Set(value.origins.map(validateInstallationOrigin))];
+        if (!origins.every(scope => matchesInstallationOrigin(scope, url)))
+          throw new Error('Invalid account permission scopes');
+      }
       // Start in the message's click gesture and finish in the worker if the popup closes.
       if (!(await chrome.permissions.request({ origins }))) return { success: false };
-      const { extension } = await browserCapabilityRegistry().settings();
+      const { extension, accountPermissionOrigins } = await browserCapabilityRegistry().settings();
       const login = extension?.logins?.accounts;
-      if (!login || new URL(login.url).origin !== url.origin)
+      const current = accountPermissionOrigins ?? [`${url.origin}/*`];
+      if (
+        !login ||
+        new URL(login.url).origin !== url.origin ||
+        origins.length !== current.length ||
+        !origins.every(scope => current.includes(scope))
+      )
         throw new Error('Account service changed');
       await grantPresetOrigins(origins);
       return { success: true };
@@ -128,6 +142,9 @@ export async function handleBrowserUiService(
         },
         setup: settings.setup,
         cacheScope: settings.cacheScope,
+        ...(settings.accountPermissionOrigins
+          ? { accountPermissionOrigins: settings.accountPermissionOrigins }
+          : {}),
         appProfiles: parseAppProfileMenu(settings.appProfiles ?? []),
         browserControl: settings.browserControl,
       };

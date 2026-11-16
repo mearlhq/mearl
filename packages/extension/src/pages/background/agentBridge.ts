@@ -571,10 +571,10 @@ export class AgentBridge {
             typeof message.presetInstallationRevision === 'string' &&
             /^[a-f0-9]{64}$/.test(message.presetInstallationRevision)
           ) {
-            void this.synchronizePreset({
-              operation: 'sync',
-              installationRevision: message.presetInstallationRevision,
-            }).catch(() => {});
+            void this.synchronizePreset(
+              { operation: 'sync', installationRevision: message.presetInstallationRevision },
+              { showPermissionsOnFirstSync: true },
+            ).catch(() => {});
           }
           this.reconnectAttempts = 0;
           this.notifyStatusChange();
@@ -1466,10 +1466,14 @@ export class AgentBridge {
   private presetSynchronization: Promise<unknown> = Promise.resolve();
   private synchronizePreset(
     input: HostToExtensionActionMap['__preset_browser']['request'],
+    options?: { showPermissionsOnFirstSync: boolean },
   ): Promise<unknown> {
     const run = () =>
-      synchronizeBrowserPreset(input, request =>
-        this.requestNativeHost('preset_browser_transfer', request),
+      synchronizeBrowserPreset(
+        input,
+        request => this.requestNativeHost('preset_browser_transfer', request),
+        undefined,
+        options,
       );
     if (input.operation === 'status') return run();
     const next = this.presetSynchronization.catch(() => {}).then(run);
