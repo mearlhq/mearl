@@ -10,11 +10,9 @@ import {
   validateInstallationOrigin,
   type InstallationConfig,
   type InstallationPreset,
-  type PresetUninstallResult,
 } from '@mearl/preset/installation';
 import {
   BrowserBundleStore,
-  BundleError,
   prepareBrowserPreset,
   createBundleFetchLoader,
   bundleDigest,
@@ -96,6 +94,7 @@ type InstallationSourceRequest = {
   viewDocumentId?: string;
   viewUrl?: string;
   settingsViewKey?: string;
+  preferredPresetId?: string;
 } & (
   | (WebsiteIdentity & { presetId: string })
   | { selection: InstallationSelection; owner?: never; presetId?: never }
@@ -165,7 +164,6 @@ interface NativeInstallation {
   version?: string;
   source?: string;
   browserRequired?: boolean;
-  uninstallSupported?: boolean;
 }
 export interface InstallationDependencies {
   native?: {
@@ -244,12 +242,12 @@ export function createInstallationService(dependencies: InstallationDependencies
       throw new Error('INSTALLATION_PERMISSION_CHANGED');
   }
 
-  async function checkResourceAccess(session: InstallationSession, url: URL) {
+  async function checkResourceAccess(preset: InstallationPreset, url: URL) {
     if (
       url.protocol !== 'https:' ||
       url.username ||
       url.password ||
-      !session.preset.origins.some(origin => matchesInstallationOrigin(origin, url)) ||
+      !preset.origins.some(origin => matchesInstallationOrigin(origin, url)) ||
       !(await chrome.permissions.contains({ origins: [`${url.origin}/*`] }))
     )
       throw new Error('INSTALLATION_RESOURCE_DENIED');
@@ -259,7 +257,7 @@ export function createInstallationService(dependencies: InstallationDependencies
     return createBundleFetchLoader({
       fetch: async (input, init) => {
         const url = new URL(String(input));
-        await checkResourceAccess(session, url);
+        await checkResourceAccess(session.preset, url);
         if ((await missingPermissions(session.preset.origins)).missingAuthorization.length)
           throw new Error('INSTALLATION_AUTHORIZATION_REQUIRED');
         return withCookieInjection(url, () =>
@@ -272,45 +270,55 @@ export function createInstallationService(dependencies: InstallationDependencies
     });
   }
 
-  async function previewPreset(session: InstallationSession): Promise<InstallationPreview> {
+  async function previewPresets(session: InstallationSession) {
     const signal = AbortSignal.timeout(5_000);
-    // A preview reads manifests with existing Chrome access and without browser cookies.
-    const load = createBundleFetchLoader({
-      fetch: async (input, init) => {
-        const url = new URL(String(input));
-        await checkResourceAccess(session, url);
-        return fetch(url, init);
-      },
-    });
-    const preset = await resolvePreset(session.preset.source, {
-      mearlApiVersion: BROWSER_BUNDLE_API_VERSION,
-      signal,
-      load: async source => {
-        const bytes = await load(source, { maxBytes: 262_144, signal });
-        return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
-      },
-    });
-    if (
-      preset.id !== session.presetId ||
-      preset.permissions.origins.some(
-        origin => !installationOriginCovered(origin, session.preset.origins),
-      )
-    )
-      throw new Error('INSTALLATION_RESOURCE_DENIED');
-    const extension = preset.defaults.extension;
-    const purpose =
-      extension === undefined
-        ? undefined
-        : parseBrowserUiSettings(extension).settings.messages?.presetInstallPurpose;
+    const presets =
+      session.catalogUrl || session.settingsViewKey
+        ? (sessionCatalog(session).presets ?? {})
+        : { [session.presetId]: session.preset };
+    const load = createBundleFetchLoader();
+    const manifests = new Map<string, Promise<Uint8Array>>();
     const enabled = (entries: Record<string, ResolvedComponent>) =>
       Object.values(entries).filter(entry => entry.enabled !== false).length;
-    return {
-      purpose,
-      appProfileCount: Object.keys(preset.appProfiles).length,
-      packageCount: enabled(preset.packages),
-      skillCount: enabled(preset.skills),
-      providerCount: enabled(preset.providers),
+    const preview = async (id: string, entry: InstallationPreset): Promise<InstallationPreview> => {
+      const preset = await resolvePreset(entry.source, {
+        mearlApiVersion: BROWSER_BUNDLE_API_VERSION,
+        signal,
+        load: async source => {
+          // Shared manifests still require access within each preset's own scopes.
+          await checkResourceAccess(entry, new URL(source));
+          const key = String(source);
+          let manifest = manifests.get(key);
+          if (!manifest) {
+            manifest = load(source, { maxBytes: 262_144, signal });
+            manifests.set(key, manifest);
+          }
+          return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await manifest));
+        },
+      });
+      if (
+        preset.id !== id ||
+        preset.permissions.origins.some(origin => !installationOriginCovered(origin, entry.origins))
+      )
+        throw new Error('INSTALLATION_RESOURCE_DENIED');
+      const extension = preset.defaults.extension;
+      return {
+        purpose:
+          extension === undefined
+            ? undefined
+            : parseBrowserUiSettings(extension).settings.messages?.presetInstallPurpose,
+        appProfileCount: Object.keys(preset.appProfiles).length,
+        packageCount: enabled(preset.packages),
+        skillCount: enabled(preset.skills),
+        providerCount: enabled(preset.providers),
+      };
     };
+    const entries = await Promise.all(
+      Object.entries(presets).map(
+        async ([id, entry]) => [id, await preview(id, entry).catch(() => undefined)] as const,
+      ),
+    );
+    return Object.fromEntries(entries.filter(([, result]) => result !== undefined));
   }
 
   function rememberInlineSession(session: StoredInstallation) {
@@ -351,6 +359,14 @@ export function createInstallationService(dependencies: InstallationDependencies
     return config;
   }
 
+  function sessionCatalog(session: InstallationSession) {
+    return parseInstallationConfig(JSON.parse(session.configuration), INSTALLATION_SITE.origin);
+  }
+
+  function preferredPreset(presets: Record<string, InstallationPreset>, preferred?: string) {
+    return preferred && Object.hasOwn(presets, preferred) ? preferred : Object.keys(presets)[0];
+  }
+
   async function readSession(id: unknown, refreshCatalog = true) {
     const value = await readStoredSession(id);
     if ('kind' in value) throw new Error('INSTALLATION_SOURCE_CONFIRMATION_REQUIRED');
@@ -360,7 +376,7 @@ export function createInstallationService(dependencies: InstallationDependencies
       ? value.catalogUrl
         ? await loadRequestedCatalog(value.catalogUrl, value.requestingPage!)
         : await configuration()
-      : parseInstallationConfig(JSON.parse(value.configuration), INSTALLATION_SITE.origin);
+      : sessionCatalog(value);
     if (
       JSON.stringify(config) !== value.configuration ||
       !Object.hasOwn(config.presets ?? {}, value.presetId) ||
@@ -511,10 +527,9 @@ export function createInstallationService(dependencies: InstallationDependencies
       needsInstall: session.completed !== true,
       ...(!session.completed && (session.catalogUrl || session.settingsViewKey)
         ? {
-            presetChoices: Object.entries(
-              parseInstallationConfig(JSON.parse(session.configuration), INSTALLATION_SITE.origin)
-                .presets ?? {},
-            ).map(([id, entry]) => ({ id, label: entry.label })),
+            presetChoices: Object.entries(sessionCatalog(session).presets ?? {}).map(
+              ([id, entry]) => ({ id, label: entry.label }),
+            ),
           }
         : {}),
     };
@@ -766,7 +781,7 @@ export function createInstallationService(dependencies: InstallationDependencies
       'selection' in request ? request.selection : await registry().captureInstallationSelection();
     const config = await loadRequestedCatalog(request.catalogUrl, request.requestingPage);
     const presets = config.presets ?? {};
-    const presetId = request.presetId ?? Object.keys(presets)[0];
+    const presetId = request.presetId ?? preferredPreset(presets, request.preferredPresetId);
     if (!presetId || !Object.hasOwn(presets, presetId))
       throw new Error('INSTALLATION_PRESET_UNAVAILABLE');
     if (request.owner) {
@@ -815,7 +830,7 @@ export function createInstallationService(dependencies: InstallationDependencies
     return view(session);
   }
 
-  async function prepareSettingsSession(settingsViewKey: string) {
+  async function prepareSettingsSession(settingsViewKey: string, preferredPresetId?: string) {
     const selection = await registry().captureInstallationSelection();
     const sessions = await availableSessions();
     const current = sessions.find(
@@ -839,6 +854,7 @@ export function createInstallationService(dependencies: InstallationDependencies
         kind: 'source-request',
         catalogUrl: catalog.href,
         requestingPage: CUSTOM_INSTALL_PAGE_URL,
+        preferredPresetId,
       };
       if (!(await chrome.permissions.contains({ origins: [`${catalog.origin}/*`] })))
         return request;
@@ -846,13 +862,13 @@ export function createInstallationService(dependencies: InstallationDependencies
     }
 
     const config = await configuration();
-    const entry = Object.entries(config.presets ?? {})[0];
-    if (!entry) throw new Error('INSTALLATION_PRESET_UNAVAILABLE');
-    const [presetId, preset] = entry;
+    const presets = config.presets ?? {};
+    const presetId = preferredPreset(presets, preferredPresetId);
+    if (!presetId) throw new Error('INSTALLATION_PRESET_UNAVAILABLE');
     const session: InstallationSession = {
       ...seed,
       presetId,
-      preset,
+      preset: presets[presetId],
       configuration: JSON.stringify(config),
     };
     await captureNative(session);
@@ -862,10 +878,7 @@ export function createInstallationService(dependencies: InstallationDependencies
   async function selectPreset(session: InstallationSession, presetId: string) {
     if (session.completed || !(session.catalogUrl || session.settingsViewKey))
       throw new Error('INVALID_INSTALLATION_REQUEST');
-    const { presets = {} } = parseInstallationConfig(
-      JSON.parse(session.configuration),
-      INSTALLATION_SITE.origin,
-    );
+    const { presets = {} } = sessionCatalog(session);
     if (!Object.hasOwn(presets, presetId)) throw new Error('INSTALLATION_PRESET_UNAVAILABLE');
     const selected = { ...session, presetId, preset: presets[presetId] };
     const result = await view(selected);
@@ -951,7 +964,7 @@ export function createInstallationService(dependencies: InstallationDependencies
     return view(session);
   }
 
-  async function managementState() {
+  async function installedPresets(): Promise<InstalledPreset[]> {
     const browser = await registry().installationStatus(true);
     const native = await dependencies.native?.capture();
     const attached = Boolean(
@@ -966,7 +979,6 @@ export function createInstallationService(dependencies: InstallationDependencies
         version: browser.presetVersion,
         source: browser.presetSource,
         browserRevision: browser.browserRevision,
-        canUninstall: !browser.installationRevision || native !== undefined,
       });
     }
     if (native?.id && native.selection) {
@@ -976,16 +988,13 @@ export function createInstallationService(dependencies: InstallationDependencies
         source: native.source,
         browserRevision: attached ? browser.browserRevision : null,
         nativeRevision: native.selection,
-        canUninstall: native.uninstallSupported === true,
       });
     }
-    return { presets, installationToken: browser.installationToken ?? null };
+    return presets;
   }
 
   return {
-    async installedPresets(): Promise<InstalledPreset[]> {
-      return (await managementState()).presets;
-    },
+    installedPresets,
     async canInstallPresets() {
       return Boolean(
         CUSTOM_INSTALL_PAGE_URL || Object.keys((await configuration()).presets ?? {}).length,
@@ -994,6 +1003,7 @@ export function createInstallationService(dependencies: InstallationDependencies
     async openPresetSelector(
       sender: chrome.runtime.MessageSender,
       inline: boolean,
+      preferredPresetId?: string,
     ): Promise<InstallationOpening> {
       const { documentId, tab, url } = sender;
       if (!isExtensionUiSender(sender, chrome.runtime.id) || !url)
@@ -1004,7 +1014,7 @@ export function createInstallationService(dependencies: InstallationDependencies
       const next = opening
         .catch(() => {})
         .then(async () => {
-          const session = await prepareSettingsSession(settingsViewKey);
+          const session = await prepareSettingsSession(settingsViewKey, preferredPresetId);
           if (!inline) return showView(session);
           delete session.viewTabId;
           if (documentId) {
@@ -1054,32 +1064,6 @@ export function createInstallationService(dependencies: InstallationDependencies
       } finally {
         await chrome.storage.session.remove(key);
       }
-    },
-    async uninstallPreset(
-      browserRevision: unknown,
-      nativeRevision: unknown,
-    ): Promise<PresetUninstallResult> {
-      const { presets, installationToken } = await managementState();
-      const current = presets.find(
-        preset =>
-          preset.browserRevision === browserRevision && preset.nativeRevision === nativeRevision,
-      );
-      if (!current?.canUninstall) return { ready: false, blocker: { reason: 'selection-changed' } };
-      if (current.nativeRevision) {
-        const result = await dependencies.native!.request(
-          { operation: 'uninstall', expectedRevision: current.nativeRevision },
-          160_000,
-        );
-        return { ready: result?.ready === true, blocker: result?.blocker };
-      }
-      if (!current.browserRevision) throw new Error('INSTALLATION_SELECTION_CHANGED');
-      try {
-        await registry().uninstallPreset(current.browserRevision, installationToken);
-      } catch (error) {
-        if (!(error instanceof BundleError) || error.code !== 'BUNDLE_CONFLICT') throw error;
-        return { ready: false, blocker: { reason: 'selection-changed' } };
-      }
-      return { ready: true };
     },
     async autoUpdate(): Promise<PresetAutoUpdateResult> {
       if (running.size) return { status: 'skipped' };
@@ -1402,7 +1386,7 @@ export function createInstallationService(dependencies: InstallationDependencies
         return next;
       }
       if (operation === 'confirmSource') return view(await readSession(input.session, false));
-      if (operation === 'preview') return previewPreset(await readSession(input.session, false));
+      if (operation === 'preview') return previewPresets(await readSession(input.session, false));
       if (operation === 'inspect') return view(await readSession(input.session, false));
       if (
         operation !== 'selectPreset' &&
@@ -1416,7 +1400,7 @@ export function createInstallationService(dependencies: InstallationDependencies
         return existing;
       }
       const task = (async () => {
-        const session = await readSession(input.session);
+        const session = await readSession(input.session, operation !== 'selectPreset');
         if (operation === 'selectPreset') return selectPreset(session, input.presetId as string);
         if (session.presetId !== stored.presetId) throw new Error('INSTALLATION_SELECTION_CHANGED');
         if ((session.catalogUrl || session.settingsViewKey) && !session.completed && !authorize)

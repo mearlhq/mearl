@@ -378,7 +378,7 @@ initializeBrowserControllers();
 const installationService = createInstallationService({
   native: createNativeInstallationClient(() => ensureNativeBridge(false)),
 });
-const checkPresetUpdate = initializePresetAutoUpdate(() => installationService.autoUpdate());
+initializePresetAutoUpdate(() => installationService.autoUpdate());
 chrome.runtime.onMessageExternal.addListener((message, sender, reply) => {
   if (message?.action !== INSTALLATION_ACTION) return;
   void installationService.external(message, sender).then(
@@ -888,13 +888,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case 'install-available':
           return installationService.canInstallPresets();
         case 'install':
-          return installationService.openPresetSelector(sender, message.inline === true);
-        case 'update':
-          return checkPresetUpdate(true);
-        case 'uninstall':
-          return installationService.uninstallPreset(
-            message.browserRevision,
-            message.nativeRevision,
+          return installationService.openPresetSelector(
+            sender,
+            message.inline === true,
+            typeof message.presetId === 'string' ? message.presetId : undefined,
           );
         default:
           throw new Error('INVALID_INSTALLATION_REQUEST');

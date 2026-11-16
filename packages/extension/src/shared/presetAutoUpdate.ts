@@ -7,7 +7,6 @@ export interface InstalledPreset {
   source?: string;
   browserRevision: string | null;
   nativeRevision?: string;
-  canUninstall: boolean;
 }
 export interface PresetAutoUpdateResult {
   status:

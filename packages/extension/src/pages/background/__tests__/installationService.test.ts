@@ -423,7 +423,7 @@ describe('website source confirmation', () => {
     ...patch,
   });
   const setup = () => {
-    const fetcher = vi.fn(
+    const fetcher = vi.fn<typeof fetch>(
       async () =>
         new Response(JSON.stringify(config), { headers: { 'content-type': 'application/json' } }),
     );
@@ -483,8 +483,16 @@ describe('website source confirmation', () => {
       expect(f.install).not.toHaveBeenCalled();
     },
   );
-  it('previews the selected preset and inherited capabilities using existing Chrome access', async () => {
+  it('previews all choices with existing Chrome access and shares inherited manifest downloads', async () => {
     const { service, fetcher, install } = setup();
+    const teamSource = config.presets!.team.source;
+    const toolsSource = new URL('./tools.json', teamSource).href;
+    const baseSource = new URL('./base.json', teamSource).href;
+    config.presets!.tools = {
+      ...config.presets!.team,
+      label: 'Tools',
+      source: toolsSource,
+    };
     const { session } = (await service.website(website(), sender())) as { session: string };
     const ui = uiSender(session);
     agent.allowed = [];
@@ -495,50 +503,57 @@ describe('website source confirmation', () => {
     await service.internal(internal('confirmSource', session), ui);
 
     const purpose = { en: 'Inspect and replay requests', zh_CN: '检查和回放请求' };
-    fetcher.mockResolvedValueOnce(
-      Response.json({
-        schemaVersion: 1,
-        id: 'team',
-        version: '1.0.0',
-        extends: { source: './base.json' },
-        packages: { legacy: { enabled: false } },
-        defaults: { extension: { messages: { presetInstallPurpose: purpose } } },
-      }),
-    );
-    fetcher.mockResolvedValueOnce(
-      Response.json({
-        schemaVersion: 1,
-        id: 'base',
-        version: '1.0.0',
-        appProfiles: { reader: 'runtime/reader' },
-        packages: {
-          runtime: { source: '../runtime/bundle.json' },
-          legacy: { source: '../legacy/bundle.json' },
-        },
-        skills: { reader: { source: 'example/reader' } },
-      }),
-    );
+    fetcher.mockImplementation(async url => {
+      const source = String(url);
+      if (source === teamSource || source === toolsSource)
+        return Response.json({
+          schemaVersion: 1,
+          id: source === teamSource ? 'team' : 'tools',
+          version: '1.0.0',
+          extends: { source: './base.json' },
+          packages: { legacy: { enabled: false } },
+          ...(source === teamSource && {
+            defaults: { extension: { messages: { presetInstallPurpose: purpose } } },
+          }),
+        });
+      if (source === baseSource)
+        return Response.json({
+          schemaVersion: 1,
+          id: 'base',
+          version: '1.0.0',
+          appProfiles: { reader: 'runtime/reader' },
+          packages: {
+            runtime: { source: '../runtime/bundle.json' },
+            legacy: { source: '../legacy/bundle.json' },
+          },
+          skills: { reader: { source: 'example/reader' } },
+        });
+      throw new Error('Unexpected manifest');
+    });
 
-    await expect(service.internal(internal('preview', session), ui)).resolves.toEqual({
-      purpose,
+    const counts = {
       appProfileCount: 1,
       packageCount: 1,
       skillCount: 1,
       providerCount: 0,
+    };
+    await expect(service.internal(internal('preview', session), ui)).resolves.toEqual({
+      team: { ...counts, purpose },
+      tools: counts,
     });
-    expect(fetcher).toHaveBeenLastCalledWith(
-      new URL('./base.json', config.presets!.team.source),
+    expect(fetcher).toHaveBeenCalledWith(
+      baseSource,
       expect.objectContaining({ credentials: 'omit', redirect: 'error' }),
     );
-    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(fetcher.mock.calls.map(([url]) => String(url)).sort()).toEqual(
+      [catalogUrl, teamSource, toolsSource, baseSource].sort(),
+    );
     expect(install).not.toHaveBeenCalled();
     expect(agent.allowed).toEqual([]);
 
     grants = false;
-    await expect(service.internal(internal('preview', session), ui)).rejects.toThrow(
-      'INSTALLATION_RESOURCE_DENIED',
-    );
-    expect(fetcher).toHaveBeenCalledTimes(3);
+    await expect(service.internal(internal('preview', session), ui)).resolves.toEqual({});
+    expect(fetcher).toHaveBeenCalledTimes(4);
   });
   it('routes a catalog from the embedded bridge into the same source-confirmation session', async () => {
     const f = setup();
@@ -1381,65 +1396,6 @@ describe('attached native installation', () => {
   });
 });
 
-describe('installed preset management', () => {
-  it('delegates removal of a linked preset and lets the browser retry a partial removal', async () => {
-    const browserRevision = 'a'.repeat(64);
-    const nativeRevision = 'b'.repeat(64);
-    const installationToken = 'c'.repeat(64);
-    const source = config.presets!.team.source;
-    const uninstallPreset = vi.fn();
-    const native = {
-      capture: vi.fn().mockResolvedValue({
-        protocol: 1,
-        selection: nativeRevision,
-        id: 'team',
-        source,
-        uninstallSupported: true,
-      }),
-      request: vi.fn().mockResolvedValue({ ready: false }),
-    };
-    const service = createInstallationService({
-      native,
-      registry: {
-        installationStatus: async () => ({
-          presetId: 'team',
-          presetVersion: '1.0.0',
-          presetSource: source,
-          browserRevision,
-          installationRevision: nativeRevision,
-          installationToken,
-        }),
-        uninstallPreset,
-      } as any,
-    });
-    expect(await service.installedPresets()).toMatchObject([
-      { id: 'team', nativeRevision, canUninstall: true },
-    ]);
-    await expect(service.uninstallPreset(browserRevision, undefined)).resolves.toMatchObject({
-      ready: false,
-      blocker: { reason: 'selection-changed' },
-    });
-    await expect(service.uninstallPreset(browserRevision, nativeRevision)).resolves.toMatchObject({
-      ready: false,
-    });
-    expect(native.request).toHaveBeenCalledWith(
-      { operation: 'uninstall', expectedRevision: nativeRevision },
-      160_000,
-    );
-    expect(uninstallPreset).not.toHaveBeenCalled();
-
-    native.capture.mockResolvedValue(undefined);
-    expect(await service.installedPresets()).toMatchObject([{ canUninstall: false }]);
-    await expect(service.uninstallPreset(browserRevision, undefined)).resolves.toMatchObject({
-      ready: false,
-      blocker: { reason: 'selection-changed' },
-    });
-    native.capture.mockResolvedValue({ protocol: 1, selection: null });
-    expect(await service.uninstallPreset(browserRevision, undefined)).toEqual({ ready: true });
-    expect(uninstallPreset).toHaveBeenCalledExactlyOnceWith(browserRevision, installationToken);
-  });
-});
-
 describe('trusted automatic preset updates', () => {
   beforeEach(() => {
     const local: Record<string, unknown> = {};
@@ -1644,6 +1600,7 @@ describe('preset selection from settings', () => {
       source: config.presets!.tools.source,
       origins: config.presets!.tools.origins,
     });
+    expect(fetch).toHaveBeenCalledTimes(1);
     await expect(
       service.internal(
         {
@@ -1684,11 +1641,11 @@ describe('preset selection from settings', () => {
     });
   });
 
-  it('requests access to the configured catalog before showing its choices', async () => {
+  it('requests access to the catalog before preselecting the installed preset', async () => {
     const { service } = make();
     grants = false;
     const sender = settingsSender();
-    const { session } = await service.openPresetSelector(sender, true);
+    const { session } = await service.openPresetSelector(sender, true, 'tools');
     await expect(service.internal(internal('inspect', session), sender)).resolves.toMatchObject({
       needsSourceConfirmation: true,
       missingOrigins: ['https://configured.example.test/*'],
@@ -1698,7 +1655,7 @@ describe('preset selection from settings', () => {
     await expect(
       service.internal(internal('confirmSource', session), sender),
     ).resolves.toMatchObject({
-      presetId: 'team',
+      presetId: 'tools',
       presetChoices: [
         { id: 'team', label: 'Team' },
         { id: 'tools', label: 'Tools' },

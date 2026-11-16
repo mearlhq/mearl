@@ -11,12 +11,14 @@ vi.mock('../../panel/utils/i18n', () => ({
   getCurrentLanguage: () => 'zh_CN',
 }));
 let state: InstallationView;
-let preview: InstallationPreview | undefined;
+let previews: Record<string, InstallationPreview>;
+const readPreviews = vi.fn();
 type SendInstallationMessage = (input: { operation: string }) => Promise<unknown>;
 let send: Mock<SendInstallationMessage>;
 afterEach(() => vi.unstubAllGlobals());
 beforeEach(() => {
-  preview = undefined;
+  previews = {};
+  readPreviews.mockReset().mockImplementation(async () => ({ success: true, data: previews }));
   state = {
     session: 'test',
     presetId: 'team',
@@ -37,7 +39,7 @@ beforeEach(() => {
         : { ...state, browserReady: true, needsInstall: false },
   }));
   chrome.runtime.sendMessage = (async (input: { operation: string }) =>
-    input.operation === 'preview' ? { success: true, data: preview } : send(input)) as any;
+    input.operation === 'preview' ? readPreviews(input) : send(input)) as any;
   chrome.permissions = { request: vi.fn(async () => true) } as any;
 });
 it('restarts an expired automatic view and navigates to its fresh session', async () => {
@@ -181,7 +183,7 @@ it('shows the selected preset purpose and keeps the source links collapsed', asy
     catalogUrl: 'https://example.test/catalog.json',
     requestingPage: 'https://example.test/installed.html',
   };
-  preview = {
+  previews.team = {
     purpose: { en: 'Inspect requests', zh_CN: '检查接口请求' },
     appProfileCount: 0,
     packageCount: 1,
@@ -203,16 +205,25 @@ it('updates the preview and requests permissions for the preset selected in the 
     { id: 'tools', label: 'Tools' },
   ];
   const origins = ['https://tools.example.test/*'];
+  previews = {
+    team: {
+      purpose: { en: 'Inspect requests' },
+      appProfileCount: 0,
+      packageCount: 1,
+      skillCount: 0,
+      providerCount: 0,
+    },
+    tools: {
+      purpose: { en: 'Replay requests' },
+      appProfileCount: 0,
+      packageCount: 1,
+      skillCount: 0,
+      providerCount: 0,
+    },
+  };
   send.mockImplementation(async input => {
     if (input.operation === 'selectPreset') {
       state = { ...state, presetId: 'tools', label: 'Tools', origins, missingOrigins: origins };
-      preview = {
-        purpose: { en: 'Replay requests' },
-        appProfileCount: 0,
-        packageCount: 1,
-        skillCount: 0,
-        providerCount: 0,
-      };
     }
     return {
       success: true,
@@ -226,10 +237,15 @@ it('updates the preview and requests permissions for the preset selected in the 
 
   const team = await screen.findByRole('button', { name: 'Team' });
   const tools = screen.getByRole('button', { name: 'Tools' });
+  await screen.findByText('Inspect requests');
   expect(team).toHaveAttribute('aria-pressed', 'true');
   expect(tools).toHaveAttribute('aria-pressed', 'false');
+  expect(screen.getByText('Replay requests').closest('[aria-hidden]')).not.toBeNull();
   fireEvent.click(tools);
-  expect(await screen.findByText('Replay requests')).toBeVisible();
+  await waitFor(() => expect(tools).toHaveAttribute('aria-pressed', 'true'));
+  expect(readPreviews).toHaveBeenCalledTimes(1);
+  expect(screen.getByText('Replay requests').closest('[aria-hidden]')).toBeNull();
+  expect(screen.getByText('Inspect requests').closest('[aria-hidden]')).not.toBeNull();
   expect(team).toHaveAttribute('aria-pressed', 'false');
   expect(tools).toHaveAttribute('aria-pressed', 'true');
   expect(chrome.permissions.request).not.toHaveBeenCalled();

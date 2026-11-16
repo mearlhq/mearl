@@ -3403,47 +3403,5 @@
   },
   "presetManagementUpdate": {
     "message": "Update"
-  },
-  "presetManagementCurrent": {
-    "message": "The Preset is up to date."
-  },
-  "presetManagementUpdated": {
-    "message": "The Preset was updated."
-  },
-  "presetManagementPermission": {
-    "message": "The update requires permission. Grant it on the installation confirmation page."
-  },
-  "presetManagementUpdateSource": {
-    "message": "Update this Preset through its original installation page or installer."
-  },
-  "presetManagementRetry": {
-    "message": "The installation is changing. Try again shortly."
-  },
-  "presetManagementUpdateFailed": {
-    "message": "Could not check for updates. Try again."
-  },
-  "presetManagementRemove": {
-    "message": "Uninstall"
-  },
-  "presetManagementConfirm": {
-    "message": "Confirm uninstall"
-  },
-  "presetManagementRemoved": {
-    "message": "The Preset was uninstalled."
-  },
-  "presetManagementRemovalPending": {
-    "message": "Uninstallation is incomplete. Reconnect the affected browsers and check again."
-  },
-  "presetManagementRemoveBrowserUpdate": {
-    "message": "Update the Mearl extension and local service for $1, then retry."
-  },
-  "presetManagementRemoveBrowserReconnect": {
-    "message": "Could not read the Preset in $1. Reconnect and retry."
-  },
-  "presetManagementRemoveSelectionChanged": {
-    "message": "The Preset installation changed. Please retry."
-  },
-  "presetManagementRemoveFailed": {
-    "message": "Uninstallation failed. Check the current installation and try again."
   }
 }

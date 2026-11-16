@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Options from '../Options';
 import { ToastContainer } from '../../panel/components/ToastContainer';
@@ -150,106 +150,69 @@ describe('Options settings', () => {
       }
     },
   );
-
-  it.each([true, false])(
-    'updates an installed preset and offers removal only when supported (%s)',
-    async canUninstall => {
-      window.history.replaceState({}, '', '?iframe=1&tabId=7');
-      const preset = {
-        id: 'team',
-        version: '1.0.0',
-        source: 'https://example.test/team.json',
-        browserRevision: 'a'.repeat(64),
-        nativeRevision: 'b'.repeat(64),
-        canUninstall,
-      };
-      const previous = vi.mocked(chrome.runtime.sendMessage).getMockImplementation()!;
-      let installed = true;
-      let uninstallBlocked = true;
-      let completeUpdate!: () => void;
-      const updating = new Promise<void>(resolve => {
-        completeUpdate = resolve;
-      });
-      vi.mocked(chrome.runtime.sendMessage).mockImplementation(async (message, ...args) => {
-        const request = message as unknown as { action?: string; operation?: string } | undefined;
-        if (request?.action !== PRESET_MANAGEMENT_ACTION) return previous(message, ...args);
-        if (request.operation === 'update') {
-          await updating;
-          return { success: true, data: { status: 'current' } };
-        }
-        if (request.operation === 'uninstall') {
-          if (uninstallBlocked) {
-            uninstallBlocked = false;
-            return {
-              success: true,
-              data: {
-                ready: false,
-                blocker: { reason: 'browser-update-required', browser: 'Example Browser' },
-              },
-            };
-          }
-          installed = false;
-          return { success: true, data: { ready: true } };
-        }
-        return { success: true, data: installed ? [preset] : [] };
-      });
-      render(
-        <>
-          <Options />
-          <ToastContainer />
-        </>,
-      );
-      expect(await screen.findByText(preset.id)).toBeVisible();
-      expect(screen.getByRole('button', { name: 'presetManagementInstall' })).toBeEnabled();
-      expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith({
-        action: PRESET_MANAGEMENT_ACTION,
-        operation: 'install',
-      });
-      expect(screen.getByText('v1.0.0')).toBeVisible();
-      const updateButton = screen.getByRole('button', { name: 'presetManagementUpdate' });
-      fireEvent.click(updateButton);
-      expect(updateButton).toHaveAttribute('aria-busy', 'true');
-      expect(updateButton).toBeDisabled();
-      expect(screen.queryByText('presetInstallWorking')).not.toBeInTheDocument();
-      completeUpdate();
-      expect(await screen.findByText('presetManagementCurrent')).toBeInTheDocument();
-      if (!canUninstall) {
-        expect(
-          screen.queryByRole('button', { name: 'presetManagementRemove' }),
-        ).not.toBeInTheDocument();
-        return;
+  it('opens the installer for the current preset and waits for confirmation', async () => {
+    window.history.replaceState({}, '', '?iframe=1&tabId=7');
+    const preset = {
+      id: 'team',
+      version: '1.0.0',
+      source: 'https://example.test/team.json',
+      browserRevision: 'a'.repeat(64),
+      nativeRevision: 'b'.repeat(64),
+    };
+    const previous = vi.mocked(chrome.runtime.sendMessage).getMockImplementation()!;
+    vi.mocked(chrome.runtime.sendMessage).mockImplementation(async (message, ...args) => {
+      const request = message as unknown as { action?: string; operation?: string } | undefined;
+      if (request?.action === INSTALLATION_ACTION) {
+        if (request.operation === 'preview') return { success: true, data: {} };
+        return {
+          success: true,
+          data: {
+            session: 'preset-selector',
+            presetId: preset.id,
+            label: 'Team',
+            source: preset.source,
+            missingOrigins: [],
+            missingAuthorization: [],
+            needsInstall: request.operation !== 'install',
+            browserReady: request.operation === 'install',
+            presetChoices: [{ id: preset.id, label: 'Team' }],
+          },
+        };
       }
-      await waitFor(() =>
-        expect(screen.getByRole('button', { name: 'presetManagementRemove' })).toBeEnabled(),
-      );
-      fireEvent.click(screen.getByRole('button', { name: 'presetManagementRemove' }));
-      expect(screen.getByRole('button', { name: 'presetManagementConfirm' })).toBeVisible();
-      expect(installed).toBe(true);
-      fireEvent.click(screen.getByRole('button', { name: 'cancel' }));
-      expect(
-        screen.queryByRole('button', { name: 'presetManagementConfirm' }),
-      ).not.toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: 'presetManagementRemove' }));
-      fireEvent.click(screen.getByRole('button', { name: 'presetManagementConfirm' }));
-      expect(
-        await screen.findByText('presetManagementRemoveBrowserUpdate: Example Browser'),
-      ).toBeVisible();
-      expect(screen.getByText(preset.id)).toBeVisible();
-      await waitFor(() =>
-        expect(screen.getByRole('button', { name: 'presetManagementRemove' })).toBeEnabled(),
-      );
-      fireEvent.click(screen.getByRole('button', { name: 'presetManagementRemove' }));
-      fireEvent.click(screen.getByRole('button', { name: 'presetManagementConfirm' }));
-      expect(await screen.findByText('presetManagementRemoved')).toBeInTheDocument();
-      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
-        action: PRESET_MANAGEMENT_ACTION,
-        operation: 'uninstall',
-        browserRevision: preset.browserRevision,
-        nativeRevision: preset.nativeRevision,
-      });
-      await waitFor(() => expect(screen.queryByText(preset.id)).not.toBeInTheDocument());
-    },
-  );
+      if (request?.action !== PRESET_MANAGEMENT_ACTION) return previous(message, ...args);
+      if (request.operation === 'status') return { success: true, data: [preset] };
+      return { success: true, data: { session: 'preset-selector', inline: true } };
+    });
+
+    render(<Options />);
+    expect(await screen.findByText('v1.0.0')).toBeVisible();
+    const update = screen.getByRole('button', { name: 'presetManagementUpdate' });
+    expect(
+      within(screen.getByRole('region', { name: 'presetManagementTitle' })).getAllByRole('button'),
+    ).toEqual([update]);
+    fireEvent.click(update);
+    const confirm = await screen.findByRole('button', { name: 'presetInstallConfirmOnce' });
+    expect(screen.getByRole('dialog')).toContainElement(confirm);
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+      action: PRESET_MANAGEMENT_ACTION,
+      operation: 'install',
+      inline: true,
+      presetId: preset.id,
+    });
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: INSTALLATION_ACTION, operation: 'install' }),
+    );
+    fireEvent.click(confirm);
+    await screen.findByText('presetInstallBrowserReady');
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: INSTALLATION_ACTION,
+        operation: 'install',
+        presetId: preset.id,
+        authorize: true,
+      }),
+    );
+  });
 
   it('uses the supplied preview tab for embedded settings', async () => {
     window.history.replaceState({}, '', '?iframe=1&tabId=7');

@@ -111,7 +111,7 @@ export function Installation({
   const source = new URLSearchParams(location.search).get('source');
   const explicitEntry = Boolean(embeddedSession) || source === 'website' || source === 'settings';
   const [view, setView] = useState<InstallationView>();
-  const [preview, setPreview] = useState<InstallationPreview>();
+  const [previews, setPreviews] = useState<Record<string, InstallationPreview>>({});
   const [phase, setPhase] = useState<
     'loading' | 'source' | 'permission' | 'authorizing' | 'installing' | 'done' | 'error'
   >('loading');
@@ -241,11 +241,9 @@ export function Installation({
 
   const previewSession =
     view?.needsInstall && !view.needsSourceConfirmation ? view.session : undefined;
-  const previewSource = view?.source;
-  const previewPresetId = view?.presetId;
   useEffect(() => {
-    setPreview(undefined);
     if (!previewSession) return;
+    setPreviews({});
     let current = true;
     void chrome.runtime
       .sendMessage({
@@ -254,13 +252,13 @@ export function Installation({
         session: previewSession,
       })
       .then(result => {
-        if (current && result?.success) setPreview(result.data);
+        if (current && result?.success) setPreviews(result.data ?? {});
       })
       .catch(() => {});
     return () => {
       current = false;
     };
-  }, [previewSession, previewSource, previewPresetId]);
+  }, [previewSession]);
 
   const confirmSource = async (selected: InstallationView) => {
     if (busy.current) return;
@@ -289,10 +287,7 @@ export function Installation({
     setError('');
     try {
       const result = await call('selectPreset', view.session, { presetId });
-      if (active.current) {
-        setPreview(undefined);
-        setView(result);
-      }
+      if (active.current) setView(result);
     } catch (error) {
       if (active.current) setError(installationError(error));
     } finally {
@@ -409,18 +404,24 @@ export function Installation({
   };
   const pending = view?.localComponentCount ?? 0;
   const allReady = view?.ready === true;
-  const purpose = preview?.purpose && browserUiText(preview.purpose, getCurrentLanguage());
-  const capabilityCounts =
-    preview && !purpose
-      ? [
-          preview.appProfileCount && t('presetInstallPreviewApps', String(preview.appProfileCount)),
-          preview.packageCount && t('presetInstallPreviewPackages', String(preview.packageCount)),
-          preview.skillCount && t('presetInstallPreviewSkills', String(preview.skillCount)),
-          preview.providerCount &&
-            t('presetInstallPreviewProviders', String(preview.providerCount)),
-        ].filter(Boolean)
-      : [];
-  const showPreview = Boolean(previewSession && (purpose || capabilityCounts.length));
+  const purposePreviews = previewSession
+    ? Object.entries(previews).flatMap(([id, preview]) => {
+        const purpose = preview.purpose && browserUiText(preview.purpose, getCurrentLanguage());
+        const counts = purpose
+          ? []
+          : [
+              preview.appProfileCount &&
+                t('presetInstallPreviewApps', String(preview.appProfileCount)),
+              preview.packageCount &&
+                t('presetInstallPreviewPackages', String(preview.packageCount)),
+              preview.skillCount && t('presetInstallPreviewSkills', String(preview.skillCount)),
+              preview.providerCount &&
+                t('presetInstallPreviewProviders', String(preview.providerCount)),
+            ].filter(Boolean);
+        return purpose || counts.length ? [{ id, purpose, counts }] : [];
+      })
+    : [];
+  const showPreview = purposePreviews.some(({ id }) => id === view?.presetId);
   const permissionOrigins =
     phase === 'permission' && view
       ? [...new Set([...view.missingOrigins, ...view.missingAuthorization])]
@@ -482,10 +483,10 @@ export function Installation({
                     key={id}
                     type="button"
                     aria-pressed={selected}
-                    disabled={switchingPreset}
+                    aria-disabled={switchingPreset || undefined}
                     onClick={() => void choosePreset(id)}
                     className={clsx(
-                      'flex min-h-9 min-w-0 cursor-pointer items-center justify-between gap-2 rounded border px-3 py-1.5 text-left text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-accent-blue disabled:cursor-wait disabled:opacity-60',
+                      'flex min-h-9 min-w-0 cursor-pointer items-center justify-between gap-2 rounded border px-3 py-1.5 text-left text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-accent-blue aria-disabled:cursor-wait',
                       selected
                         ? 'border-accent-blue/60 bg-accent-blue/10 text-accent-blue'
                         : 'border-border bg-bg-secondary text-text-primary hover:bg-bg-hover',
@@ -504,22 +505,39 @@ export function Installation({
         )}
         {(showPresetSelector || showPreview) && (
           <div className={clsx(showPresetSelector && 'min-h-12')}>
-            {showPreview && (
-              <section aria-labelledby="preset-install-purpose" className="space-y-1.5">
+            {purposePreviews.length > 0 && (
+              <section
+                aria-labelledby="preset-install-purpose"
+                className={clsx('space-y-1.5', !showPreview && 'invisible')}
+              >
                 <h2 id="preset-install-purpose" className="text-xs font-semibold">
                   {t('presetInstallPurposeTitle')}
                 </h2>
-                {purpose ? (
-                  <p className="break-words text-sm leading-relaxed text-text-secondary">
-                    {purpose}
-                  </p>
-                ) : (
-                  <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm leading-relaxed text-text-secondary">
-                    {capabilityCounts.map(content => (
-                      <li key={content}>{content}</li>
-                    ))}
-                  </ul>
-                )}
+                <div className="grid text-sm leading-relaxed text-text-secondary">
+                  {purposePreviews.map(({ id, purpose, counts }) => {
+                    const selected = id === view?.presetId;
+                    return (
+                      <div
+                        key={id}
+                        aria-hidden={!selected || undefined}
+                        className={clsx(
+                          'col-start-1 row-start-1 min-w-0',
+                          !selected && 'invisible',
+                        )}
+                      >
+                        {purpose ? (
+                          <p className="break-words">{purpose}</p>
+                        ) : (
+                          <ul className="flex flex-wrap gap-x-4 gap-y-1">
+                            {counts.map(content => (
+                              <li key={content}>{content}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </section>
             )}
           </div>
@@ -764,7 +782,7 @@ export function Installation({
             presetChoices.length > 0) && (
             <button
               onClick={() => void cancel()}
-              disabled={switchingPreset}
+              aria-disabled={switchingPreset || undefined}
               className="min-h-8 rounded border border-border px-3 py-1.5 text-xs text-text-secondary hover:bg-bg-hover hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-blue"
             >
               {t('presetInstallCancel')}
@@ -772,8 +790,8 @@ export function Installation({
           )}
           <button
             onClick={allow}
-            disabled={switchingPreset}
-            className="min-h-8 rounded border border-transparent bg-accent-blue px-3 py-1.5 text-xs font-medium text-white hover:brightness-90 focus-visible:ring-2 focus-visible:ring-accent-blue disabled:opacity-60 dark:border-accent-blue/40 dark:bg-accent-bg dark:text-text-primary dark:hover:brightness-125"
+            aria-disabled={switchingPreset || undefined}
+            className="min-h-8 rounded border border-transparent bg-accent-blue px-3 py-1.5 text-xs font-medium text-white hover:brightness-90 focus-visible:ring-2 focus-visible:ring-accent-blue dark:border-accent-blue/40 dark:bg-accent-bg dark:text-text-primary dark:hover:brightness-125"
           >
             {phase === 'source'
               ? t('presetInstallReadSource')
