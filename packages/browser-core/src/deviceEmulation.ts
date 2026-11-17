@@ -34,6 +34,8 @@ export interface DevicePreset {
   appProfileModel: string;
   /** 与设备配套的 App 容器系统。 */
   appProfileOs: 'ios' | 'android';
+  /** iPad 的桌面 Safari 与 App WebView 使用不同的平台标识。 */
+  appProfileIosIdentity?: { uaPlatform: string; systemVersion: string; navigatorPlatform: 'iPad' };
   /** 竖屏时设备屏幕顶部的物理外观。 */
   appearance: DeviceAppearance;
 }
@@ -56,12 +58,19 @@ export interface ResolvedDeviceChromeConfig extends DeviceChromeViewConfig {
 }
 
 /** Shared system-bar geometry for H5 containers and local mini-programs. */
-export function getDeviceChromeViewConfig(emulation: ResolvedEmulationConfig): ResolvedDeviceChromeConfig {
-  const platform = emulation.platform === 'Android' || emulation.platform === 'OpenHarmony' ? 'android' : 'ios';
+export function getDeviceChromeViewConfig(
+  emulation: ResolvedEmulationConfig,
+): ResolvedDeviceChromeConfig {
+  const platform =
+    emulation.platform === 'Android' || emulation.platform === 'OpenHarmony' ? 'android' : 'ios';
   const sideBarWidth = getDeviceSideBarWidth(emulation.presetName, emulation.orientation);
   return {
     platform,
-    statusBarHeight: sideBarWidth ? 0 : emulation.orientation === 'landscape' ? 24 : emulation.safeAreaInsets.top,
+    statusBarHeight: sideBarWidth
+      ? 0
+      : emulation.orientation === 'landscape'
+        ? 24
+        : emulation.safeAreaInsets.top,
     bottomBarHeight: emulation.safeAreaInsets.bottom,
     ...(sideBarWidth ? { sideBarWidth } : {}),
     safeAreaInsets: { ...emulation.safeAreaInsets },
@@ -197,6 +206,11 @@ export const DEVICE_PRESETS: Record<BrowserDevicePresetName, DevicePreset> = {
     landscapeSafeAreaInsets: { top: 0, right: 24, bottom: 20, left: 24 },
     appProfileModel: 'iPad mini (A17 Pro)',
     appProfileOs: 'ios',
+    appProfileIosIdentity: {
+      uaPlatform: 'iPad; CPU OS 18_6 like Mac OS X',
+      systemVersion: '26.0',
+      navigatorPlatform: 'iPad',
+    },
     appearance: { cutout: 'none' },
   },
   'galaxy-s26': {
@@ -301,6 +315,11 @@ export const DEVICE_PRESETS: Record<BrowserDevicePresetName, DevicePreset> = {
     landscapeSafeAreaInsets: { top: 0, right: 24, bottom: 20, left: 24 },
     appProfileModel: 'iPad mini',
     appProfileOs: 'ios',
+    appProfileIosIdentity: {
+      uaPlatform: 'iPad; CPU OS 17_0 like Mac OS X',
+      systemVersion: '17.0',
+      navigatorPlatform: 'iPad',
+    },
     appearance: { cutout: 'none' },
   },
   'galaxy-s23': {

@@ -87,7 +87,7 @@ export interface AppProfileDefinition {
   /** 容器的应用标识，由能力包定义 */
   appName: string;
   defaultAppVersion: string;
-  /** UA 主体格式；未提供时使用标准浏览器 UA */
+  /** device-webview 模板中的浏览器平台和版本随设备预设变化。 */
   uaFamily?: string;
   uaTemplate?: { ios: string; android: string };
   policies?: AppProfilePolicies;
@@ -271,26 +271,54 @@ export function validateAppProfileDefinition(value: unknown): AppProfileDefiniti
   for (const key of ['name', 'label', 'appName', 'defaultAppVersion'])
     if (!text(value[key]) || !value[key]) invalid(key);
   if (!/^[a-z][a-z0-9-]*(?:\/[a-z][a-z0-9-]*)?$/.test(value.name as string)) invalid('name');
-  if (value.defaultAppId !== undefined &&
-      (typeof value.defaultAppId !== 'string' || !/^[a-z][a-z0-9-]{0,79}$/.test(value.defaultAppId) ||
-        ['constructor', 'prototype'].includes(value.defaultAppId))) invalid('defaultAppId');
+  if (
+    value.defaultAppId !== undefined &&
+    (typeof value.defaultAppId !== 'string' ||
+      !/^[a-z][a-z0-9-]{0,79}$/.test(value.defaultAppId) ||
+      ['constructor', 'prototype'].includes(value.defaultAppId))
+  )
+    invalid('defaultAppId');
   if (value.usage !== undefined) {
     const usage = value.usage;
     fields(usage, [], ['description', 'limitations', 'skills', 'documentation'], 'usage');
-    if (new TextEncoder().encode(JSON.stringify(usage)).byteLength > 4096) invalid('usage exceeds 4 KiB');
-    if (usage.description !== undefined && (!text(usage.description) || usage.description.length > 512)) invalid('usage.description');
+    if (new TextEncoder().encode(JSON.stringify(usage)).byteLength > 4096)
+      invalid('usage exceeds 4 KiB');
+    if (
+      usage.description !== undefined &&
+      (!text(usage.description) || usage.description.length > 512)
+    )
+      invalid('usage.description');
     for (const key of ['limitations', 'skills'] as const) {
       const items = usage[key];
-      if (items !== undefined && (!Array.isArray(items) || items.length > 8 || items.some(item => !text(item) || !item || item.length > 256))) invalid(`usage.${key}`);
+      if (
+        items !== undefined &&
+        (!Array.isArray(items) ||
+          items.length > 8 ||
+          items.some(item => !text(item) || !item || item.length > 256))
+      )
+        invalid(`usage.${key}`);
     }
     if (usage.documentation !== undefined) {
-      if (!Array.isArray(usage.documentation) || usage.documentation.length > 8) invalid('usage.documentation');
+      if (!Array.isArray(usage.documentation) || usage.documentation.length > 8)
+        invalid('usage.documentation');
       for (const link of usage.documentation) {
         fields(link, ['title', 'url'], [], 'usage.documentation');
-        if (!text(link.title) || !link.title || link.title.length > 128 || !text(link.url) || link.url.length > 1024) invalid('usage.documentation');
+        if (
+          !text(link.title) ||
+          !link.title ||
+          link.title.length > 128 ||
+          !text(link.url) ||
+          link.url.length > 1024
+        )
+          invalid('usage.documentation');
         let url: URL;
-        try { url = new URL(link.url); } catch { invalid('usage.documentation.url'); }
-        if (url.protocol !== 'https:' || url.username || url.password) invalid('usage.documentation.url');
+        try {
+          url = new URL(link.url);
+        } catch {
+          invalid('usage.documentation.url');
+        }
+        if (url.protocol !== 'https:' || url.username || url.password)
+          invalid('usage.documentation.url');
       }
     }
   }
@@ -325,7 +353,8 @@ export function validateAppProfileDefinition(value: unknown): AppProfileDefiniti
         .split('.')
         .some(part => ['__proto__', 'prototype', 'constructor'].includes(part)) ||
       globals.has(bridge.global) ||
-      (typeof bridge.style !== 'string' || !/^[a-zA-Z][a-zA-Z0-9-]{0,63}$/.test(bridge.style)) ||
+      typeof bridge.style !== 'string' ||
+      !/^[a-zA-Z][a-zA-Z0-9-]{0,63}$/.test(bridge.style) ||
       (bridge.persistent !== undefined && typeof bridge.persistent !== 'boolean')
     )
       invalid('bridge');
@@ -334,11 +363,35 @@ export function validateAppProfileDefinition(value: unknown): AppProfileDefiniti
   validateActions(value.actions);
   if (value.labels !== undefined) {
     fields(value.labels, ['en'], ['zh_CN'], 'labels');
-    if (!text(value.labels.en) || !value.labels.en || value.labels.en.length > 120 || value.labels.zh_CN !== undefined && (!text(value.labels.zh_CN) || value.labels.zh_CN.length > 120)) invalid('labels');
+    if (
+      !text(value.labels.en) ||
+      !value.labels.en ||
+      value.labels.en.length > 120 ||
+      (value.labels.zh_CN !== undefined &&
+        (!text(value.labels.zh_CN) || value.labels.zh_CN.length > 120))
+    )
+      invalid('labels');
   }
-  if (value.actionIcon !== undefined && (typeof value.actionIcon !== 'string' || value.actionIcon.length > 32768 || !/^data:image\/png;base64,iVBORw0KGgo[A-Za-z0-9+/]*={0,2}$/.test(value.actionIcon))) invalid('actionIcon');
-  if (value.authorization !== undefined && (!record(value.authorization) || Object.keys(value.authorization).sort().join(',') !== 'hook,method' || typeof value.authorization.hook !== 'string' || !/^[a-z][a-zA-Z0-9_.-]{0,95}$/.test(value.authorization.hook) || typeof value.authorization.method !== 'string' || !value.authorization.method || value.authorization.method.length > 200)) invalid('authorization');
-  if (value.settingsUi !== undefined && value.settingsUi !== 'runtime') throw new Error('Invalid App settings UI');
+  if (
+    value.actionIcon !== undefined &&
+    (typeof value.actionIcon !== 'string' ||
+      value.actionIcon.length > 32768 ||
+      !/^data:image\/png;base64,iVBORw0KGgo[A-Za-z0-9+/]*={0,2}$/.test(value.actionIcon))
+  )
+    invalid('actionIcon');
+  if (
+    value.authorization !== undefined &&
+    (!record(value.authorization) ||
+      Object.keys(value.authorization).sort().join(',') !== 'hook,method' ||
+      typeof value.authorization.hook !== 'string' ||
+      !/^[a-z][a-zA-Z0-9_.-]{0,95}$/.test(value.authorization.hook) ||
+      typeof value.authorization.method !== 'string' ||
+      !value.authorization.method ||
+      value.authorization.method.length > 200)
+  )
+    invalid('authorization');
+  if (value.settingsUi !== undefined && value.settingsUi !== 'runtime')
+    throw new Error('Invalid App settings UI');
   if (
     value.settingsGroup !== undefined &&
     (typeof value.settingsGroup !== 'string' || value.settingsGroup.length > 64)
@@ -361,12 +414,12 @@ export function validateAppProfileDefinition(value: unknown): AppProfileDefiniti
       'policies',
     );
     const p = value.policies;
-    if (
-      p.titleBar !== undefined &&
-      (typeof p.titleBar !== 'string' || p.titleBar.length > 64)
-    )
+    if (p.titleBar !== undefined && (typeof p.titleBar !== 'string' || p.titleBar.length > 64))
       invalid('policies.titleBar');
-    if (p.networkResult !== undefined && (typeof p.networkResult !== 'string' || p.networkResult.length > 64))
+    if (
+      p.networkResult !== undefined &&
+      (typeof p.networkResult !== 'string' || p.networkResult.length > 64)
+    )
       invalid('policies.networkResult');
     if (p.navigatorLanguage !== undefined && typeof p.navigatorLanguage !== 'boolean')
       invalid('policies.navigatorLanguage');
@@ -482,7 +535,11 @@ export function validateAppProfileDefinition(value: unknown): AppProfileDefiniti
         invalid('setting.option type');
     }
   }
-  if (value.runtimeOptions !== undefined && (!record(value.runtimeOptions) || !json(value.runtimeOptions))) invalid('runtimeOptions');
+  if (
+    value.runtimeOptions !== undefined &&
+    (!record(value.runtimeOptions) || !json(value.runtimeOptions))
+  )
+    invalid('runtimeOptions');
   for (const key of ['popBeforeOpenParam', 'messageEvent'])
     if (value[key] !== undefined && !text(value[key])) invalid(key);
   if (value.statusBarBackgroundColors !== undefined && !stringMap(value.statusBarBackgroundColors))

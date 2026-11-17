@@ -127,12 +127,18 @@ const getFitToWindowScale = async (
   }
 };
 
+const getRuntimeDevicePreset = (preset: QuickDevicePresetName): QuickFixedDevicePresetName =>
+  preset === 'ios-adaptive' ? 'iphone-17-pro' : preset === 'android-adaptive' ? 'pixel-11' : preset;
+
 const getAdaptiveRuntimeConfig = (
   preset: 'ios-adaptive' | 'android-adaptive',
   orientation: QuickDeviceOrientation,
 ): InheritedViewportDeviceEnvironmentConfig => {
-  const runtimePreset = preset === 'ios-adaptive' ? 'iphone-17-pro' : 'pixel-11';
-  const base = resolveEmulationConfig({ enabled: true, preset: runtimePreset, orientation });
+  const base = resolveEmulationConfig({
+    enabled: true,
+    preset: getRuntimeDevicePreset(preset),
+    orientation,
+  });
   const chromeConfig = getQuickDeviceChromeConfig(preset, orientation);
   return {
     viewport: 'inherit',
@@ -153,13 +159,7 @@ const getProfileOs = (config: InjectedAppProfileConfig): 'ios' | 'android' =>
   config.platform === 'Android' ? 'android' : 'ios';
 
 const getDeviceDocumentEnvironmentKey = (preset: QuickDevicePresetName): string => {
-  const runtimePreset: QuickFixedDevicePresetName =
-    preset === 'ios-adaptive'
-      ? 'iphone-17-pro'
-      : preset === 'android-adaptive'
-        ? 'pixel-11'
-        : preset;
-  const config = resolveEmulationConfig({ enabled: true, preset: runtimePreset });
+  const config = resolveEmulationConfig({ enabled: true, preset: getRuntimeDevicePreset(preset) });
   return JSON.stringify([config.userAgent, config.platform, config.mobile, config.touch]);
 };
 
@@ -233,8 +233,10 @@ const profileMatchesSelection = (
   if (!selection) {
     return true;
   }
+  const boundPreset = profile.binding?.options.devicePreset;
   return (
     getProfileOs(profile) === getQuickDevicePresetOs(selection.preset) &&
+    (boundPreset === undefined || boundPreset === getRuntimeDevicePreset(selection.preset)) &&
     (profile.binding?.options.deviceModel ?? profile.globals.__DEVICE_MODEL__) ===
       getQuickDevicePresetModel(selection.preset)
   );
@@ -245,17 +247,28 @@ const updateProfileForSelection = async (
   profile: InjectedAppProfileConfig,
   selection: QuickDeviceSimulationSelection | null,
   reload: boolean,
-): Promise<void> => {
+): Promise<string | undefined> => {
+  const boundOptions = profile.binding?.options;
   const os = selection ? getQuickDevicePresetOs(selection.preset) : getProfileOs(profile);
   const deviceModel = selection
     ? getQuickDevicePresetModel(selection.preset)
-    : (profile.binding?.options.deviceModel ?? profile.globals.__DEVICE_MODEL__);
+    : (boundOptions?.deviceModel ?? profile.globals.__DEVICE_MODEL__);
+  const devicePreset = selection
+    ? getRuntimeDevicePreset(selection.preset)
+    : boundOptions?.devicePreset;
+  const orientation = selection?.orientation ?? boundOptions?.orientation;
   const params = getProfileUpdateParams(tabId, profile, os, deviceModel, reload);
   const { os: targetOs, deviceModel: targetModel, ...command } = params;
-  await handleSetAppProfile(command, () => null, {
+  const result = await handleSetAppProfile(command, () => null, {
     current: profile,
-    deviceOptions: { os: targetOs, deviceModel: targetModel },
+    deviceOptions: {
+      os: targetOs,
+      deviceModel: targetModel,
+      ...(devicePreset && { devicePreset }),
+      ...(orientation && { orientation }),
+    },
   });
+  return result.userAgent;
 };
 
 export function getQuickDeviceEmulationState(tabId: number): QuickDeviceEmulationResponse {
@@ -334,7 +347,7 @@ const applyQuickDeviceEmulation = async (
   await hydrateQuickDeviceSimulationState(tabId);
   const currentDevice = getEmulationConfigForTab(tabId);
   const currentSelection = getActiveSelection(tabId);
-  const documentEnvironmentChanged = deviceDocumentEnvironmentChanged(currentSelection, preset);
+  let documentEnvironmentChanged = deviceDocumentEnvironmentChanged(currentSelection, preset);
   const targetSelection: QuickDeviceSimulationSelection = normalizeQuickDeviceSelection({
     preset,
     orientation,
@@ -343,32 +356,20 @@ const applyQuickDeviceEmulation = async (
     splitScreen,
   });
   const profile = await getAppProfileForTab(tabId);
-  const targetOs = getQuickDevicePresetOs(preset);
-  const targetDeviceModel = getQuickDevicePresetModel(preset);
-  const profileOsChanged = Boolean(profile && getProfileOs(profile) !== targetOs);
-  const profileDeviceModelChanged = Boolean(
-    profile &&
-    (profile.binding?.options.deviceModel ?? profile.globals.__DEVICE_MODEL__) !==
-      targetDeviceModel,
-  );
-  const profileDeviceAppearanceChanged = Boolean(
-    profile && !profileMatchesSelection(profile, targetSelection),
-  );
-  const profileNeedsUpdate = Boolean(
-    profile && (profileOsChanged || profileDeviceModelChanged || profileDeviceAppearanceChanged),
-  );
+  const profileNeedsUpdate = profile && !profileMatchesSelection(profile, targetSelection);
   const scale =
     !isQuickAdaptiveDevicePresetName(preset) && targetSelection.fitToWindow
       ? await getFitToWindowScale(tabId, preset, orientation)
       : 1;
 
   if (profile && profileNeedsUpdate) {
-    await updateProfileForSelection(
+    const updatedUa = await updateProfileForSelection(
       tabId,
       profile,
       targetSelection,
       isQuickAdaptiveDevicePresetName(preset) && documentEnvironmentChanged,
     );
+    if (updatedUa && updatedUa !== profile.userAgent) documentEnvironmentChanged = true;
   }
 
   try {
@@ -560,9 +561,10 @@ export function setQuickAppSimulation({
         previousDevice.orientation === selection.orientation &&
         getEmulationFitToWindowForTab(tabId) === selection.fitToWindow &&
         Boolean((await getDeviceShellForTab(tabId))?.config.phoneFrame);
-      const deviceOptions = isQuickFixedDevicePresetName(selection.preset)
-        ? { devicePreset: selection.preset, orientation: selection.orientation }
-        : undefined;
+      const deviceOptions = {
+        devicePreset: getRuntimeDevicePreset(selection.preset),
+        orientation: selection.orientation,
+      };
       let fixedDeviceUpdateStarted = false;
 
       try {
@@ -584,7 +586,7 @@ export function setQuickAppSimulation({
           await setQuickDeviceSimulationState(tabId, selection, { updateGlobalDefault });
           device = await getQuickDeviceEmulationStateWithGlobalDefault(tabId);
         } else {
-          fixedDeviceUpdateStarted = Boolean(deviceOptions);
+          fixedDeviceUpdateStarted = isQuickFixedDevicePresetName(selection.preset);
           device = await applyQuickDeviceEmulation(
             { tabId, ...selection },
             {
@@ -752,6 +754,12 @@ async function applyAppSimulation(
       reload: false,
     },
     () => null,
+    {
+      deviceOptions: {
+        devicePreset: deviceConfig.presetName,
+        orientation: deviceConfig.orientation,
+      },
+    },
   )) as unknown as Record<string, unknown>;
 
   try {

@@ -230,7 +230,7 @@ describe('quick device emulation', () => {
         reload: false,
       },
       expect.any(Function),
-      { deviceOptions: undefined },
+      { deviceOptions: { devicePreset: 'iphone-17-pro', orientation: 'portrait' } },
     );
     expect(getQuickDeviceEmulationState(7)).toMatchObject({
       active: true,
@@ -423,6 +423,7 @@ describe('quick device emulation', () => {
         reload: false,
       }),
       expect.any(Function),
+      { deviceOptions: { devicePreset: 'pixel-11', orientation: 'landscape' } },
     );
     expect(deviceHandlerMocks.handleSetDeviceEmulation).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -434,6 +435,42 @@ describe('quick device emulation', () => {
         splitScreen: true,
       }),
       expect.any(Function),
+    );
+  });
+
+  it('restores the saved App device preset when combined emulation fails without a quick selection', async () => {
+    const previous = resolveAppProfile('reader', {
+      devicePreset: 'pixel-11',
+      orientation: 'landscape',
+    }).injected;
+    profileRuleMocks.getAppProfileForTab.mockResolvedValue(previous);
+    deviceHandlerMocks.handleSetDeviceEmulation.mockRejectedValue(new Error('Reload failed'));
+    deviceStateMocks.getEmulationConfigForTab.mockReturnValue(emulation('galaxy-s26', 'portrait'));
+
+    await expect(
+      handleSetAppSimulation(
+        {
+          tabId: 7,
+          enabled: true,
+          profile: 'reader',
+          emulation: { preset: 'galaxy-s26' },
+        },
+        () => null,
+      ),
+    ).rejects.toThrow('Reload failed');
+
+    expect(appProfileHandlerMocks.handleSetAppProfile).toHaveBeenLastCalledWith(
+      expect.objectContaining({ reload: true }),
+      expect.any(Function),
+      {
+        current: previous,
+        deviceOptions: {
+          os: 'android',
+          deviceModel: 'Pixel 11',
+          devicePreset: 'pixel-11',
+          orientation: 'landscape',
+        },
+      },
     );
   });
 
@@ -669,6 +706,36 @@ describe('quick device emulation', () => {
     );
   });
 
+  it('reloads when an App UA changes between devices with the same browser UA', async () => {
+    seedQuickDevice('pixel-11', 'portrait');
+    profileRuleMocks.getAppProfileForTab.mockResolvedValue({
+      ...(appProfile('Android', 'Pixel 11') as object),
+      userAgent: 'App Android 17; Pixel 11',
+    });
+    appProfileHandlerMocks.handleSetAppProfile.mockResolvedValueOnce({
+      enabled: true,
+      userAgent: 'App Android 16; SM-S942B',
+    });
+    deviceStateMocks.getEmulationConfigForTab
+      .mockReturnValueOnce(emulation('pixel-11', 'portrait'))
+      .mockReturnValueOnce(emulation('pixel-11', 'portrait'))
+      .mockReturnValue(emulation('galaxy-s26', 'portrait'));
+
+    await setQuickDeviceEmulation({ tabId: 7, preset: 'galaxy-s26', orientation: 'portrait' });
+
+    expect(appProfileHandlerMocks.handleSetAppProfile).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.any(Function),
+      expect.objectContaining({
+        deviceOptions: expect.objectContaining({ devicePreset: 'galaxy-s26' }),
+      }),
+    );
+    expect(deviceHandlerMocks.handleSetDeviceEmulation.mock.calls[0]?.[0]).not.toHaveProperty(
+      'reload',
+      false,
+    );
+  });
+
   it('keeps a matching App appearance when only the fit scale changes', async () => {
     seedQuickDevice('pixel-11', 'portrait', true);
     profileRuleMocks.getAppProfileForTab.mockResolvedValue(appProfile('Android', 'Pixel 11'));
@@ -710,7 +777,14 @@ describe('quick device emulation', () => {
         reload: false,
       },
       expect.any(Function),
-      expect.objectContaining({ deviceOptions: { os: 'android', deviceModel: 'Pixel 11' } }),
+      expect.objectContaining({
+        deviceOptions: {
+          os: 'android',
+          deviceModel: 'Pixel 11',
+          devicePreset: 'pixel-11',
+          orientation: 'landscape',
+        },
+      }),
     );
     expect(deviceHandlerMocks.handleSetDeviceEmulation).toHaveBeenCalledWith(
       {
@@ -755,7 +829,12 @@ describe('quick device emulation', () => {
       },
       expect.any(Function),
       expect.objectContaining({
-        deviceOptions: { os: 'android', deviceModel: 'HUAWEI Pura X Max' },
+        deviceOptions: {
+          os: 'android',
+          deviceModel: 'HUAWEI Pura X Max',
+          devicePreset: 'pura-x-max',
+          orientation: 'portrait',
+        },
       }),
     );
     expect(deviceHandlerMocks.handleSetDeviceEmulation).toHaveBeenCalledWith(
@@ -796,7 +875,14 @@ describe('quick device emulation', () => {
         reload: true,
       },
       expect.any(Function),
-      expect.objectContaining({ deviceOptions: { os: 'ios', deviceModel: 'iPhone 17 Pro' } }),
+      expect.objectContaining({
+        deviceOptions: {
+          os: 'ios',
+          deviceModel: 'iPhone 17 Pro',
+          devicePreset: 'iphone-17-pro',
+          orientation: 'portrait',
+        },
+      }),
     );
   });
 
@@ -819,13 +905,25 @@ describe('quick device emulation', () => {
       expect.objectContaining({}),
       expect.any(Function),
       expect.objectContaining({
-        deviceOptions: { os: 'android', deviceModel: 'HUAWEI Pura X Max' },
+        deviceOptions: {
+          os: 'android',
+          deviceModel: 'HUAWEI Pura X Max',
+          devicePreset: 'pura-x-max',
+          orientation: 'portrait',
+        },
       }),
     );
     expect(appProfileHandlerMocks.handleSetAppProfile).toHaveBeenLastCalledWith(
       expect.objectContaining({}),
       expect.any(Function),
-      expect.objectContaining({ deviceOptions: { os: 'android', deviceModel: 'Pixel 11' } }),
+      expect.objectContaining({
+        deviceOptions: {
+          os: 'android',
+          deviceModel: 'Pixel 11',
+          devicePreset: 'pixel-11',
+          orientation: 'portrait',
+        },
+      }),
     );
   });
 
@@ -1011,7 +1109,14 @@ describe('quick device emulation', () => {
         reload: true,
       }),
       expect.any(Function),
-      expect.objectContaining({ deviceOptions: { os: 'android', deviceModel: 'Pixel 11' } }),
+      expect.objectContaining({
+        deviceOptions: {
+          os: 'android',
+          deviceModel: 'Pixel 11',
+          devicePreset: 'pixel-11',
+          orientation: 'portrait',
+        },
+      }),
     );
     expect(appProfileHandlerMocks.handleSetAppProfile.mock.calls[0]?.[0]).not.toHaveProperty(
       'emulation',

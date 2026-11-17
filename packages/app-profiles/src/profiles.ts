@@ -197,11 +197,10 @@ export function applyAppBridgeConfig(
   return out;
 }
 
-
-
 /** Built-ins provide UA/version identity; full environments come from capability packages. */
 /** Profiles are supplied by installed capabilities; the core has no App defaults. */
-export const APP_PROFILES: Readonly<Partial<Record<BuiltinAppProfileName, AppProfile>>> = Object.freeze({});
+export const APP_PROFILES: Readonly<Partial<Record<BuiltinAppProfileName, AppProfile>>> =
+  Object.freeze({});
 
 export interface ResolveAppProfileOptions extends AppProfileOptions {
   os?: AppProfileOs;
@@ -241,10 +240,34 @@ export function buildAppProfileUa(
     (options.devicePreset ? DEVICE_PRESETS[options.devicePreset]?.appProfileModel : undefined) ??
     'Pixel 11';
   if (profile.uaTemplate) {
-    return profile.uaTemplate[os]
-      .replaceAll('{v}', version)
-      .replaceAll('{deviceModel}', deviceModel)
-      .replaceAll('{language}', options.language ?? profile.policies?.defaultLanguage ?? 'zh-Hans');
+    let template = profile.uaTemplate[os];
+    const preset = options.devicePreset && DEVICE_PRESETS[options.devicePreset];
+    if (profile.uaFamily === 'device-webview' && preset && preset.appProfileOs === os) {
+      if (os === 'ios') {
+        const platform =
+          preset.appProfileIosIdentity?.uaPlatform ??
+          /^Mozilla\/5\.0 \((iPhone; [^)]+)\)/.exec(preset.userAgent)?.[1];
+        const engine = /AppleWebKit\/[\d.]+/.exec(preset.userAgent)?.[0];
+        if (platform)
+          template = template.replace(
+            /^(Mozilla\/5\.0 )\(i(?:Phone|Pad); [^)]+\)/,
+            `$1(${platform})`,
+          );
+        if (engine) template = template.replace(/AppleWebKit\/[\d.]+/, engine);
+      } else if (preset.platform === 'Android') {
+        const chrome = /Chrome\/[\d.]+/.exec(preset.userAgent)?.[0];
+        template = template.replace(
+          /\(Linux; Android [\d.]+;/,
+          `(Linux; Android ${preset.platformVersion};`,
+        );
+        if (chrome) template = template.replace(/Chrome\/[\d.]+/, chrome);
+      }
+    }
+    return template.replace(/\{(v|deviceModel|language)\}/g, (_, token: string) => {
+      if (token === 'v') return version;
+      if (token === 'deviceModel') return deviceModel;
+      return options.language ?? profile.policies?.defaultLanguage ?? 'zh-Hans';
+    });
   }
   return os === 'android'
     ? `Mozilla/5.0 (Linux; Android 17; ${deviceModel}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36`
@@ -266,9 +289,7 @@ export function resolveAppProfile(
 ): ResolvedAppProfile {
   const definition = pinnedDefinition ?? APP_PROFILES[name as BuiltinAppProfileName];
   if (!definition || definition.name !== name) {
-    throw new Error(
-      `Unknown app profile "${name}". Install an App simulation capability first.`,
-    );
+    throw new Error(`Unknown app profile "${name}". Install an App simulation capability first.`);
   }
   return resolveAppProfileDefinition(definition, options);
 }
@@ -325,16 +346,27 @@ export function resolveAppProfileDefinition(
     preset: devicePreset,
     orientation: options.orientation,
   });
-  const deviceModel = options.deviceModel ?? DEVICE_PRESETS[devicePreset].appProfileModel;
+  const preset = DEVICE_PRESETS[devicePreset];
+  const deviceModel = options.deviceModel ?? preset.appProfileModel;
+  const matchingDevice =
+    profile.uaFamily === 'device-webview' && preset.appProfileOs === os ? preset : undefined;
 
-  const globals: Record<string, string> = profile.pageRuntime || profile.bridges.length > 0 || Object.keys(profile.globals).length > 0 ? {
-    ...Object.fromEntries(Object.entries(profile.globals).map(([key, value]) => [key, value.replaceAll('{deviceModel}', deviceModel).replaceAll('{v}', version)])),
-    __APP_NAME__: profile.appName,
-    __APP_VERSION__: version,
-    __DEVICE_MODEL__: deviceModel,
-  } : {};
+  const globals: Record<string, string> =
+    profile.pageRuntime || profile.bridges.length > 0 || Object.keys(profile.globals).length > 0
+      ? {
+          ...Object.fromEntries(
+            Object.entries(profile.globals).map(([key, value]) => [
+              key,
+              value.replaceAll('{deviceModel}', deviceModel).replaceAll('{v}', version),
+            ]),
+          ),
+          __APP_NAME__: profile.appName,
+          __APP_VERSION__: version,
+          __DEVICE_MODEL__: deviceModel,
+        }
+      : {};
 
-  const ua = buildAppProfileUa(profile, { ...options, os, deviceModel });
+  const ua = buildAppProfileUa(profile, { ...options, os, devicePreset, deviceModel });
 
   return {
     profile: profile.name as AppProfileName,
@@ -375,10 +407,20 @@ export function resolveAppProfileDefinition(
       language: options.language ?? profile.policies?.defaultLanguage ?? 'zh-Hans',
       // UA 随注入配置一起下发，供 DNR、页内运行时和动态 WebView 导航前刷新使用
       userAgent: ua,
-      navigatorPlatform: os === 'android' ? 'Linux armv8l' : 'iPhone',
+      navigatorPlatform:
+        os === 'android'
+          ? 'Linux armv8l'
+          : (matchingDevice?.appProfileIosIdentity?.navigatorPlatform ?? 'iPhone'),
       // systemInfo 使用产品系统版本；Safari UA 中的系统 token 可能是兼容性固定值。
       platform: os === 'android' ? 'Android' : 'iOS',
-      systemVersion: os === 'android' ? '17' : '26.0',
+      systemVersion:
+        os === 'android'
+          ? matchingDevice?.platform === 'Android'
+            ? matchingDevice.platformVersion
+            : '17'
+          : (matchingDevice?.appProfileIosIdentity?.systemVersion ??
+            matchingDevice?.platformVersion ??
+            '26.0'),
       clientType: os === 'android' ? 'android' : 'iphone',
       actions: applyAppBridgeConfig(profile.actions, options.bridgeConfig),
       schemes: profile.schemes,
@@ -390,7 +432,9 @@ export function resolveAppProfileDefinition(
       ...(profile.nativeBack && { nativeBack: profile.nativeBack }),
       ...(profile.layerUrlProxy && { layerUrlProxy: profile.layerUrlProxy }),
       ...(profile.urlSyncHostSuffixes && { urlSyncHostSuffixes: profile.urlSyncHostSuffixes }),
-      ...(profile.runtimeOptions && { runtimeOptions: JSON.parse(JSON.stringify(profile.runtimeOptions)) }),
+      ...(profile.runtimeOptions && {
+        runtimeOptions: JSON.parse(JSON.stringify(profile.runtimeOptions)),
+      }),
       simulateSystemBars: false,
       externalDeviceChrome: false,
       rootContainer: {
