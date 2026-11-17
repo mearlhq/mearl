@@ -4,9 +4,26 @@
 
 在终端使用 `mearl`，或在 TypeScript 中使用 `@mearl/client`，控制浏览器、查看请求和日志，或执行 Skill 命令。CLI、SDK 和脚本运行器共用浏览器路由与插件运行时，安装和连接由 `@mearl/setup` 管理。
 
-首次使用当前版本可运行 `mearl guide`，默认只读取核心工作流。`mearl guide --list` 列出专题；例如 `mearl guide run` 读取 SDK 组合调用，`mearl guide environment` 读取设备与 App 指引。指南只读 npm 包内资源，不连接浏览器、加载插件、安装环境或触发自动更新。动作参数继续使用 `mearl <action> --help`，目标的已安装能力继续按现有目录查询。
+首次使用当前版本可运行 `mearl guide`，默认只读取核心工作流。`mearl guide --list` 列出专题；例如 `mearl guide run` 读取 SDK 组合调用，`mearl guide environment` 读取设备与 App 指引。指南读取 npm 包内资源和本地 Preset 元数据。动作参数继续使用 `mearl <action> --help`，目标的已安装能力继续按现有目录查询。
 
-指南正文唯一维护在本包的 `guides/`，构建时复制到 `dist/guides/`，`pnpm check:skills` 校验一致性。CLI 输出将本地文档链接转换为下一条指南命令。`skills/mearl/` 只分发精简的 `SKILL.md`，不附带正文副本；仅使用 MCP、无法执行 CLI 时，直接使用当前工具说明与 schema。
+`mearl guide skills` 会在正文展示已选 Preset 的专用 Skill。`defaults.skillCatalog` 以 Skill 名称为键，每项用 `description` 描述适用场景，也可直接写成字符串。按需安装的 Skill 默认使用 `defaults.skillCatalogSource`。某个条目使用其他仓库时，给该条目填写 `source`，值可用当前安装器支持的仓库标识或完整 HTTPS 仓库地址。顶层 `skills` 中启用的条目由 Preset 管理。`defaults.extension.links.agentDocs` 可链接团队 Skill 的使用说明。
+
+```json
+{
+  "defaults": {
+    "skillCatalogSource": "team/skills",
+    "skillCatalog": {
+      "team-report": { "description": "读取团队报表" },
+      "other-report": {
+        "description": "读取其他团队的报表",
+        "source": "https://github.com/example/other-skills"
+      }
+    }
+  }
+}
+```
+
+本包随附的指南维护在 `guides/`，构建时复制到 `dist/guides/`，由 `pnpm check:skills` 校验一致性。CLI 输出将本地文档链接转换为指南命令。`skills/mearl/` 分发精简的 `SKILL.md`。仅使用 MCP 时，直接使用当前工具说明与 schema。
 
 统一浏览器 SDK 与 CLI。它会发现当前机器及已配置 cloud-server 下所有 connector 的浏览器，并根据 `browser_list` 返回的全局 `browserId` 自动选择本地 Socket 或云端 WebSocket 链路。
 

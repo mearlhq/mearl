@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import type { PresetSkillCatalogEntry } from '@mearl/daemon-core/installation';
 import { CLIENT_VERSION } from './runtimePaths.js';
 
 /** One catalog drives CLI navigation and the build-time resource copy. */
@@ -25,48 +26,120 @@ export function renderGuideLinks(source: string, commandName = 'mearl'): string 
   });
 }
 
+function renderPresetSkills(
+  setupCommand: string,
+  skillCatalog?: Record<string, PresetSkillCatalogEntry>,
+  agentDocs?: string,
+): string {
+  if (!skillCatalog && !agentDocs) return '';
+  const lines = ['## 当前 Preset 的专用 Skill', ''];
+  if (skillCatalog) {
+    const entries = Object.entries(skillCatalog);
+    lines.push('| 适用场景 | Skill | 安装来源 |', '| --- | --- | --- |');
+    for (const [name, { description, source, managed }] of entries) {
+      const cell = description.replaceAll('\\', '\\\\').replaceAll('|', '\\|');
+      const install = managed ? 'Preset 管理' : source ? `\`${source}\`` : '见 Skill 说明';
+      lines.push(`| ${cell} | \`${name}\` | ${install} |`);
+    }
+    lines.push('');
+    if (entries.some(([, entry]) => entry.source)) {
+      lines.push(
+        '按需安装时，将同一行的安装来源和 Skill 名称填入命令。',
+        '',
+        '```bash',
+        `${setupCommand} plugin install '<source>' --skill <skill-name> --yes`,
+        '```',
+        '',
+      );
+    }
+    if (entries.some(([, entry]) => entry.managed)) {
+      lines.push(
+        `Preset 管理的 Skill 缺失时，先用 \`${setupCommand} preset status\` 检查，再用 \`${setupCommand} preset apply\` 重试同步。`,
+        '',
+      );
+    }
+  }
+  if (agentDocs) lines.push(`查看未安装 Skill 的用法和安装方式：${agentDocs}`, '');
+  return lines.join('\n') + '\n';
+}
+
 /** Only packaged files are read; unknown IDs never become filesystem paths. */
-export async function readGuide(id: string, commandName = 'mearl', version = CLIENT_VERSION): Promise<string> {
+export async function readGuide(
+  id: string,
+  commandName = 'mearl',
+  version = CLIENT_VERSION,
+): Promise<string> {
   const topic = GUIDE_TOPICS.find(topic => topic.id === id);
   if (!topic) throw new Error(`未知指南主题：${id}。用 ${commandName} guide --list 查看主题。`);
   let source: string;
   try {
     source = readFileSync(new URL(`./guides/${topic.file}`, import.meta.url), 'utf8');
   } catch (error) {
-    throw new Error(`当前安装缺少指南资源：${topic.id}。请通过当前发行版的安装入口修复安装包；参数可用 ${commandName} <action> --help 查询。`, { cause: error });
+    throw new Error(
+      `当前安装缺少指南资源：${topic.id}。请通过当前发行版的安装入口修复安装包；参数可用 ${commandName} <action> --help 查询。`,
+      { cause: error },
+    );
   }
   let management: string | undefined;
-  if (source.includes('{{setup}}')) {
-    const { readInstallationManagement, setupManagementCommand } = await import('@mearl/daemon-core/installation');
+  let presetSkills = '';
+  const hasSetup = source.includes('{{setup}}');
+  if (id === 'skills' || hasSetup) {
+    const { readInstallationManagement, setupManagementCommand } =
+      await import('@mearl/daemon-core/installation');
     const installed = await readInstallationManagement();
-    const command = setupManagementCommand(installed.setup ?? { package: '@mearl/setup', version: 'beta' });
-    source = source.replaceAll('{{setup}}', command);
-    management = installed.source ? `管理入口：${command}；沿用本机已选 preset。` : `首次安装入口：${command}；本机尚未选择 preset。`;
+    const command = setupManagementCommand(
+      installed.setup ?? { package: '@mearl/setup', version: 'beta' },
+    );
+    if (hasSetup) {
+      source = source.replaceAll('{{setup}}', command);
+      if (id !== 'skills') {
+        management = installed.source
+          ? `管理入口：${command}；沿用本机已选 preset。`
+          : `首次安装入口：${command}；本机尚未选择 preset。`;
+      }
+    }
+    if (id === 'skills')
+      presetSkills = renderPresetSkills(command, installed.skillCatalog, installed.agentDocs);
   }
   return [
     `[mearl:guide] CLI ${version} · ${topic.id}`,
     '本指南随 CLI 分发；扩展、远端宿主与已安装能力仍须按目标实际帮助核验。',
     ...(management ? [management] : []),
     '',
-    renderGuideLinks(source.trim(), commandName),
+    renderGuideLinks(source.trim(), commandName).replace(
+      /^\{\{presetSkills\}\}\r?\n\r?\n/m,
+      () => presetSkills,
+    ),
     '',
     `其他主题：${commandName} guide --list；具体参数：${commandName} <action> --help。`,
     `[mearl:guide] end ${topic.id}`,
   ].join('\n');
 }
 
-export async function runGuideCli(args: string[], commandName = 'mearl', version = CLIENT_VERSION): Promise<number> {
+export async function runGuideCli(
+  args: string[],
+  commandName = 'mearl',
+  version = CLIENT_VERSION,
+): Promise<number> {
   const list = () => GUIDE_TOPICS.map(topic => `  ${topic.id.padEnd(18)}${topic.title}`).join('\n');
   if (args.length === 1 && (args[0] === '--help' || args[0] === '-h')) {
-    console.log(`${commandName} guide — CLI ${version}\n\n用法：${commandName} guide [topic]\n      ${commandName} guide --list\n\n默认只读 core；按需读取单个专题。只读本地资源，不连接浏览器或检查更新。\n\n${list()}`);
+    console.log(
+      `${commandName} guide — CLI ${version}\n\n用法：${commandName} guide [topic]\n      ${commandName} guide --list\n\n默认只读 core；按需读取单个专题。只读本地资源，不连接浏览器或检查更新。\n\n${list()}`,
+    );
     return 0;
   }
   if (args.length === 1 && args[0] === '--list') {
     console.log(`${commandName} guide — CLI ${version}\n${list()}`);
     return 0;
   }
-  if (args.length > 1 || args[0]?.startsWith('-') || !GUIDE_TOPICS.some(topic => topic.id === (args[0] ?? 'core'))) {
-    console.error(`未知指南主题或选项：${args.join(' ')}。用 ${commandName} guide --list 查看主题。`);
+  if (
+    args.length > 1 ||
+    args[0]?.startsWith('-') ||
+    !GUIDE_TOPICS.some(topic => topic.id === (args[0] ?? 'core'))
+  ) {
+    console.error(
+      `未知指南主题或选项：${args.join(' ')}。用 ${commandName} guide --list 查看主题。`,
+    );
     return 2;
   }
   try {

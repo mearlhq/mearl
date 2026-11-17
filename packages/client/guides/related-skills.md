@@ -2,6 +2,10 @@
 
 站点或业务对象与任务意图都匹配时，优先使用已安装的专用 Skill。通用网页操作继续使用 Mearl；不要仅因关键词相同就改用其他能力。专用站点的路由说明由对应 Skill 提供。
 
+{{presetSkills}}
+
+## 通用 Skill
+
 | 意图 | Skill |
 | --- | --- |
 | 时间戳、Base64、图片编码、URL 编解码 | format-converter |

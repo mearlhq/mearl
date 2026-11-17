@@ -4,9 +4,26 @@
 
 Use `mearl` in a terminal or `@mearl/client` in TypeScript to control browsers, inspect requests and logs, or run Skill commands. The CLI, SDK, and script runner share browser routing and plugin runtimes. `@mearl/setup` manages installation and connections.
 
-Run `mearl guide` for the core workflow in this version; `mearl guide --list` lists topics. For example, `mearl guide run` covers SDK composition and `mearl guide environment` covers devices/Apps. Guides read bundled npm resources without browser connections, plugin loading, installation, or automatic updates. Use `mearl <action> --help` for arguments and existing catalogs for installed target capabilities.
+Run `mearl guide` for the core workflow in this version. Use `mearl guide --list` to list topics. For example, `mearl guide run` covers SDK composition and `mearl guide environment` covers devices and Apps. Guides read bundled npm resources and local Preset metadata. Use `mearl <action> --help` for arguments and existing catalogs for installed target capabilities.
 
-Guide content is maintained only in this package's `guides/`, copied to `dist/guides/` at build time, and checked by `pnpm check:skills`. CLI output converts local document links into guide commands. `skills/mearl/` distributes only a compact `SKILL.md`, without guide copies. MCP-only clients unable to run CLI use current tool descriptions/schemas.
+`mearl guide skills` lists specialized Skills for the selected Preset. In `defaults.skillCatalog`, map each Skill name to an entry with a `description` of its use cases, or provide the description as a string. On-demand installs use `defaults.skillCatalogSource` by default. Set an individual entry's `source` to use a different repository, using a repository identifier supported by the installer or a full HTTPS repository URL. The Preset manages enabled entries in its top-level `skills` map. `defaults.extension.links.agentDocs` can link to team Skill instructions.
+
+```json
+{
+  "defaults": {
+    "skillCatalogSource": "team/skills",
+    "skillCatalog": {
+      "team-report": { "description": "Read team reports" },
+      "other-report": {
+        "description": "Read another team's reports",
+        "source": "https://github.com/example/other-skills"
+      }
+    }
+  }
+}
+```
+
+This package maintains its bundled guides in `guides/`, copies them to `dist/guides/` at build time, and checks them with `pnpm check:skills`. CLI output converts local document links into guide commands. `skills/mearl/` distributes a compact `SKILL.md`. MCP-only clients use the current tool descriptions and schemas.
 
 A unified browser SDK and CLI discovering browsers on this machine and all connectors under configured cloud-server instances. Global `browserId` from `browser_list` selects local Socket or cloud WebSocket routing automatically.
 

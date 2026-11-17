@@ -525,13 +525,84 @@ export function presetSelectionRevision(state: SelectionState): string | null {
   return revision(state);
 }
 
+function presetAgentDocs(defaults: JsonObject | undefined): string | undefined {
+  const extension = defaults?.extension;
+  if (!extension || typeof extension !== 'object' || Array.isArray(extension)) return;
+  const links = extension.links;
+  if (!links || typeof links !== 'object' || Array.isArray(links)) return;
+  const value = links.agentDocs;
+  if (typeof value !== 'string' || value.length > 4096 || !URL.canParse(value)) return;
+  const url = new URL(value);
+  if (url.protocol !== 'https:' || !url.hostname || url.username || url.password) return;
+  return url.href;
+}
+
+export interface PresetSkillCatalogEntry {
+  description: string;
+  source?: string;
+  managed?: true;
+}
+
+function presetSkillSource(value: unknown): string | undefined {
+  if (typeof value !== 'string' || value.length > 2048 || !/^[\w@][\w.:/@#%+~-]*$/.test(value))
+    return;
+  if (value.includes('://')) {
+    if (!URL.canParse(value)) return;
+    const url = new URL(value);
+    if (!url.hostname || url.password || (url.username && url.protocol !== 'ssh:')) return;
+    if (url.protocol !== 'https:' && url.protocol !== 'ssh:') return;
+  }
+  return value;
+}
+
+function presetSkillCatalog(
+  preset: ResolvedPreset | undefined,
+): Record<string, PresetSkillCatalogEntry> | undefined {
+  if (!preset) return;
+  const value = preset.defaults.skillCatalog;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return;
+  const entries = Object.entries(value);
+  if (entries.length === 0 || entries.length > 64) return;
+  const defaultSource = presetSkillSource(preset.defaults.skillCatalogSource);
+  const catalog: Record<string, PresetSkillCatalogEntry> = {};
+  for (const [name, entry] of entries) {
+    const objectEntry =
+      entry && typeof entry === 'object' && !Array.isArray(entry) ? entry : undefined;
+    const description = typeof entry === 'string' ? entry : objectEntry?.description;
+    if (
+      !/^[a-z][a-z0-9-]{0,63}$/.test(name) ||
+      typeof description !== 'string' ||
+      description.length > 240 ||
+      !description.trim() ||
+      /[\p{Cc}\p{Zl}\p{Zp}]/u.test(description)
+    )
+      continue;
+    const skill: PresetSkillCatalogEntry = { description: description.trim() };
+    const declared = Object.hasOwn(preset.skills, name) ? preset.skills[name] : undefined;
+    if (declared && declared.enabled !== false) {
+      skill.managed = true;
+    } else {
+      const source =
+        objectEntry?.source === undefined ? defaultSource : presetSkillSource(objectEntry.source);
+      if (source) skill.source = source;
+    }
+    catalog[name] = skill;
+  }
+  return Object.keys(catalog).length ? catalog : undefined;
+}
+
 /** Reads accepted local metadata without loading capability factories, browsers or network sources. */
 export async function readInstallationManagement(options: { directory?: string } = {}) {
   const current = await new PresetInstallationStore(options).current({ verifyResources: false });
+  const defaults = current.preset?.defaults;
+  const agentDocs = presetAgentDocs(defaults);
+  const skillCatalog = presetSkillCatalog(current.preset);
   return {
-    setup: parseSetupManagement(current.preset?.defaults.management),
+    setup: parseSetupManagement(defaults?.management),
     source: current.receipt?.snapshot.source,
     revision: current.receipt?.revision,
+    ...(agentDocs ? { agentDocs } : {}),
+    ...(skillCatalog ? { skillCatalog } : {}),
   };
 }
 

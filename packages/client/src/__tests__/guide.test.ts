@@ -3,14 +3,25 @@ import { readFileSync } from 'node:fs';
 import { readInstallationManagement } from '@mearl/daemon-core/installation';
 import { GUIDE_TOPICS, readGuide, renderGuideLinks, runGuideCli } from '../guide.js';
 
-vi.mock('node:fs', async original => { const actual = await original<typeof import('node:fs')>(); return { ...actual, readFileSync: vi.fn(actual.readFileSync) }; });
-vi.mock('@mearl/daemon-core/installation', async original => ({ ...await original<typeof import('@mearl/daemon-core/installation')>(), readInstallationManagement: vi.fn() }));
+vi.mock('node:fs', async original => {
+  const actual = await original<typeof import('node:fs')>();
+  return { ...actual, readFileSync: vi.fn(actual.readFileSync) };
+});
+vi.mock('@mearl/daemon-core/installation', async original => ({
+  ...(await original<typeof import('@mearl/daemon-core/installation')>()),
+  readInstallationManagement: vi.fn(),
+}));
 
 afterEach(() => vi.restoreAllMocks());
 
 it('turns packaged reference links into topic commands and retains section hints and external URLs', () => {
-  expect(renderGuideLinks('Read [controls](./api-page-automation.md#page_wait), [site](https://example.com/docs) and [here](#section).'))
-    .toBe('Read controls（`mearl guide automation`，小节 `page_wait`）, [site](https://example.com/docs) and [here](#section).');
+  expect(
+    renderGuideLinks(
+      'Read [controls](./api-page-automation.md#page_wait), [site](https://example.com/docs) and [here](#section).',
+    ),
+  ).toBe(
+    'Read controls（`mearl guide automation`，小节 `page_wait`）, [site](https://example.com/docs) and [here](#section).',
+  );
   expect(() => renderGuideLinks('[missing](../private.md)')).toThrow('未打包');
 });
 
@@ -26,16 +37,74 @@ it('lists bounded topics without loading bodies or a browser', async () => {
 
 it('renders one local management entry across lifecycle and plugin instructions', async () => {
   vi.mocked(readFileSync).mockReturnValueOnce('{{setup}} update\n{{setup}} uninstall --yes');
-  vi.mocked(readInstallationManagement).mockResolvedValue({ setup: { package: '@team/setup', version: 'beta' }, source: 'https://example.test/preset.json', revision: 'a'.repeat(64) });
+  vi.mocked(readInstallationManagement).mockResolvedValue({
+    setup: { package: '@team/setup', version: 'beta' },
+    source: 'https://example.test/preset.json',
+    revision: 'a'.repeat(64),
+  });
   const text = await readGuide('troubleshooting');
   expect(text).toContain('npx @team/setup@beta update');
   expect(text).toContain('npx @team/setup@beta uninstall --yes');
   expect(text).not.toContain('@mearl/setup');
 });
 
+it.each(['\n', '\r\n'])(
+  'composes the selected Preset catalog with the bundled Skill guide with %j line endings',
+  async newline => {
+    const agentDocs = 'https://example.test/skills';
+    vi.mocked(readFileSync).mockReturnValue(
+      '# 专用 Skill 使用与安装\n\n{{presetSkills}}\n\n## 通用 Skill\n\n{{setup}} plugin install'.replaceAll(
+        '\n',
+        newline,
+      ),
+    );
+    vi.mocked(readInstallationManagement).mockResolvedValue({
+      setup: { package: '@team/setup', version: 'latest' },
+      source: 'https://example.test/preset.json',
+      revision: 'a'.repeat(64),
+      agentDocs,
+      skillCatalog: {
+        'team-report': { description: 'Read CSV | JSON reports', source: 'team/skills' },
+        'other-report': {
+          description: 'Read another team’s reports',
+          source: 'https://example.test/other/skills.git',
+        },
+        'managed-report': { description: 'Read managed reports', managed: true },
+      },
+    });
+    const guide = await readGuide('skills');
+    expect(guide).toContain('| Read CSV \\| JSON reports | `team-report` | `team/skills` |');
+    expect(guide).toContain('| `other-report` | `https://example.test/other/skills.git` |');
+    expect(guide).toContain('| `managed-report` | Preset 管理 |');
+    expect(guide).toContain(agentDocs);
+    expect(guide).toContain(
+      "npx @team/setup@latest plugin install '<source>' --skill <skill-name> --yes",
+    );
+    expect(guide).toContain('npx @team/setup@latest preset apply');
+    expect(guide).not.toContain('管理入口');
+    expect(guide.indexOf('team-report')).toBeLessThan(guide.indexOf('## 通用 Skill'));
+    vi.mocked(readFileSync).mockReturnValueOnce('{{setup}} update');
+    const troubleshooting = await readGuide('troubleshooting');
+    expect(troubleshooting).toContain('管理入口：npx @team/setup@latest');
+    expect(troubleshooting).not.toContain(agentDocs);
+    vi.mocked(readInstallationManagement).mockResolvedValue({
+      setup: undefined,
+      source: undefined,
+      revision: undefined,
+    });
+    const genericGuide = await readGuide('skills');
+    expect(genericGuide).not.toContain('当前 Preset');
+    expect(genericGuide).not.toContain('{{presetSkills}}');
+  },
+);
+
 it('distinguishes an unselected installation and refuses corrupt ownership metadata', async () => {
   vi.mocked(readFileSync).mockReturnValue('{{setup}} update');
-  vi.mocked(readInstallationManagement).mockResolvedValue({ setup: undefined, source: undefined, revision: undefined });
+  vi.mocked(readInstallationManagement).mockResolvedValue({
+    setup: undefined,
+    source: undefined,
+    revision: undefined,
+  });
   expect(await readGuide('troubleshooting')).toContain('本机尚未选择 preset');
   vi.mocked(readInstallationManagement).mockRejectedValue(new Error('BUNDLE_INTEGRITY'));
   const log = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -44,8 +113,11 @@ it('distinguishes an unselected installation and refuses corrupt ownership metad
   expect(log).not.toHaveBeenCalled();
 });
 
-it.each([['unknown'], ['../core'], ['--full'], ['--list', 'core'], ['core', 'extra']])('rejects invalid guide input: %j', async (...args) => {
-  const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-  expect(await runGuideCli(args)).toBe(2);
-  expect(error).toHaveBeenCalledWith(expect.stringContaining('guide --list'));
-});
+it.each([['unknown'], ['../core'], ['--full'], ['--list', 'core'], ['core', 'extra']])(
+  'rejects invalid guide input: %j',
+  async (...args) => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(await runGuideCli(args)).toBe(2);
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('guide --list'));
+  },
+);
