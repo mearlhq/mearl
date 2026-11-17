@@ -89,7 +89,6 @@ function initInterception(config: {
   // 这样既能改写网关域名，又不影响上层 interceptFetch 对原始 URL 的匹配逻辑。
   if (config.networkRoutes) {
     installNetworkRoutes(config.networkRoutes);
-
   }
 
   // 初始化各个模块
@@ -106,7 +105,6 @@ function initInterception(config: {
     interceptXHR();
   }
 
-
   // 通知 content script 已准备好
   window.postMessage(
     {
@@ -120,13 +118,13 @@ function initInterception(config: {
 (function () {
   'use strict';
 
+  listenForPageTimeOverride();
   // 防止重复注入：early-inject 可能被静态 manifest 与动态 registerContentScripts 各注入一次，
   // 同一 MAIN world 执行两次会重复劫持 fetch/EventSource（导致 SSE 记录重复）。
   if (window.__mearlEarlyInjected) {
     return;
   }
   window.__mearlEarlyInjected = true;
-  listenForPageTimeOverride();
 
   // ─── Read Server-Timing flags from navigation response ──────────────────
   // DNR rules inject Server-Timing headers that we read synchronously at
@@ -177,14 +175,17 @@ function initInterception(config: {
         networkRoutes = readInjectedNetworkRoutes(timing.description);
       }
 
-
       if (timing.name === TAB_PAGE_OVERRIDE_SERVER_TIMING_KEY && timing.description) {
         try {
           const json = decodeURIComponent(escape(atob(timing.description)));
           const cfg = JSON.parse(json) as {
             ua?: string;
             time?: { offsetMs?: unknown; revision?: unknown };
+            timezone?: { timezone: string; revision: number };
           };
+          if (typeof cfg.timezone?.timezone === 'string') {
+            window.__mearlApplyPageTimezone__?.(cfg.timezone.timezone, cfg.timezone.revision);
+          }
           const offsetMs = cfg.time?.offsetMs;
           const revision = cfg.time?.revision;
           if (

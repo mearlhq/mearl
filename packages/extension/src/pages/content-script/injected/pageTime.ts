@@ -1,10 +1,19 @@
+import { createPageTimezone } from './pageTimezone';
+
 const PAGE_TIME_STATE_KEY = '__mearlPageTimeOverride__';
 const PAGE_TIME_CHANGE_EVENT = 'mearl:page-time-change';
+
+declare global {
+  interface Window {
+    __mearlApplyPageTimezone__?: (timezone: string, revision: number) => boolean;
+  }
+}
 
 interface PageTimeState {
   NativeDate: DateConstructor;
   nativeNow: () => number;
   MockDate: DateConstructor | null;
+  timezone: ReturnType<typeof createPageTimezone>;
   offsetMs: number | null;
   revision: number;
 }
@@ -17,7 +26,14 @@ const notifyPageTimeChange = () => window.dispatchEvent(new Event(PAGE_TIME_CHAN
 const getOrCreatePageTimeState = (): PageTimeState => {
   const pageGlobal = getPageGlobal();
   const current = pageGlobal[PAGE_TIME_STATE_KEY];
-  if (current) return current;
+  if (current) {
+    if (!current.timezone) {
+      // A live document may still hold a clock installed before the extension was updated.
+      current.timezone = createPageTimezone(current.NativeDate);
+      current.MockDate = null;
+    }
+    return current;
+  }
 
   const NativeDate = pageGlobal.Date;
   const nativeNow = NativeDate.now.bind(NativeDate);
@@ -25,6 +41,7 @@ const getOrCreatePageTimeState = (): PageTimeState => {
     NativeDate,
     nativeNow,
     MockDate: null,
+    timezone: createPageTimezone(NativeDate),
     offsetMs: null,
     revision: -1,
   };
@@ -35,12 +52,12 @@ const getOrCreatePageTimeState = (): PageTimeState => {
   return state;
 };
 
-const installPageTime = (offsetMs: number, revision: number) => {
+const refreshDate = (state: PageTimeState) => {
   const pageGlobal = getPageGlobal();
-  const state = getOrCreatePageTimeState();
-  if (revision < state.revision) return;
-  state.offsetMs = offsetMs;
-  state.revision = revision;
+  if (state.offsetMs === null && !state.timezone.active) {
+    if (pageGlobal.Date === state.MockDate) pageGlobal.Date = state.NativeDate;
+    return;
+  }
   let MockDate = state.MockDate;
   if (!MockDate) {
     MockDate = new Proxy(state.NativeDate, {
@@ -48,54 +65,61 @@ const installPageTime = (offsetMs: number, revision: number) => {
         return new state.NativeDate(state.nativeNow() + (state.offsetMs ?? 0)).toString();
       },
       construct(target, args, newTarget) {
-        return Reflect.construct(
-          target,
-          args.length === 0 ? [state.nativeNow() + (state.offsetMs ?? 0)] : args,
-          newTarget,
-        );
+        let dateArgs = args;
+        if (args.length === 0) {
+          dateArgs = [state.nativeNow() + (state.offsetMs ?? 0)];
+        } else if (state.timezone.active && args.length > 1) {
+          dateArgs = [state.timezone.fromWallTime(Reflect.apply(target.UTC, target, args))];
+        } else if (state.timezone.active && typeof args[0] === 'string') {
+          dateArgs = [state.timezone.parse(args[0])];
+        }
+        return Reflect.construct(target, dateArgs, newTarget);
       },
       get(target, property, receiver) {
         if (property === 'now') return () => state.nativeNow() + (state.offsetMs ?? 0);
+        if (property === 'parse' && state.timezone.active) return state.timezone.parse;
         return Reflect.get(target, property, receiver);
       },
     });
     state.MockDate = MockDate;
   }
   pageGlobal.Date = MockDate;
-  notifyPageTimeChange();
-};
-
-const restorePageTime = (revision: number) => {
-  const pageGlobal = getPageGlobal();
-  const state = getOrCreatePageTimeState();
-  if (revision < state.revision) return;
-  if (state.MockDate && pageGlobal.Date === state.MockDate) pageGlobal.Date = state.NativeDate;
-  state.offsetMs = null;
-  state.revision = revision;
-  notifyPageTimeChange();
 };
 
 export const applyPageTimeOverride = (offsetMs: number | null, revision = 0): void => {
   if (!Number.isSafeInteger(revision) || revision < 0) return;
-  if (typeof offsetMs === 'number' && Number.isFinite(offsetMs)) {
-    installPageTime(offsetMs, revision);
-  } else if (offsetMs === null) {
-    restorePageTime(revision);
-  }
+  if (offsetMs !== null && !Number.isFinite(offsetMs)) return;
+  const state = getOrCreatePageTimeState();
+  if (revision < state.revision) return;
+  state.offsetMs = offsetMs;
+  state.revision = revision;
+  refreshDate(state);
+  notifyPageTimeChange();
 };
 
 /** 接收 ISOLATED content script 转发的时间偏移，并在页面 MAIN world 覆盖 Date。 */
 export const listenForPageTimeOverride = () => {
+  if (window.__mearlApplyPageTimezone__) return;
   // document_start 时固定原始时钟，页面后续改写 Date.now 也不会形成代理自调用。
-  getOrCreatePageTimeState();
+  const state = getOrCreatePageTimeState();
+  window.__mearlApplyPageTimezone__ = (timezone, revision) => {
+    if (!state.timezone.update(timezone, revision)) return false;
+    refreshDate(state);
+    notifyPageTimeChange();
+    return true;
+  };
   window.addEventListener('message', event => {
     if (
       event.source !== window ||
       event.data?.source !== 'mearl-content' ||
-      event.data?.type !== 'PAGE_TIME_OVERRIDE'
+      !['PAGE_TIME_OVERRIDE', 'PAGE_TIMEZONE_OVERRIDE'].includes(event.data?.type)
     ) {
       return;
     }
-    applyPageTimeOverride(event.data.offsetMs ?? null, event.data.revision ?? 0);
+    if (event.data.type === 'PAGE_TIME_OVERRIDE') {
+      applyPageTimeOverride(event.data.offsetMs ?? null, event.data.revision ?? 0);
+    } else if (typeof event.data.timezone === 'string') {
+      window.__mearlApplyPageTimezone__?.(event.data.timezone, event.data.revision);
+    }
   });
 };

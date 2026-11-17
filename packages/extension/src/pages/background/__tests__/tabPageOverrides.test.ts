@@ -19,6 +19,8 @@ const timeMocks = vi.hoisted(() => ({
 
 vi.mock('../debuggerManager', () => debuggerMocks);
 vi.mock('../pageTimeOverride', () => timeMocks);
+vi.mock('../contentScriptRegistrar', () => ({ ensureContentScriptsForOrigins: vi.fn() }));
+vi.mock('../frameMessaging', () => ({ getTabFrameIds: async () => [0, 2] }));
 
 interface SessionRuleUpdate {
   removeRuleIds?: number[];
@@ -35,6 +37,13 @@ describe('per-tab page overrides', () => {
     sessionRules = new Map();
     vi.clearAllMocks();
 
+    chrome.tabs = { get: vi.fn(async () => ({ url: 'https://example.test/' })) } as any;
+    chrome.permissions = {
+      contains: vi.fn(async () => true),
+      getAll: vi.fn(async () => ({ origins: ['https://example.test/*'] })),
+      request: vi.fn(async () => true),
+    } as any;
+    chrome.scripting = { executeScript: vi.fn(async () => [{ result: true }]) } as any;
     chrome.storage.session = {
       get: vi.fn(async (key: string) => ({ [key]: storedValues[key] })),
       set: vi.fn(async (values: Record<string, unknown>) => {
@@ -125,6 +134,91 @@ describe('per-tab page overrides', () => {
       time: { offsetMs: 5_000, revision: 1 },
     });
     expect(rules[0]?.condition.resourceTypes).toEqual(['main_frame', 'sub_frame']);
+  });
+
+  it('applies the page timezone and preserves it across navigation when Chrome rejects native emulation', async () => {
+    debuggerMocks.enableTimezoneForTab.mockRejectedValueOnce(
+      new Error('Timezone override is only available to trusted clients'),
+    );
+    (chrome.permissions.contains as ReturnType<typeof vi.fn>).mockResolvedValueOnce(false);
+    await expect(
+      overridesModule.updateTabPageOverrides(51, { customTimezone: 'Asia/Tokyo' }),
+    ).rejects.toMatchObject({ origin: 'https://example.test/*' });
+    expect(sessionRules.size).toBe(0);
+    expect(chrome.scripting.executeScript).not.toHaveBeenCalled();
+
+    debuggerMocks.enableTimezoneForTab.mockRejectedValueOnce(
+      new Error('Timezone override is only available to trusted clients'),
+    );
+    await overridesModule.grantTabTimezoneSiteAccess(
+      51,
+      { customTimezone: 'Asia/Tokyo' },
+      'https://example.test/*',
+    );
+    expect(chrome.permissions.request).toHaveBeenCalledWith({
+      origins: ['https://example.test/*'],
+    });
+    for (const frameId of [0, 2]) {
+      expect(chrome.scripting.executeScript).toHaveBeenCalledWith(
+        expect.objectContaining({
+          target: { tabId: 51, frameIds: [frameId] },
+          world: 'MAIN',
+          args: ['Asia/Tokyo', 1],
+        }),
+      );
+    }
+    const header = [...sessionRules.values()][0]?.action.responseHeaders?.[0]?.value;
+    expect(JSON.parse(atob(/desc="([^"]+)"/.exec(header ?? '')?.[1] ?? ''))).toEqual({
+      timezone: { timezone: 'Asia/Tokyo', revision: 1 },
+    });
+    await overridesModule.updateTabPageOverrides(51, { customTimezone: '' });
+    expect(debuggerMocks.disableTimezoneForTab).not.toHaveBeenCalled();
+    expect(chrome.scripting.executeScript).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        args: ['', 2],
+      }),
+    );
+    expect(sessionRules.size).toBe(0);
+  });
+
+  it('restores the preceding page timezone if the navigation rule cannot be saved', async () => {
+    debuggerMocks.enableTimezoneForTab.mockRejectedValueOnce(
+      new Error('Timezone override is only available to trusted clients'),
+    );
+    await overridesModule.updateTabPageOverrides(52, { customTimezone: 'Asia/Tokyo' });
+    vi.mocked(chrome.declarativeNetRequest.updateSessionRules).mockRejectedValueOnce(
+      new Error('rule update failed'),
+    );
+    await expect(
+      overridesModule.updateTabPageOverrides(52, { customTimezone: 'Europe/London' }),
+    ).rejects.toThrow('rule update failed');
+    expect(chrome.scripting.executeScript).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        args: ['Asia/Tokyo', 3],
+      }),
+    );
+    await expect(overridesModule.getTabPageOverrides(52)).resolves.toMatchObject({
+      customTimezone: 'Asia/Tokyo',
+    });
+  });
+
+  it('returns the committed timezone to a document started during an update', async () => {
+    debuggerMocks.enableTimezoneForTab.mockRejectedValueOnce(
+      new Error('Timezone override is only available to trusted clients'),
+    );
+    const ruleUpdate = Promise.withResolvers<void>();
+    const ruleUpdated = Promise.withResolvers<void>();
+    vi.mocked(chrome.declarativeNetRequest.updateSessionRules).mockImplementationOnce(async () => {
+      ruleUpdate.resolve();
+      await ruleUpdated.promise;
+    });
+
+    const change = overridesModule.updateTabPageOverrides(53, { customTimezone: 'Asia/Tokyo' });
+    await ruleUpdate.promise;
+    const startup = overridesModule.getPageTimezoneOverride(53);
+    ruleUpdated.resolve();
+    await change;
+    await expect(startup).resolves.toMatchObject({ timezone: 'Asia/Tokyo' });
   });
 
   it('clears a stale time override when saved page settings have time disabled', async () => {

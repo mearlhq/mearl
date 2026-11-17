@@ -435,6 +435,40 @@ describe('Options settings', () => {
     }
   });
 
+  it('keeps the confirmed timezone selected until the site access retry succeeds', async () => {
+    window.history.replaceState({}, '', '?iframe=1&tabId=7');
+    const origin = 'https://example.test/*';
+    const sendMessage = chrome.runtime.sendMessage as ReturnType<typeof vi.fn>;
+    const originalSend = sendMessage.getMockImplementation() as (message: unknown) => unknown;
+    sendMessage.mockImplementation(async message => {
+      if (message.action === TAB_PAGE_OVERRIDES_SET_ACTION && !message.siteAccessOrigin) {
+        return { success: false, siteAccessOrigin: origin };
+      }
+      return originalSend(message);
+    });
+
+    render(<Options />);
+    fireEvent.click(await screen.findByRole('button', { name: 'timezoneTokyo' }));
+    const grant = await screen.findByRole('button', { name: 'timezoneGrantSiteAccess' });
+    expect(screen.getByRole('button', { name: 'timezoneSystem' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    fireEvent.click(grant);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'timezoneTokyo' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      ),
+    );
+    expect(chrome.runtime.sendMessage).toHaveBeenLastCalledWith({
+      action: TAB_PAGE_OVERRIDES_SET_ACTION,
+      tabId: 7,
+      patch: { customTimezone: 'Asia/Tokyo' },
+      siteAccessOrigin: origin,
+    });
+  });
+
   it('shows clean page defaults for a new tab without saving on open', async () => {
     window.history.replaceState({}, '', '?iframe=1&tabId=8');
     vi.mocked(chrome.storage.sync.get).mockImplementationOnce((defaults, callback) =>

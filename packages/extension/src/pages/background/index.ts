@@ -168,7 +168,10 @@ import {
   cleanupTabPageOverrides,
   disableTabPageOverride,
   ensureTabPageOverridesApplied,
+  getPageTimezoneOverride,
   getTabPageOverrides,
+  grantTabTimezoneSiteAccess,
+  PageTimezoneSiteAccessError,
   updateTabPageOverrides,
 } from './tabPageOverrides';
 
@@ -1813,14 +1816,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ offsetMs: null });
       return true;
     }
-    getTimeOverrideForTab(tabId)
-      .then(override => sendResponse(override ?? { offsetMs: null, revision: 0 }))
+    Promise.all([getTimeOverrideForTab(tabId), getPageTimezoneOverride(tabId)])
+      .then(([time, timezone]) =>
+        sendResponse({ ...(time ?? { offsetMs: null, revision: 0 }), timezone }),
+      )
       .catch(() => sendResponse({ offsetMs: null, revision: 0 }));
     return true;
   }
 
   // 设置页上报当前页面，恢复该 tab 的页面覆盖。
   if (message.action === 'settingsSetContextTab') {
+    if (!isExtensionUiSender(sender, chrome.runtime.id)) {
+      sendResponse({ ok: false, error: 'Extension UI required' });
+      return true;
+    }
     void (async () => {
       try {
         const previousTabId = await getSettingsContextTabId();
@@ -1852,17 +1861,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.action === TAB_PAGE_OVERRIDES_SET_ACTION) {
+    if (!isExtensionUiSender(sender, chrome.runtime.id)) {
+      sendResponse({ success: false, error: 'Extension UI required' });
+      return true;
+    }
     const tabId = message.tabId;
     if (typeof tabId !== 'number') {
       sendResponse({ success: false, error: 'No browser tab found' });
       return true;
     }
-    updateTabPageOverrides(tabId, message.patch)
+    const update =
+      typeof message.siteAccessOrigin === 'string'
+        ? grantTabTimezoneSiteAccess(tabId, message.patch, message.siteAccessOrigin)
+        : updateTabPageOverrides(tabId, message.patch);
+    update
       .then(overrides => {
         scheduleDnrNotify(tabId);
         sendResponse({ success: true, overrides });
       })
-      .catch(error => sendResponse({ success: false, error: String(error) }));
+      .catch(error =>
+        sendResponse({
+          success: false,
+          error: String(error),
+          ...(error instanceof PageTimezoneSiteAccessError
+            ? { siteAccessOrigin: error.origin }
+            : {}),
+        }),
+      );
     return true;
   }
 

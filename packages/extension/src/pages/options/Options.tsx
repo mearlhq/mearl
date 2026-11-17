@@ -85,9 +85,12 @@ const Options: FC<OptionsProps> = ({ embeddedTabId }) => {
   const [uaInput, setUaInput] = useState(() => navigator.userAgent);
   const [uaEnabled, setUaEnabled] = useState(false);
   const [customTimezone, setCustomTimezone] = useState<TabCustomTimezone>('');
-  const [customTime, setCustomTime] = useState<number | null>(null);
   const [showPermissions, setShowPermissions] = useState(false);
   const [customTimeInput, setCustomTimeInput] = useState('');
+  const [timezoneSaving, setTimezoneSaving] = useState(false);
+  const [timezoneError, setTimezoneError] = useState<
+    { timezone: TabCustomTimezone; origin: string } | 'failed' | null
+  >(null);
 
   const switchClass = (enabled: boolean) =>
     clsx(
@@ -124,7 +127,6 @@ const Options: FC<OptionsProps> = ({ embeddedTabId }) => {
       setUaInput(normalizedOverrides.customUserAgent || navigator.userAgent);
       setUaEnabled(normalizedOverrides.customUserAgentEnabled);
       setCustomTimezone(normalizedOverrides.customTimezone);
-      setCustomTime(normalizedOverrides.customTime);
       setCustomTimeInput(
         normalizedOverrides.customTime === null
           ? ''
@@ -147,7 +149,6 @@ const Options: FC<OptionsProps> = ({ embeddedTabId }) => {
       setUaInput(next.customUserAgent || navigator.userAgent);
       setUaEnabled(next.customUserAgentEnabled);
       setCustomTimezone(next.customTimezone);
-      setCustomTime(next.customTime);
       setCustomTimeInput(
         next.customTime === null ? '' : formatCustomTime(next.customTime, next.customTimezone),
       );
@@ -193,7 +194,10 @@ const Options: FC<OptionsProps> = ({ embeddedTabId }) => {
     }
   };
 
-  const saveTabPageOverrides = async (patch: Partial<TabPageOverrides>) => {
+  const saveTabPageOverrides = async (
+    patch: Partial<TabPageOverrides>,
+    siteAccessOrigin?: string,
+  ) => {
     if (settingsTabId === null) return;
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     setSaveStatus('saving');
@@ -202,12 +206,26 @@ const Options: FC<OptionsProps> = ({ embeddedTabId }) => {
         action: TAB_PAGE_OVERRIDES_SET_ACTION,
         tabId: settingsTabId,
         patch,
+        ...(siteAccessOrigin ? { siteAccessOrigin } : {}),
       })) as TabPageOverridesResponse | undefined;
-      if (!response?.success) throw new Error(response?.error || 'Failed to save page overrides');
+      if (!response?.success) {
+        if (response?.siteAccessOrigin && patch.customTimezone !== undefined) {
+          setTimezoneError({ timezone: patch.customTimezone, origin: response.siteAccessOrigin });
+          setSaveStatus('error');
+          return;
+        }
+        throw new Error(response?.error || 'Failed to save page overrides');
+      }
+      if (patch.customTimezone !== undefined && response.overrides) {
+        const { customTimezone, customTime } = normalizeTabPageOverrides(response.overrides);
+        setCustomTimezone(customTimezone);
+        setCustomTimeInput(customTime === null ? '' : formatCustomTime(customTime, customTimezone));
+      }
       setSaveStatus('success');
       hideTimerRef.current = window.setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (error) {
       console.error('Failed to save page overrides:', error);
+      if (patch.customTimezone !== undefined) setTimezoneError('failed');
       setSaveStatus('error');
     }
   };
@@ -320,30 +338,29 @@ const Options: FC<OptionsProps> = ({ embeddedTabId }) => {
     void saveTabPageOverrides({ customUserAgent: '', customUserAgentEnabled: false });
   };
 
-  const handleTimezoneChange = (nextTimezone: TabCustomTimezone) => {
-    setCustomTimezone(nextTimezone);
-    if (customTime !== null) {
-      setCustomTimeInput(formatCustomTime(customTime, nextTimezone));
+  const handleTimezoneChange = async (nextTimezone: TabCustomTimezone, origin?: string) => {
+    setTimezoneSaving(true);
+    setTimezoneError(null);
+    try {
+      await saveTabPageOverrides({ customTimezone: nextTimezone }, origin);
+    } finally {
+      setTimezoneSaving(false);
     }
-    void saveTabPageOverrides({ customTimezone: nextTimezone });
   };
 
   const handleCustomTimeChange = (value: string) => {
     setCustomTimeInput(value);
     if (!value) {
-      setCustomTime(null);
       void saveTabPageOverrides({ customTime: null });
       return;
     }
     const nextCustomTime = parseCustomTime(value, customTimezone);
     if (nextCustomTime === null) return;
-    setCustomTime(nextCustomTime);
     void saveTabPageOverrides({ customTime: nextCustomTime });
   };
 
   const handleUseCurrentTime = () => {
     const nextCustomTime = Date.now();
-    setCustomTime(nextCustomTime);
     setCustomTimeInput(formatCustomTime(nextCustomTime, customTimezone));
     void saveTabPageOverrides({ customTime: nextCustomTime });
   };
@@ -515,6 +532,7 @@ const Options: FC<OptionsProps> = ({ embeddedTabId }) => {
                               type="datetime-local"
                               step="60"
                               value={customTimeInput}
+                              disabled={timezoneSaving}
                               onChange={event => handleCustomTimeChange(event.target.value)}
                               onClick={event => event.currentTarget.showPicker()}
                               className="h-6 w-full rounded border border-border bg-bg-primary py-0 pl-2.5 pr-6 text-xs text-text-primary outline-none focus:border-blue-400 [&::-webkit-calendar-picker-indicator]:hidden"
@@ -523,6 +541,7 @@ const Options: FC<OptionsProps> = ({ embeddedTabId }) => {
                               <button
                                 type="button"
                                 onClick={() => handleCustomTimeChange('')}
+                                disabled={timezoneSaving}
                                 className="absolute right-1 top-1/2 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary"
                                 title={t('customTimeClear')}
                                 aria-label={t('customTimeClear')}
@@ -534,6 +553,7 @@ const Options: FC<OptionsProps> = ({ embeddedTabId }) => {
                           <button
                             type="button"
                             onClick={handleUseCurrentTime}
+                            disabled={timezoneSaving}
                             className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-border bg-bg-primary text-text-primary transition-colors hover:border-blue-400"
                             title={t('customTimeNow')}
                             aria-label={t('customTimeNow')}
@@ -545,7 +565,8 @@ const Options: FC<OptionsProps> = ({ embeddedTabId }) => {
                           {timezoneOptions.map(option => (
                             <Button
                               key={option.value}
-                              onClick={() => handleTimezoneChange(option.value)}
+                              onClick={() => void handleTimezoneChange(option.value)}
+                              disabled={timezoneSaving}
                               variant={customTimezone === option.value ? 'primary' : 'secondary'}
                               aria-pressed={customTimezone === option.value}
                               title={option.value || undefined}
@@ -554,6 +575,28 @@ const Options: FC<OptionsProps> = ({ embeddedTabId }) => {
                             </Button>
                           ))}
                         </div>
+                        {timezoneError && (
+                          <div className="col-span-2 mt-2 flex flex-wrap items-center gap-2 text-xs">
+                            {timezoneError === 'failed' ? (
+                              <span role="alert" className="text-red-600 dark:text-red-400">
+                                {t('timezoneApplyFailed')}
+                              </span>
+                            ) : (
+                              <Button
+                                size="sm"
+                                disabled={timezoneSaving}
+                                onClick={() =>
+                                  void handleTimezoneChange(
+                                    timezoneError.timezone,
+                                    timezoneError.origin,
+                                  )
+                                }
+                              >
+                                {t('timezoneGrantSiteAccess')}
+                              </Button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}

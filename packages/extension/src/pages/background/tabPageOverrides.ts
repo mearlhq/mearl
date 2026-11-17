@@ -6,7 +6,10 @@ import {
   type TabPageOverrides,
 } from '../../shared/tabPageOverrides';
 import { disableTimezoneForTab, enableTimezoneForTab } from './debuggerManager';
+import { ensureContentScriptsForOrigins } from './contentScriptRegistrar';
+import { getTabFrameIds } from './frameMessaging';
 import { runSerializedQuickSimulationUpdate } from './quickSimulationUpdateQueue';
+import { getSimulationSitePattern, getSimulationSiteUrl } from '../../shared/permissionRequest';
 import {
   disableTimeForTab,
   enableTimeForTab,
@@ -23,6 +26,17 @@ const TAB_PAGE_CONFIG_RULE_ID_START = 999701;
 const TAB_PAGE_CONFIG_RULE_ID_END = 999749;
 const TAB_UA_RULE_ID_OFFSET = 50;
 const ALLOWED_TIMEZONES = new Set<TabCustomTimezone>(TAB_CUSTOM_TIMEZONES);
+
+interface PageTimezoneOverride {
+  timezone: TabCustomTimezone;
+  revision: number;
+}
+
+export class PageTimezoneSiteAccessError extends Error {
+  constructor(readonly origin: string) {
+    super('Site access is required to simulate the page timezone');
+  }
+}
 
 const pageConfigRuleIdsByTab = new Map<number, number>();
 let pageConfigRuleIdCursor = TAB_PAGE_CONFIG_RULE_ID_START;
@@ -87,12 +101,14 @@ function buildPageOverrideRules(
   configRuleId: number,
   userAgent: string,
   timeOverride: PageTimeOverride | null,
+  timezoneOverride: PageTimezoneOverride | null,
 ): chrome.declarativeNetRequest.Rule[] {
   const config = {
     ...(userAgent ? { ua: userAgent } : {}),
     ...(timeOverride?.offsetMs !== null && timeOverride?.offsetMs !== undefined
       ? { time: timeOverride }
       : {}),
+    ...(timezoneOverride?.timezone ? { timezone: timezoneOverride } : {}),
   };
   const rules: chrome.declarativeNetRequest.Rule[] = [
     {
@@ -138,11 +154,12 @@ async function syncTabPageOverrideRules(
   tabId: number,
   userAgent: string,
   timeOverride: PageTimeOverride | null,
+  timezoneOverride: PageTimezoneOverride | null,
 ): Promise<void> {
   await runRuleUpdateExclusive(async () => {
     await ensurePageOverrideRulesHydrated();
     const previousRuleId = pageConfigRuleIdsByTab.get(tabId);
-    if (!userAgent && timeOverride?.offsetMs == null) {
+    if (!userAgent && timeOverride?.offsetMs == null && !timezoneOverride?.timezone) {
       if (previousRuleId === undefined) return;
       await chrome.declarativeNetRequest.updateSessionRules({
         removeRuleIds: [previousRuleId, previousRuleId + TAB_UA_RULE_ID_OFFSET],
@@ -154,7 +171,7 @@ async function syncTabPageOverrideRules(
     const ruleId = previousRuleId ?? allocatePageConfigRuleId();
     await chrome.declarativeNetRequest.updateSessionRules({
       removeRuleIds: [ruleId, ruleId + TAB_UA_RULE_ID_OFFSET],
-      addRules: buildPageOverrideRules(tabId, ruleId, userAgent, timeOverride),
+      addRules: buildPageOverrideRules(tabId, ruleId, userAgent, timeOverride, timezoneOverride),
     });
     pageConfigRuleIdsByTab.set(tabId, ruleId);
   });
@@ -200,73 +217,218 @@ export function isTabPageOverrideRuleId(ruleId: number): boolean {
   );
 }
 
-export async function getTabPageOverrides(tabId: number): Promise<TabPageOverrides> {
+async function readTabPageOverrides(tabId: number) {
   const key = tabPageOverridesStorageKey(tabId);
   const stored = await chrome.storage.session.get(key);
-  return normalizeTabPageOverrides(stored[key]);
+  const value = stored[key] as
+    | (TabPageOverrides & {
+        pageTimezone?: PageTimezoneOverride | null;
+      })
+    | undefined;
+  return { overrides: normalizeTabPageOverrides(value), pageTimezone: value?.pageTimezone ?? null };
+}
+
+export async function getTabPageOverrides(tabId: number): Promise<TabPageOverrides> {
+  return (await readTabPageOverrides(tabId)).overrides;
+}
+
+export async function getPageTimezoneOverride(tabId: number): Promise<PageTimezoneOverride | null> {
+  // A new document can start between the live update and the navigation rule being saved.
+  return runTabUpdateExclusive(tabId, async () => (await readTabPageOverrides(tabId)).pageTimezone);
+}
+
+export async function getNativeTimezoneSetting(tabId: number): Promise<string | undefined> {
+  const { overrides, pageTimezone } = await readTabPageOverrides(tabId);
+  return pageTimezone ? undefined : overrides.customTimezone || undefined;
+}
+
+async function getTabSitePattern(tabId: number): Promise<string | undefined> {
+  const rawUrl =
+    (await chrome.tabs.get(tabId)).url ??
+    (await chrome.webNavigation.getFrame({ tabId, frameId: 0 }))?.url;
+  const url = rawUrl && getSimulationSiteUrl(rawUrl);
+  return url ? getSimulationSitePattern(url) : undefined;
+}
+
+async function applyPageTimezone(tabId: number, override: PageTimezoneOverride): Promise<void> {
+  if (override.timezone) {
+    const origin = await getTabSitePattern(tabId);
+    if (!origin) throw new Error('Timezone simulation requires an HTTP or HTTPS page');
+    if (!(await chrome.permissions.contains({ origins: [origin] }))) {
+      throw new PageTimezoneSiteAccessError(origin);
+    }
+    const { origins = [] } = await chrome.permissions.getAll();
+    await ensureContentScriptsForOrigins(origins);
+  }
+  const applyToFrame = async (frameId: number) => {
+    const injection = {
+      target: { tabId, frameIds: [frameId] },
+      world: 'MAIN' as const,
+      injectImmediately: true,
+    };
+    const apply = () =>
+      chrome.scripting.executeScript({
+        ...injection,
+        func: (timezone: string, revision: number) =>
+          window.__mearlApplyPageTimezone__?.(timezone, revision),
+        args: [override.timezone, override.revision],
+      });
+    let [result] = await apply();
+    if (result?.result == null && override.timezone) {
+      // Open documents can predate registration or an extension update.
+      await chrome.scripting.executeScript({
+        ...injection,
+        files: ['src/pages/content-script/early-inject.js'],
+      });
+      [result] = await apply();
+    }
+    if (override.timezone && result?.result !== true) {
+      throw new Error('Page timezone simulation is unavailable');
+    }
+  };
+
+  if (override.timezone) await applyToFrame(0);
+  else await applyToFrame(0).catch(() => {});
+  const frames = await getTabFrameIds(tabId);
+  // Cross-origin frames may require their own site access.
+  await Promise.allSettled(frames.filter(id => id !== 0).map(applyToFrame));
+}
+
+async function updateTimezone(
+  tabId: number,
+  timezone: TabCustomTimezone,
+  previous: PageTimezoneOverride | null,
+): Promise<PageTimezoneOverride | null> {
+  if (!previous) {
+    try {
+      if (timezone) await enableTimezoneForTab(tabId, timezone, 'settings');
+      else await disableTimezoneForTab(tabId, 'settings');
+      return null;
+    } catch (error) {
+      if (!String(error).includes('Timezone override is only available to trusted clients'))
+        throw error;
+    }
+  }
+  const next = { timezone, revision: (previous?.revision ?? 0) + 1 };
+  await applyPageTimezone(tabId, next);
+  return next;
 }
 
 export async function updateTabPageOverrides(
   tabId: number,
   patch: unknown,
+  expectedSite?: string,
 ): Promise<TabPageOverrides> {
-  const update = () => runTabUpdateExclusive(tabId, async () => {
-    const previous = await getTabPageOverrides(tabId);
-    const validatedPatch = validatePatch(patch);
-    const next = normalizeTabPageOverrides({ ...previous, ...validatedPatch });
-    const effectiveUserAgent = next.customUserAgentEnabled ? next.customUserAgent.trim() : '';
-    const timeChanged = previous.customTime !== next.customTime;
-    let timeOverride = await getTimeOverrideForTab(tabId);
-    let shouldNotifyTime = false;
-
-    if (previous.customTimezone !== next.customTimezone) {
-      if (next.customTimezone) {
-        await enableTimezoneForTab(tabId, next.customTimezone, 'settings');
-      } else {
-        await disableTimezoneForTab(tabId, 'settings');
+  const update = () =>
+    runTabUpdateExclusive(tabId, async () => {
+      if (expectedSite && (await getTabSitePattern(tabId)) !== expectedSite) {
+        throw new Error('The tab changed sites while requesting access');
       }
-    }
-    if (next.customTime === null) {
-      if (timeChanged || timeOverride?.offsetMs != null) {
-        timeOverride = await disableTimeForTab(tabId, false);
+      const { overrides: previous, pageTimezone: previousPageTimezone } =
+        await readTabPageOverrides(tabId);
+      const validatedPatch = validatePatch(patch);
+      const next = normalizeTabPageOverrides({ ...previous, ...validatedPatch });
+      const effectiveUserAgent = next.customUserAgentEnabled ? next.customUserAgent.trim() : '';
+      const timeChanged = previous.customTime !== next.customTime;
+      let timeOverride = await getTimeOverrideForTab(tabId);
+      let shouldNotifyTime = false;
+
+      let pageTimezone = previousPageTimezone;
+      if (validatedPatch.customTimezone !== undefined) {
+        pageTimezone = await updateTimezone(tabId, next.customTimezone, previousPageTimezone);
+      }
+      if (next.customTime === null) {
+        if (timeChanged || timeOverride?.offsetMs != null) {
+          timeOverride = await disableTimeForTab(tabId, false);
+          shouldNotifyTime = true;
+        }
+      } else if (timeChanged || timeOverride?.offsetMs == null) {
+        timeOverride = await enableTimeForTab(tabId, next.customTime, false);
         shouldNotifyTime = true;
       }
-    } else if (timeChanged || timeOverride?.offsetMs == null) {
-      timeOverride = await enableTimeForTab(tabId, next.customTime, false);
-      shouldNotifyTime = true;
-    }
-    await syncTabPageOverrideRules(tabId, effectiveUserAgent, timeOverride);
-    if (shouldNotifyTime && timeOverride) await sendTimeOverrideForTab(tabId, timeOverride);
-
-    await chrome.storage.session.set({ [tabPageOverridesStorageKey(tabId)]: next });
-    return next;
-  });
+      const key = tabPageOverridesStorageKey(tabId);
+      try {
+        await syncTabPageOverrideRules(tabId, effectiveUserAgent, timeOverride, pageTimezone);
+        await chrome.storage.session.set({
+          [key]: pageTimezone ? { ...next, pageTimezone } : next,
+        });
+      } catch (error) {
+        if (pageTimezone && pageTimezone !== previousPageTimezone) {
+          const restored = {
+            timezone: previousPageTimezone?.timezone ?? '',
+            revision: pageTimezone.revision + 1,
+          } satisfies PageTimezoneOverride;
+          await Promise.allSettled([
+            applyPageTimezone(tabId, restored),
+            syncTabPageOverrideRules(
+              tabId,
+              previous.customUserAgentEnabled ? previous.customUserAgent.trim() : '',
+              timeOverride,
+              restored,
+            ),
+            chrome.storage.session.set({ [key]: { ...previous, pageTimezone: restored } }),
+          ]);
+        }
+        throw error;
+      }
+      if (shouldNotifyTime && timeOverride) await sendTimeOverrideForTab(tabId, timeOverride);
+      return next;
+    });
   return patch && typeof patch === 'object' && Object.hasOwn(patch, 'customTimezone')
     ? runSerializedQuickSimulationUpdate(tabId, update)
     : update();
 }
 
+export async function grantTabTimezoneSiteAccess(
+  tabId: number,
+  patch: unknown,
+  origin: string,
+): Promise<TabPageOverrides> {
+  const url = getSimulationSiteUrl(origin);
+  const { customTimezone } = validatePatch(patch);
+  if (!url || getSimulationSitePattern(url) !== origin || !customTimezone) {
+    throw new Error('Invalid timezone site access request');
+  }
+  // Request from the click's runtime message so Chrome can close the toolbar popup safely.
+  if (!(await chrome.permissions.request({ origins: [origin] }))) {
+    throw new PageTimezoneSiteAccessError(origin);
+  }
+  return updateTabPageOverrides(tabId, { customTimezone }, origin);
+}
+
 export async function ensureTabPageOverridesApplied(tabId: number): Promise<void> {
-  await runTabUpdateExclusive(tabId, async () => {
-    const overrides = await getTabPageOverrides(tabId);
-    const userAgent = overrides.customUserAgentEnabled ? overrides.customUserAgent.trim() : '';
-    let timeOverride = await getTimeOverrideForTab(tabId);
-    let shouldNotifyTime = false;
-    if (overrides.customTimezone) {
-      await enableTimezoneForTab(tabId, overrides.customTimezone, 'settings');
-    }
-    if (overrides.customTime === null) {
-      if (timeOverride?.offsetMs != null) {
-        timeOverride = await disableTimeForTab(tabId, false);
+  await runSerializedQuickSimulationUpdate(tabId, () =>
+    runTabUpdateExclusive(tabId, async () => {
+      const { overrides, pageTimezone } = await readTabPageOverrides(tabId);
+      const userAgent = overrides.customUserAgentEnabled ? overrides.customUserAgent.trim() : '';
+      let timeOverride = await getTimeOverrideForTab(tabId);
+      let shouldNotifyTime = false;
+      let restoredTimezone = pageTimezone;
+      if (pageTimezone?.timezone) {
+        await applyPageTimezone(tabId, pageTimezone).catch(() => {});
+      } else if (overrides.customTimezone) {
+        restoredTimezone = await updateTimezone(tabId, overrides.customTimezone, null).catch(
+          () => pageTimezone,
+        );
+      }
+      if (overrides.customTime === null) {
+        if (timeOverride?.offsetMs != null) {
+          timeOverride = await disableTimeForTab(tabId, false);
+          shouldNotifyTime = true;
+        }
+      } else if (timeOverride?.offsetMs == null) {
+        timeOverride = await enableTimeForTab(tabId, overrides.customTime, false);
         shouldNotifyTime = true;
       }
-    } else if (timeOverride?.offsetMs == null) {
-      timeOverride = await enableTimeForTab(tabId, overrides.customTime, false);
-      shouldNotifyTime = true;
-    }
-    await syncTabPageOverrideRules(tabId, userAgent, timeOverride);
-    if (shouldNotifyTime && timeOverride) await sendTimeOverrideForTab(tabId, timeOverride);
-  });
+      await syncTabPageOverrideRules(tabId, userAgent, timeOverride, restoredTimezone);
+      if (restoredTimezone !== pageTimezone) {
+        await chrome.storage.session.set({
+          [tabPageOverridesStorageKey(tabId)]: { ...overrides, pageTimezone: restoredTimezone },
+        });
+      }
+      if (shouldNotifyTime && timeOverride) await sendTimeOverrideForTab(tabId, timeOverride);
+    }),
+  );
 }
 
 export async function disableTabPageOverride(tabId: number, target: unknown): Promise<void> {
@@ -288,7 +450,7 @@ export async function disableTabPageOverride(tabId: number, target: unknown): Pr
 export async function cleanupTabPageOverrides(tabId: number): Promise<void> {
   await runTabUpdateExclusive(tabId, async () => {
     await Promise.all([
-      syncTabPageOverrideRules(tabId, '', null),
+      syncTabPageOverrideRules(tabId, '', null, null),
       chrome.storage.session.remove(tabPageOverridesStorageKey(tabId)),
     ]);
   });

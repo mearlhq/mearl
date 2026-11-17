@@ -52,4 +52,5 @@ export interface TabPageOverridesResponse {
   success: boolean;
   overrides?: TabPageOverrides;
   error?: string;
+  siteAccessOrigin?: string;
 }

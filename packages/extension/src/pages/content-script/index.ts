@@ -251,6 +251,36 @@ const DEVICE_PREVIEW_TOOLBAR_COLLAPSED = 'device-preview-toolbar-collapsed';
     });
   }
 
+  if (isExtensionContextValid()) {
+    const updateTime = (offsetMs: number | null, revision: number) => {
+      deviceChromeManager?.updateTimeOverride(offsetMs, revision);
+      window.postMessage(
+        { source: 'mearl-content', type: 'PAGE_TIME_OVERRIDE', offsetMs, revision },
+        '*',
+      );
+    };
+    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+      if (message.action !== 'pageTimeOverride') return;
+      const offsetMs = Number.isFinite(message.offsetMs) ? message.offsetMs : null;
+      updateTime(offsetMs, typeof message.revision === 'number' ? message.revision : 0);
+      sendResponse({ ok: true });
+    });
+    void safeSendMessage<{
+      offsetMs?: number | null;
+      revision?: number;
+      timezone?: { timezone: string; revision: number } | null;
+    }>({ action: 'getPageTimeOverride' }).then(response => {
+      if (!response || !Object.hasOwn(response, 'offsetMs')) return;
+      updateTime(response.offsetMs ?? null, response.revision ?? 0);
+      if (response.timezone) {
+        window.postMessage(
+          { source: 'mearl-content', type: 'PAGE_TIMEZONE_OVERRIDE', ...response.timezone },
+          '*',
+        );
+      }
+    });
+  }
+
   if (!isTopFrame) {
     return;
   }
@@ -378,27 +408,6 @@ const DEVICE_PREVIEW_TOOLBAR_COLLAPSED = 'device-preview-toolbar-collapsed';
           return;
         }
 
-        if (message.action === 'pageTimeOverride') {
-          deviceChromeManager?.updateTimeOverride(
-            message.offsetMs === null ||
-              (typeof message.offsetMs === 'number' && Number.isFinite(message.offsetMs))
-              ? message.offsetMs
-              : null,
-            typeof message.revision === 'number' ? message.revision : 0,
-          );
-          window.postMessage(
-            {
-              source: 'mearl-content',
-              type: 'PAGE_TIME_OVERRIDE',
-              offsetMs: message.offsetMs,
-              revision: message.revision,
-            },
-            '*',
-          );
-          sendResponse({ ok: true });
-          return true;
-        }
-
         if (message.action === 'debuggerAttached') {
           // debugger 已连接，启用 override
           window.postMessage(
@@ -449,22 +458,6 @@ const DEVICE_PREVIEW_TOOLBAR_COLLAPSED = 'device-preview-toolbar-collapsed';
         } else if (message.action === 'updateDnrIndicator') {
           dnrIndicator.updateDnrIndicator((message.rules ?? []) as DnrRule[]);
         }
-      });
-
-      void safeSendMessage<{ offsetMs?: number | null; revision?: number }>({
-        action: 'getPageTimeOverride',
-      }).then(response => {
-        if (!response || !Object.hasOwn(response, 'offsetMs')) return;
-        deviceChromeManager?.updateTimeOverride(response.offsetMs ?? null, response.revision ?? 0);
-        window.postMessage(
-          {
-            source: 'mearl-content',
-            type: 'PAGE_TIME_OVERRIDE',
-            offsetMs: response.offsetMs ?? null,
-            revision: response.revision ?? 0,
-          },
-          '*',
-        );
       });
     } catch {
       // ignore

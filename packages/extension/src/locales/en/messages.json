@@ -1976,6 +1976,12 @@
   "timezoneSystem": {
     "message": "Default"
   },
+  "timezoneApplyFailed": {
+    "message": "Could not apply the timezone. Your selection is unchanged."
+  },
+  "timezoneGrantSiteAccess": {
+    "message": "Grant site access and apply timezone"
+  },
   "timezoneShanghai": {
     "message": "Shanghai"
   },

@@ -1972,6 +1972,12 @@
   "timezoneSystem": {
     "message": "默认"
   },
+  "timezoneApplyFailed": {
+    "message": "未能应用时区，当前选择未改变"
+  },
+  "timezoneGrantSiteAccess": {
+    "message": "授权当前网站并应用时区"
+  },
   "timezoneShanghai": {
     "message": "上海"
   },
