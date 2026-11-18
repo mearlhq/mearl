@@ -507,7 +507,19 @@ export function invoke(
       controlSource,
       options.socketPath,
       options.deadline,
-    ).then(decorateBrowserListResult);
+    ).then(result => {
+      const installedProviders = listInstalledProviders().map(provider => ({
+        id: provider.providerId,
+        name: provider.name,
+        builtin: false,
+        version: provider.version,
+        protocolVersion: provider.protocolVersion,
+      }));
+      return decorateBrowserListResult({
+        ...result,
+        ...(installedProviders.length ? { installedProviders } : {}),
+      });
+    });
   }
   const selector = browser ?? defaultBrowser ?? process.env.MEARL_BROWSER ?? undefined;
   return dispatchInvoke(

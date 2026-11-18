@@ -68,7 +68,14 @@ vi.mock('@mearl/provider/runtime', () => ({
 
 vi.mock('@mearl/provider/host', async importOriginal => ({
   ...(await importOriginal<typeof import('@mearl/provider/host')>()),
-  listInstalledProviders: vi.fn(() => installedProviderIds.map(providerId => ({ providerId }))),
+  listInstalledProviders: vi.fn(() =>
+    installedProviderIds.map(providerId => ({
+      providerId,
+      name: 'Fixture provider',
+      version: '1.0.0',
+      protocolVersion: 3,
+    })),
+  ),
   ensureProviderControlHost: vi.fn(async () => ({
     socketPath: '/tmp/mearl-provider-control.sock',
   })),
@@ -609,8 +616,19 @@ describe('external provider routing', () => {
 
     await expect(invoke('browser_list')).resolves.toMatchObject({
       count: 1,
+      connectedCount: 0,
+      defaultBrowserId: null,
       warnings: ['provider fixture: startup warning'],
       browsers: [expect.objectContaining({ browserId: 'managed:fixture', type: 'managed' })],
+      installedProviders: [
+        {
+          id: 'fixture',
+          name: 'Fixture provider',
+          builtin: false,
+          version: '1.0.0',
+          protocolVersion: 3,
+        },
+      ],
     });
 
     expect(createConnectionMock).toHaveBeenCalledWith('/tmp/mearl-native-browser.sock');

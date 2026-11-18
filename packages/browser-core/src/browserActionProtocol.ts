@@ -258,6 +258,8 @@ export interface BrowserListResult {
   connectedCount: number;
   defaultBrowserId: string | null;
   browsers: BrowserInfo[];
+  /** Registered external Providers, including those without a browser instance. */
+  installedProviders?: Array<BrowserProviderIdentity & { source?: BrowserSource }>;
   /** Partial discovery failures; successfully inspected browser sources remain in the result. */
   warnings?: string[];
   /** Present only for an explicit, source-local Provider launch-form query. */

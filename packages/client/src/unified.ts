@@ -23,6 +23,7 @@ import {
   parseBrowserManageParams,
   parseSessionManageParams,
   resolveSessionManageId,
+  type BrowserListResult as BrowserListProtocolResult,
   type ControlSessionInfo,
   type BrowserSource,
 } from '@mearl/browser-core';
@@ -77,12 +78,8 @@ interface BrowserRecord {
   [key: string]: any;
 }
 
-interface BrowserListResult {
-  count: number;
-  connectedCount: number;
-  defaultBrowserId: string | null;
+interface BrowserListResult extends Omit<BrowserListProtocolResult, 'browsers'> {
   browsers: BrowserRecord[];
-  warnings?: string[];
 }
 
 interface RemoteBrowserListing {
@@ -820,6 +817,10 @@ export class UnifiedClient {
       ? result.browsers
       : [];
     const browsers = rawBrowsers.map(browser => decorateBrowser(browser, source));
+    const providers: BrowserListResult['installedProviders'] = result?.installedProviders;
+    const installedProviders = Array.isArray(providers)
+      ? providers.map(provider => ({ ...provider, source }))
+      : [];
     const resultWarnings = Array.isArray(result?.warnings)
       ? result.warnings.filter((warning: unknown): warning is string => typeof warning === 'string')
       : [];
@@ -834,6 +835,7 @@ export class UnifiedClient {
             })
           : null,
       browsers,
+      ...(installedProviders.length ? { installedProviders } : {}),
       ...(result?.discovery ? { discovery: result.discovery } : {}),
       ...(resultWarnings.length > 0 ? { warnings: resultWarnings } : {}),
     };
@@ -984,6 +986,7 @@ export class UnifiedClient {
     }
     for (const listing of listings) warnings.push(...(listing.warnings ?? []));
     const browsers = listings.flatMap(listing => listing.browsers);
+    const installedProviders = listings.flatMap(listing => listing.installedProviders ?? []);
     const defaults = listings
       .map(listing => listing.defaultBrowserId)
       .filter((browserId): browserId is string => typeof browserId === 'string');
@@ -1001,6 +1004,7 @@ export class UnifiedClient {
       connectedCount: browsers.filter(browser => browser.status === 'connected').length,
       defaultBrowserId,
       browsers,
+      ...(installedProviders.length ? { installedProviders } : {}),
       ...(warnings.length > 0 ? { warnings } : {}),
     });
   }

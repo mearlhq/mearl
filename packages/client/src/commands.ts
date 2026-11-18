@@ -434,6 +434,9 @@ export const COMMANDS = [
     name: 'browser_list',
     description: '列出所有浏览器及其连接状态、类型和 Provider 托管实例信息',
     summary: '列出本地及远端浏览器与连接状态',
+    result: [
+      'installedProviders lists registered external Providers by source, even when they have no browser instances.',
+    ],
     params: [
       {
         name: 'provider',

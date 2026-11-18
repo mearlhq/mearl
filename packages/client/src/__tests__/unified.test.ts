@@ -222,6 +222,7 @@ describe('UnifiedClient browser routing', () => {
           count: 1,
           connectedCount: 1,
           defaultBrowserId: 'local-chrome',
+          installedProviders: [{ id: 'ego', name: 'Ego Lite', builtin: false }],
           browsers: [
             {
               browserId: 'local-chrome',
@@ -250,6 +251,7 @@ describe('UnifiedClient browser routing', () => {
       count: 1,
       connectedCount: 1,
       defaultBrowserId: 'example-cloud:session-a',
+      installedProviders: [{ id: 'ego', name: 'Ego Lite', builtin: false }],
       browsers: [
         {
           browserId: 'example-cloud:session-a',
@@ -266,7 +268,19 @@ describe('UnifiedClient browser routing', () => {
     });
 
     const listing = await listPromise;
-    expect(listing).toMatchObject({ count: 2, connectedCount: 2, defaultBrowserId: null });
+    expect(listing).toMatchObject({
+      count: 2,
+      connectedCount: 2,
+      defaultBrowserId: null,
+      installedProviders: [
+        { id: 'ego', name: 'Ego Lite', source: { kind: 'local' } },
+        {
+          id: 'ego',
+          name: 'Ego Lite',
+          source: { kind: 'remote', connectorId: 'node-a', connectorName: 'work-mac' },
+        },
+      ],
+    });
     expect(listing.browsers.map((browser: any) => browser.browserId)).toEqual([
       'mearl:local:local-chrome',
       'mearl:remote:node-a:example-cloud:session-a',
