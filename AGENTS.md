@@ -39,14 +39,6 @@ pnpm check:core-browser
 
 Do not run separate formatting commands unless requested. Respect configured Git hooks; do not assume a formatter or hook exists without checking this checkout.
 
-### Publishing and Deployment
-
-Publishing packages, changing release versions, changing repository visibility and deploying websites require an explicit user request. Do not rewrite history. Preserve pnpm's clean-worktree, publish-branch and remote synchronization checks; do not use `--no-git-checks`.
-
-Release through `.github/workflows/publish.yml`, following `docs/releases.md`. The `beta` and `patch` channels select versions automatically and inject them into an exported build tree. The `stable` channel requires committed version files and release notes. The separate `.github/workflows/website.yml` deploys on website-related pushes to `main` and also accepts manual runs.
-
-Match validation to the requested scope. Release tasks end with the successful authorized publication and its version and installation or download entry point.
-
 ### Reloading the Extension
 
 After building an unpacked extension, reload it through the connected browser:
@@ -190,17 +182,21 @@ pnpm exec vitest run --project skills
 
 ## Version Management
 
+- Choose whether to release from user impact and the full difference between the last stable release and the remote candidate. Source-only tests, repository guidance, refactors and build cleanup with no change to distributed behavior ride with the next relevant release. Website-only changes use the [website workflow](.github/workflows/website.yml). Track its automatic deployment for matching pushes to `main` and verify the affected page.
+- Use `patch` on the matching stable line when a verified fix resolves a user-facing defect in the current release, such as a failed upgrade, a broken workflow or incorrect results, and the full candidate fits a backward-compatible patch. Use `beta` for installable previews and changes that need broader acceptance evidence. If the candidate includes unfinished work, use an appropriate preview or defer distribution until it is ready. Promote a complete minor or major candidate through `stable` when its intended scope is ready and beta evidence covers affected workflows, installation or upgrade, and any compatibility or migration requirements. A request for a specific channel takes precedence within the platform's release controls.
+- Release from `main` through the [Publish workflow](.github/workflows/publish.yml) and follow [the release guide](docs/releases.md). Assess eligibility during implementation so required version and release-note changes can be reviewed. Before dispatch, check the exact reviewed remote candidate, required CI, the registry and tags, any active or partially completed run and whether the intended channel already delivered the candidate. Confirm the workflow uses the expected commit. Preserve clean-worktree, publish-branch and remote synchronization checks. After failure, inspect published state and use the documented same-artifact retry when available.
 - The `beta` and `patch` channels use automatic version selection and an exported build tree as described in `docs/releases.md`.
-- For an explicitly requested release through the `stable` channel, run `pnpm bump <version>`, review all workspace versions, Skill frontmatter and MCP metadata, and prepare both `changelogs/v<version>.md` and `changelogs/v<version>.en.md` before committing.
+- For `stable`, run `pnpm bump <version>`, review all workspace versions, Skill frontmatter and MCP metadata, and prepare both `changelogs/v<version>.md` and `changelogs/v<version>.en.md` before committing.
 - After publishing a stable or patch version, verify that its GitHub Release has user-facing change notes and a comparison link. Update the Release and commit the matching Chinese and English entries under `changelogs/` if the workflow generated only a commit list.
 - Release notes describe concrete user-visible changes and compatibility requirements. Use plain level-three section headings. Verify website rendering when its changelog presentation changes.
 - Commit stable version files and notes together using `chore: v<version>`, matching root `package.json`.
+- `patch` and `stable` publish to npm `latest` and submit the release to Chrome Web Store and SkillHub. Verify the published npm version and dist-tag, GitHub Release, website and relevant download or installation path. Confirm each applicable submission and report platform review separately while it is pending. Availability requires confirmation from the corresponding distribution channel.
 
-## Git Workflow
+## Agent Delivery
 
-- Use the `codex/` prefix for new branches.
-- Before committing, ask a review sub-agent to inspect the final diff for regressions, restrained design, unnecessary abstractions and duplicated or redundant logic. Resolve actionable findings first.
-- Write commit messages in English. Use Conventional Commit types with optional scope and concise English descriptions; write any body or footer prose in English as well. Release version commits use the `chore: v<version>` exception above.
-- Keep descriptions to one short phrase capturing the theme; avoid enumerating every change or restating old/new details.
-- Squash completed worktree work into `main`, one commit per completed piece of work; do not create merge commits for routine worktree integration.
-- After merging, remove the completed worktree and its branch when they no longer hold other work. Preserve unrelated branches, worktrees and user changes.
+An implementation request or actionable bug report starts end-to-end delivery by default. Own acceptance, independent review, commit, push, remote checks and each release that meets the criteria above. Follow a narrower scope such as investigation or local-only work when requested. Ask the user only for an unresolved requirement that materially changes the outcome or for an action the platform or repository requires them to approve. Follow branch protection and release controls. Changes to repository visibility require separate authorization. Never rewrite shared history.
+
+1. Define observable acceptance criteria from the request. Reproduce a reported bug when possible and verify the fix or feature through its normal entry point. Run the relevant checks above and capture evidence from the actual user workflow. Fix failures within scope and rerun affected checks.
+2. After local validation and before committing, dispatch an independent review sub-agent. Give it the acceptance criteria, checks run and exact task diff. Ask it to check correctness, regressions, missing coverage, duplication and unnecessary abstractions. Resolve actionable findings and repeat affected validation and review after material changes. A required check or review that cannot run blocks the affected delivery step.
+3. Commit only the reviewed work. Use concise English Conventional Commit messages, including any body or footer. Use `codex/` for new branches. Squash completed worktree work into `main` with one commit per completed piece of work. Use the repository's pull request path when required by branch protection. Preserve unrelated worktrees, edits, staged changes and local commits. Remove a completed worktree and branch after integration once they hold no other work.
+4. Before pushing, compare the candidate with the actual remote target and isolate the task on the correct base if the outgoing range includes unrelated local commits. Push without force, verify the remote commit and follow its CI to completion. On divergence, reconcile safely and recheck affected changes before pushing. Complete any eligible release and report acceptance evidence, the commit and remote checks, and either the version and distribution entry point or the reason a release was unnecessary or remains blocked or pending.
