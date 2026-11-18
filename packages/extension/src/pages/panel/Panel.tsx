@@ -46,12 +46,10 @@ import { toggleSpmOverlay } from './utils/spmHighlight';
 import {
   startHeatmap,
   stopHeatmap,
-  detectPageSpmAB,
-  detectPagePath,
+  detectHeatmapPage,
   getYesterdayDs,
   type HeatmapErrorCode,
   type HeatmapMeasure,
-  type HeatmapStartResult,
   type HeatmapStatus,
 } from './utils/heatmap';
 import { setValueByPathInParsedData } from './utils/helpers';
@@ -93,14 +91,16 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
   });
   const [navigationDividers, setNavigationDividers] = useState<NavigationDivider[]>([]);
   const [isHiddenListExpanded, setIsHiddenListExpanded] = useState<boolean>(false);
-  const [tabId, setTabId] = useState<number | null>(null);
+  const [previewTabId, setPreviewTabId] = useState<number | null>(null);
+  const tabId = isDevtools ? chrome.devtools.inspectedWindow.tabId : previewTabId;
   const [apiOverrides, setApiOverrides] = useState<Map<string, ResponseOverride[]>>(new Map());
   const [showRequestCasesModal, setShowRequestCasesModal] = useState<boolean>(false);
   const [showRequestImportModal, setShowRequestImportModal] = useState<boolean>(false);
   const [editingOverrideId, setEditingOverrideId] = useState<string | null>(null);
   const [showAgentModal, setShowAgentModal] = useState<boolean>(false);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
-  const [config, configLoaded] = useExtensionConfig(undefined, { localOnly: !isDevtools });
+  // Render from local preferences while the config and UI settings subscriptions load services.
+  const [config, configLoaded] = useExtensionConfig(undefined, { localOnly: true });
   const {
     agentEnabled,
     accountsEnabled,
@@ -122,35 +122,16 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
 
   // ─── 热度地图 ──────────────────────────────────────────────────────────────
   const [pageSpmAB, setPageSpmAB] = useState<string | null>(null);
-  const [pagePath, setPagePath] = useState<string | null>(null);
-  const isTripPath =
-    !!pagePath &&
-    !!browserUiSettings.heatmap &&
-    pagePath.startsWith(browserUiSettings.heatmap.pathPrefix);
-  const isTripPathRef = useRef(isTripPath);
-  useEffect(() => {
-    isTripPathRef.current = isTripPath;
-  }, [isTripPath]);
-  const [storedHeatmapMeasure, setHeatmapMeasure] = useLocalStorage<HeatmapMeasure>(
-    'panel-heatmap-measure',
-    '',
-  );
-  const heatmapMeasure = browserUiSettings.heatmap?.measures.some(
-    value => value.id === storedHeatmapMeasure,
-  )
-    ? storedHeatmapMeasure
-    : (browserUiSettings.heatmap?.defaultMeasure ?? '');
+  const [pageSpmA, setPageSpmA] = useState<string | null>(null);
+  const expectedSpmA = browserUiSettings.heatmap?.bodySpmPrefix;
+  const heatmapAvailable = trackingMetadataEnabled && !!expectedSpmA && pageSpmA === expectedSpmA;
+  const [heatmapMeasures, setHeatmapMeasures] = useState<HeatmapMeasure[]>([]);
+  const heatmapMeasuresRef = useRef(heatmapMeasures);
   const [heatmapStatus, setHeatmapStatus] = useState<HeatmapStatus>('idle');
   const [heatmapError, setHeatmapError] = useState<string | null>(null);
   const [heatmapErrorCode, setHeatmapErrorCode] = useState<HeatmapErrorCode | null>(null);
   const heatmapStatusRef = useRef(heatmapStatus);
-  useEffect(() => {
-    heatmapStatusRef.current = heatmapStatus;
-  }, [heatmapStatus]);
-  const heatmapMeasureRef = useRef(heatmapMeasure);
-  useEffect(() => {
-    heatmapMeasureRef.current = heatmapMeasure;
-  }, [heatmapMeasure]);
+  const heatmapRequestRevision = useRef(0);
   // 数据日期 ds（yyyyMMdd）；不持久化，panel 重开默认 T-1
   const [heatmapDs, setHeatmapDs] = useState<string>(() => getYesterdayDs());
   const heatmapDsRef = useRef(heatmapDs);
@@ -281,8 +262,7 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
   useEffect(() => {
     if (!configLoaded) return;
     let disposed = false;
-    // The preview subscribes to browser UI settings independently of its local translations.
-    void initI18n(config.language, { localOnly: !isDevtools }).then(() => {
+    void initI18n(config.language, { localOnly: true }).then(() => {
       if (disposed) return;
       setConfigReady(true);
       forceUpdate({});
@@ -290,7 +270,7 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
     return () => {
       disposed = true;
     };
-  }, [config.language, configLoaded, isDevtools]);
+  }, [config.language, configLoaded]);
 
   useEffect(() => {
     if (checkAndConsumeReloadToast()) showToast(t('extension_reloaded'), 'info');
@@ -299,7 +279,7 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
   // 实时翻译：当设置变化时通知 background，并清理之前的翻译标记
   // configReady 为 false 时跳过，避免初始 'none' 值在配置加载前错误地覆盖 background 状态
   useEffect(() => {
-    if (!configReady || (!isDevtools && !tabId)) return;
+    if (!configReady || tabId === null) return;
 
     // 通知 background 更新实时翻译目标
     chrome.runtime
@@ -318,19 +298,15 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
         return rest as CapturedRequest;
       }),
     );
-  }, [globalTranslation, configReady, isDevtools, tabId]);
+  }, [globalTranslation, configReady, tabId]);
 
-  // 获取当前 tab ID 并加载已有的响应覆盖配置
+  // 加载目标标签页的响应覆盖配置
   useEffect(() => {
-    const currentTabId = isDevtools ? chrome.devtools.inspectedWindow.tabId : tabId;
-    if (currentTabId) {
-      setTabId(currentTabId);
-      // 不再自动检测 content script 状态，改为按需检测
-
+    if (tabId !== null) {
       // 从 background 加载已有的响应覆盖配置
       sendMessageSafely({
         action: 'getOverrides',
-        tabId: currentTabId,
+        tabId,
       }).then(response => {
         if (response && response.overrides && response.overrides.length > 0) {
           setApiOverrides(() => {
@@ -358,7 +334,7 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
         }
       });
     }
-  }, [isDevtools, isDevtools ? null : tabId]);
+  }, [tabId]);
 
   // 源码追溯结果（picker → fiber → 字段匹配）
   const [traceResult, setTraceResult] = useState<TraceResult | null>(null);
@@ -372,7 +348,7 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
   const { clearPreview, retryPreview, markPreviewReady } = usePanelPortBridge({
     previewToken,
     onPreviewState: (id, state) => {
-      if (id !== null) setTabId(id);
+      if (id !== null) setPreviewTabId(id);
       setPreviewState(state);
     },
     setNavigationDividers,
@@ -426,40 +402,10 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
       }
     };
 
-    // SPM 高亮、当前页路径与热度地图跟随 DevTools 的导航通知刷新：这些副作用在
-    // 同文档路由后也需要按最新 URL 重新对齐，且均为幂等操作。
-    const handleNavigated = (url: string) => {
-      // 同步当前页路径（用于判断是否启用热度数据）
-      try {
-        setPagePath(new URL(url).pathname);
-      } catch {
-        setPagePath(null);
-      }
-      // 页面跳转后重新识别 spmAB 并按需重启热度地图
-      setTimeout(() => {
-        detectPageSpmAB().then(ab => {
-          setPageSpmAB(ab);
-          if (
-            trackingMetadataEnabledRef.current &&
-            ab &&
-            heatmapStatusRef.current === 'active' &&
-            isTripPathRef.current
-          ) {
-            setHeatmapStatus('loading');
-            startHeatmap(ab, heatmapMeasureRef.current, heatmapDsRef.current).then(r =>
-              applyHeatmapResultRef.current(r),
-            );
-          }
-        });
-      }, 800);
-    };
-
     window.addEventListener('mearl-main-frame-committed', handleMainFrameCommitted);
-    chrome.devtools.network.onNavigated.addListener(handleNavigated);
 
     return () => {
       chrome.devtools.network.onRequestFinished.removeListener(handleDevtoolsRequest);
-      chrome.devtools.network.onNavigated.removeListener(handleNavigated);
       window.removeEventListener('mearl-main-frame-committed', handleMainFrameCommitted);
     };
   }, [handleDevtoolsRequest, preserveLog, isDevtools]);
@@ -511,91 +457,147 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
     }
   }, [mode, showAllSpm, tabId]);
 
-  // ─── 热度地图：进入 rum 模式时识别一次 spmAB + 当前路径 ──────────────────
-  useEffect(() => {
-    if (isDevtools && mode === 'rum') {
-      detectPageSpmAB().then(setPageSpmAB);
-      detectPagePath().then(setPagePath);
-    }
-  }, [mode, browserUiSettings.heatmap, isDevtools]);
-
-  const applyHeatmapResultRef = useRef<(r: HeatmapStartResult) => void>(() => {});
-  const applyHeatmapResult = useCallback((result: HeatmapStartResult) => {
-    if (
-      !trackingMetadataEnabledRef.current ||
-      (!result.success && result.error === 'HEATMAP_CANCELLED')
-    )
-      return;
-    if (result.success) {
-      setHeatmapStatus('active');
-      setHeatmapError(null);
-      setHeatmapErrorCode(null);
-    } else {
-      setHeatmapStatus('error');
-      setHeatmapError(result.error);
-      setHeatmapErrorCode(result.errorCode);
-    }
+  const updateHeatmapStatus = useCallback((status: HeatmapStatus) => {
+    heatmapStatusRef.current = status;
+    setHeatmapStatus(status);
   }, []);
 
-  useEffect(() => {
-    applyHeatmapResultRef.current = applyHeatmapResult;
-  }, [applyHeatmapResult]);
+  const updateHeatmapMeasures = useCallback((measures: HeatmapMeasure[]) => {
+    heatmapMeasuresRef.current = measures;
+    setHeatmapMeasures(measures);
+  }, []);
 
-  const handleToggleHeatmap = useCallback(async () => {
-    if (!trackingMetadataEnabledRef.current) return;
-    if (heatmapStatus === 'active' || heatmapStatus === 'error') {
-      // 关闭
-      await stopHeatmap();
-      setHeatmapStatus('idle');
+  const loadHeatmap = useCallback(
+    async (targetTabId: number, spmAB: string, measures: HeatmapMeasure[], ds: string) => {
+      const revision = ++heatmapRequestRevision.current;
+      updateHeatmapMeasures(measures);
+      updateHeatmapStatus('loading');
       setHeatmapError(null);
       setHeatmapErrorCode(null);
-      return;
-    }
-    if (!pageSpmAB) return;
-    setHeatmapStatus('loading');
-    const result = await startHeatmap(pageSpmAB, heatmapMeasure, heatmapDs);
-    applyHeatmapResult(result);
-  }, [heatmapStatus, pageSpmAB, heatmapMeasure, heatmapDs, applyHeatmapResult]);
+      const result = await startHeatmap(targetTabId, spmAB, measures, ds);
+      if (revision !== heatmapRequestRevision.current || !trackingMetadataEnabledRef.current)
+        return;
 
-  const handleSelectHeatmapMeasure = useCallback(
-    async (m: HeatmapMeasure) => {
-      setHeatmapMeasure(m);
-      // 已开启则立即应用新指标（background 复用缓存）
-      if (trackingMetadataEnabledRef.current && heatmapStatus === 'active' && pageSpmAB) {
-        setHeatmapStatus('loading');
-        const result = await startHeatmap(pageSpmAB, m, heatmapDs);
-        applyHeatmapResult(result);
+      if (result.success) {
+        updateHeatmapStatus('active');
+        return;
+      }
+
+      updateHeatmapMeasures([]);
+      if (result.error === 'HEATMAP_CANCELLED') {
+        updateHeatmapStatus('idle');
+      } else {
+        void stopHeatmap(targetTabId);
+        updateHeatmapStatus('error');
+        setHeatmapError(result.error);
+        setHeatmapErrorCode(result.errorCode);
       }
     },
-    [setHeatmapMeasure, heatmapStatus, pageSpmAB, heatmapDs, applyHeatmapResult],
+    [updateHeatmapMeasures, updateHeatmapStatus],
+  );
+
+  const clearHeatmap = useCallback(
+    (targetTabId: number) => {
+      heatmapRequestRevision.current++;
+      updateHeatmapMeasures([]);
+      updateHeatmapStatus('idle');
+      setHeatmapError(null);
+      setHeatmapErrorCode(null);
+      void stopHeatmap(targetTabId);
+    },
+    [updateHeatmapMeasures, updateHeatmapStatus],
+  );
+
+  useEffect(() => {
+    if (tabId === null || mode !== 'rum' || !trackingMetadataEnabled || !expectedSpmA) return;
+
+    let revision = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const refreshPage = async (current: number, navigated: boolean) => {
+      const page = await detectHeatmapPage(tabId);
+      if (current !== revision) return;
+      setPageSpmA(page?.spmA ?? null);
+      setPageSpmAB(page?.spmAB ?? null);
+      if (!navigated || page?.spmA !== expectedSpmA) return;
+      const status = heatmapStatusRef.current;
+      if (status !== 'active' && status !== 'loading') return;
+      if (!page.spmAB) {
+        clearHeatmap(tabId);
+        return;
+      }
+      void loadHeatmap(tabId, page.spmAB, heatmapMeasuresRef.current, heatmapDsRef.current);
+    };
+    const handleNavigated = () => {
+      setPageSpmAB(null);
+      const current = ++revision;
+      clearTimeout(timer);
+      // 等待新页面写入 SPM 后再读取，连续导航只处理最后一次。
+      timer = setTimeout(() => void refreshPage(current, true), 800);
+    };
+    const handlePermissionsChanged = ({ origins }: chrome.permissions.Permissions) => {
+      if (origins?.length) handleNavigated();
+    };
+    const permissionsAdded = chrome.permissions.onAdded as chrome.events.Event<
+      (permissions: chrome.permissions.Permissions) => void
+    >;
+    setPageSpmA(null);
+    setPageSpmAB(null);
+    void refreshPage(revision, false);
+    window.addEventListener('mearl-panel-page-navigated', handleNavigated);
+    permissionsAdded.addListener(handlePermissionsChanged);
+    chrome.permissions.onRemoved.addListener(handlePermissionsChanged);
+    return () => {
+      revision++;
+      clearTimeout(timer);
+      window.removeEventListener('mearl-panel-page-navigated', handleNavigated);
+      permissionsAdded.removeListener(handlePermissionsChanged);
+      chrome.permissions.onRemoved.removeListener(handlePermissionsChanged);
+    };
+  }, [tabId, mode, trackingMetadataEnabled, expectedSpmA, loadHeatmap, clearHeatmap]);
+
+  const handleSelectHeatmapMeasure = useCallback(
+    (measure: HeatmapMeasure) => {
+      if (tabId === null || !pageSpmAB || !trackingMetadataEnabledRef.current) return;
+      const current = heatmapMeasuresRef.current;
+      const next = current.includes(measure)
+        ? current.filter(id => id !== measure)
+        : [...current, measure];
+      if (!next.length) {
+        clearHeatmap(tabId);
+        return;
+      }
+      void loadHeatmap(tabId, pageSpmAB, next, heatmapDs);
+    },
+    [tabId, pageSpmAB, heatmapDs, clearHeatmap, loadHeatmap],
   );
 
   const handleSelectHeatmapDs = useCallback(
-    async (ds: string) => {
-      if (ds === heatmapDs) return;
+    (ds: string) => {
+      if (ds === heatmapDs || heatmapStatusRef.current === 'loading') return;
       setHeatmapDs(ds);
       // 已开启则按新日期重拉（背景层按 spmAB+ds 缓存，换日 = 重新发请求）
-      if (trackingMetadataEnabledRef.current && heatmapStatus === 'active' && pageSpmAB) {
-        setHeatmapStatus('loading');
-        const result = await startHeatmap(pageSpmAB, heatmapMeasure, ds);
-        applyHeatmapResult(result);
+      if (
+        tabId !== null &&
+        trackingMetadataEnabledRef.current &&
+        heatmapStatusRef.current === 'active' &&
+        pageSpmAB
+      ) {
+        void loadHeatmap(tabId, pageSpmAB, heatmapMeasuresRef.current, ds);
       }
     },
-    [heatmapDs, heatmapStatus, pageSpmAB, heatmapMeasure, applyHeatmapResult],
+    [tabId, heatmapDs, pageSpmAB, loadHeatmap],
   );
 
-  // 热度地图按已安装设置、RUM 模式和路径范围显示。
+  // 热度地图按已安装设置、RUM 模式和页面 A 点显示。
   useEffect(() => {
     if (
-      (!trackingMetadataEnabled || mode !== 'rum' || !isTripPath) &&
+      tabId !== null &&
+      (!heatmapAvailable || mode !== 'rum') &&
       heatmapStatusRef.current !== 'idle'
     ) {
-      stopHeatmap();
-      setHeatmapStatus('idle');
-      setHeatmapError(null);
-      setHeatmapErrorCode(null);
+      clearHeatmap(tabId);
     }
-  }, [mode, isTripPath, trackingMetadataEnabled]);
+  }, [tabId, mode, heatmapAvailable, clearHeatmap]);
 
   const hideApi = (apiName: string) => {
     setHiddenApis(prev => (prev.includes(apiName) ? prev : [...prev, apiName]));
@@ -822,7 +824,7 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
   );
 
   // 等待 i18n 加载完成再渲染，避免首屏文案先中文后英文的闪烁
-  if (!configReady || (!isDevtools && !tabId)) {
+  if (!configReady || tabId === null) {
     return <div className="h-screen bg-gray-50" />;
   }
 
@@ -835,7 +837,10 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
         modificationEnabled={modificationEnabled}
         onToggleModification={toggleModification}
         mode={mode}
-        onSetMode={setMode}
+        onSetMode={nextMode => {
+          if (nextMode === 'rum' && sourceTracer.isPicking) sourceTracer.cancel();
+          setMode(nextMode);
+        }}
         onShowAgentStatus={() => setShowAgentModal(true)}
         agentConnected={agentConnected}
         cloudConnected={cloudConnectorState.connected}
@@ -843,20 +848,17 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
         onShowSettings={() => setShowSettingsModal(true)}
         showAllSpm={showAllSpm}
         onToggleShowAllSpm={handleToggleShowAllSpm}
-        heatmapAvailable={isDevtools && trackingMetadataEnabled && isTripPath}
+        heatmapAvailable={heatmapAvailable}
         pageSpmAB={pageSpmAB}
-        heatmapMeasure={heatmapMeasure}
+        heatmapMeasures={heatmapMeasures}
         heatmapDs={heatmapDs}
         heatmapStatus={heatmapStatus}
         heatmapError={heatmapError}
         heatmapErrorCode={heatmapErrorCode}
         onSelectHeatmapMeasure={handleSelectHeatmapMeasure}
         onSelectHeatmapDs={handleSelectHeatmapDs}
-        onToggleHeatmap={handleToggleHeatmap}
         accountsEnabled={accountsEnabled}
-        onToggleSourceTrace={
-          tabId !== null && (!isDevtools || mode === 'protocol') ? sourceTracer.toggle : undefined
-        }
+        onToggleSourceTrace={sourceTracer.toggle}
         sourceTraceActive={sourceTracer.isPicking}
       />
       {!isDevtools && (

@@ -2,7 +2,7 @@
  * 热度地图渲染（DOM overlay 版）：
  * - 同一个 spm 在页面上可能命中多个 DOM 元素（如列表项、并排按钮）。这里按 spm 聚合：
  *   求所有命中元素的 bounding box 并集，画一个大边框 + 一个 label，避免重复 label 互相遮挡
- * - label 显示当前指标的值；边框/label 颜色按"档位"染色（5 档：蓝/青/绿/橙/红）
+ * - label 显示选中指标的值，边框和 label 按第一项指标的档位染色
  * - 档位用对数空间下的五分位数划分（start() 时按 spm 唯一值算好，滚动颜色稳定）
  * - 纯展示，不带任何 hover/click 交互；overlay 全部 pointer-events:none，不影响页面
  *
@@ -13,15 +13,9 @@
 import { findSpmElements } from './spmHighlight';
 import { getEffectiveZIndex } from './zIndexUtil';
 import { createSpmOverlayLifecycle, type SpmOverlayLifecycle } from './spmOverlayLifecycle';
+import type { HeatmapDataPoint, HeatmapDisplayMeasure } from '../../shared/heatmap';
 
 const HEATMAP_OVERLAY_SELECTOR = '[data-mtop-heatmap-overlay]';
-
-export type HeatmapMeasure = string;
-export type HeatmapPoint = {
-  spm: string;
-  spmName: string | null;
-  measures: Record<string, number>;
-};
 
 /**
  * 5 档主色（RGB 元组，运行时按档内透明度拼 rgba）：蓝 → 青 → 绿 → 橙 → 红
@@ -49,7 +43,7 @@ function colorForTier(tier: number, inTierNorm: number) {
   };
 }
 
-function formatNumber(value: number, format: 'number' | 'percent'): string {
+function formatNumber(value: number, format: HeatmapDisplayMeasure['format']): string {
   if (format === 'percent') return `${(value * 100).toFixed(2)}%`;
   if (value >= 100_000_000) return `${(value / 100_000_000).toFixed(2)}亿`;
   if (value >= 10_000) return `${(value / 10_000).toFixed(2)}w`;
@@ -88,7 +82,7 @@ function valueToTier(value: number, bounds: number[]): { tier: number; inTierNor
 }
 
 export type HeatmapRenderer = {
-  start: (measure: HeatmapMeasure, points: HeatmapPoint[], format?: 'number' | 'percent') => void;
+  start: (measures: HeatmapDisplayMeasure[], points: HeatmapDataPoint[]) => void;
   stop: () => void;
 };
 
@@ -97,8 +91,6 @@ type OverlayHandle = {
   label: HTMLSpanElement;
   /** spm 第一次出现时算好的 zIndex，后续滚动不重算；start() 重置 */
   z: number;
-  /** 上一次写入的 value，用于短路颜色/textContent 写入；NaN 表示从未画过 */
-  lastValue: number;
   /** 上一次写入的尺寸，用于短路 width/height 写入；位置不缓存（亚像素直写） */
   lastW: number;
   lastH: number;
@@ -111,15 +103,15 @@ type GroupAcc = {
   right: number;
   bottom: number;
   z: number;
-  value: number;
+  display: HeatmapDisplay;
   /** true = 该 spm 是新的，需要写入 zIndex（已有 overlay 复用 handle.z） */
   isNew: boolean;
 };
 
+type HeatmapDisplay = { colorValue: number; label: string };
+
 export function createHeatmapRenderer(): HeatmapRenderer {
-  let currentMeasure: HeatmapMeasure = '';
-  let currentFormat: 'number' | 'percent' = 'number';
-  let pointBySpm = new Map<string, HeatmapPoint>();
+  const displayBySpm = new Map<string, HeatmapDisplay>();
   const elementToSpm = new Map<Element, string>();
   // 一个 spm 一个 overlay（合并 box）；key 是 spm 字符串而不是 Element
   const overlays = new Map<string, OverlayHandle>();
@@ -129,16 +121,6 @@ export function createHeatmapRenderer(): HeatmapRenderer {
   let lifecycle: SpmOverlayLifecycle | null = null;
   // 模块级复用，避免每帧 new Map（high-freq GC 也会拖卡顿）
   const grouped = new Map<string, GroupAcc>();
-  // 当前 measure 下"有值（>0）"的 spm 集合；start() / measure 切换时重算。
-  // render 用它在循环里 short-circuit value=0 的元素，跳过它们的 getBoundingClientRect。
-  const drawableSpms = new Set<string>();
-
-  function getSpmValue(spm: string): number | null {
-    const p = pointBySpm.get(spm);
-    if (!p) return null;
-    const v = p.measures[currentMeasure];
-    return typeof v === 'number' && Number.isFinite(v) ? v : 0;
-  }
 
   function ensureOverlay(spm: string): OverlayHandle {
     let h = overlays.get(spm);
@@ -168,15 +150,14 @@ export function createHeatmapRenderer(): HeatmapRenderer {
       'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",monospace',
       'line-height:1',
       'padding:1px 3px',
-      'white-space:nowrap',
-      'max-width:120px',
-      'overflow:hidden',
-      'text-overflow:ellipsis',
+      'width:max-content',
+      'max-width:min(360px,calc(100vw - 12px))',
+      'white-space:normal',
       'pointer-events:none',
     ].join(';');
     box.appendChild(label);
     document.documentElement.appendChild(box);
-    h = { box, label, z: 0, lastValue: NaN, lastW: NaN, lastH: NaN };
+    h = { box, label, z: 0, lastW: NaN, lastH: NaN };
     overlays.set(spm, h);
     return h;
   }
@@ -193,9 +174,9 @@ export function createHeatmapRenderer(): HeatmapRenderer {
    * 每个 spm 画一个 union box；不再可见的 spm 回收。
    *
    * 性能要点：
-   * - drawableSpms 提前过滤 value=0 的元素，省掉它们的 getBoundingClientRect
+   * - displayBySpm 提前过滤没有正值的元素，省掉它们的 getBoundingClientRect
    * - 用 transform: translate 代替 left/top（走 compositor，不触发 layout/paint）
-   * - 位置/尺寸/颜色/text/zIndex 都按 OverlayHandle.lastXxx 缓存短路；只写变化的属性
+   * - 尺寸按 OverlayHandle 缓存，颜色和文本只在创建时写入
    * - zIndex 只在新 spm 的第一个元素上算一次（不再取 group 内 max，省掉重复 getEffectiveZIndex）
    */
   function render(visible: ReadonlySet<Element>) {
@@ -203,8 +184,9 @@ export function createHeatmapRenderer(): HeatmapRenderer {
     for (const el of visible) {
       if (!el.isConnected) continue;
       const spm = elementToSpm.get(el);
-      // 跳过没数据 / value<=0 的 spm，省一次 getBoundingClientRect
-      if (!spm || !drawableSpms.has(spm)) continue;
+      if (!spm) continue;
+      const display = displayBySpm.get(spm);
+      if (!display) continue;
       const r = el.getBoundingClientRect();
       if (r.width === 0 && r.height === 0) continue;
 
@@ -217,7 +199,7 @@ export function createHeatmapRenderer(): HeatmapRenderer {
           right: r.right,
           bottom: r.bottom,
           z: existing ? existing.z : getEffectiveZIndex(el),
-          value: getSpmValue(spm) as number,
+          display,
           isNew: !existing,
         };
         grouped.set(spm, acc);
@@ -247,17 +229,13 @@ export function createHeatmapRenderer(): HeatmapRenderer {
         h.lastH = ht;
       }
 
-      if (h.lastValue !== acc.value) {
-        const { tier, inTierNorm } = valueToTier(acc.value, tierBounds);
+      if (acc.isNew) {
+        const { tier, inTierNorm } = valueToTier(acc.display.colorValue, tierBounds);
         const color = colorForTier(tier, inTierNorm);
         h.box.style.borderColor = color.border;
         h.box.style.background = color.bg;
-        h.label.textContent = formatNumber(acc.value, currentFormat);
+        h.label.textContent = acc.display.label;
         h.label.style.background = color.labelBg;
-        h.lastValue = acc.value;
-      }
-
-      if (acc.isNew) {
         h.box.style.zIndex = String(acc.z);
         h.z = acc.z;
       }
@@ -272,7 +250,7 @@ export function createHeatmapRenderer(): HeatmapRenderer {
   function shouldTrack(el: Element): boolean {
     if (elementToSpm.has(el)) return true;
     const abcd = el.getAttribute('data-spm-abcd') || el.getAttribute('data-spm-anchor-id');
-    if (abcd && pointBySpm.has(abcd)) {
+    if (abcd && displayBySpm.has(abcd)) {
       elementToSpm.set(el, abcd);
       return true;
     }
@@ -285,35 +263,46 @@ export function createHeatmapRenderer(): HeatmapRenderer {
     elementToSpm.clear();
     for (const h of overlays.values()) h.box.remove();
     overlays.clear();
-    drawableSpms.clear();
+    displayBySpm.clear();
     tierBounds = [0, 0, 0, 0, 0, 0];
     document.querySelectorAll(HEATMAP_OVERLAY_SELECTOR).forEach(n => n.remove());
   }
 
-  function start(measure: HeatmapMeasure, points: HeatmapPoint[], format: 'number' | 'percent' = 'number') {
+  function start(measures: HeatmapDisplayMeasure[], points: HeatmapDataPoint[]) {
     clearAll();
-    currentMeasure = measure;
-    currentFormat = format;
-    pointBySpm = new Map(points.map(p => [p.spm, p]));
+    for (const point of points) {
+      const values = measures.map(({ id }) => {
+        const value = point.measures[id];
+        return Number.isFinite(value) ? value : null;
+      });
+      if (!values.some(value => value !== null && value > 0)) {
+        displayBySpm.delete(point.spm);
+        continue;
+      }
+      displayBySpm.set(point.spm, {
+        colorValue: values[0] ?? 0,
+        label: values
+          .map((value, index) =>
+            value === null ? '—' : formatNumber(value, measures[index].format),
+          )
+          .join(' / '),
+      });
+    }
 
     // 预跑 findSpmElements 把"非 abcd 直接命中"的元素（如祖先 B/C + data-spm-click 的 D）
     // 也建好映射；lifecycle 启动后的初始扫描走 SPM_SELECTOR 也会观察到它们。
-    for (const spm of pointBySpm.keys()) {
+    for (const spm of displayBySpm.keys()) {
       for (const el of findSpmElements(spm)) {
         if (!elementToSpm.has(el)) elementToSpm.set(el, spm);
       }
     }
 
-    // 按"页面上实际能映射上的 spm 唯一集合"算分位（去重——同 spm 多元素只贡献一次值，
-    // 避免某个被重复实例化 N 次的 spm 把档位分布压扁）。同时填 drawableSpms，
-    // render 用它在循环里跳过 value<=0 的元素。
+    // 按实际匹配到的 SPM 算分位，同一个 SPM 只贡献一次值。
     const mappedSpms = new Set(elementToSpm.values());
     const allValues: number[] = [];
     for (const spm of mappedSpms) {
-      const v = getSpmValue(spm);
-      if (v === null) continue;
-      allValues.push(v);
-      if (v > 0) drawableSpms.add(spm);
+      const display = displayBySpm.get(spm);
+      if (display) allValues.push(display.colorValue);
     }
     tierBounds = computeTierBounds(allValues);
 

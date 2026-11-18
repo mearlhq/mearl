@@ -129,6 +129,9 @@
   "heatmapCurrentSpmAB": {
     "message": "当前页 AB 点"
   },
+  "heatmapSpmABCopied": {
+    "message": "已复制 AB 点"
+  },
   "heatmapNoSpmAB": {
     "message": "未识别到当前页 AB 点，请刷新页面或检查页面是否打了 spm"
   },

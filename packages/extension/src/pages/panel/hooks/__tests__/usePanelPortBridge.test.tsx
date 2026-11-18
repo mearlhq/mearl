@@ -182,3 +182,25 @@ it('delivers source trace results and cancellations from the embedded panel port
     window.removeEventListener('mearl-element-pick-cancelled', cancelled);
   }
 });
+
+it.each([undefined, 'preview-token'])('delivers the same page navigation events for %s', token => {
+  renderHook(() => usePanelPortBridgeHarness(1, token));
+  const navigated = vi.fn();
+  const committed = vi.fn();
+  window.addEventListener('mearl-panel-page-navigated', navigated);
+  window.addEventListener('mearl-main-frame-committed', committed);
+  try {
+    const receive = (message: object) =>
+      ports[0].receive(token ? { type: 'notification', message } : message);
+    receive({ action: 'panelPageNavigated' });
+    expect(navigated).toHaveBeenCalledOnce();
+    expect(committed).not.toHaveBeenCalled();
+
+    receive({ action: 'mainFrameCommitted', url: 'https://example.test', timestampMs: 100 });
+    expect(navigated).toHaveBeenCalledTimes(2);
+    expect(committed).toHaveBeenCalledOnce();
+  } finally {
+    window.removeEventListener('mearl-panel-page-navigated', navigated);
+    window.removeEventListener('mearl-main-frame-committed', committed);
+  }
+});

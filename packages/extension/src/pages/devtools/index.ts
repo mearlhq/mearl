@@ -3,25 +3,17 @@ import {
   extractSelectedElementEvalError,
   formatInspectedWindowEvalException,
 } from '../shared/selectedElementEval';
-
-// 创建 DevTools 面板
-chrome.devtools.panels.create(
-  'Mearl',
-  'icons/panel-icon.svg',
-  'src/pages/panel/index.html',
-  function () {
-    console.log('Mearl panel created');
-  },
-);
+import { DEVICE_PREVIEW_DEVTOOLS_VISIBILITY_ACTION } from '../../shared/devicePreviewPanel';
 
 // ==================== DevTools Page Agent Bridge ====================
 // 通过长连接向 background 注册 devtools-page 端口，
 // 使 page_inspect selector "$0" 无需打开 Mearl 标签即可读取 Elements 当前选区。
 
 const tabId = chrome.devtools.inspectedWindow.tabId;
-const devtoolsPagePort = chrome.runtime.connect({ name: `devtools-page-${tabId}` });
+let mearlVisible = false;
+let devtoolsPagePort: chrome.runtime.Port | undefined;
 
-devtoolsPagePort.onMessage.addListener(async (message: any) => {
+async function handleAgentQuery(message: any) {
   if (message.action !== 'agentQuery') return;
 
   const { correlationId, query } = message;
@@ -75,4 +67,45 @@ devtoolsPagePort.onMessage.addListener(async (message: any) => {
       })
       .catch(() => {});
   }
-});
+}
+
+function reportVisibility() {
+  try {
+    devtoolsPagePort?.postMessage({
+      action: DEVICE_PREVIEW_DEVTOOLS_VISIBILITY_ACTION,
+      visible: mearlVisible,
+    });
+  } catch {
+    // The next connection publishes the current state.
+  }
+}
+
+function connectDevtoolsPage() {
+  if (!chrome.runtime.id) return;
+  const port = chrome.runtime.connect({ name: `devtools-page-${tabId}` });
+  devtoolsPagePort = port;
+  port.onMessage.addListener(handleAgentQuery);
+  port.onDisconnect.addListener(() => {
+    if (devtoolsPagePort !== port) return;
+    devtoolsPagePort = undefined;
+    window.setTimeout(connectDevtoolsPage, 250);
+  });
+  reportVisibility();
+}
+
+chrome.devtools.panels.create(
+  'Mearl',
+  'icons/panel-icon.svg',
+  'src/pages/panel/index.html',
+  panel => {
+    panel.onShown.addListener(() => {
+      mearlVisible = true;
+      reportVisibility();
+    });
+    panel.onHidden.addListener(() => {
+      mearlVisible = false;
+      reportVisibility();
+    });
+  },
+);
+connectDevtoolsPage();

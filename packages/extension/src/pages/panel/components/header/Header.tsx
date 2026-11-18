@@ -29,14 +29,13 @@ interface HeaderProps {
   // 热度数据
   heatmapAvailable: boolean;
   pageSpmAB: string | null;
-  heatmapMeasure: HeatmapMeasure;
+  heatmapMeasures: HeatmapMeasure[];
   heatmapDs: string;
   heatmapStatus: HeatmapStatus;
   heatmapError: string | null;
   heatmapErrorCode: HeatmapErrorCode | null;
   onSelectHeatmapMeasure: (m: HeatmapMeasure) => void;
   onSelectHeatmapDs: (ds: string) => void;
-  onToggleHeatmap: () => void;
   accountsEnabled?: boolean;
   onToggleSourceTrace?: () => void;
   sourceTraceActive?: boolean;
@@ -59,14 +58,13 @@ export const Header: FC<HeaderProps> = ({
   onToggleShowAllSpm,
   heatmapAvailable,
   pageSpmAB,
-  heatmapMeasure,
+  heatmapMeasures,
   heatmapDs,
   heatmapStatus,
   heatmapError,
   heatmapErrorCode,
   onSelectHeatmapMeasure,
   onSelectHeatmapDs,
-  onToggleHeatmap,
   accountsEnabled = false,
   onToggleSourceTrace,
   sourceTraceActive = false,
@@ -77,7 +75,7 @@ export const Header: FC<HeaderProps> = ({
     : t('mcpIntegrationDisconnected');
 
   return (
-    <div className="@container min-w-0 px-2 py-1.5 flex justify-between items-center border-b border-toolbar-border bg-toolbar text-text-primary">
+    <div className="@container relative min-w-0 px-2 py-1.5 flex justify-between items-center border-b border-toolbar-border bg-toolbar text-text-primary">
       <div className="flex shrink-0 items-center gap-2">
         <span className="inline-flex items-center text-sm font-medium select-none">Mearl</span>
         {agentEnabled && (
@@ -101,7 +99,7 @@ export const Header: FC<HeaderProps> = ({
 
       <div className="flex shrink-0 gap-1.5 items-center text-xs">
         {/* 源码追溯 - picker 找元素对应的接口字段 + 源码 */}
-        {onToggleSourceTrace && (
+        {mode === 'protocol' && onToggleSourceTrace && (
           <button
             onClick={onToggleSourceTrace}
             aria-pressed={sourceTraceActive ?? false}
@@ -117,18 +115,17 @@ export const Header: FC<HeaderProps> = ({
           </button>
         )}
 
-        {/* 热度数据 - icon 按钮，点击切换、悬停展开配置面板（仅 /app/trip 路径下可用） */}
+        {/* 热度数据 */}
         {mode === 'rum' && heatmapAvailable && (
           <HeatmapButton
             pageSpmAB={pageSpmAB}
-            heatmapMeasure={heatmapMeasure}
+            heatmapMeasures={heatmapMeasures}
             heatmapDs={heatmapDs}
             heatmapStatus={heatmapStatus}
             heatmapError={heatmapError}
             heatmapErrorCode={heatmapErrorCode}
             onSelectMeasure={onSelectHeatmapMeasure}
             onSelectDs={onSelectHeatmapDs}
-            onToggleHeatmap={onToggleHeatmap}
           />
         )}
 

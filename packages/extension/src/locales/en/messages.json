@@ -133,11 +133,14 @@
   "heatmapCurrentSpmAB": {
     "message": "Page AB"
   },
+  "heatmapSpmABCopied": {
+    "message": "Page AB copied"
+  },
   "heatmapNoSpmAB": {
     "message": "Page AB not detected. Refresh the page or check if SPM is tagged."
   },
   "heatmapLoginRequired": {
-    "message": "Please log in to $1 first"
+    "message": "Sign in to $1"
   },
   "heatmapOpenLogin": {
     "message": "Open login page"

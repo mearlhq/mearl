@@ -1,4 +1,5 @@
-import { createHeatmapRenderer, type HeatmapPoint } from './heatmapOverlay';
+import type { HeatmapRenderPayload } from '../../shared/heatmap';
+import { createHeatmapRenderer } from './heatmapOverlay';
 import { createSpmHighlighter } from './spmHighlight';
 
 const FRAME_VISUAL_RUNTIME_FLAG = '__mearlFrameVisualRuntime';
@@ -35,9 +36,13 @@ export function installFrameVisualRuntime(): void {
       return true;
     }
     if (message.action === 'renderHeatmap') {
-      const payload = message.payload as { measure: string; points: HeatmapPoint[]; format?: 'number' | 'percent' } | undefined;
-      if (payload?.measure && Array.isArray(payload.points)) {
-        heatmapRenderer.start(payload.measure, payload.points, payload.format);
+      const payload = message.payload as HeatmapRenderPayload | undefined;
+      if (
+        Array.isArray(payload?.measures) &&
+        payload.measures.length &&
+        Array.isArray(payload.points)
+      ) {
+        heatmapRenderer.start(payload.measures, payload.points);
       }
       sendResponse({ success: true });
       return true;

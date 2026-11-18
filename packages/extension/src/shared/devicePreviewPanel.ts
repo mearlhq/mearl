@@ -6,6 +6,7 @@ export const DEVICE_PREVIEW_PANEL_PAGE = 'src/pages/device-preview-panel/index.h
 export const DEVICE_PREVIEW_PANEL_PORT = 'device-preview-panel:';
 export const DEVICE_PREVIEW_PANEL_STATE_ACTION = 'devicePreviewPanelState';
 export const DEVICE_PREVIEW_PANEL_READY_ACTION = 'devicePreviewPanelReady';
+export const DEVICE_PREVIEW_DEVTOOLS_VISIBILITY_ACTION = 'devicePreviewDevtoolsVisibility';
 export const DEVICE_PREVIEW_PANEL_WIDTH = 'device-preview-panel-width';
 export const DEVICE_PREVIEW_PANEL_OPEN = 'device-preview-panel-open';
 export const DEVICE_PREVIEW_TOOLBAR_COLLAPSED = 'device-preview-toolbar-collapsed';

@@ -7,29 +7,78 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.enabled.mockResolvedValue(true);
   mocks.prepare.mockResolvedValue({ bundleId: 'fixture', revision: 'first', invoke: mocks.invoke });
-  mocks.invoke.mockResolvedValue({ success: true, points: [{ spm: 'a.b.c.d', spmName: 'Card', measures: { clicks: 12, ratio: 0.25 } }], cached: false });
+  mocks.invoke.mockResolvedValue({
+    success: true,
+    points: [{ spm: 'a.b.c.d', spmName: 'Card', measures: { clicks: 12, ratio: 0.25 } }],
+    cached: false,
+  });
 });
 it('caches by accepted provider and keeps the installed measure values intact', async () => {
   const result = await fetchHeatmapData('cached.page', '20261024');
-  expect(result).toMatchObject({ success: true, cached: false, points: [{ measures: { clicks: 12, ratio: 0.25 } }] });
+  expect(result).toMatchObject({
+    success: true,
+    cached: false,
+    points: [{ measures: { clicks: 12, ratio: 0.25 } }],
+  });
   expect(mocks.invoke).toHaveBeenCalledWith({ spmAB: 'cached.page', ds: '20261024' });
-  expect(await fetchHeatmapData('cached.page', '20261024')).toMatchObject({ success: true, cached: true });
+  expect(await fetchHeatmapData('cached.page', '20261024')).toMatchObject({
+    success: true,
+    cached: true,
+  });
   expect(mocks.invoke).toHaveBeenCalledTimes(1);
-  mocks.prepare.mockResolvedValue({ bundleId: 'fixture', revision: 'replacement', invoke: mocks.invoke });
+  mocks.prepare.mockResolvedValue({
+    bundleId: 'fixture',
+    revision: 'replacement',
+    invoke: mocks.invoke,
+  });
   expect(await fetchHeatmapData('cached.page', '20261024')).toMatchObject({ cached: false });
   expect(mocks.invoke).toHaveBeenCalledTimes(2);
 });
 it('does not use cached private data when its service or provider is unavailable', async () => {
   await fetchHeatmapData('removed.page', '20261024');
   mocks.prepare.mockResolvedValue(null);
-  expect(await fetchHeatmapData('removed.page', '20261024')).toEqual({ success: false, errorCode: 'unknown', error: 'CAPABILITY_NOT_INSTALLED' });
+  expect(await fetchHeatmapData('removed.page', '20261024')).toEqual({
+    success: false,
+    errorCode: 'unknown',
+    error: 'CAPABILITY_NOT_INSTALLED',
+  });
   mocks.enabled.mockResolvedValue(false);
-  expect(await fetchHeatmapData('removed.page', '20261024')).toEqual({ success: false, errorCode: 'unknown', error: 'TRACKING_METADATA_DISABLED' });
+  expect(await fetchHeatmapData('removed.page', '20261024')).toEqual({
+    success: false,
+    errorCode: 'unknown',
+    error: 'TRACKING_METADATA_DISABLED',
+  });
   expect(mocks.invoke).toHaveBeenCalledTimes(1);
+});
+it('shares an in-flight page and date request across metric changes', async () => {
+  let finish!: (result: Awaited<ReturnType<typeof fetchHeatmapData>>) => void;
+  mocks.invoke.mockImplementationOnce(
+    () =>
+      new Promise(resolve => {
+        finish = resolve;
+      }),
+  );
+  const first = fetchHeatmapData('pending.page', '20261024');
+  await vi.waitFor(() => expect(mocks.invoke).toHaveBeenCalledOnce());
+  const second = fetchHeatmapData('pending.page', '20261024');
+  await vi.waitFor(() => expect(mocks.prepare).toHaveBeenCalledTimes(2));
+  const response = { success: true, points: [], cached: false } as const;
+  finish({ ...response, points: [] });
+
+  expect(await Promise.all([first, second])).toEqual([response, response]);
+  expect(mocks.invoke).toHaveBeenCalledOnce();
 });
 it('preserves installed login and metric errors and reports execution failures', async () => {
   mocks.invoke.mockResolvedValue({ success: false, errorCode: 'login', error: 'Sign in' });
-  expect(await fetchHeatmapData('login.page', '20261024')).toEqual({ success: false, errorCode: 'login', error: 'Sign in' });
+  expect(await fetchHeatmapData('login.page', '20261024')).toEqual({
+    success: false,
+    errorCode: 'login',
+    error: 'Sign in',
+  });
   mocks.invoke.mockRejectedValue(new Error('offline'));
-  expect(await fetchHeatmapData('error.page', '20261024')).toEqual({ success: false, errorCode: 'network', error: 'offline' });
+  expect(await fetchHeatmapData('error.page', '20261024')).toEqual({
+    success: false,
+    errorCode: 'network',
+    error: 'offline',
+  });
 });

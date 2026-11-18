@@ -1,11 +1,12 @@
 import { browserUiText } from '@mearl/preset/bundles';
 import { useBrowserUiSettings } from '../../utils/browserUiSettings';
 import { getCurrentLanguage } from '../../utils/i18n';
-import { FC, useRef } from 'react';
-import { useDelayedHover } from '../../../../shared/hooks/useDelayedHover';
-import { Flame, LogIn, AlertCircle, Loader2 } from 'lucide-react';
+import { FC, useEffect, useId, useRef, useState } from 'react';
+import { Flame, Copy, AlertCircle, Loader2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { t } from '../../utils/i18n';
+import { copyToClipboard } from '../../utils/clipboard';
+import { showToast } from '../../utils/toast';
 import {
   formatDsDisplay,
   getYesterdayDs,
@@ -17,96 +18,105 @@ import {
 
 export interface HeatmapButtonProps {
   pageSpmAB: string | null;
-  heatmapMeasure: HeatmapMeasure;
+  heatmapMeasures: HeatmapMeasure[];
   heatmapDs: string;
   heatmapStatus: HeatmapStatus;
   heatmapError: string | null;
   heatmapErrorCode: HeatmapErrorCode | null;
   onSelectMeasure: (m: HeatmapMeasure) => void;
   onSelectDs: (ds: string) => void;
-  onToggleHeatmap: () => void;
 }
-
-const SHOW_DELAY = 180;
-const HIDE_DELAY = 220;
 
 export const HeatmapButton: FC<HeatmapButtonProps> = ({
   pageSpmAB,
-  heatmapMeasure,
+  heatmapMeasures,
   heatmapDs,
   heatmapStatus,
   heatmapError,
   heatmapErrorCode,
   onSelectMeasure,
   onSelectDs,
-  onToggleHeatmap,
 }) => {
   const settings = useBrowserUiSettings();
-  const {
-    open: isOpen,
-    scheduleOpen: scheduleShow,
-    scheduleClose,
-    cancelOpen,
-    cancelClose: cancelHide,
-  } = useDelayedHover({ openDelay: SHOW_DELAY, closeDelay: HIDE_DELAY });
-  // 原生 date picker 位于 body 上，输入框聚焦时保持菜单展开供日期选择。
-  const dateInputFocusedRef = useRef(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverId = useId();
 
-  const scheduleHide = () => {
-    if (dateInputFocusedRef.current) {
-      cancelOpen();
-      cancelHide();
-      return;
-    }
-    scheduleClose();
-  };
+  useEffect(() => {
+    if (!isOpen) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (event.target instanceof Node && !containerRef.current?.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      setIsOpen(false);
+      if (containerRef.current?.contains(document.activeElement)) triggerRef.current?.focus();
+    };
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [isOpen]);
 
-  const heatmapActive = heatmapStatus === 'active';
   const heatmapLoading = heatmapStatus === 'loading';
-  const heatmapToggleDisabled = !pageSpmAB || heatmapLoading;
-  const heatmapOn = heatmapActive || heatmapLoading;
+  const heatmapOn = heatmapStatus === 'active' || heatmapLoading;
+  const loginRequired = heatmapErrorCode === 'login';
+  const loginUrl = settings.links?.heatmap;
+  const errorMessage = loginRequired
+    ? t('heatmapLoginRequired', loginUrl ? new URL(loginUrl).hostname : t('dataService'))
+    : heatmapErrorCode === 'measure_expired'
+      ? t('heatmapMeasureExpired')
+      : heatmapError;
 
   return (
-    <div className="relative" onMouseEnter={scheduleShow} onMouseLeave={scheduleHide}>
+    <div ref={containerRef} className="@[640px]:relative">
       <button
-        onClick={onToggleHeatmap}
-        disabled={heatmapToggleDisabled}
+        ref={triggerRef}
+        type="button"
+        onClick={() => setIsOpen(open => !open)}
+        aria-expanded={isOpen}
+        aria-controls={isOpen ? popoverId : undefined}
+        aria-label={t('heatmap')}
         className={clsx(
-          'p-0.75 rounded transition-colors flex items-center',
+          'p-0.75 rounded transition-colors flex items-center cursor-pointer',
           heatmapOn
             ? 'bg-orange-500/20 text-orange-600 hover:bg-orange-500/30 dark:text-orange-400'
-            : 'text-text-secondary hover:text-text-primary hover:bg-bg-hover',
-          heatmapToggleDisabled
-            ? heatmapLoading
-              ? 'cursor-wait'
-              : 'cursor-not-allowed opacity-60'
-            : 'cursor-pointer',
+            : isOpen
+              ? 'bg-bg-hover text-text-primary'
+              : 'text-text-secondary hover:text-text-primary hover:bg-bg-hover',
         )}
-        title={!pageSpmAB ? t('heatmapNoSpmAB') : t('heatmap')}
+        title={t('heatmap')}
       >
         {heatmapLoading ? <Loader2 size={14} className="animate-spin" /> : <Flame size={14} />}
       </button>
 
       {isOpen && (
         <div
-          className="absolute left-0 top-full mt-1 z-50 w-80 rounded-md border border-border bg-bg-primary shadow-lg text-text-primary"
-          onMouseEnter={cancelHide}
-          onMouseLeave={scheduleHide}
+          id={popoverId}
+          className="absolute right-2 top-full z-50 mt-1 w-80 max-w-[calc(100vw-1rem)] rounded-md border border-border bg-bg-primary text-text-primary shadow-lg @[640px]:right-auto @[640px]:left-0"
         >
           {/* 指标 chips：3 列 × 2 行 */}
           <div className="px-2 pt-2 pb-1.5 grid grid-cols-3 gap-1.5">
             {(settings.heatmap?.measures ?? []).map(definition => {
               const m = definition.id;
-              const selected = m === heatmapMeasure;
+              const selected = heatmapMeasures.includes(m);
               return (
                 <button
                   key={m}
+                  type="button"
                   onClick={() => onSelectMeasure(m)}
+                  aria-pressed={selected}
+                  disabled={!pageSpmAB}
                   className={clsx(
-                    'px-1.5 py-1 rounded text-xxs text-center cursor-pointer transition-colors border truncate',
+                    'px-1.5 py-1 rounded text-xxs text-center cursor-pointer transition-colors border truncate disabled:cursor-default',
                     selected
                       ? 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/40 font-medium'
-                      : 'bg-bg-secondary text-text-secondary border-transparent hover:bg-bg-hover hover:text-text-primary',
+                      : 'bg-bg-secondary text-text-secondary border-transparent enabled:hover:bg-bg-hover enabled:hover:text-text-primary disabled:opacity-60',
                   )}
                 >
                   {browserUiText(definition.label, getCurrentLanguage())}
@@ -116,29 +126,31 @@ export const HeatmapButton: FC<HeatmapButtonProps> = ({
           </div>
 
           {/* 错误信息 */}
-          {heatmapStatus === 'error' && heatmapError && (
-            <div className="px-2 pb-2.5 -mt-1">
-              <div className="flex items-start gap-1.5 text-xs text-red-600 dark:text-red-400">
-                <AlertCircle size={12} className="mt-0.5 shrink-0" />
-                <div className="flex-1">
-                  <div>
-                    {heatmapErrorCode === 'login'
-                      ? t('heatmapLoginRequired', settings.links?.heatmap ? new URL(settings.links.heatmap).hostname : t('dataService'))
-                      : heatmapErrorCode === 'measure_expired'
-                        ? t('heatmapMeasureExpired')
-                        : heatmapError}
-                  </div>
-                  {heatmapErrorCode === 'login' && settings.links?.heatmap && (
-                    <button
-                      onClick={() => window.open(settings.links!.heatmap, '_blank')}
-                      className="mt-1 inline-flex items-center gap-1 text-blue-600 hover:underline cursor-pointer"
-                    >
-                      <LogIn size={11} />
-                      {t('heatmapOpenLogin')}
-                    </button>
-                  )}
-                </div>
-              </div>
+          {heatmapStatus === 'error' && errorMessage && (
+            <div
+              className={clsx(
+                'flex gap-1.5 px-2 pb-2 text-xs text-red-600 dark:text-red-400',
+                loginRequired ? 'items-center' : 'items-start',
+              )}
+            >
+              <AlertCircle size={12} className={clsx('shrink-0', !loginRequired && 'mt-0.5')} />
+              {loginRequired ? (
+                <span className="truncate" title={errorMessage}>
+                  {errorMessage}
+                </span>
+              ) : (
+                <span className="min-w-0 wrap-break-word">{errorMessage}</span>
+              )}
+              {loginRequired && loginUrl && (
+                <a
+                  href={loginUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="shrink-0 whitespace-nowrap text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  {t('heatmapOpenLogin')}
+                </a>
+              )}
             </div>
           )}
 
@@ -146,35 +158,37 @@ export const HeatmapButton: FC<HeatmapButtonProps> = ({
 
           {/* 底部一行：左 = AB 点（缺失则提示），右 = 日期输入框 */}
           <div className="px-2 py-1.5 bg-bg-secondary/50 flex items-center justify-between gap-2">
-            <span
-              className="text-2xs text-text-secondary font-mono truncate"
-              title={!pageSpmAB ? t('heatmapNoSpmAB') : undefined}
-            >
-              {pageSpmAB ? (
-                <>
-                  {t('heatmapCurrentSpmAB')}: <span className="text-text-primary">{pageSpmAB}</span>
-                </>
-              ) : (
-                <span className="opacity-70">{t('heatmapNoSpmAB')}</span>
-              )}
-            </span>
+            {pageSpmAB ? (
+              <div className="flex min-w-0 items-center gap-1 whitespace-nowrap font-mono text-2xs text-text-secondary">
+                <span>{t('heatmapCurrentSpmAB')}:</span>
+                <button
+                  type="button"
+                  className="flex min-w-0 cursor-pointer items-center gap-1 rounded text-text-primary hover:text-blue-600 dark:hover:text-blue-400"
+                  title={`${t('copy')} ${pageSpmAB}`}
+                  aria-label={`${t('copy')} ${pageSpmAB}`}
+                  onClick={async () => {
+                    const copied = await copyToClipboard(pageSpmAB);
+                    if (copied) showToast(t('heatmapSpmABCopied'), 'success');
+                    else showToast(t('copyFailed'), 'error');
+                  }}
+                >
+                  <span className="truncate">{pageSpmAB}</span>
+                  <Copy size={11} className="shrink-0" aria-hidden="true" />
+                </button>
+              </div>
+            ) : (
+              <span className="truncate text-2xs text-text-secondary" title={t('heatmapNoSpmAB')}>
+                {t('heatmapNoSpmAB')}
+              </span>
+            )}
             <input
               type="date"
               value={formatDsDisplay(heatmapDs)}
               max={formatDsDisplay(getYesterdayDs())}
+              disabled={heatmapLoading}
               onChange={e => {
                 const parsed = parseDsInput(e.target.value);
                 if (parsed) onSelectDs(parsed);
-              }}
-              onFocus={() => {
-                // 原生 date picker 浮在 body 上、不属于本菜单的 mouseenter 区域；
-                // input 取得焦点期间锁住菜单，避免鼠标移到 picker 时被 scheduleHide 关掉
-                dateInputFocusedRef.current = true;
-                cancelHide();
-              }}
-              onBlur={() => {
-                dateInputFocusedRef.current = false;
-                scheduleHide();
               }}
               title={t('heatmapDataDateTooltip')}
               className="shrink-0 bg-bg-primary border border-border rounded px-1.5 py-0.5 text-2xs text-text-primary font-mono"

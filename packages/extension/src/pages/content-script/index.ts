@@ -37,6 +37,7 @@ const QUICK_DEVICE_CHROME_UPDATE_ACTION = 'quickDeviceChromeUpdate';
 const DEVICE_PREVIEW_PANEL_WIDTH = 'device-preview-panel-width';
 const DEVICE_PREVIEW_PANEL_OPEN = 'device-preview-panel-open';
 const DEVICE_PREVIEW_TOOLBAR_COLLAPSED = 'device-preview-toolbar-collapsed';
+const DEVICE_PREVIEW_DEVTOOLS_VISIBILITY_ACTION = 'devicePreviewDevtoolsVisibility';
 
 (function () {
   installFrameVisualRuntime();
@@ -104,6 +105,29 @@ const DEVICE_PREVIEW_TOOLBAR_COLLAPSED = 'device-preview-toolbar-collapsed';
             };
             chrome.runtime.onMessage.addListener(onMessage);
             return () => chrome.runtime.onMessage.removeListener(onMessage);
+          },
+          subscribeDevtoolsVisibility(listener) {
+            let active = true;
+            let receivedUpdate = false;
+            const onMessage = (message: { action?: string; visible?: boolean }) => {
+              if (
+                message.action === DEVICE_PREVIEW_DEVTOOLS_VISIBILITY_ACTION &&
+                typeof message.visible === 'boolean'
+              ) {
+                receivedUpdate = true;
+                listener(message.visible);
+              }
+            };
+            chrome.runtime.onMessage.addListener(onMessage);
+            void safeSendMessage<{ devtoolsVisible?: boolean }>({
+              action: 'devicePreviewPanelState',
+            }).then(result => {
+              if (active && !receivedUpdate) listener(result?.devtoolsVisible === true);
+            });
+            return () => {
+              active = false;
+              chrome.runtime.onMessage.removeListener(onMessage);
+            };
           },
           async loadLayout() {
             const result = await chrome.storage.local.get([

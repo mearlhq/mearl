@@ -83,7 +83,13 @@ import {
   clearSimulationSitePermission,
   resolveSimulationSitePermission,
 } from './simulationSitePermission';
-import { handleStartHeatmap, handleStopHeatmap, reconcileHeatmapService } from './heatmapHandler';
+import {
+  getHeatmapPage,
+  handleStartHeatmap,
+  handleStopHeatmap,
+  reconcileHeatmapService,
+  stopDevicePreviewHeatmap,
+} from './heatmapHandler';
 import { sendTabMessageToFrameIdsSafe, sendTabMessageToFramesSafe } from './frameMessaging';
 import {
   clearSpmOverlayState,
@@ -239,12 +245,18 @@ import {
   recordBackgroundProtocolStreamStart,
   setCollectorUpdateListener,
 } from './backgroundRequestCollector';
-import { DEVICE_PREVIEW_PANEL_STATE_ACTION } from '../../shared/devicePreviewPanel';
+import {
+  DEVICE_PREVIEW_DEVTOOLS_VISIBILITY_ACTION,
+  DEVICE_PREVIEW_PANEL_PAGE,
+  DEVICE_PREVIEW_PANEL_STATE_ACTION,
+} from '../../shared/devicePreviewPanel';
 import {
   closeDevicePreviewPanel,
   connectDevicePreviewPanel,
   getDevicePreviewPanelPort,
   getDevicePreviewPanelToken,
+  isDevicePreviewDevtoolsVisible,
+  setDevicePreviewDevtoolsVisible,
   interruptDevicePreviewPanel,
   navigateDevicePreviewPanel,
   notifyDevicePreviewPanel,
@@ -626,9 +638,34 @@ function notifyPanelDocumentCommit(tabId: number, url: string, timestampMs: numb
   postToPanel(tabId, message);
 }
 
+// 同文档路由和业务 WebView 切页刷新页面功能，不清空采集日志。
+async function notifyPanelPageNavigation(details: {
+  tabId: number;
+  frameId: number;
+}): Promise<void> {
+  const { tabId, frameId } = details;
+  if (!devtoolsPorts.has(tabId) && !getDevicePreviewPanelToken(tabId)) return;
+  if (frameId !== 0) {
+    const frame = await chrome.webNavigation.getFrame({ tabId, frameId });
+    if (frame?.parentFrameId !== 0 || frameId !== (await resolveToolboxPageFrame(tabId))) return;
+  }
+  const message = { action: 'panelPageNavigated' };
+  postToPanel(tabId, message);
+  notifyDevicePreviewPanel(tabId, message);
+}
+
 chrome.webNavigation.onCommitted.addListener(details => {
-  if (details.frameId !== 0) return;
-  notifyPanelDocumentCommit(details.tabId, details.url, details.timeStamp);
+  if (details.frameId === 0)
+    notifyPanelDocumentCommit(details.tabId, details.url, details.timeStamp);
+  else void notifyPanelPageNavigation(details).catch(() => {});
+});
+
+chrome.webNavigation.onHistoryStateUpdated.addListener(details => {
+  void notifyPanelPageNavigation(details).catch(() => {});
+});
+
+chrome.webNavigation.onReferenceFragmentUpdated.addListener(details => {
+  void notifyPanelPageNavigation(details).catch(() => {});
 });
 
 setCollectorUpdateListener((tabId, update) => {
@@ -812,6 +849,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({
           success: true,
           token: getDevicePreviewPanelToken(tabId, open, message.retryCapture === true),
+          devtoolsVisible: isDevicePreviewDevtoolsVisible(tabId),
         });
       })
       .catch(() => sendResponse({ success: false }));
@@ -2015,6 +2053,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // 处理来自 devtools panel 的消息
   const tabId = message.tabId;
+  const fromDevicePreview =
+    sender.url?.split(/[?#]/, 1)[0] === chrome.runtime.getURL(DEVICE_PREVIEW_PANEL_PAGE);
+  const previewSuppressed = fromDevicePreview && isDevicePreviewDevtoolsVisible(tabId);
   if (isExtensionUiServiceAction(message.action)) {
     void handleExtensionServiceRequest(message, sender, {
       extensionId: chrome.runtime.id,
@@ -2194,6 +2235,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.action === 'startElementPicker') {
+    if (previewSuppressed) {
+      sendResponse({ success: false, cancelled: true });
+      return;
+    }
     const previousTrace = sourceTraceOwners.get(tabId);
     const generation = nextElementPickerStartGeneration(tabId);
     const previewPort = message.traceMode
@@ -2417,6 +2462,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.action === 'highlightSpm') {
+    if (previewSuppressed) {
+      sendResponse({ found: 0 });
+      return;
+    }
     sendTabMessageToFramesSafe<{ found?: number }>(
       tabId,
       { action: 'highlightSpm', spm: message.spm },
@@ -2454,6 +2503,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.action === 'toggleSpmOverlay') {
+    if (previewSuppressed) {
+      sendResponse({ success: false });
+      return;
+    }
     setSpmOverlayEnabled(tabId, Boolean(message.enabled));
     sendTabMessageToFramesSafe(
       tabId,
@@ -2463,8 +2516,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.action === 'getHeatmapPage') {
+    if (!sender.url?.startsWith(chrome.runtime.getURL('src/pages/'))) return;
+    getHeatmapPage(tabId).then(sendResponse, () => sendResponse(null));
+    return true;
+  }
+
   if (message.action === 'startHeatmap') {
-    handleStartHeatmap(tabId, message.spmAB, message.ds, message.measure)
+    if (previewSuppressed) {
+      sendResponse({ success: false, errorCode: 'unknown', error: 'HEATMAP_CANCELLED' });
+      return;
+    }
+    handleStartHeatmap(tabId, message.spmAB, message.ds, message.measures, fromDevicePreview)
       .then(sendResponse)
       .catch(err =>
         sendResponse({
@@ -2477,6 +2540,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.action === 'stopHeatmap') {
+    if (previewSuppressed) {
+      sendResponse({ success: true });
+      return;
+    }
     handleStopHeatmap(tabId).then(sendResponse);
     return true;
   }
@@ -2594,6 +2661,7 @@ chrome.tabs.onRemoved.addListener(tabId => {
   cleanupControlledTab(tabId);
   devtoolsPorts.delete(tabId);
   devtoolsPagePorts.delete(tabId);
+  setDevicePreviewDevtoolsVisible(tabId, false);
   cleanupDnrTab(tabId);
   void cleanupTimeForTab(tabId).catch(() => {});
   void cleanupTabPageOverrides(tabId).catch(() => {});
@@ -2747,11 +2815,32 @@ chrome.runtime.onConnect.addListener(port => {
     }
   } else if (port.name.startsWith('devtools-page-')) {
     const tabId = parseInt(port.name.split('-')[2], 10);
-    if (!isNaN(tabId)) {
-      devtoolsPagePorts.set(tabId, port);
-      port.onDisconnect.addListener(() => {
-        devtoolsPagePorts.delete(tabId);
-      });
+    if (
+      !Number.isInteger(tabId) ||
+      port.sender?.id !== chrome.runtime.id ||
+      port.sender?.url !== chrome.runtime.getURL('src/pages/devtools/index.html')
+    ) {
+      port.disconnect();
+      return;
     }
+    devtoolsPagePorts.set(tabId, port);
+    port.onMessage.addListener(message => {
+      if (
+        devtoolsPagePorts.get(tabId) === port &&
+        message?.action === DEVICE_PREVIEW_DEVTOOLS_VISIBILITY_ACTION &&
+        typeof message.visible === 'boolean'
+      ) {
+        setDevicePreviewDevtoolsVisible(tabId, message.visible);
+        if (message.visible) {
+          stopDevicePreviewHeatmap(tabId);
+          if (sourceTraceOwners.get(tabId)?.previewPort) void stopTabElementPicker(tabId);
+        }
+      }
+    });
+    port.onDisconnect.addListener(() => {
+      if (devtoolsPagePorts.get(tabId) !== port) return;
+      devtoolsPagePorts.delete(tabId);
+      setDevicePreviewDevtoolsVisible(tabId, false);
+    });
   }
 });

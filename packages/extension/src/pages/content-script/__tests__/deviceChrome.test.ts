@@ -27,6 +27,10 @@ const chromeHosts = (): NodeListOf<HTMLElement> =>
   document.querySelectorAll<HTMLElement>('[data-mearl-quick-device-chrome]');
 const layoutStyle = (): HTMLStyleElement | null =>
   document.querySelector<HTMLStyleElement>('[data-mearl-quick-device-layout]');
+const devtoolsHidden = (listener: (visible: boolean) => void) => {
+  listener(false);
+  return () => {};
+};
 
 describe('Quick device chrome', () => {
   let manager: QuickDeviceChromeManager;
@@ -371,6 +375,7 @@ describe('Quick device chrome', () => {
           initialLayout: bootstrap?.previewLayout,
           url: () => 'about:blank',
           subscribeReady: () => () => {},
+          subscribeDevtoolsVisibility: devtoolsHidden,
           loadLayout,
           savePanelOpen: vi.fn(),
           saveWidth: vi.fn(),
@@ -438,6 +443,7 @@ describe('Quick device chrome', () => {
           requestToken: vi.fn().mockResolvedValue(null),
           url: () => 'about:blank',
           subscribeReady: () => () => {},
+          subscribeDevtoolsVisibility: devtoolsHidden,
           loadLayout: async () => ({}),
           savePanelOpen: vi.fn(),
           saveWidth: vi.fn(),
@@ -506,6 +512,7 @@ describe('Quick device chrome', () => {
         requestToken,
         url: () => 'about:blank',
         subscribeReady: () => () => {},
+        subscribeDevtoolsVisibility: devtoolsHidden,
         loadLayout: async () => ({}),
         savePanelOpen: vi.fn(),
         saveWidth: vi.fn(),
@@ -548,6 +555,89 @@ describe('Quick device chrome', () => {
     expect(requestToken).toHaveBeenCalledOnce();
   });
 
+  it('unmounts the embedded debug UI during DevTools takeover and restores its open preference', async () => {
+    vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1200);
+    const attachShadow = vi.spyOn(Element.prototype, 'attachShadow');
+    const requestToken = vi.fn().mockResolvedValue('preview-token');
+    const url = vi.fn().mockReturnValue('about:blank');
+    const savePanelOpen = vi.fn();
+    const unsubscribe = vi.fn();
+    let ready!: (viewer: string) => void;
+    let devtoolsVisibility!: (visible: boolean) => void;
+    manager.destroy();
+    manager = createQuickDeviceChromeManager({
+      previewPanel: {
+        label: 'Debug',
+        resizeLabel: 'Resize',
+        unavailableLabel: 'Unavailable',
+        retryLabel: 'Retry',
+        loadingLabel: 'Loading',
+        toolbarLabel: 'Device toolbar',
+        initialLayout: { panelOpen: true },
+        requestToken,
+        url,
+        subscribeReady: listener => {
+          ready = listener;
+          return () => {};
+        },
+        subscribeDevtoolsVisibility: listener => {
+          devtoolsVisibility = listener;
+          return unsubscribe;
+        },
+        loadLayout: async () => ({}),
+        savePanelOpen,
+        saveWidth: vi.fn(),
+        saveToolbarCollapsed: vi.fn(),
+      },
+    });
+    manager.update({ ...iosConfig, phoneFrame: { width: 402, height: 874 } });
+
+    const root = attachShadow.mock.results
+      .map(result => result.value as ShadowRoot)
+      .find(shadow => shadow.querySelector('.debug-toggle'))!;
+    const debug = root.querySelector<HTMLButtonElement>('.debug-toggle')!;
+    const divider = root.querySelector<HTMLElement>('[role="separator"]')!;
+    const stageLeft = () =>
+      (layoutStyle()?.sheet?.cssRules[0] as CSSStyleRule).style.getPropertyValue(
+        '--mearl-phone-frame-left',
+      );
+
+    expect(debug.hidden).toBe(true);
+    devtoolsVisibility(true);
+    expect(debug.hidden).toBe(true);
+    expect(divider.hidden).toBe(true);
+    expect(stageLeft()).toBe('50%');
+    expect(root.querySelector('iframe')).toBeNull();
+    expect(requestToken).not.toHaveBeenCalled();
+
+    devtoolsVisibility(false);
+    await vi.waitFor(() => expect(root.querySelector('iframe')).not.toBeNull());
+    const frame = root.querySelector('iframe')!;
+    ready(url.mock.calls[0][1]);
+    expect(debug.hidden).toBe(false);
+    expect(frame.hidden).toBe(false);
+    expect(divider.hidden).toBe(false);
+
+    devtoolsVisibility(true);
+    expect(debug.hidden).toBe(true);
+    expect(root.querySelector('iframe')).toBeNull();
+    expect(divider.hidden).toBe(true);
+    expect(stageLeft()).toBe('50%');
+    expect(root.querySelector('[aria-controls="device-preview-preset"]')).toBeInTheDocument();
+
+    devtoolsVisibility(false);
+    expect(debug.hidden).toBe(false);
+    await vi.waitFor(() => expect(root.querySelector('iframe')).not.toBeNull());
+    expect(root.querySelector('iframe')?.hidden).toBe(false);
+    expect(requestToken.mock.calls).toEqual([
+      [true, false],
+      [true, false],
+    ]);
+    expect(savePanelOpen).not.toHaveBeenCalled();
+    manager.destroy();
+    expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
   it('restores manual debug visibility and preserves it across viewport changes', async () => {
     let width = 1200;
     let panelOpen = false;
@@ -568,6 +658,7 @@ describe('Quick device chrome', () => {
           requestToken,
           url: () => 'about:blank',
           subscribeReady: () => () => {},
+          subscribeDevtoolsVisibility: devtoolsHidden,
           loadLayout,
           savePanelOpen: open => {
             panelOpen = open;
@@ -642,6 +733,7 @@ describe('Quick device chrome', () => {
           requestToken,
           url,
           subscribeReady: () => () => {},
+          subscribeDevtoolsVisibility: devtoolsHidden,
           loadLayout: async () => ({}),
           savePanelOpen: vi.fn(),
           saveWidth: vi.fn(),
@@ -682,6 +774,7 @@ describe('Quick device chrome', () => {
           ready = listener;
           return () => {};
         },
+        subscribeDevtoolsVisibility: devtoolsHidden,
         loadLayout: async () => ({}),
         savePanelOpen: vi.fn(),
         saveWidth: vi.fn(),

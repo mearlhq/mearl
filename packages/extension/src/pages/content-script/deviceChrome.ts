@@ -50,6 +50,7 @@ interface QuickDeviceChromeManagerOptions {
     requestToken(open: boolean, retryCapture: boolean): Promise<string | null>;
     url(token: string, viewer: string): string;
     subscribeReady(listener: (viewer: string) => void): () => void;
+    subscribeDevtoolsVisibility(listener: (visible: boolean) => void): () => void;
     loadLayout(): Promise<Pick<DevicePreviewLayout, 'width' | 'toolbarCollapsed' | 'panelOpen'>>;
     savePanelOpen(open: boolean): void;
     saveWidth(width: number): void;
@@ -351,7 +352,9 @@ function createPreviewControls(
   let preferencesLoaded = initialLayout !== undefined;
   let panelOpen =
     typeof initialLayout?.panelOpen === 'boolean' ? initialLayout.panelOpen : undefined;
+  let devtoolsVisible: boolean | undefined;
   const shouldOpen = (width: number) =>
+    devtoolsVisible === false &&
     width >= MIN_DEBUG_PREVIEW_WIDTH &&
     (panelOpen ?? (preferencesLoaded && width >= MIN_DOCKED_PREVIEW_WIDTH));
   let open = shouldOpen(viewport().width);
@@ -399,7 +402,7 @@ function createPreviewControls(
     status.hidden = !open || !statusLabel.textContent;
     status.style.width = panelWidth ? `${panelWidth}px` : '100%';
     status.style.height = panelHeight ? `${panelHeight}px` : '100%';
-    button.hidden = viewportWidth < MIN_DEBUG_PREVIEW_WIDTH;
+    button.hidden = devtoolsVisible !== false || viewportWidth < MIN_DEBUG_PREVIEW_WIDTH;
     toolbarButton.hidden = !toolbar.element.hidden;
     button.style.right = toolbarButton.style.right = `${panelWidth + PREVIEW_CONTROL_INSET}px`;
     button.setAttribute('aria-expanded', String(open));
@@ -500,7 +503,7 @@ function createPreviewControls(
     enable: boolean,
     { automaticRetry = false, retryCapture = false } = {},
   ) => {
-    if (button.disabled) return;
+    if (button.disabled || (enable && devtoolsVisible !== false)) return;
     button.disabled = true;
     if (!automaticRetry) {
       window.clearTimeout(loadingTimer);
@@ -516,7 +519,7 @@ function createPreviewControls(
     try {
       const token = await options.requestToken(enable, retryCapture);
       if (destroyed) return;
-      if (enable) {
+      if (enable && devtoolsVisible === false) {
         if (!token) throw new Error('Device preview panel is unavailable');
         mountFrame(token, automaticRetry);
       }
@@ -538,7 +541,7 @@ function createPreviewControls(
     if (event.isTrusted && open && !retryButton.hidden) void request(true, { retryCapture: true });
   });
   button.addEventListener('click', event => {
-    if (!event.isTrusted) return;
+    if (!event.isTrusted || devtoolsVisible !== false) return;
     panelOpen = !open;
     options.savePanelOpen(panelOpen);
     if (!panelOpen) {
@@ -578,9 +581,19 @@ function createPreviewControls(
     if (area === 'sync' && changes.language) void toolbar.refresh();
   };
   chrome.storage?.onChanged?.addListener(onLanguageChange);
+  const unsubscribeDevtoolsVisibility = options.subscribeDevtoolsVisibility(visible => {
+    if (devtoolsVisible === visible) return;
+    devtoolsVisible = visible;
+    if (visible) {
+      window.clearTimeout(loadingTimer);
+      showStatus();
+      removeFrame();
+    }
+    resize();
+    onChange();
+  });
   resize();
-  if (open) void request(true);
-  else if (panelOpen === false) void request(false);
+  if (panelOpen === false) void request(false);
 
   return {
     host,
@@ -593,6 +606,7 @@ function createPreviewControls(
       window.removeEventListener('message', receivePanelMessage);
       chrome.storage?.onChanged?.removeListener(onLanguageChange);
       unsubscribeReady();
+      unsubscribeDevtoolsVisibility();
       removeFrame();
       host.remove();
     },

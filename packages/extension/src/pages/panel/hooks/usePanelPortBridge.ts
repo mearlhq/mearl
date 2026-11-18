@@ -16,7 +16,10 @@ import {
   mergeCapturedRequests,
   type PanelRequestCaptureState,
 } from '../utils/capturedState';
-import { DEVICE_PREVIEW_PANEL_PORT, type DevicePreviewPanelMessage } from '../../../shared/devicePreviewPanel';
+import {
+  DEVICE_PREVIEW_PANEL_PORT,
+  type DevicePreviewPanelMessage,
+} from '../../../shared/devicePreviewPanel';
 import type { NavigationDivider } from '../types';
 
 interface UsePanelPortBridgeOptions {
@@ -78,7 +81,16 @@ export const usePanelPortBridge = ({
   // 记录每个 SSE 请求归属的列表（协议接口 vs 普通请求），
   // 以便后续 SSE_CHUNK/SSE_COMPLETE（只带 requestId、不带 url）能更新到正确的列表
   const sseQueueRef = useRef<Promise<void>>(Promise.resolve());
-  const sseRequestListRef = useRef<Map<string, { list: 'protocol' | 'requests'; state: PanelRequestCaptureState; source: PanelRequestCaptureState['source'] }>>(new Map());
+  const sseRequestListRef = useRef<
+    Map<
+      string,
+      {
+        list: 'protocol' | 'requests';
+        state: PanelRequestCaptureState;
+        source: PanelRequestCaptureState['source'];
+      }
+    >
+  >(new Map());
 
   // 处理 SSE 连接消息 - 立即创建请求记录
   const handleSSEConnectionMessage = useCallback(
@@ -97,10 +109,14 @@ export const usePanelPortBridge = ({
 
       // 根据 URL 判断归属：协议接口进 mtop 列表，普通请求进 requests 列表
       const captureState = requestCaptureStateRef.current;
-      const extraction = await inspectRequest(url, requestBody) ?? undefined;
+      const extraction = (await inspectRequest(url, requestBody)) ?? undefined;
       if (!current() || requestCaptureStateRef.current !== captureState) return;
       const isProtocol = Boolean(extraction);
-      sseRequestListRef.current.set(requestId, { list: isProtocol ? 'protocol' : 'requests', state: captureState, source: captureState.source });
+      sseRequestListRef.current.set(requestId, {
+        list: isProtocol ? 'protocol' : 'requests',
+        state: captureState,
+        source: captureState.source,
+      });
       const setter = isProtocol ? setRequests : setNonCapturedRequests;
 
       setter(prev => {
@@ -202,7 +218,8 @@ export const usePanelPortBridge = ({
           : undefined;
 
         const newRequest: CapturedRequest = {
-          environment: extraction?.environment, namespace: extraction?.namespace,
+          environment: extraction?.environment,
+          namespace: extraction?.namespace,
           id: Date.now() + Math.random(),
           url,
           method: method || 'GET',
@@ -241,7 +258,12 @@ export const usePanelPortBridge = ({
       const { requestId, type, error, timestamp } = message;
 
       const owner = sseRequestListRef.current.get(requestId);
-      if (!owner || owner.state !== requestCaptureStateRef.current || owner.source !== requestCaptureStateRef.current.source) return;
+      if (
+        !owner ||
+        owner.state !== requestCaptureStateRef.current ||
+        owner.source !== requestCaptureStateRef.current.source
+      )
+        return;
       const setter = owner.list === 'requests' ? setNonCapturedRequests : setRequests;
       sseRequestListRef.current.delete(requestId);
 
@@ -307,7 +329,12 @@ export const usePanelPortBridge = ({
       const { requestId, event, data, eventId, timestamp } = message;
 
       const owner = sseRequestListRef.current.get(requestId);
-      if (!owner || owner.state !== requestCaptureStateRef.current || owner.source !== requestCaptureStateRef.current.source) return;
+      if (
+        !owner ||
+        owner.state !== requestCaptureStateRef.current ||
+        owner.source !== requestCaptureStateRef.current.source
+      )
+        return;
       const setter = owner.list === 'requests' ? setNonCapturedRequests : setRequests;
 
       setter(prev => {
@@ -370,7 +397,9 @@ export const usePanelPortBridge = ({
         else protocolRequests.push(decorated);
       }
 
-      setRequests(previous => mergeCapturedRequests(replace ? [] : previous, protocolRequests, removedRequestIds));
+      setRequests(previous =>
+        mergeCapturedRequests(replace ? [] : previous, protocolRequests, removedRequestIds),
+      );
       setNonCapturedRequests(previous =>
         mergeCapturedRequests(replace ? [] : previous, regularRequests, removedRequestIds),
       );
@@ -389,8 +418,13 @@ export const usePanelPortBridge = ({
     const enqueueSse = (work: (current: () => boolean) => void | Promise<void>) => {
       const accepted = requestCaptureStateRef.current;
       const source = accepted.source;
-      const current = () => !isCleaned && requestCaptureStateRef.current === accepted && accepted.source === source;
-      sseQueueRef.current = sseQueueRef.current.then(() => { if (current()) return work(current); }).catch(console.warn);
+      const current = () =>
+        !isCleaned && requestCaptureStateRef.current === accepted && accepted.source === source;
+      sseQueueRef.current = sseQueueRef.current
+        .then(() => {
+          if (current()) return work(current);
+        })
+        .catch(console.warn);
     };
 
     const switchRequestCaptureSource = (
@@ -423,9 +457,16 @@ export const usePanelPortBridge = ({
       if (message.action === 'mainFrameCommitted') {
         window.dispatchEvent(
           new CustomEvent('mearl-main-frame-committed', {
-            detail: { url: typeof message.url === 'string' ? message.url : '', timestampMs: message.timestampMs },
+            detail: {
+              url: typeof message.url === 'string' ? message.url : '',
+              timestampMs: message.timestampMs,
+            },
           }),
         );
+      }
+
+      if (message.action === 'mainFrameCommitted' || message.action === 'panelPageNavigated') {
+        window.dispatchEvent(new Event('mearl-panel-page-navigated'));
         return;
       }
 
@@ -486,7 +527,8 @@ export const usePanelPortBridge = ({
           const { type } = query;
           if (type === 'getRequests') {
             const source = query.source ?? 'protocol';
-            const pool = source === 'requests' ? nonCapturedRequestsRef.current : requestsRef.current;
+            const pool =
+              source === 'requests' ? nonCapturedRequestsRef.current : requestsRef.current;
             const hidden = new Set(
               source === 'requests' ? hiddenNonProtocolApisRef.current : hiddenApisRef.current,
             );
@@ -649,12 +691,16 @@ export const usePanelPortBridge = ({
         case 'SSE_MESSAGE':
         case 'SSE_CHUNK':
         case 'SSE_CUSTOM_EVENT':
-          enqueueSse(() => { handleSSEMessageUpdate(message); });
+          enqueueSse(() => {
+            handleSSEMessageUpdate(message);
+          });
           break;
 
         case 'SSE_COMPLETE':
         case 'SSE_ERROR':
-          enqueueSse(() => { handleSSEComplete(message); });
+          enqueueSse(() => {
+            handleSSEComplete(message);
+          });
           break;
 
         case 'FETCH_RESPONSE':
@@ -717,11 +763,17 @@ export const usePanelPortBridge = ({
     const doConnect = () => {
       if (isCleaned) return;
       try {
-        port = chrome.runtime.connect({ name: previewToken === undefined
-          ? `devtools-panel-${tabId}` : DEVICE_PREVIEW_PANEL_PORT + previewToken });
+        port = chrome.runtime.connect({
+          name:
+            previewToken === undefined
+              ? `devtools-panel-${tabId}`
+              : DEVICE_PREVIEW_PANEL_PORT + previewToken,
+        });
         previewPortRef.current = previewToken === undefined ? null : port;
         connectFailCount = 0; // 连接成功，重置失败计数
-        port.onMessage.addListener(previewToken === undefined ? messageHandler : handlePreviewMessage);
+        port.onMessage.addListener(
+          previewToken === undefined ? messageHandler : handlePreviewMessage,
+        );
         port.onDisconnect.addListener(() => {
           if (isCleaned) return;
           port = null;

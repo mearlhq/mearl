@@ -1,5 +1,6 @@
 import { limitBufferedField } from '@mearl/browser-core';
 import {
+  DEVICE_PREVIEW_DEVTOOLS_VISIBILITY_ACTION,
   DEVICE_PREVIEW_PANEL_PAGE,
   DEVICE_PREVIEW_PANEL_PORT,
   DEVICE_PREVIEW_PANEL_READY_ACTION,
@@ -19,6 +20,24 @@ import {
 const consumer = 'device-preview-panel';
 const panels = new Map<number, PreviewPanel>();
 const closing = new Map<number, Promise<void>>();
+const devtoolsVisibleTabs = new Set<number>();
+
+export function isDevicePreviewDevtoolsVisible(tabId: number): boolean {
+  return devtoolsVisibleTabs.has(tabId);
+}
+
+export function setDevicePreviewDevtoolsVisible(tabId: number, visible: boolean): void {
+  if (devtoolsVisibleTabs.has(tabId) === visible) return;
+  if (visible) devtoolsVisibleTabs.add(tabId);
+  else devtoolsVisibleTabs.delete(tabId);
+  void chrome.tabs
+    .sendMessage(
+      tabId,
+      { action: DEVICE_PREVIEW_DEVTOOLS_VISIBILITY_ACTION, visible },
+      { frameId: 0 },
+    )
+    .catch(() => {});
+}
 
 interface PreviewPanel {
   token: string;

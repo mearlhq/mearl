@@ -120,18 +120,18 @@ export const EventDetail: FC<RumEventDetailProps> = ({
       });
     };
     highlightMain();
+    if (tabId === null || !highlightSpm) return;
     const onNavigated = () => {
       clearTimeout(timer);
       timer = setTimeout(highlightMain, 500);
     };
-    const navigation = tabId !== null && highlightSpm ? devtoolsNetwork?.onNavigated : undefined;
-    navigation?.addListener(onNavigated);
+    window.addEventListener('mearl-panel-page-navigated', onNavigated);
     return () => {
       hotzoneRevision.current++;
       clearTimeout(timer);
-      navigation?.removeListener(onNavigated);
+      window.removeEventListener('mearl-panel-page-navigated', onNavigated);
     };
-  }, [event?.id, highlightSpm, tabId, devtoolsNetwork]);
+  }, [event?.id, highlightSpm, tabId]);
 
   const toggleSection = (id: string) => {
     setCollapsedSections(prev => ({ ...prev, [id]: !prev[id] }));

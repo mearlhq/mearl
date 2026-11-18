@@ -1,5 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import {
+  DEVICE_PREVIEW_DEVTOOLS_VISIBILITY_ACTION,
   DEVICE_PREVIEW_PANEL_PAGE,
   DEVICE_PREVIEW_PANEL_PORT,
   DEVICE_PREVIEW_PANEL_READY_ACTION,
@@ -20,9 +21,39 @@ import {
   connectDevicePreviewPanel,
   getDevicePreviewPanelPort,
   getDevicePreviewPanelToken,
+  isDevicePreviewDevtoolsVisible,
   navigateDevicePreviewPanel,
+  setDevicePreviewDevtoolsVisible,
   updateDevicePreviewPanel,
 } from '../devicePreviewPanel';
+
+it('tracks Mearl visibility by inspected tab and notifies its outer preview only on changes', () => {
+  const previousTabs = chrome.tabs;
+  const sendMessage = vi.fn().mockResolvedValue(undefined);
+  chrome.tabs = { ...chrome.tabs, sendMessage } as typeof chrome.tabs;
+  const tabId = 42;
+  try {
+    setDevicePreviewDevtoolsVisible(tabId, true);
+    setDevicePreviewDevtoolsVisible(tabId, true);
+    expect(isDevicePreviewDevtoolsVisible(tabId)).toBe(true);
+    expect(isDevicePreviewDevtoolsVisible(tabId + 1)).toBe(false);
+    expect(sendMessage).toHaveBeenCalledExactlyOnceWith(
+      tabId,
+      { action: DEVICE_PREVIEW_DEVTOOLS_VISIBILITY_ACTION, visible: true },
+      { frameId: 0 },
+    );
+    setDevicePreviewDevtoolsVisible(tabId, false);
+    expect(isDevicePreviewDevtoolsVisible(tabId)).toBe(false);
+    expect(sendMessage).toHaveBeenLastCalledWith(
+      tabId,
+      { action: DEVICE_PREVIEW_DEVTOOLS_VISIBILITY_ACTION, visible: false },
+      { frameId: 0 },
+    );
+  } finally {
+    setDevicePreviewDevtoolsVisible(tabId, false);
+    chrome.tabs = previousTabs;
+  }
+});
 
 function viewer(
   tabId: number,
