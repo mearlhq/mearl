@@ -6,6 +6,7 @@ import { getAction } from './cdp-backend/action-registry.js';
 import { getCdpPageDialogs, monitorCdpPageDialogs } from './cdp-backend/page-dialogs.js';
 import { initializePageSession } from './cdp-backend/page-session-initializers.js';
 import { nativeCapabilities } from './native-capability-services.js';
+import type { BrowserCapabilityAction } from '@mearl/browser-core';
 
 export type { CdpTransport } from './cdp-backend/client.js';
 export interface ExternalPageHostOptions {
@@ -14,11 +15,20 @@ export interface ExternalPageHostOptions {
   url: string;
   sessionId: string;
   transport: CdpTransport;
+  /** Use Console.messageAdded when the transport filters Runtime console events. */
+  consoleDomain?: 'Runtime' | 'Console';
   assertControl(): Promise<void>;
   onHostActivity?(active: boolean): void;
 }
 
+export const EXTERNAL_PAGE_CAPTURE_ACTIONS = [
+  'tab_checkpoint',
+  'get_requests',
+  'get_logs',
+] as const satisfies readonly BrowserCapabilityAction[];
+
 const actions = new Set([
+  ...EXTERNAL_PAGE_CAPTURE_ACTIONS,
   'page_snapshot',
   'page_frames',
   'page_eval',
@@ -44,17 +54,29 @@ export async function createExternalPageHost(options: ExternalPageHostOptions) {
   await nativeCapabilities.refresh();
   const root = CdpClient.fromTransport(options.transport);
   let controller = new AbortController();
+  let captureReady: Promise<void> | undefined;
+  const suspend = () => controller.abort(new Error('External task control ended'));
+  const assertControl = async () => {
+    try {
+      await options.assertControl();
+    } catch (error) {
+      suspend();
+      throw error;
+    }
+  };
   const session: PageSession = {
     tabId: options.tabId,
     targetId: options.targetId,
     url: options.url,
     runtimeOwner: { browser: root.identity, target: options.targetId, pid: process.pid },
     client: root.createChildSession(options.sessionId),
-    buffers: createBuffers(),
-    assertHostControl: options.assertControl,
+    buffers: createBuffers(options.tabId),
+    assertHostControl: assertControl,
     hostSignal: controller.signal,
     onHostRequestActivity: options.onHostActivity,
   };
+  const startCapture = () =>
+    setupBufferListeners(session.client, session.buffers, options.consoleDomain, controller.signal);
   const unmonitor = monitorCdpPageDialogs(session);
   const detach = async () => {
     try {
@@ -68,7 +90,7 @@ export async function createExternalPageHost(options: ExternalPageHostOptions) {
   };
   try {
     await session.client.sendCommand('Page.enable');
-    await setupBufferListeners(session.client, session.buffers);
+    await startCapture();
     await initializePageSession(session);
   } catch (error) {
     controller.abort(error);
@@ -86,26 +108,40 @@ export async function createExternalPageHost(options: ExternalPageHostOptions) {
       if (!actions.has(action)) throw new Error(`Unsupported external page action: ${action}`);
       if (data.tabId !== undefined && data.tabId !== options.tabId)
         throw new Error('External page target mismatch');
-      await options.assertControl();
+      const previousLease = controller.signal;
+      const renewing = previousLease.aborted;
+      await assertControl();
+      if (disposed) throw new Error('External page host is closed');
+      if (!renewing) previousLease.throwIfAborted();
       if (controller.signal.aborted) {
-        controller = new AbortController();
-        session.hostSignal = controller.signal;
+        const renewed = new AbortController();
+        controller = renewed;
+        session.hostSignal = renewed.signal;
+        session.buffers = createBuffers(options.tabId);
+        captureReady = startCapture().catch(error => {
+          renewed.abort(error);
+          throw error;
+        });
       }
+      const lease = controller.signal;
+      await captureReady;
+      lease.throwIfAborted();
       const handler = getAction(action);
       if (!handler || handler.session !== 'page')
         throw new Error(`Page handler unavailable: ${action}`);
       try {
-        return await getCdpPageDialogs(session).execute(() =>
-          handler.handler(session, { ...data, tabId: options.tabId }, 'local'),
-        );
+        const result = await getCdpPageDialogs(session).execute(() => {
+          lease.throwIfAborted();
+          return handler.handler(session, { ...data, tabId: options.tabId }, 'local');
+        });
+        if (EXTERNAL_PAGE_CAPTURE_ACTIONS.some(name => name === action)) lease.throwIfAborted();
+        return result;
       } catch (error) {
         if (action === 'set_device_emulation' || action === 'set_app_profile') uncertain = true;
         throw error;
       }
     },
-    suspend() {
-      controller.abort(new Error('External task control ended'));
-    },
+    suspend,
     async dispose() {
       if (disposed) return;
       controller.abort(new Error('External page host disposed'));

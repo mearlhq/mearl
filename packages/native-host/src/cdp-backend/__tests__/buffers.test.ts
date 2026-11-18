@@ -1,14 +1,23 @@
 const parser = vi.hoisted(() => ({
   matches: (url: string) => url.includes('events.example.com/report'),
-  parse: (_url: string, data: string | undefined, options: { now: number; sequence: number }) => data ? JSON.parse(data).events.map((event: Record<string, unknown>, index: number) => ({ source: 'rum', id: `${options.sequence}-${index}`, timestamp: options.now, _raw: event, _context: { requestUrl: _url }, ...event })) : [],
+  parse: (_url: string, data: string | undefined, options: { now: number; sequence: number }) =>
+    data
+      ? JSON.parse(data).events.map((event: Record<string, unknown>, index: number) => ({
+          source: 'rum',
+          id: `${options.sequence}-${index}`,
+          timestamp: options.now,
+          _raw: event,
+          _context: { requestUrl: _url },
+          ...event,
+        }))
+      : [],
 }));
-vi.mock('../../capability-contracts.js', async original => ({ ...await original<typeof import('../../capability-contracts.js')>(), getTrackingCapability: () => parser }));
+vi.mock('../../capability-contracts.js', async original => ({
+  ...(await original<typeof import('../../capability-contracts.js')>()),
+  getTrackingCapability: () => parser,
+}));
 import { describe, expect, it, vi } from 'vitest';
-import {
-  createBuffers,
-  recordCdpProtocolStreamStart,
-  setupBufferListeners,
-} from '../buffers.js';
+import { createBuffers, recordCdpProtocolStreamStart, setupBufferListeners } from '../buffers.js';
 import {
   cdpCaptureCheckpoint,
   cdpGetEvents,
@@ -17,10 +26,65 @@ import {
 } from '../request-handlers.js';
 
 describe('CDP capture buffers and installed event parsers', () => {
+  it('captures console messages on transports that filter Runtime console events', async () => {
+    const listeners = new Map<string, (params: any) => void>();
+    const client = {
+      sendCommand: vi.fn().mockResolvedValue({}),
+      on: (method: string, listener: (params: any) => void) => listeners.set(method, listener),
+    } as any;
+    const buffers = createBuffers(77);
+    await setupBufferListeners(client, buffers, 'Console');
+    expect(client.sendCommand).toHaveBeenCalledWith('Console.enable', {});
+    expect(listeners.has('Runtime.consoleAPICalled')).toBe(false);
+
+    const session = { tabId: 77, buffers } as any;
+    const { cursor } = await cdpCaptureCheckpoint(session, { tabId: 77 });
+    listeners.get('Console.messageAdded')!({ message: { level: 'warning', text: 'retry' } });
+    const result = await cdpGetLogs(session, { tabId: 77, after: cursor, level: 'warn' });
+    expect(result.logs).toEqual([
+      expect.objectContaining({ level: 'warn', message: 'retry', origin: 'console' }),
+    ]);
+  });
+
+  it('keeps network and Runtime capture available if the optional console domain is rejected', async () => {
+    const listeners = new Map<string, (params: any) => void>();
+    const client = {
+      sendCommand: vi.fn(async (method: string) => {
+        if (method === 'Console.enable') throw new Error('Method not found');
+        return {};
+      }),
+      on: (method: string, listener: (params: any) => void) => {
+        listeners.set(method, listener);
+        return () => listeners.delete(method);
+      },
+    } as any;
+    const buffers = createBuffers(77);
+    const controller = new AbortController();
+    await setupBufferListeners(client, buffers, 'Console', controller.signal);
+    expect(listeners.has('Console.messageAdded')).toBe(false);
+    expect(listeners.has('Network.requestWillBeSent')).toBe(true);
+    const log = listeners.get('Runtime.consoleAPICalled')!;
+    const event = { type: 'warning', args: [{ type: 'string', value: 'retry' }] };
+    log(event);
+    controller.abort();
+    log(event);
+    expect(listeners.size).toBe(0);
+    expect(buffers.logs).toEqual([expect.objectContaining({ message: 'retry' })]);
+  });
+
   it('retains delegated stream annotations in the shared request buffer', () => {
     const buffers = createBuffers(77);
-    recordCdpProtocolStreamStart(buffers, { api: 'opaque.query', method: 'POST', namespace: 'sample', environment: 'qa' });
-    expect(buffers.requests[0]).toMatchObject({ namespace: 'sample', environment: 'qa', source: 'protocol' });
+    recordCdpProtocolStreamStart(buffers, {
+      api: 'opaque.query',
+      method: 'POST',
+      namespace: 'sample',
+      environment: 'qa',
+    });
+    expect(buffers.requests[0]).toMatchObject({
+      namespace: 'sample',
+      environment: 'qa',
+      source: 'protocol',
+    });
   });
   it.each([undefined, true, false])(
     'honors the body override with field selection: %s',

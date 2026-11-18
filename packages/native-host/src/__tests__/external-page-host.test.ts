@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({
   session: undefined as any,
-  handler: vi.fn(async () => ({ ok: true })),
+  handler: vi.fn(async (_action: string, _session: unknown, _data: unknown) => ({ ok: true })),
   close: vi.fn(),
 }));
 vi.mock('../cdp-backend/handlers.js', () => ({}));
@@ -31,7 +31,10 @@ vi.mock('../native-capability-services.js', () => ({
   nativeCapabilities: { refresh: async () => {} },
 }));
 vi.mock('../cdp-backend/action-registry.js', () => ({
-  getAction: () => ({ session: 'page', handler: fixture.handler }),
+  getAction: (action: string) => ({
+    session: 'page',
+    handler: (session: unknown, data: unknown) => fixture.handler(action, session, data),
+  }),
 }));
 vi.mock('../cdp-backend/app-profile-handlers.js', () => ({ clearCdpAppProfile: async () => {} }));
 vi.mock('../cdp-backend/device-shell.js', () => ({ clearCdpDeviceShell: async () => {} }));
@@ -56,13 +59,44 @@ it('checks ownership before handlers and renews the host lease only after explic
   await expect(host.invoke('page_eval')).rejects.toThrow('user control');
   expect(fixture.handler).not.toHaveBeenCalled();
   expect(fixture.session.hostSignal).toBe(firstLease);
+  const firstBuffers = fixture.session.buffers;
   controlled = true;
   await expect(host.invoke('page_eval')).resolves.toEqual({ ok: true });
+  for (const action of ['tab_checkpoint', 'get_requests', 'get_logs']) {
+    await expect(host.invoke(action)).resolves.toEqual({ ok: true });
+    expect(fixture.handler).toHaveBeenLastCalledWith(action, fixture.session, { tabId: 1 });
+  }
   expect(fixture.session.hostSignal.aborted).toBe(false);
   expect(firstLease.aborted).toBe(true);
+  expect(fixture.session.buffers).not.toBe(firstBuffers);
   await expect(host.invoke('page_eval', { tabId: 2 })).rejects.toThrow('target mismatch');
   await expect(host.invoke('browser_close')).rejects.toThrow('Unsupported');
   await host.dispose();
   expect(fixture.session.hostSignal.aborted).toBe(true);
   expect(fixture.close).toHaveBeenCalledOnce();
+});
+
+it.each(['suspend', 'dispose'] as const)('rejects a pending capture query after %s', async end => {
+  let nextCheck: Promise<void> | undefined;
+  const host = await createExternalPageHost({
+    tabId: 1,
+    targetId: 'page',
+    url: 'about:blank',
+    sessionId: 'session',
+    transport: {} as any,
+    assertControl: () => {
+      const check = nextCheck ?? Promise.resolve();
+      nextCheck = undefined;
+      return check;
+    },
+  });
+  let release!: () => void;
+  nextCheck = new Promise<void>(resolve => {
+    release = resolve;
+  });
+  const query = host.invoke('tab_checkpoint');
+  await host[end]();
+  release();
+  await expect(query).rejects.toThrow(/control ended|host is closed/);
+  await host.dispose();
 });

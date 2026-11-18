@@ -1,7 +1,17 @@
-import { createRequestStreamCapture, updateRequestStreamCaptureResponse, appendRequestStreamCaptureChunk, finishRequestStreamCapture } from '@mearl/browser-core';
+import {
+  createRequestStreamCapture,
+  updateRequestStreamCaptureResponse,
+  appendRequestStreamCaptureChunk,
+  finishRequestStreamCapture,
+} from '@mearl/browser-core';
 import { nativeCapabilities } from '../native-capability-services.js';
 import { parseRequestMetadata } from '@mearl/browser-core';
-import { getTrackingCapability, type ProtocolStreamCapture, type ProtocolStreamCaptureResponse, type ProtocolStreamCaptureStart } from '../capability-contracts.js';
+import {
+  getTrackingCapability,
+  type ProtocolStreamCapture,
+  type ProtocolStreamCaptureResponse,
+  type ProtocolStreamCaptureStart,
+} from '../capability-contracts.js';
 /**
  * In-memory circular buffers for CDP network requests, console logs, and
  * RUM/tracking events. A single CdpSession subscribes to CDP events and
@@ -67,7 +77,10 @@ interface CdpSseStream {
 }
 
 export type CdpProtocolStreamCapture = ProtocolStreamCapture;
-export type CdpProtocolStreamStart = Omit<ProtocolStreamCaptureStart, 'id' | 'tabId' | 'captureSequence'>;
+export type CdpProtocolStreamStart = Omit<
+  ProtocolStreamCaptureStart,
+  'id' | 'tabId' | 'captureSequence'
+>;
 export type CdpProtocolStreamResponse = ProtocolStreamCaptureResponse;
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
@@ -161,10 +174,12 @@ function appendTrackingEvents(
   batchSequence: number,
   captureSequence: number,
 ): boolean {
-  const events = (getTrackingCapability()?.parse(url, postData, {
-    sequence: batchSequence,
-    now: Date.now(),
-  }) ?? []).map(event => ({ ...event, captureSequence }));
+  const events = (
+    getTrackingCapability()?.parse(url, postData, {
+      sequence: batchSequence,
+      now: Date.now(),
+    }) ?? []
+  ).map(event => ({ ...event, captureSequence }));
   if (events.length === 0) return false;
 
   const removed = appendCapturedTrackingBatch(buffers.events, events, MAX_EVENTS);
@@ -209,7 +224,9 @@ export function recordCdpProtocolStreamStart(
   data: CdpProtocolStreamStart,
 ): CdpProtocolStreamCapture {
   const capture = createRequestStreamCapture({
-    ...data, url: data.url ?? `protocol://${data.api}/`, source: 'protocol',
+    ...data,
+    url: data.url ?? `protocol://${data.api}/`,
+    source: 'protocol',
     id: ++buffers.requestCounter,
     tabId: buffers.capture.tabId,
     captureSequence: nextCaptureSequence(buffers.capture),
@@ -343,9 +360,26 @@ function appendCapturedLog(buffers: CdpBuffers, log: Omit<ConsoleLog, 'captureSe
 export async function setupBufferListeners(
   client: CdpClient | CdpChildSession,
   buffers: CdpBuffers,
+  consoleDomain: 'Runtime' | 'Console' = 'Runtime',
+  signal?: AbortSignal,
 ): Promise<void> {
+  const removeListeners: Array<() => void> = [];
+  let ready = !signal;
+  const on = (method: string, listener: (params: any) => void) => {
+    const remove = client.on(method, params => {
+      if (ready && !signal?.aborted) listener(params);
+    });
+    removeListeners.push(remove);
+    return remove;
+  };
+  const stop = () => {
+    for (const remove of removeListeners.splice(0)) remove();
+  };
+  signal?.throwIfAborted();
+  signal?.addEventListener('abort', stop, { once: true });
+
   // ── Network.requestWillBeSent ──────────────────────────────────────────────
-  client.on('Network.requestWillBeSent', (params: any) => {
+  on('Network.requestWillBeSent', (params: any) => {
     const url: string = params.request?.url ?? '';
     if (!url.startsWith('http')) return;
     if (getTrackingCapability()?.matches(url)) {
@@ -369,7 +403,9 @@ export async function setupBufferListeners(
       return;
     }
     const resourceType = String(params.type ?? '').toLowerCase();
-    const metadata = parseRequestMetadata(nativeCapabilities.get('request.inspect')?.({ url, body: params.request?.postData }));
+    const metadata = parseRequestMetadata(
+      nativeCapabilities.get('request.inspect')?.({ url, body: params.request?.postData }),
+    );
     const protocolApiName = metadata?.apiName ?? null;
     const isProtocol = protocolApiName !== null;
     if (!isProtocol && !COLLECTED_RESOURCE_TYPES.has(resourceType)) return;
@@ -408,7 +444,7 @@ export async function setupBufferListeners(
       responseHeaders: [],
       responseBody: resourceType === 'eventsource' ? [] : null,
       environment: metadata?.environment,
-    namespace: metadata?.namespace,
+      namespace: metadata?.namespace,
       isProxy: metadata?.isProxy ?? false,
       proxyRequestUrl: metadata?.proxyRequestUrl ?? null,
       proxyData: null,
@@ -425,7 +461,7 @@ export async function setupBufferListeners(
   });
 
   // ── Network.responseReceived ───────────────────────────────────────────────
-  client.on('Network.responseReceived', (params: any) => {
+  on('Network.responseReceived', (params: any) => {
     const partial = buffers.pending.get(params.requestId);
     if (!partial) return;
 
@@ -462,7 +498,7 @@ export async function setupBufferListeners(
     refreshCapturedRequest(buffers, partial);
   });
 
-  client.on('Network.dataReceived', (params: any) => {
+  on('Network.dataReceived', (params: any) => {
     const partial = buffers.pending.get(params.requestId);
     const stream = buffers.sseStreams.get(params.requestId);
     if (!partial || stream?.mode !== 'resource' || typeof params.data !== 'string') return;
@@ -475,7 +511,7 @@ export async function setupBufferListeners(
     );
   });
 
-  client.on('Network.eventSourceMessageReceived', (params: any) => {
+  on('Network.eventSourceMessageReceived', (params: any) => {
     const partial = buffers.pending.get(params.requestId);
     if (!partial) return;
     const stream = ensurePageSseStream(buffers, partial, 'eventsource');
@@ -498,7 +534,7 @@ export async function setupBufferListeners(
   });
 
   // ── Network.loadingFinished ────────────────────────────────────────────────
-  client.on('Network.loadingFinished', (params: any) => {
+  on('Network.loadingFinished', (params: any) => {
     const partial = buffers.pending.get(params.requestId);
     if (!partial) return;
 
@@ -562,7 +598,7 @@ export async function setupBufferListeners(
   });
 
   // ── Network.loadingFailed ──────────────────────────────────────────────────
-  client.on('Network.loadingFailed', (params: any) => {
+  on('Network.loadingFailed', (params: any) => {
     const partial = buffers.pending.get(params.requestId);
     if (!partial) return;
 
@@ -582,36 +618,60 @@ export async function setupBufferListeners(
     refreshCapturedRequest(buffers, partial);
   });
 
-  // ── Runtime.consoleAPICalled ───────────────────────────────────────────────
-  client.on('Runtime.consoleAPICalled', (params: any) => {
-    const levelMap: Record<string, string> = {
-      warning: 'warn',
-      debug: 'debug',
-      info: 'info',
-      error: 'error',
-      assert: 'error',
-    };
-    const level = levelMap[params.type] ?? 'log';
-    const args: string[] = (params.args ?? []).map((arg: any) => {
-      if (arg.type === 'string') return arg.value;
-      if (arg.value !== undefined) return String(arg.value);
-      if (arg.description !== undefined) return arg.description;
-      return JSON.stringify(arg);
+  let useRuntimeConsole = true;
+  if (consoleDomain === 'Console') {
+    const removeConsole = on('Console.messageAdded', ({ message: entry }) => {
+      const message = entry.text ?? '';
+      appendCapturedLog(buffers, {
+        level: entry.level === 'warning' ? 'warn' : (entry.level ?? 'log'),
+        message,
+        timestampMs: Date.now(),
+        source: entry.url
+          ? `${entry.url.split('/').pop() || entry.url}${entry.line ? `:${entry.line}` : ''}`
+          : 'console',
+        args: [message],
+        origin: 'console',
+      });
     });
+    try {
+      await ensureCdpDomain(client, 'Console');
+      useRuntimeConsole = false;
+    } catch {
+      removeConsole();
+    }
+  }
+  signal?.throwIfAborted();
+  if (useRuntimeConsole) {
+    on('Runtime.consoleAPICalled', (params: any) => {
+      const levelMap: Record<string, string> = {
+        warning: 'warn',
+        debug: 'debug',
+        info: 'info',
+        error: 'error',
+        assert: 'error',
+      };
+      const level = levelMap[params.type] ?? 'log';
+      const args: string[] = (params.args ?? []).map((arg: any) => {
+        if (arg.type === 'string') return arg.value;
+        if (arg.value !== undefined) return String(arg.value);
+        if (arg.description !== undefined) return arg.description;
+        return JSON.stringify(arg);
+      });
 
-    appendCapturedLog(buffers, {
-      level,
-      message: args.join(' '),
-      timestampMs: params.timestamp ?? Date.now(),
-      source: params.stackTrace?.callFrames?.[0]?.url
-        ? `${params.stackTrace.callFrames[0].url.split('/').pop() || params.stackTrace.callFrames[0].url}:${params.stackTrace.callFrames[0].lineNumber + 1}`
-        : 'console',
-      args,
-      origin: 'console',
+      appendCapturedLog(buffers, {
+        level,
+        message: args.join(' '),
+        timestampMs: params.timestamp ?? Date.now(),
+        source: params.stackTrace?.callFrames?.[0]?.url
+          ? `${params.stackTrace.callFrames[0].url.split('/').pop() || params.stackTrace.callFrames[0].url}:${params.stackTrace.callFrames[0].lineNumber + 1}`
+          : 'console',
+        args,
+        origin: 'console',
+      });
     });
-  });
+  }
 
-  client.on('Runtime.exceptionThrown', (params: any) => {
+  on('Runtime.exceptionThrown', (params: any) => {
     const details = params.exceptionDetails ?? {};
     const exception = details.exception;
     const message =
@@ -636,7 +696,7 @@ export async function setupBufferListeners(
   });
 
   // ── Log.entryAdded ─────────────────────────────────────────────────────────
-  client.on('Log.entryAdded', (params: any) => {
+  on('Log.entryAdded', (params: any) => {
     const entry = params.entry ?? {};
     const levelMap: Record<string, string> = {
       verbose: 'log',
@@ -671,4 +731,6 @@ export async function setupBufferListeners(
     ensureCdpDomain(client, 'Runtime'),
     ensureCdpDomain(client, 'Log'),
   ]);
+  signal?.throwIfAborted();
+  ready = true;
 }
