@@ -2,9 +2,7 @@
 /**
  * Build script for @mearl/native-host
  *
- * Bundles src/index.ts into a single standalone dist/index.js using esbuild.
- * The output is a self-contained executable that can be registered as a
- * Chrome Native Messaging Host.
+ * Bundles the Chrome Native Messaging entry point and the host's public modules.
  */
 
 import * as esbuild from 'esbuild';
@@ -69,21 +67,6 @@ const builds = await Promise.all([
     entryPoints: [resolve(__dirname, 'src/install.ts')],
     outfile: resolve(__dirname, 'dist/install.js'),
   }),
-  esbuild.build({
-    ...sharedOptions,
-    entryPoints: [resolve(__dirname, '../client/src/plugin-worker.ts')],
-    outfile: resolve(__dirname, 'dist/plugin-worker.js'),
-  }),
-  esbuild.build({
-    ...sharedOptions,
-    entryPoints: [resolve(__dirname, '../client/src/plugin-task-host.ts')],
-    outfile: resolve(__dirname, 'dist/plugin-task-host.js'),
-  }),
-  esbuild.build({
-    ...sharedOptions,
-    entryPoints: [resolve(__dirname, '../client/src/pluginModelSessionWorker.ts')],
-    outfile: resolve(__dirname, 'dist/pluginModelSessionWorker.js'),
-  }),
 ]);
 
 writeBundleNotices(builds.map(result => result.metafile), __dirname, resolve(__dirname, 'dist/THIRD_PARTY_NOTICES.txt'));
@@ -117,4 +100,4 @@ execSync('tsc --emitDeclarationOnly --declaration --outDir dist', {
   stdio: 'inherit',
 });
 
-console.log('[native-host] Built runtime, installer and plugin executor (with .d.ts)');
+console.log('[native-host] Built runtime and public modules (with .d.ts)');

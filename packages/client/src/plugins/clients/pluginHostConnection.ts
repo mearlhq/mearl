@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { closeSync, mkdirSync, openSync } from 'node:fs';
 import { createConnection } from 'node:net';
 import type { Socket } from 'node:net';
-import { PLUGIN_TASK_HOST_PATH } from '../../runtimePaths.js';
+import { resolvePluginTaskHostPath } from '../../runtimePaths.js';
 import {
   claimRecord,
   isProcessOwnerAlive,
@@ -15,10 +15,7 @@ import {
 import { pluginHostPaths } from '../runtime/pluginHostPaths.js';
 
 import { PLUGIN_TASK_PROTOCOL_VERSION } from '@mearl/browser-core';
-import type {
-  PluginInvocationSource,
-  PluginExecutionHost,
-} from '@mearl/browser-core';
+import type { PluginInvocationSource, PluginExecutionHost } from '@mearl/browser-core';
 import type { PluginExecutionContext } from '../sdk/plugin.js';
 import type { PluginTaskScope } from '../pluginTaskProtocol.js';
 import { readPluginTaskMessages, writePluginTaskMessage } from '../pluginTaskWire.js';
@@ -153,7 +150,7 @@ export class PluginHostConnection {
       if (!['ENOENT', 'ECONNREFUSED', 'PLUGIN_TASK_CONNECTION_LOST'].includes(code ?? ''))
         throw error;
     }
-    await ensureHost(this.configuration.runtimePath ?? PLUGIN_TASK_HOST_PATH);
+    await ensureHost(this.configuration.runtimePath ?? resolvePluginTaskHostPath());
     const deadline = Date.now() + 10000;
     let failure: unknown;
     do {

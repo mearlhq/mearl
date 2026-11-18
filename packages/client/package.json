@@ -38,6 +38,7 @@
       "types": "./dist/plugin.d.ts",
       "import": "./dist/plugin.js"
     },
+    "./plugin-task-host": "./dist/plugin-task-host.js",
     "./script": {
       "types": "./dist/script.d.ts",
       "import": "./dist/script.js"

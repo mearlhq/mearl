@@ -100,7 +100,7 @@ The plugin host manages commands, tasks, page instances, events, models, and sta
 ### Ownership and identity
 
 - Execution environments have persistent `hostId` and per-process `epoch`. hostId lives in the plugin registry directory and identifies environments without granting permissions.
-- Each environment's user-level execution service owns tasks/executors. Browser Native Hosts adapt connections and targets. Browser targets and model execution locations are independently selected and pinned after launch, unaffected by default-browser changes.
+- Each environment's user-level execution service owns tasks and executors. `@mearl/client` provides the task service and workers. Browser Native Hosts adapt connections and targets. Browser targets and model execution locations are independently selected and pinned after launch, unaffected by default-browser changes.
 - Commands have `invocationId`, source, plugin, and optional parent invocation. Trusted entries construct context; business input cannot replace it. Nested calls inherit host/source and receive new invocation IDs.
 - Installation IDs, logical names, and immutable code revisions are separate. Tasks/page instances pin revisions; updates affect new execution only. Active work completes, drains, or stops by policy. Complete source snapshots include local dependencies; entry metadata cannot substitute for revisions.
 

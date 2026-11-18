@@ -135,6 +135,16 @@ describe('persistent plugin tasks', () => {
     expect(restarted.host.epoch).not.toBe(statuses[0].host.epoch);
   });
 
+  it('starts the Client package task service and runs a command with its worker', async () => {
+    const caller = client({ runtimePath: undefined });
+    const task = await caller.start('fixture', { command: 'echo', input: { value: 1 } });
+
+    expect(await caller.wait(task.taskId)).toMatchObject({
+      input: { value: 1 },
+      resource: 'pinned',
+    });
+  });
+
   it('pins source, resources, cwd, environment and audit identity at acceptance', async () => {
     service = await startPluginHostServer({
       concurrency: 1,

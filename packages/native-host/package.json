@@ -29,9 +29,6 @@
   "files": [
     "README.en.md",
     "dist/index.js",
-    "dist/plugin-worker.js",
-    "dist/plugin-task-host.js",
-    "dist/pluginModelSessionWorker.js",
     "dist/install.js",
     "dist/install.d.ts",
     "dist/node-capabilities.js",
