@@ -8,6 +8,7 @@ import { initializePresetAutoUpdate } from './presetAutoUpdate';
 import { PRESET_MANAGEMENT_ACTION } from '../../shared/presetAutoUpdate';
 import { createLazyInstallationService } from './lazyInstallationService';
 import { INSTALLATION_ACTION } from '../../shared/installation';
+import { handleBrowserTracking } from './browserTracking';
 import { initializeBrowserPureCapabilities } from './browserPureCapabilities';
 import { handleBrowserUiService, initializeBrowserUiOperations } from './browserUiService';
 import { handleExtensionServiceRequest } from './extensionServiceHandler';
@@ -866,15 +867,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   if (message.action === 'browserTracking') {
-    void import('./browserTracking')
-      .then(({ handleBrowserTracking }) => handleBrowserTracking(message.data, sender))
-      .then(sendResponse)
-      .catch(error =>
-        sendResponse({
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        }),
-      );
+    void handleBrowserTracking(message.data, sender).then(sendResponse);
     return true;
   }
   if (
