@@ -5,7 +5,6 @@ vi.mock('../../panel/utils/browserUiSettings', () => ({
 }));
 import { resolveSkillCatalog } from '../skillCatalog';
 import { publicSkillCatalog } from '../publicSkillCatalog';
-import releasedSkills from '../../../../../../skills/catalog.json';
 const provider = { bundleId: 'custom', revision: 'accepted-config' };
 const skill = {
   id: 'sample',
@@ -79,31 +78,31 @@ it('rejects malformed metadata instead of installing an incomplete or unsafe ent
   const catalog = await resolveSkillCatalog();
   await expect(catalog.search('')).rejects.toThrow();
 });
-it('bundles the public Mearl skills for offline browsing and preview', async () => {
-  const fetch = vi.spyOn(globalThis, 'fetch');
-  const result = await publicSkillCatalog.search('');
-  expect(result.skills.map(item => item.name).sort()).toEqual([...releasedSkills].sort());
-  const mearl = result.skills.find(item => item.name === 'mearl')!;
-  expect(await publicSkillCatalog.markdown(mearl)).toContain('name: mearl');
-  expect(fetch).not.toHaveBeenCalled();
-});
-it('uses the official search result source and name for installation, retaining its id only for the page', async () => {
+it('discovers Mearl-related skills from skills.sh without a bundled catalog', async () => {
   const fetch = vi
     .spyOn(globalThis, 'fetch')
-    .mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          skills: [
-            {
-              id: 'example/repo/path-name',
-              name: 'actual-name',
-              source: 'example/repo',
-              installs: 12,
-            },
-          ],
-        }),
-      ),
-    );
+    .mockResolvedValue(new Response(JSON.stringify({ skills: [] })));
+  expect(await publicSkillCatalog.search('')).toEqual({ skills: [] });
+  expect(fetch).toHaveBeenCalledWith(
+    'https://skills.sh/api/search?q=mearl&limit=50',
+    expect.objectContaining({ credentials: 'omit' }),
+  );
+});
+it('uses the official search result source and name for installation, retaining its id only for the page', async () => {
+  const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    new Response(
+      JSON.stringify({
+        skills: [
+          {
+            id: 'example/repo/path-name',
+            name: 'actual-name',
+            source: 'example/repo',
+            installs: 12,
+          },
+        ],
+      }),
+    ),
+  );
   const result = await publicSkillCatalog.search('example');
   expect(fetch).toHaveBeenCalledWith(
     'https://skills.sh/api/search?q=example&limit=50',
@@ -190,21 +189,4 @@ it('previews one exact named directory in a large repository without scanning un
     );
   expect(await publicSkillCatalog.markdown(entry)).toContain('# Example');
   expect(fetch).toHaveBeenCalledTimes(3);
-});
-
-it('uses the same builtin Skill sources and preview links for beta releases', async () => {
-  vi.resetModules();
-  vi.spyOn(chrome.runtime, 'getManifest').mockReturnValue({
-    manifest_version: 3,
-    name: 'Mearl',
-    version: '3.0.0.0',
-    version_name: '3.0.0-beta.0',
-  });
-  const { publicSkillCatalog: betaCatalog } = await import('../publicSkillCatalog');
-  const result = await betaCatalog.search('');
-  expect(result.skills).toHaveLength(releasedSkills.length);
-  for (const skill of result.skills) {
-    expect(skill.installSource).toBe('https://github.com/mearlhq/mearl');
-    expect(skill.pageUrl).toContain('/tree/main/skills/');
-  }
 });

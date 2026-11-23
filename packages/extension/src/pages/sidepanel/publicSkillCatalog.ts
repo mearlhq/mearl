@@ -1,13 +1,7 @@
-import releasedSkills from '../../../../../skills/catalog.json';
 import type { SkillCatalog, SkillSummary } from './skillCatalog';
 
-const source = 'mearlhq/mearl';
-const bundledDocs = import.meta.glob<string>('../../../../../skills/*/SKILL.md', {
-  query: '?raw',
-  import: 'default',
-  eager: true,
-});
 const repositoryPattern = /^[A-Za-z0-9][A-Za-z0-9_.-]*\/[A-Za-z0-9][A-Za-z0-9_.-]*$/;
+const defaultDiscoveryQuery = 'mearl';
 const previewCache = new Map<string, string>();
 function scalar(markdown: string, key: 'name' | 'description') {
   const frontmatter = markdown.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1] ?? '';
@@ -23,28 +17,6 @@ function scalar(markdown: string, key: 'name' | 'description') {
     ? value.slice(1, -1).replace(/''/g, "'")
     : value;
 }
-// The catalog follows the release snapshot; source-only Skills join it during version preparation.
-const builtinSkills: SkillSummary[] = Object.entries(bundledDocs)
-  .filter(([path]) => releasedSkills.includes(path.split('/').at(-2)!))
-  .map(([path, markdown]) => {
-    const folder = path.split('/').at(-2)!;
-    const name = scalar(markdown, 'name') || folder;
-    const installSource = `https://github.com/${source}`;
-    const pageBase = `https://github.com/${source}/tree/main`;
-    return {
-      id: `${source}/${name}`,
-      name,
-      source,
-      installSource,
-      sourceType: 'github',
-      description: scalar(markdown, 'description'),
-      installs: 0,
-      tags: [],
-      collectionIds: [],
-      files: [`skills/${folder}/SKILL.md`],
-      pageUrl: `${pageBase}/skills/${encodeURIComponent(folder)}`,
-    };
-  });
 
 async function requestJson(url: string, signal?: AbortSignal): Promise<any> {
   const response = await fetch(url, {
@@ -65,8 +37,8 @@ async function requestJson(url: string, signal?: AbortSignal): Promise<any> {
 
 async function search(query: string, signal?: AbortSignal) {
   signal?.throwIfAborted();
-  if (!query.trim()) return { skills: builtinSkills };
-  const params = new URLSearchParams({ q: query.trim(), limit: '50' });
+  const value = query.trim() || defaultDiscoveryQuery;
+  const params = new URLSearchParams({ q: value, limit: '50' });
   const result = await requestJson(`https://skills.sh/api/search?${params}`, signal);
   if (!Array.isArray(result?.skills)) throw new Error('SKILLS_INVALID_RESPONSE');
   const skills: SkillSummary[] = result.skills.slice(0, 50).flatMap((value: any) => {
@@ -100,8 +72,6 @@ async function search(query: string, signal?: AbortSignal) {
 
 async function markdown(skill: SkillSummary, signal?: AbortSignal) {
   signal?.throwIfAborted();
-  const builtin = skill.source === source && builtinSkills.find(item => item.name === skill.name);
-  if (builtin) return bundledDocs[`../../../../../${builtin.files[0]}`];
   if (!repositoryPattern.test(skill.source)) throw new Error('SKILLS_MARKDOWN_UNAVAILABLE');
   const key = JSON.stringify([skill.source, skill.name]);
   const cached = previewCache.get(key);
