@@ -15,7 +15,6 @@ import { readPhysicalDeviceEnvironment } from './deviceEnvironmentObservation';
 import { isSubset } from '../../shared/isSubset';
 import { splitMockConditions } from '../../shared/mockConditions';
 import { extractApiName } from './utils';
-import { translateJson } from '../panel/utils/translate';
 import type { GlobalTranslationTarget } from '../panel/utils/config';
 import {
   buildEnableDeviceEnvironmentCommands,
@@ -2218,6 +2217,7 @@ export async function handleRequestPaused(tabId: number, params: any, sessionId?
         }
 
         const targetLang = globalTranslation as 'en' | 'zh-TW'; // 此处已被 globalTranslation !== 'none' 保护
+        const { translateJson } = await import('../panel/utils/translate');
         const result = await translateJson(data, targetLang);
 
         if (result.success && result.translatedData) {

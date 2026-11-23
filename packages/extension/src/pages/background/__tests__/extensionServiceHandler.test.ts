@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { ExtensionRpcError } from '@mearl/browser-core';
 import { handleExtensionServiceRequest } from '../extensionServiceHandler';
-vi.mock('../../panel/utils/i18n', () => ({ t: (key: string) => key }));
+vi.mock('../../../shared/i18n', () => ({ t: (key: string) => key }));
 const extensionId = 'abcdefghijklmnopabcdefghijklmnop';
 const ui = { id: extensionId, url: `chrome-extension://${extensionId}/popup.html` };
 

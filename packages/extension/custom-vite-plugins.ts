@@ -107,7 +107,9 @@ export function wrapInjectedIIFE (): PluginOption {
           chunk.type === 'chunk' &&
           (chunk.fileName?.endsWith('injected.js') ||
             chunk.fileName?.endsWith('early-inject.js') ||
-            chunk.fileName?.endsWith('element-picker-main-runtime.js'))
+            chunk.fileName?.endsWith('element-picker-main-runtime.js') ||
+            chunk.fileName?.endsWith('element-picker-isolated-runtime.js') ||
+            chunk.fileName?.endsWith('frame-visual-runtime.js'))
         ) {
           chunk.code = `;(function(){${chunk.code}})();`;
         }
@@ -120,6 +122,8 @@ const CLASSIC_CONTENT_SCRIPT_OUTPUTS = [
   'src/pages/content-script/early-inject.js',
   'src/pages/content-script/index.js',
   'src/pages/content-script/element-picker-main-runtime.js',
+  'src/pages/content-script/element-picker-isolated-runtime.js',
+  'src/pages/content-script/frame-visual-runtime.js',
 ];
 
 // Manifest registration and chrome.scripting.executeScript load these fixed-path

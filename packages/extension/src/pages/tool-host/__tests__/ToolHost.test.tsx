@@ -15,6 +15,10 @@ vi.mock('../../panel/utils/i18n', () => ({
   initI18n: mocks.initI18n,
   t: (key: string) => key,
 }));
+vi.mock('../../../shared/i18n', () => ({
+  getCurrentLanguage: mocks.getCurrentLanguage,
+  t: (key: string) => key,
+}));
 vi.mock('../../panel/utils/config', () => ({ onConfigChange: mocks.onConfigChange }));
 vi.mock('../SandboxToolPage', () => ({
   SandboxToolPage: ({ title }: { title: string }) => <iframe title={title} />,

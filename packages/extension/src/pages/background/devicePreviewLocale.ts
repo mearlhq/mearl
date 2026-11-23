@@ -1,5 +1,5 @@
 import { DEFAULT_CONFIG } from '../panel/utils/config';
-import { loadMessages } from '../panel/utils/i18n';
+import { loadMessages } from '../../shared/i18n';
 import {
   DEVICE_PREVIEW_TOOLBAR_MESSAGE_KEYS,
   type QuickDeviceToolbarLabels,

@@ -2,18 +2,6 @@ import { afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 
-vi.mock('webextension-polyfill', () => ({
-  default: {
-    i18n: {
-      getMessage: (key: string) => key,
-      getUILanguage: () => 'zh_CN',
-    },
-    runtime: {
-      getURL: (path: string) => path,
-    },
-  },
-}));
-
 // 在每个测试后清理
 afterEach(() => {
   cleanup();
@@ -23,12 +11,17 @@ afterEach(() => {
 global.chrome = {
   runtime: {
     sendMessage: vi.fn(),
+    getURL: vi.fn((path: string) => path),
     getManifest: vi.fn(() => ({ version: '2.0.0' })),
     onMessage: {
       addListener: vi.fn(),
       removeListener: vi.fn(),
     },
     lastError: undefined,
+  } as any,
+  i18n: {
+    getMessage: (key: string) => key,
+    getUILanguage: () => 'zh_CN',
   } as any,
   devtools: {
     network: {

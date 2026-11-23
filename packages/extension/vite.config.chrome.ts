@@ -44,6 +44,14 @@ export default mergeConfig(
             __dirname,
             'src/pages/content-script/elementPickerMainRuntime.ts',
           ),
+          'element-picker-isolated-runtime': resolve(
+            __dirname,
+            'src/pages/content-script/elementPickerIsolatedRuntime.ts',
+          ),
+          'frame-visual-runtime': resolve(
+            __dirname,
+            'src/pages/content-script/frameVisualIsolatedRuntime.ts',
+          ),
         },
         output: {
           entryFileNames: (chunkInfo) => {
@@ -57,6 +65,12 @@ export default mergeConfig(
             }
             if (chunkInfo.name === 'element-picker-main-runtime') {
               return 'src/pages/content-script/element-picker-main-runtime.js';
+            }
+            if (chunkInfo.name === 'element-picker-isolated-runtime') {
+              return 'src/pages/content-script/element-picker-isolated-runtime.js';
+            }
+            if (chunkInfo.name === 'frame-visual-runtime') {
+              return 'src/pages/content-script/frame-visual-runtime.js';
             }
             return 'assets/[name]-[hash].js';
           },

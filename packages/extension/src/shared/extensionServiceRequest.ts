@@ -6,7 +6,7 @@ import {
   type ExtensionUiServiceRequest,
   type ExtensionUiServiceResponse,
 } from '@mearl/browser-core';
-import { t } from '../pages/panel/utils/i18n';
+import { t } from './i18n';
 import type { NativeHostUpdateInfo } from '../pages/panel/components/NativeHostUpdateGuide';
 
 export async function requestExtensionService<

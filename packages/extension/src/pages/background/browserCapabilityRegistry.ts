@@ -1,7 +1,6 @@
 import { invalidateRequestInspection } from './requestInspection';
 import { missingPresetPermissions } from '../../shared/presetPermissions';
 import { matchesInstallationOrigin } from '@mearl/preset/installation';
-import { invalidateBrowserTracking } from './browserTracking';
 import {
   appProfileRevision,
   DomainPermissionError,
@@ -45,6 +44,15 @@ import { validateRequestUiSetting } from '../../shared/browserRequestUiValidatio
 import { validateBrowserViewPreferences } from '../../shared/browserViewPreferences';
 import type { BrowserPresetSettings } from '../../shared/browserPresetSettings';
 
+const capabilityRuntime = globalThis as typeof globalThis & {
+  __mearlBrowserCapabilityRevision?: number;
+};
+
+function bumpBrowserCapabilityRevision() {
+  capabilityRuntime.__mearlBrowserCapabilityRevision =
+    (capabilityRuntime.__mearlBrowserCapabilityRevision ?? 0) + 1;
+}
+
 function validateBrowserUiContributions(bundles: PreparedBundle[], apiVersion: string) {
   selectExtensionContributions(bundles);
   validateBrowserViewPreferences(selectBrowserView(bundles, 'requestImport', apiVersion));
@@ -71,7 +79,7 @@ function notifyRequestUiChanged() {
       /* A listener cannot interrupt preset activation. */
     }
   }
-  invalidateBrowserTracking();
+  bumpBrowserCapabilityRevision();
   invalidateRequestInspection();
   try {
     void chrome.runtime.sendMessage({ action: BROWSER_REQUEST_UI_CHANGED }).catch(() => {});

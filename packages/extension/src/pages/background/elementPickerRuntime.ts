@@ -2,14 +2,21 @@ import type {
   ElementCommentLabels,
   ElementPickerPage,
 } from '../content-script/elementCommentTypes';
+import {
+  ELEMENT_PICKER_RUNTIME_FLAG,
+  ELEMENT_PICKER_RUNTIME_PATH,
+} from '../../shared/contentScriptRuntimes';
 import { getTabFrameIds } from './frameMessaging';
+import {
+  ensureOptionalContentRuntime,
+  ensureOptionalContentRuntimeForFrames,
+} from './optionalContentRuntime';
 
 const ELEMENT_PICKER_MAIN_RUNTIME_PATH = 'src/pages/content-script/element-picker-main-runtime.js';
 const MAIN_RUNTIME_OPERATION_TIMEOUT_MS = 1500;
 
 type ElementPickerInjectionTarget =
-  | { tabId: number; allFrames: true }
-  | { tabId: number; frameIds: number[] };
+  { tabId: number; allFrames: true } | { tabId: number; frameIds: number[] };
 
 export interface ActiveElementPickerSession {
   traceMode: boolean;
@@ -22,7 +29,30 @@ export interface ActiveElementPickerSession {
 
 const activeElementPickerSessions = new Map<number, ActiveElementPickerSession>();
 
-export async function getElementPickerPreviewFrameIds(tabId: number, rootFrameId: number): Promise<number[]> {
+export function ensureElementPickerRuntime(tabId: number): Promise<number[]> {
+  return ensureOptionalContentRuntime(
+    tabId,
+    ELEMENT_PICKER_RUNTIME_FLAG,
+    ELEMENT_PICKER_RUNTIME_PATH,
+  );
+}
+
+export function ensureElementPickerRuntimeForFrames(
+  tabId: number,
+  frameIds: number[],
+): Promise<number[]> {
+  return ensureOptionalContentRuntimeForFrames(
+    tabId,
+    frameIds,
+    ELEMENT_PICKER_RUNTIME_FLAG,
+    ELEMENT_PICKER_RUNTIME_PATH,
+  );
+}
+
+export async function getElementPickerPreviewFrameIds(
+  tabId: number,
+  rootFrameId: number,
+): Promise<number[]> {
   const frames = await chrome.webNavigation.getAllFrames({ tabId });
   const parents = new Map((frames ?? []).map(frame => [frame.frameId, frame.parentFrameId]));
   const isInRoot = (frameId: number): boolean => {
@@ -31,7 +61,10 @@ export async function getElementPickerPreviewFrameIds(tabId: number, rootFrameId
     }
     return false;
   };
-  return [rootFrameId, ...Array.from(parents.keys()).filter(id => id !== rootFrameId && isInRoot(id))];
+  return [
+    rootFrameId,
+    ...Array.from(parents.keys()).filter(id => id !== rootFrameId && isInRoot(id)),
+  ];
 }
 
 function everyInjectedFrameIsReady(
@@ -162,7 +195,9 @@ export async function restoreElementPickerSessionForFrame(
   const session = activeElementPickerSessions.get(tabId);
   if (!session) return false;
   if (session.previewRootFrameId !== undefined && frameId !== session.previewRootFrameId) {
-    const frameIds = await getElementPickerPreviewFrameIds(tabId, session.previewRootFrameId).catch((): number[] => []);
+    const frameIds = await getElementPickerPreviewFrameIds(tabId, session.previewRootFrameId).catch(
+      (): number[] => [],
+    );
     if (!frameIds.includes(frameId)) return false;
   }
   if (session.traceMode && !(await ensureElementPickerMainRuntimeForFrame(tabId, frameId))) {

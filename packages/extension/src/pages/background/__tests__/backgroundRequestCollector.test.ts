@@ -1,8 +1,13 @@
-vi.mock('../requestInspection', async () => { const { requestMetadataFixture } = await import('../../../test/fixtures/requestMetadata'); return { inspectBrowserRequest: vi.fn(async input => requestMetadataFixture(input)) }; });
+vi.mock('../requestInspection', async () => {
+  const { requestMetadataFixture } = await import('../../../test/fixtures/requestMetadata');
+  return { inspectBrowserRequest: vi.fn(async input => requestMetadataFixture(input)) };
+});
 import { trackingEvent } from '../../../test/fixtures/tracking';
 const decoder = vi.hoisted(() => ({ decode: vi.fn() }));
-vi.mock('../browserTracking', () => ({ captureBrowserTrackingDecoder: () => decoder.decode }));
-vi.mock('../../panel/utils/i18n', () => ({ getCurrentLanguage: () => 'en' }));
+vi.mock('../browserTrackingClient', () => ({
+  captureBrowserTrackingDecoder: async () => decoder.decode,
+}));
+vi.mock('../../../shared/i18n', () => ({ getCurrentLanguage: () => 'en' }));
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   cleanupCollector,
@@ -30,7 +35,11 @@ import {
 } from '../debuggerSessionManager';
 
 let debuggerEventListener:
-  | ((source: chrome.debugger.Debuggee & { sessionId?: string }, method: string, params: any) => void)
+  | ((
+      source: chrome.debugger.Debuggee & { sessionId?: string },
+      method: string,
+      params: any,
+    ) => void)
   | undefined;
 
 beforeEach(() => {
@@ -51,22 +60,27 @@ afterEach(() => {
   setCollectorUpdateListener(null);
 });
 
-
 describe('background request collector debugger lifecycle', () => {
   it('reads independent response bodies from WebView sessions sharing a CDP request ID', async () => {
     const tabId = 2208;
     const left = { tabId, sessionId: 'left' };
     const right = { tabId, sessionId: 'right' };
-    chrome.debugger.sendCommand = vi.fn(async (target, method) => method === 'Network.getResponseBody'
-      ? { body: JSON.stringify({ session: target.sessionId }), base64Encoded: false }
-      : {});
+    chrome.debugger.sendCommand = vi.fn(async (target, method) =>
+      method === 'Network.getResponseBody'
+        ? { body: JSON.stringify({ session: target.sessionId }), base64Encoded: false }
+        : {},
+    );
     try {
       await registerRequestCollectionWebView(tabId, left.sessionId);
       await startRequestCollection(tabId, 'device-preview-panel');
       await registerRequestCollectionWebView(tabId, right.sessionId);
       await startRequestCollection(tabId, 'agent');
       for (const target of [left, right]) {
-        expect(chrome.debugger.sendCommand).toHaveBeenCalledWith(target, 'Network.enable', expect.any(Object));
+        expect(chrome.debugger.sendCommand).toHaveBeenCalledWith(
+          target,
+          'Network.enable',
+          expect.any(Object),
+        );
         debuggerEventListener?.(target, 'Network.requestWillBeSent', {
           requestId: '42',
           request: { url: `https://example.test/${target.sessionId}`, method: 'GET' },
@@ -75,10 +89,17 @@ describe('background request collector debugger lifecycle', () => {
         });
       }
       for (const target of [right, left]) {
-        debuggerEventListener?.(target, 'Network.loadingFinished', { requestId: '42', timestamp: 1.1 });
+        debuggerEventListener?.(target, 'Network.loadingFinished', {
+          requestId: '42',
+          timestamp: 1.1,
+        });
       }
-      await vi.waitFor(() => expect(getCollectorSnapshot(tabId).requests.map(request => request.responseBody))
-        .toEqual([{ session: 'left' }, { session: 'right' }]));
+      await vi.waitFor(() =>
+        expect(getCollectorSnapshot(tabId).requests.map(request => request.responseBody)).toEqual([
+          { session: 'left' },
+          { session: 'right' },
+        ]),
+      );
       await stopRequestCollection(tabId, 'device-preview-panel');
       expect(isCollecting(tabId)).toBe(true);
       await stopRequestCollection(tabId, 'agent');
@@ -268,9 +289,31 @@ describe('background request collector debugger lifecycle', () => {
   });
 
   it('captures and filters RUM, aplus, and ARMS events without a panel', async () => {
-    decoder.decode.mockResolvedValueOnce({ available: true, tracking: true, events: [trackingEvent({ id: 'rum-1', source: 'rum', event_type: 'view', name: 'home' })] })
-      .mockResolvedValueOnce({ available: true, tracking: true, events: [trackingEvent({ id: 'aplus-1', source: 'aplus', event_type: 'CLK', name: '1.2.button.submit' })] })
-      .mockResolvedValueOnce({ available: true, tracking: true, events: [trackingEvent({ id: 'arms-1', source: 'arms', event_type: 'error', name: 'checkout' })] });
+    decoder.decode
+      .mockResolvedValueOnce({
+        available: true,
+        tracking: true,
+        events: [trackingEvent({ id: 'rum-1', source: 'rum', event_type: 'view', name: 'home' })],
+      })
+      .mockResolvedValueOnce({
+        available: true,
+        tracking: true,
+        events: [
+          trackingEvent({
+            id: 'aplus-1',
+            source: 'aplus',
+            event_type: 'CLK',
+            name: '1.2.button.submit',
+          }),
+        ],
+      })
+      .mockResolvedValueOnce({
+        available: true,
+        tracking: true,
+        events: [
+          trackingEvent({ id: 'arms-1', source: 'arms', event_type: 'error', name: 'checkout' }),
+        ],
+      });
     await startRequestCollection(2203);
     expect(debuggerEventListener).toBeTypeOf('function');
 
@@ -288,8 +331,7 @@ describe('background request collector debugger lifecycle', () => {
       requestId: 'aplus-1',
       request: {
         url:
-          'https://example.test/tracking/click?data=' +
-          encodeURIComponent('spm=1.2.button.submit'),
+          'https://example.test/tracking/click?data=' + encodeURIComponent('spm=1.2.button.submit'),
       },
       type: 'Image',
     });
@@ -324,8 +366,15 @@ describe('background request collector debugger lifecycle', () => {
   });
 
   it('captures console, exceptions, and pending requests after one atomic checkpoint', async () => {
-    decoder.decode.mockResolvedValueOnce({ available: true, tracking: false, events: [] })
-      .mockResolvedValueOnce({ available: true, tracking: true, events: [trackingEvent({ id: 'rum-submit', source: 'rum', event_type: 'action', name: 'submit' })] });
+    decoder.decode
+      .mockResolvedValueOnce({ available: true, tracking: false, events: [] })
+      .mockResolvedValueOnce({
+        available: true,
+        tracking: true,
+        events: [
+          trackingEvent({ id: 'rum-submit', source: 'rum', event_type: 'action', name: 'submit' }),
+        ],
+      });
     await startRequestCollection(2206);
     expect(chrome.debugger.sendCommand).toHaveBeenCalledWith(
       { tabId: 2206 },
@@ -581,8 +630,13 @@ describe('background request collector debugger lifecycle', () => {
       return Promise.resolve(method === 'Network.getRequestPostData' ? { postData } : {});
     });
 
-    decoder.decode.mockResolvedValueOnce({ available: true, tracking: true, events: [] })
-      .mockResolvedValueOnce({ available: true, tracking: true, events: [trackingEvent({ id: 'deferred', event_type: 'action', name: 'deferred' })] });
+    decoder.decode
+      .mockResolvedValueOnce({ available: true, tracking: true, events: [] })
+      .mockResolvedValueOnce({
+        available: true,
+        tracking: true,
+        events: [trackingEvent({ id: 'deferred', event_type: 'action', name: 'deferred' })],
+      });
     await startRequestCollection(2204);
     debuggerEventListener?.({ tabId: 2204 }, 'Network.requestWillBeSent', {
       requestId: 'rum-deferred',
@@ -615,13 +669,18 @@ describe('background request collector debugger lifecycle', () => {
 
 function deferredDecode() {
   let resolve!: (value: any) => void;
-  const promise = new Promise<any>(done => { resolve = done; });
+  const promise = new Promise<any>(done => {
+    resolve = done;
+  });
   return { promise, resolve };
 }
 const ordinary = { available: true, tracking: false, events: [] };
 function emitRequest(tabId: number, requestId: string) {
   debuggerEventListener?.({ tabId }, 'Network.requestWillBeSent', {
-    requestId, request: { url: `https://example.test/${requestId}`, method: 'GET' }, type: 'Fetch', wallTime: 1700000000,
+    requestId,
+    request: { url: `https://example.test/${requestId}`, method: 'GET' },
+    type: 'Fetch',
+    wallTime: 1700000000,
   });
 }
 
@@ -630,79 +689,135 @@ it('holds the cursor behind slow decoding and commits concurrent requests in arr
   decoder.decode.mockReset().mockReturnValueOnce(first.promise).mockResolvedValue(ordinary);
   await startRequestCollection(2301);
   const before = getCaptureCheckpoint(2301).cursor;
-  emitRequest(2301, 'first'); emitRequest(2301, 'second');
-  debuggerEventListener?.({ tabId: 2301 }, 'Runtime.consoleAPICalled', { type: 'log', args: [{ value: 'later log' }], timestamp: 1700000000001 });
+  emitRequest(2301, 'first');
+  emitRequest(2301, 'second');
+  debuggerEventListener?.({ tabId: 2301 }, 'Runtime.consoleAPICalled', {
+    type: 'log',
+    args: [{ value: 'later log' }],
+    timestamp: 1700000000001,
+  });
   expect(getCaptureCheckpoint(2301).cursor).toBe(before);
   expect(getCollectedLogs(2301, { after: before }).entries).toEqual([]);
   const flushed = flushRequestCollection(2301);
-  first.resolve(ordinary); await flushed;
-  expect(getCollectedRequests(2301, { source: 'all', after: before }).requests.map(request => request.url)).toEqual(['https://example.test/first', 'https://example.test/second']);
+  first.resolve(ordinary);
+  await flushed;
+  expect(
+    getCollectedRequests(2301, { source: 'all', after: before }).requests.map(
+      request => request.url,
+    ),
+  ).toEqual(['https://example.test/first', 'https://example.test/second']);
   expect(getCollectedLogs(2301, { after: before }).entries[0].message).toBe('later log');
-  await stopRequestCollection(2301); cleanupCollector(2301); cleanupDebuggerSession(2301);
+  await stopRequestCollection(2301);
+  cleanupCollector(2301);
+  cleanupDebuggerSession(2301);
 });
 it('does not advance a query cursor over a new request received while an earlier flush waits', async () => {
-  const first = deferredDecode(), second = deferredDecode();
+  const first = deferredDecode(),
+    second = deferredDecode();
   decoder.decode.mockReset().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
   await startRequestCollection(2302);
   emitRequest(2302, 'before-query');
   const flushing = flushRequestCollection(2302);
   emitRequest(2302, 'after-query');
-  first.resolve(ordinary); await flushing;
+  first.resolve(ordinary);
+  await flushing;
   const query = getCollectedRequests(2302, { source: 'all' });
   expect(query.requests.map(request => request.url)).toEqual(['https://example.test/before-query']);
-  second.resolve(ordinary); await flushRequestCollection(2302);
-  expect(getCollectedRequests(2302, { source: 'all', after: query.nextCursor }).requests.map(request => request.url)).toEqual(['https://example.test/after-query']);
-  await stopRequestCollection(2302); cleanupCollector(2302); cleanupDebuggerSession(2302);
+  second.resolve(ordinary);
+  await flushRequestCollection(2302);
+  expect(
+    getCollectedRequests(2302, { source: 'all', after: query.nextCursor }).requests.map(
+      request => request.url,
+    ),
+  ).toEqual(['https://example.test/after-query']);
+  await stopRequestCollection(2302);
+  cleanupCollector(2302);
+  cleanupDebuggerSession(2302);
 });
 it('discards an old generation after stop/restart without clearing the replacement queue', async () => {
   const old = deferredDecode();
   decoder.decode.mockReset().mockReturnValueOnce(old.promise).mockResolvedValue(ordinary);
-  await startRequestCollection(2303); emitRequest(2303, 'old');
-  await stopRequestCollection(2303); await startRequestCollection(2303); emitRequest(2303, 'new');
-  old.resolve(ordinary); await flushRequestCollection(2303);
-  expect(getCollectorSnapshot(2303).requests.map(request => request.url)).toEqual(['https://example.test/new']);
-  await stopRequestCollection(2303); cleanupCollector(2303); cleanupDebuggerSession(2303);
+  await startRequestCollection(2303);
+  emitRequest(2303, 'old');
+  await stopRequestCollection(2303);
+  await startRequestCollection(2303);
+  emitRequest(2303, 'new');
+  old.resolve(ordinary);
+  await flushRequestCollection(2303);
+  expect(getCollectorSnapshot(2303).requests.map(request => request.url)).toEqual([
+    'https://example.test/new',
+  ]);
+  await stopRequestCollection(2303);
+  cleanupCollector(2303);
+  cleanupDebuggerSession(2303);
 });
 it('reports installed decoder failures at the query boundary instead of returning an empty history', async () => {
   decoder.decode.mockReset().mockRejectedValue(new Error('installed decoder failed'));
   await startRequestCollection(2304);
-  const checkpoint = getCaptureCheckpoint(2304); emitRequest(2304, 'failed');
+  const checkpoint = getCaptureCheckpoint(2304);
+  emitRequest(2304, 'failed');
   await expect(flushRequestCollection(2304)).rejects.toThrow('installed decoder failed');
   await expect(flushRequestCollection(2304, { allowDecodeFailure: true })).resolves.toBeUndefined();
   expect(getCollectedRequests(2304, { source: 'all', after: checkpoint.cursor }).gap).toBe(true);
-  expect(getCollectedLogs(2304, {}).entries).toEqual([expect.objectContaining({ message: 'Tracking decoding failed: installed decoder failed' })]);
+  expect(getCollectedLogs(2304, {}).entries).toEqual([
+    expect.objectContaining({ message: 'Tracking decoding failed: installed decoder failed' }),
+  ]);
   decoder.decode.mockResolvedValue(ordinary);
-  emitRequest(2304, 'recovered'); await flushRequestCollection(2304);
+  emitRequest(2304, 'recovered');
+  await flushRequestCollection(2304);
   expect(getCollectorSnapshot(2304).requests).toHaveLength(1);
-  await stopRequestCollection(2304); cleanupCollector(2304); cleanupDebuggerSession(2304);
+  await stopRequestCollection(2304);
+  cleanupCollector(2304);
+  cleanupDebuggerSession(2304);
 });
 it('does not publish an old response body into a restarted capture with matching request IDs', async () => {
   let finish!: (value: unknown) => void;
-  const body = new Promise(resolve => { finish = resolve; });
-  chrome.debugger.sendCommand = vi.fn().mockImplementation((_target, method) => method === 'Network.getResponseBody' ? body : Promise.resolve({}));
+  const body = new Promise(resolve => {
+    finish = resolve;
+  });
+  chrome.debugger.sendCommand = vi
+    .fn()
+    .mockImplementation((_target, method) =>
+      method === 'Network.getResponseBody' ? body : Promise.resolve({}),
+    );
   decoder.decode.mockReset().mockResolvedValue(ordinary);
-  await startRequestCollection(2305); emitRequest(2305, 'same');
+  await startRequestCollection(2305);
+  emitRequest(2305, 'same');
   debuggerEventListener?.({ tabId: 2305 }, 'Network.loadingFinished', { requestId: 'same' });
   await flushRequestCollection(2305);
-  await stopRequestCollection(2305); await startRequestCollection(2305); emitRequest(2305, 'same');
+  await stopRequestCollection(2305);
+  await startRequestCollection(2305);
+  emitRequest(2305, 'same');
   await flushRequestCollection(2305);
-  finish({ body: '{"stale":true}', base64Encoded: false }); await new Promise(resolve => setTimeout(resolve, 0));
+  finish({ body: '{"stale":true}', base64Encoded: false });
+  await new Promise(resolve => setTimeout(resolve, 0));
   expect(getCollectorSnapshot(2305).requests).toHaveLength(1);
   expect(getCollectorSnapshot(2305).requests[0].responseBody).toBeNull();
-  await stopRequestCollection(2305); cleanupCollector(2305); cleanupDebuggerSession(2305);
+  await stopRequestCollection(2305);
+  cleanupCollector(2305);
+  cleanupDebuggerSession(2305);
 });
 
 it('keeps requests and logs available after a malformed tracking row and reports the event gap', async () => {
-  const error = new Error('malformed event'); error.name = 'TrackingRequestError';
+  const error = new Error('malformed event');
+  error.name = 'TrackingRequestError';
   decoder.decode.mockReset().mockRejectedValueOnce(error).mockResolvedValue(ordinary);
   await startRequestCollection(2306);
   const checkpoint = getCaptureCheckpoint(2306);
-  emitRequest(2306, 'bad'); emitRequest(2306, 'ordinary');
+  emitRequest(2306, 'bad');
+  emitRequest(2306, 'ordinary');
   await flushRequestCollection(2306);
-  expect(getCollectedRequests(2306, { source: 'all' }).requests.map(request => request.url)).toEqual(['https://example.test/ordinary']);
-  expect(getCollectedLogs(2306, {}).entries[0].message).toBe('Tracking decoding failed: malformed event');
+  expect(
+    getCollectedRequests(2306, { source: 'all' }).requests.map(request => request.url),
+  ).toEqual(['https://example.test/ordinary']);
+  expect(getCollectedLogs(2306, {}).entries[0].message).toBe(
+    'Tracking decoding failed: malformed event',
+  );
   expect(getCollectedEvents(2306, { after: checkpoint.cursor }).gap).toBe(true);
-  emitRequest(2306, 'later'); await flushRequestCollection(2306);
+  emitRequest(2306, 'later');
+  await flushRequestCollection(2306);
   expect(getCollectedRequests(2306, { source: 'all' }).requests).toHaveLength(2);
-  await stopRequestCollection(2306); cleanupCollector(2306); cleanupDebuggerSession(2306);
+  await stopRequestCollection(2306);
+  cleanupCollector(2306);
+  cleanupDebuggerSession(2306);
 });

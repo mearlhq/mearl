@@ -23,7 +23,6 @@
     "preact": "10.29.0",
     "prismjs": "1.30.0",
     "uqr": "0.1.2",
-    "webextension-polyfill": "0.12.0",
     "@mearl/plugin-tracking": "workspace:*"
   },
   "devDependencies": {
@@ -41,7 +40,6 @@
     "@types/prismjs": "1.26.6",
     "@types/react": "19.2.10",
     "@types/react-dom": "19.2.3",
-    "@types/webextension-polyfill": "0.12.4",
     "@vitejs/plugin-react": "5.2.0",
     "@vitest/ui": "4.1.12",
     "adm-zip": "0.6.1",

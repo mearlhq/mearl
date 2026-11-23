@@ -31,6 +31,10 @@ vi.mock('../../../panel/utils/i18n', () => ({
   getCurrentLanguage: () => 'en',
   t: (key: string) => key,
 }));
+vi.mock('../../../../shared/i18n', () => ({
+  getCurrentLanguage: () => 'en',
+  t: (key: string) => key,
+}));
 vi.mock('../../toolboxRequest', async importOriginal => ({
   ...(await importOriginal<typeof import('../../toolboxRequest')>()),
   requestToolbox: mocks.list,

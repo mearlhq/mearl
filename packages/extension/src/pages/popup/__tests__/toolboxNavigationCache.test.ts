@@ -4,6 +4,7 @@ import { cacheToolboxNavigation, readToolboxNavigationCache } from '../toolboxNa
 
 const language = vi.hoisted(() => ({ current: 'en' }));
 vi.mock('../../panel/utils/i18n', () => ({ getCurrentLanguage: () => language.current }));
+vi.mock('../../../shared/i18n', () => ({ getCurrentLanguage: () => language.current }));
 
 const storageKey = 'mearl.popup.toolbox.navigation';
 const tool: ToolboxPluginTool = {

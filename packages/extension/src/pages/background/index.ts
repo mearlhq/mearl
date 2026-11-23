@@ -6,10 +6,8 @@ import { cleanupEnvironmentRevisions } from './environmentRevisions';
 import { resolveBrowserDocumentSender } from './browserDocuments';
 import { initializePresetAutoUpdate } from './presetAutoUpdate';
 import { PRESET_MANAGEMENT_ACTION } from '../../shared/presetAutoUpdate';
-import { createInstallationService } from './installationService';
-import { createNativeInstallationClient } from './nativeInstallationClient';
+import { createLazyInstallationService } from './lazyInstallationService';
 import { INSTALLATION_ACTION } from '../../shared/installation';
-import { handleBrowserTracking } from './browserTracking';
 import { initializeBrowserPureCapabilities } from './browserPureCapabilities';
 import { handleBrowserUiService, initializeBrowserUiOperations } from './browserUiService';
 import { handleExtensionServiceRequest } from './extensionServiceHandler';
@@ -45,7 +43,6 @@ import {
   EXTERNAL_SERVICE_UPDATE_ACTION,
   SERVICE_DEFAULTS_CACHE_KEY,
 } from '../../shared/externalServices';
-import { openInstallPage } from './installPage';
 import {
   clearAccountAutoLoginTab,
   getAccountIdentity,
@@ -90,7 +87,12 @@ import {
   reconcileHeatmapService,
   stopDevicePreviewHeatmap,
 } from './heatmapHandler';
-import { sendTabMessageToFrameIdsSafe, sendTabMessageToFramesSafe } from './frameMessaging';
+import {
+  getTabFrameIds,
+  sendTabMessageToFrameIdsSafe,
+  sendTabMessageToFramesSafe,
+} from './frameMessaging';
+import { ensureFrameVisualRuntime, ensureFrameVisualRuntimeForFrames } from './frameVisualRuntime';
 import {
   clearSpmOverlayState,
   isSpmOverlayEnabled,
@@ -105,6 +107,8 @@ import {
 } from './contentScriptRegistrar';
 import {
   clearActiveElementPickerSession,
+  ensureElementPickerRuntime,
+  ensureElementPickerRuntimeForFrames,
   ensureElementPickerMainRuntime,
   ensureElementPickerMainRuntimeForFrames,
   getActiveElementPickerSession,
@@ -114,6 +118,7 @@ import {
   selectInitialElementPickerFrame,
   setActiveElementPickerSession,
 } from './elementPickerRuntime';
+import { CONTENT_SCRIPT_FRAME_READY } from '../../shared/contentScriptRuntimes';
 import { resolveToolboxPageFrame } from './toolboxPageFrame';
 import {
   buildDnrDisplayData,
@@ -223,11 +228,6 @@ import {
   UPDATE_SETUP_EXTENSION_ACTION,
 } from '../../shared/extensionUpdate';
 import { initOverrideNotifier, notifyPanelOverrideChanged } from './overrideNotifier';
-import {
-  translateJson,
-  getTranslationCache,
-  type TranslateProgress,
-} from '../panel/utils/translate';
 import { saveDevRules, disableDevRule, autoApplyDevRules } from './devRulesService';
 import {
   TAB_PAGE_OVERRIDES_GET_ACTION,
@@ -396,9 +396,7 @@ installAgentChatTabBindingObservers(async removed => {
 initializeAccountTracking();
 initializeBrowserRequestLogins();
 initializeBrowserControllers();
-const installationService = createInstallationService({
-  native: createNativeInstallationClient(() => ensureNativeBridge(false)),
-});
+const installationService = createLazyInstallationService(() => ensureNativeBridge(false));
 initializePresetAutoUpdate(() => installationService.autoUpdate());
 chrome.runtime.onMessageExternal.addListener((message, sender, reply) => {
   if (message?.action !== INSTALLATION_ACTION) return;
@@ -426,7 +424,8 @@ chrome.runtime.onUpdateAvailable.addListener(details => {
 
 chrome.runtime.onInstalled.addListener(details => {
   if (details.reason === 'install') {
-    void openInstallPage(details.reason)
+    void import('./installPage')
+      .then(({ openInstallPage }) => openInstallPage(details.reason))
       .then(guide => {
         if (guide) return installationService.installDefaultForGuide(guide);
       })
@@ -867,7 +866,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   if (message.action === 'browserTracking') {
-    void handleBrowserTracking(message.data, sender).then(sendResponse);
+    void import('./browserTracking')
+      .then(({ handleBrowserTracking }) => handleBrowserTracking(message.data, sender))
+      .then(sendResponse)
+      .catch(error =>
+        sendResponse({
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
     return true;
   }
   if (
@@ -1997,6 +2004,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         void restoreSpmOverlayForFrame(tabId, sender.frameId ?? 0);
         return;
       }
+      if (message.type === CONTENT_SCRIPT_FRAME_READY) {
+        const frameId = sender.frameId ?? 0;
+        if (getActiveElementPickerSession(tabId))
+          void ensureElementPickerRuntimeForFrames(tabId, [frameId]);
+        if (isSpmOverlayEnabled(tabId)) void ensureFrameVisualRuntimeForFrames(tabId, [frameId]);
+        return;
+      }
       if (message.type === 'ELEMENT_PICKER_PAUSED') {
         void sendTabMessageToFramesSafe(tabId, { action: 'pauseElementPicker' });
         return;
@@ -2266,14 +2280,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const inPreview = (await getDeviceShellForTab(tabId))?.config.phoneFrame !== undefined;
       const previewRootFrameId = inPreview ? await resolveToolboxPageFrame(tabId) : undefined;
       if (inPreview && !previewRootFrameId) throw new Error('Business WebView is not ready');
-      const ping = { action: 'pingElementPickerRuntime' };
-      const pickerFrames = previewRootFrameId
-        ? await sendTabMessageToFrameIdsSafe<PickerPing>(
-            tabId,
-            await getElementPickerPreviewFrameIds(tabId, previewRootFrameId),
-            ping,
-          )
-        : await sendTabMessageToFramesSafe<PickerPing>(tabId, ping, { notifyOnUnreachable: true });
+      const candidateFrameIds = previewRootFrameId
+        ? await getElementPickerPreviewFrameIds(tabId, previewRootFrameId)
+        : await getTabFrameIds(tabId);
+      const readyFrameIds = await ensureElementPickerRuntimeForFrames(
+        tabId,
+        candidateFrameIds.length > 0 ? candidateFrameIds : [0],
+      );
+      const pickerFrames = await sendTabMessageToFrameIdsSafe<PickerPing>(
+        tabId,
+        readyFrameIds,
+        { action: 'pingElementPickerRuntime' },
+        { notifyOnUnreachable: true },
+      );
       if (elementPickerStartGenerations.get(tabId) !== generation) {
         sendResponse({ success: false, cancelled: true });
         return;
@@ -2432,11 +2451,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'traceHighlightField') {
     void (async () => {
       const frameId = typeof message.frameId === 'number' ? message.frameId : undefined;
-      const ready =
+      const isolatedFrames =
+        frameId === undefined
+          ? await ensureElementPickerRuntime(tabId)
+          : await ensureElementPickerRuntimeForFrames(tabId, [frameId]);
+      const mainReady =
         frameId === undefined
           ? await ensureElementPickerMainRuntime(tabId)
           : (await ensureElementPickerMainRuntimeForFrames(tabId, [frameId])).length > 0;
-      if (!ready) {
+      if (isolatedFrames.length === 0 || !mainReady) {
         notifyContentScriptUnreachable(tabId);
         sendResponse({ count: 0 });
         return;
@@ -2466,27 +2489,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ found: 0 });
       return;
     }
-    sendTabMessageToFramesSafe<{ found?: number }>(
-      tabId,
-      { action: 'highlightSpm', spm: message.spm },
-      { notifyOnUnreachable: true },
-    ).then(results =>
-      sendResponse({
-        found: results.reduce((total, result) => total + (result.response.found ?? 0), 0),
-      }),
-    );
+    void ensureFrameVisualRuntime(tabId)
+      .then(frameIds =>
+        sendTabMessageToFrameIdsSafe<{ found?: number }>(
+          tabId,
+          frameIds,
+          { action: 'highlightSpm', spm: message.spm },
+          { notifyOnUnreachable: true },
+        ),
+      )
+      .then(results =>
+        sendResponse({
+          found: results.reduce((total, result) => total + (result.response.found ?? 0), 0),
+        }),
+      );
     return true;
   }
 
   if (message.action === 'inspectSpm') {
-    sendTabMessageToFramesSafe<{ found?: number }>(
-      tabId,
-      { action: 'inspectSpm', spm: message.spm },
-      { notifyOnUnreachable: true },
-    ).then(results => {
-      const matched = results.find(result => (result.response.found ?? 0) > 0);
-      sendResponse({ ok: true, ...(matched ? { frameId: matched.frameId } : {}) });
-    });
+    void ensureFrameVisualRuntime(tabId)
+      .then(frameIds =>
+        sendTabMessageToFrameIdsSafe<{ found?: number }>(
+          tabId,
+          frameIds,
+          { action: 'inspectSpm', spm: message.spm },
+          { notifyOnUnreachable: true },
+        ),
+      )
+      .then(results => {
+        const matched = results.find(result => (result.response.found ?? 0) > 0);
+        sendResponse({ ok: true, ...(matched ? { frameId: matched.frameId } : {}) });
+      });
     return true;
   }
 
@@ -2508,11 +2541,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return;
     }
     setSpmOverlayEnabled(tabId, Boolean(message.enabled));
-    sendTabMessageToFramesSafe(
-      tabId,
-      { action: 'toggleSpmOverlay', enabled: message.enabled },
-      { notifyOnUnreachable: !!message.enabled },
-    ).then(results => sendResponse({ success: results.length > 0 }));
+    if (!message.enabled) {
+      void sendTabMessageToFramesSafe(tabId, {
+        action: 'toggleSpmOverlay',
+        enabled: false,
+      }).then(results => sendResponse({ success: results.length > 0 }));
+      return true;
+    }
+    void ensureFrameVisualRuntime(tabId)
+      .then(frameIds =>
+        sendTabMessageToFrameIdsSafe(
+          tabId,
+          frameIds,
+          { action: 'toggleSpmOverlay', enabled: true },
+          { notifyOnUnreachable: true },
+        ),
+      )
+      .then(results => sendResponse({ success: results.length > 0 }));
     return true;
   }
 
@@ -2527,7 +2572,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ success: false, errorCode: 'unknown', error: 'HEATMAP_CANCELLED' });
       return;
     }
-    handleStartHeatmap(tabId, message.spmAB, message.ds, message.measures, fromDevicePreview)
+    ensureFrameVisualRuntime(tabId)
+      .then(() =>
+        handleStartHeatmap(tabId, message.spmAB, message.ds, message.measures, fromDevicePreview),
+      )
       .then(sendResponse)
       .catch(err =>
         sendResponse({
@@ -2555,25 +2603,39 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.action === 'getTranslationCache') {
-    sendResponse({ success: true, cache: getTranslationCache() });
+    void import('../panel/utils/translate')
+      .then(({ getTranslationCache }) =>
+        sendResponse({ success: true, cache: getTranslationCache() }),
+      )
+      .catch(error =>
+        sendResponse({
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
     return true;
   }
 
   if (message.action === 'translateJson') {
-    translateJson(message.data, message.targetLang, (progress: TranslateProgress) => {
-      // 发送翻译进度更新
-      chrome.runtime
-        .sendMessage({
-          action: 'translateProgress',
-          requestId: message.requestId,
-          progress,
-        })
-        .catch(() => {
-          // 忽略没有接收者的错误
-        });
-    })
+    import('../panel/utils/translate')
+      .then(({ translateJson }) =>
+        translateJson(message.data, message.targetLang, progress => {
+          chrome.runtime
+            .sendMessage({
+              action: 'translateProgress',
+              requestId: message.requestId,
+              progress,
+            })
+            .catch(() => {});
+        }),
+      )
       .then(result => sendResponse(result))
-      .catch(error => sendResponse({ success: false, error: error.message }));
+      .catch(error =>
+        sendResponse({
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
     return true;
   }
 

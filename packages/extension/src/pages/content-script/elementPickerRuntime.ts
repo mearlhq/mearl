@@ -1,13 +1,13 @@
 import type { ElementPickerPage } from './elementCommentTypes';
 import { createElementPicker } from './elementPicker';
 
-const RUNTIME_FLAG = '__mearlElementPickerRuntime';
+const ELEMENT_PICKER_RUNTIME_FLAG = '__mearlElementPickerRuntime';
 const FRAME_TOKEN = `picker-frame-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 export function installElementPickerRuntime(): void {
   const runtimeWindow = window as typeof window & Record<string, unknown>;
-  if (runtimeWindow[RUNTIME_FLAG]) return;
-  runtimeWindow[RUNTIME_FLAG] = true;
+  if (runtimeWindow[ELEMENT_PICKER_RUNTIME_FLAG]) return;
+  runtimeWindow[ELEMENT_PICKER_RUNTIME_FLAG] = true;
 
   const elementPicker = createElementPicker({
     onFrameActive: () => {

@@ -1,5 +1,5 @@
 import type { ToolboxPluginToolLocale } from '@mearl/browser-core';
-import { getCurrentLanguage } from '../pages/panel/utils/i18n';
+import { getCurrentLanguage } from './i18n';
 
 interface LocalizableToolboxMetadata {
   title: string;

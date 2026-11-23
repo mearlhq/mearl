@@ -33,8 +33,9 @@ import {
   type RequestStreamCaptureStart as ProtocolStreamCaptureStart,
 } from '@mearl/browser-core';
 import { CapturedRequest, RumEvent } from '../panel/types';
-import { captureBrowserTrackingDecoder, type TrackingRequestResult } from './browserTracking';
-import { getCurrentLanguage } from '../panel/utils/i18n';
+import type { TrackingRequestResult } from './browserTracking';
+import { captureBrowserTrackingDecoder } from './browserTrackingClient';
+import { getCurrentLanguage } from '../../shared/i18n';
 import { inspectBrowserRequest } from './requestInspection';
 import type { RequestMetadata } from '@mearl/browser-core';
 import {
@@ -309,15 +310,15 @@ function handleDebuggerEvent(source: CollectorTarget, method: string, params: an
     eventSequences.set(tabId, sequence);
     const sequences = pendingCaptureSequences.get(tabId)!;
     sequences.add(captureSequence);
-    const decode = captureBrowserTrackingDecoder();
     const input = {
       url: params.request.url,
       body: params.request.postData,
       options: { sequence, now: Date.now() },
       locale: getCurrentLanguage(),
     };
+    const decoder = captureBrowserTrackingDecoder();
     const decoded = Promise.all([
-      decode(input),
+      decoder.then(decode => decode(input)),
       inspectBrowserRequest({ url: input.url, body: input.body }),
     ]);
     // The ordered commit attaches the rejection handler after preceding network events.
@@ -340,7 +341,7 @@ function handleDebuggerEvent(source: CollectorTarget, method: string, params: an
               .sendCommand(source, 'Network.getRequestPostData', { requestId: params.requestId })
               .catch(() => undefined)) as { postData?: string } | undefined;
             if (!collectingTabs.has(tabId) || captureStates.get(tabId) !== state) return;
-            if (body?.postData) result = await decode({ ...input, body: body.postData });
+            if (body?.postData) result = await (await decoder)({ ...input, body: body.postData });
           }
           if (!collectingTabs.has(tabId) || captureStates.get(tabId) !== state) return;
           collectionErrors.delete(tabId);

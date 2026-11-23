@@ -5,7 +5,7 @@ import {
   type ExtensionUiServiceAction,
 } from '@mearl/browser-core';
 import { isExtensionUiSender } from './extensionMessageTrust';
-import { t } from '../panel/utils/i18n';
+import { t } from '../../shared/i18n';
 
 export async function handleExtensionServiceRequest(
   message: { action: unknown; data?: Record<string, unknown> },

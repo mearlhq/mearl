@@ -1,4 +1,4 @@
-import { t } from '../../panel/utils/i18n';
+import { t } from '../../../shared/i18n';
 
 const AGENT_GROUP_TITLE = 'Mearl';
 let groupQueue: Promise<void> = Promise.resolve();

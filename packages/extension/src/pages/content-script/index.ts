@@ -20,8 +20,6 @@ import {
 import type { ElementPickerPage } from './elementCommentTypes';
 import { listenAppBridgeRelay } from './appBridgeRelay';
 import { installAppBridgeConfigOverlay } from './appBridgeConfigOverlay';
-import { installFrameVisualRuntime } from './frameVisualRuntime';
-import { installElementPickerRuntime } from './elementPickerRuntime';
 import type { QuickDeviceChromeConfig } from '../../shared/quickAppProfile';
 import {
   createQuickDeviceChromeManager,
@@ -40,9 +38,6 @@ const DEVICE_PREVIEW_TOOLBAR_COLLAPSED = 'device-preview-toolbar-collapsed';
 const DEVICE_PREVIEW_DEVTOOLS_VISIBILITY_ACTION = 'devicePreviewDevtoolsVisibility';
 
 (function () {
-  installFrameVisualRuntime();
-  installElementPickerRuntime();
-
   // 防止重复注入
   if ((window as any).__mearlInjected) {
     return;
@@ -265,6 +260,10 @@ const DEVICE_PREVIEW_DEVTOOLS_VISIBILITY_ACTION = 'devicePreviewDevtoolsVisibili
   // 每个 frame 上报自身位置，由后台按发送方 tab 的环境决定是否补 CORS 规则。
   void safeSendMessage({ action: 'networkControlReportOrigin' });
   installInjectedMessageRelay(isTopFrame);
+  void safeSendMessage({
+    source: 'mearl-content-script',
+    type: 'CONTENT_SCRIPT_FRAME_READY',
+  });
 
   // 页面加载时自动解析 dev rules 里的 \a 和 \b 占位符
   // 仅在主 frame 执行，避免 iframe 覆盖主页面解析结果

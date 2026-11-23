@@ -5,6 +5,10 @@ import { ChatVisualization } from '../components/ChatVisualization';
 describe('ChatVisualization', () => {
   it('reveals the preview at its first valid height', async () => {
     vi.stubGlobal('chrome', {
+      i18n: {
+        getMessage: (key: string) => key,
+        getUILanguage: () => 'en',
+      },
       runtime: {
         getURL: () => 'about:blank',
         sendMessage: vi.fn().mockResolvedValue({ success: true, data: { html: '<svg></svg>' } }),
