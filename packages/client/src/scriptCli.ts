@@ -8,7 +8,7 @@ export async function runScriptCli(args: string[], commandName: string): Promise
     .name(`${commandName} run`)
     .description('执行 Node.js 脚本；预注入 mearl SDK，支持顶层 await、条件和循环')
     .option('--file <path>', '读取 JavaScript 文件；省略时从 stdin 读取')
-    .option('--session <new-or-id>', '首次建立或复用控制会话')
+    .option('--session <new-or-id>', '建立或复用控制会话；已有 ID 后通常无需 --browser')
     .option('--browser <id-or-name>', '指定浏览器')
     .option('--connector <id-or-name>', '限制到远端 connector')
     .option('--local', '仅使用本机浏览器')

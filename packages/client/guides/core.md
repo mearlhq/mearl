@@ -19,7 +19,7 @@ mearl page_click --payload '{"tabId":12345,"selector":"@e3"}'
 
 默认使用统一发现。需要选择目标时用 `browser_list`，沿用返回的完整实例名或 `browserId`。远端连接与 Provider 选择见[浏览器管理](./api-browser-setup.md)。
 
-多步浏览器任务默认使用会话。首次 `tab_open` / `page_snapshot` / `page_screenshot` 传 `--session new`，后续复用完整 `session.sessionId` 与 `tabId`。会话固定目标，Cookie 和存储仍共享。目标声明由外部工具控制时（例如 Ego 任务），沿用其交接与收尾，不传 Mearl `--session`；跨工具先核验同一实例和物理页面，不能仅凭 URL/标题或直接复用 ref、label、tab ID。详见[工具协作](./browser-tool-cooperation.md)。
+多步浏览器任务默认使用会话。首次 `tab_open` / `page_snapshot` / `page_screenshot` 传 `--session new`，后续复用完整 `session.sessionId` 与 `tabId`。会话建立后，页面 action 通常只传 `--session <id>`、`tabId` 及业务参数，不重复传 `--browser`；CLI 会从会话恢复浏览器与传输。仅当会话解析报告跨宿主歧义，或需要显式限定宿主时，再传 `--browser`；它会限定查找范围并校验结果是否与会话匹配。Cookie 和存储仍共享。目标声明由外部工具控制时（例如 Ego 任务），沿用其交接与收尾，不传 Mearl `--session`；跨工具先核验同一实例和物理页面，不能仅凭 URL/标题或直接复用 ref、label、tab ID。详见[工具协作](./browser-tool-cooperation.md)。
 
 ## 观察、操作与判读
 

@@ -96,7 +96,7 @@ mearl page_snapshot --browser '<browserId>' --payload '{"tabId":12345,"mode":"vi
 
 ## 目标宿主与高级路由参数
 
-默认不传宿主、连接或传输覆盖参数。`browser_list` 会同时查询当前机器和全部远端 connector，结果名称带机器前缀，`source` 包含远端机器的 `connectorId` 和 `connectorName`，全局 `browserId` 可跨 CLI 调用并自动选择本地或远端传输。需要指定目标时优先传这个全局 ID；完整实例名称跨来源唯一时也可由客户端解析。建立控制会话后，后续 action 只需传 `--session <sessionId>` 和页面参数。不要依赖名称片段的模糊匹配。
+默认不传宿主、连接或传输覆盖参数。`browser_list` 会同时查询当前机器和全部远端 connector，结果名称带机器前缀，`source` 包含远端机器的 `connectorId` 和 `connectorName`，全局 `browserId` 可跨 CLI 调用并自动选择本地或远端传输。需要指定目标时优先传这个全局 ID；完整实例名称跨来源唯一时也可由客户端解析。建立控制会话后，后续 action 通常只需传 `--session <sessionId>` 和页面参数，不重复传 `--browser`。仅在会话解析报告跨宿主歧义，或需要显式限定宿主时，再用 `--browser` 限定查找范围并校验结果。不要依赖名称片段的模糊匹配。
 
 | 参数 | 作用 | 使用时机 |
 | --- | --- | --- |

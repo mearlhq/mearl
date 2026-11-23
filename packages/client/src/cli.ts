@@ -208,7 +208,7 @@ function printUsage(commandName: string, version: string): void {
     '  --timeout <seconds>   超时时间（默认按 action 推导）',
     '  --compact             强制紧凑 JSON（管道默认紧凑，交互终端默认美化）',
     '  --output <path>       保存输出或截图',
-    '  --session <new|id>    首次建立或复用控制会话',
+    '  --session <new|id>    建立或复用控制会话；已有 ID 后通常无需 --browser',
     '  --browser <id|名称>   指定 browser_list 返回的浏览器',
     '',
     '其他选项：',
