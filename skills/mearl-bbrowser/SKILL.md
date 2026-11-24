@@ -71,8 +71,9 @@ CLI 对应 `mearl bbrowser --payload '{"command":"site","input":{"tokens":["zhih
 
 ## 浏览器和结果
 
-- `--browser`、`--session`、`--timeout`、`--output` 使用 Mearl 宿主语义。`--tab` 使用 Mearl 的数字 tabId。
+- `--browser`、`--session`、`--timeout`、`--output` 使用 Mearl 宿主语义。浏览器名称有多个匹配时，用 `browser_list` 查找完整 browserId。`--tab` 使用 Mearl 的数字 tabId。
 - 有 domain 时后台复用该域名页面或新建页面；显式 tab 必须匹配适配器域名。没有 domain 时使用当前活动页或首个页面。默认保留页面，不主动刷新用户页面。
+- 通过扩展连接运行时，缺少目标域名权限会在选定浏览器中发起授权。确认后自动重试被权限检查拦住的操作一次。拒绝、关闭确认窗口或超时会结束本次调用。
 - 脚本在页面主世界执行，保留 helper 与页面全局状态，等待异步结果。不自动重试执行失败的适配器。
 - 成功返回 `{ "result": ... }`；返回 JSON 字符串时解析为 JSON。适配器返回 error 时输出 `success:false`、`error.message`、原始 `result` 和可选 `hint`，CLI 退出码为 1。会话结果还包含 Mearl 的 `session`，新建会话后用其 sessionId 继续操作或释放。
 - 登录、验证码、页面初始化和站点改版问题按返回的错误核查。适配器中的 bb-browser 操作提示可用 Mearl 对应能力完成；浏览器人工交接和会话收尾遵循 Mearl 工作流。

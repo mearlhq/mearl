@@ -19,6 +19,7 @@ export interface CloudResponse {
   success: boolean;
   data?: any;
   error?: string;
+  errorDetails?: unknown;
   versionWarning?: string;
 }
 
@@ -54,9 +55,7 @@ export interface CloudConnectorListResult {
 }
 
 export type CloudConnectorSelectorResult<T> =
-  | { status: 'matched'; connector: T }
-  | { status: 'ambiguous' }
-  | { status: 'not_found' };
+  { status: 'matched'; connector: T } | { status: 'ambiguous' } | { status: 'not_found' };
 
 export const MAX_BUFFER_SIZE = 10 * 1024 * 1024;
 export const DEFAULT_REQUEST_TIMEOUT = 60;

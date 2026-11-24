@@ -36,6 +36,7 @@ import {
 } from './browserRegistry.js';
 import { resolveActionTimeoutSec } from './actionTimeouts.js';
 import {
+  browserActionResponseError,
   isBrowserCapabilityAction,
   parseBrowserListParams,
   parseBrowserManageParams,
@@ -962,7 +963,7 @@ async function invokeOnce(
               ),
             );
           } else {
-            settle(new Error(response.error || 'Socket 服务端返回未知错误'));
+            settle(browserActionResponseError(response, 'Socket 服务端返回未知错误'));
           }
           return;
         } catch {

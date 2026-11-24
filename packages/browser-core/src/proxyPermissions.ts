@@ -9,6 +9,9 @@ export interface DomainPermissionFailure {
   requestDispatched: false;
 }
 
+// Leave time for the browser's confirmation window to return its decision.
+export const DOMAIN_PERMISSION_ACTION_TIMEOUT_MS = 100_000;
+
 export class DomainPermissionError extends Error implements DomainPermissionFailure {
   readonly code = 'DOMAIN_PERMISSION_REQUIRED';
   readonly requestDispatched = false;
@@ -21,6 +24,35 @@ export class DomainPermissionError extends Error implements DomainPermissionFail
     super(message);
     this.name = 'DomainPermissionError';
   }
+}
+
+export function getDomainPermissionFailure(value: unknown): DomainPermissionFailure | undefined {
+  const failure = value as Partial<DomainPermissionFailure> | null | undefined;
+  if (
+    failure?.code === 'DOMAIN_PERMISSION_REQUIRED' &&
+    failure.requestDispatched === false &&
+    typeof failure.action === 'string' &&
+    failure.action.length > 0 &&
+    typeof failure.domain === 'string' &&
+    failure.domain.length > 0
+  ) {
+    return {
+      code: failure.code,
+      action: failure.action,
+      domain: failure.domain,
+      requestDispatched: false,
+    };
+  }
+}
+
+export function browserActionResponseError(
+  response: { error?: string; errorDetails?: unknown },
+  fallback: string,
+): Error {
+  const failure = getDomainPermissionFailure(response.errorDetails);
+  return failure
+    ? new DomainPermissionError(failure.action, failure.domain, response.error || undefined)
+    : new Error(response.error || fallback);
 }
 
 export const ALLOWED_ORIGINS = ['*://localhost/*', '*://127.0.0.1/*'] as const;

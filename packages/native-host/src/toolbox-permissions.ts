@@ -1,4 +1,8 @@
-import { DomainPermissionError } from '@mearl/browser-core';
+import {
+  browserActionResponseError,
+  DOMAIN_PERMISSION_ACTION_TIMEOUT_MS,
+  DomainPermissionError,
+} from '@mearl/browser-core';
 
 type ExtensionInvoker = (
   action: string,
@@ -8,21 +12,9 @@ type ExtensionInvoker = (
 ) => Promise<any>;
 
 const pendingPermissions = new Map<string, Promise<boolean>>();
-const PERMISSION_TIMEOUT_MS = 100_000;
 
 export function extensionResponseError(message: { error?: string; errorDetails?: unknown }): Error {
-  const details = message.errorDetails as Record<string, unknown> | undefined;
-  if (
-    details?.code === 'DOMAIN_PERMISSION_REQUIRED' &&
-    details.requestDispatched === false &&
-    typeof details.action === 'string' &&
-    details.action.length > 0 &&
-    typeof details.domain === 'string' &&
-    details.domain.length > 0
-  ) {
-    return new DomainPermissionError(details.action, details.domain, message.error);
-  }
-  return new Error(message.error || 'Unknown error from extension');
+  return browserActionResponseError(message, 'Unknown error from extension');
 }
 
 /** Toolbox commands share one decision per domain; simultaneous commands share the open dialog. */
@@ -33,7 +25,7 @@ export function createToolboxExtensionInvoker(send: ExtensionInvoker): Extension
     if (!decision) {
       decision = pendingPermissions.get(domain);
       if (!decision) {
-        decision = send('request_permission', { domain }, PERMISSION_TIMEOUT_MS)
+        decision = send('request_permission', { domain }, DOMAIN_PERMISSION_ACTION_TIMEOUT_MS)
           .then(result => result?.granted === true)
           .finally(() => pendingPermissions.delete(domain));
         pendingPermissions.set(domain, decision);

@@ -9,6 +9,7 @@ import {
   DEFAULT_HEARTBEAT_INTERVAL,
 } from '@mearl/cloud-types';
 import { resolveActionTimeoutSec } from '@mearl/client/action-timeouts';
+import { getDomainPermissionFailure } from '@mearl/client/local';
 import { resolveConnectorIdentity, type ConnectorIdentity } from './identity.js';
 import { requireConnectorEndpoint, type ConnectorEndpoint } from './endpoint.js';
 import { loadConnectorPlugin, type ConnectorPlugin } from './plugins.js';
@@ -107,11 +108,15 @@ export class CloudConnector {
 
   connect(): void {
     if (!isWebSocketEndpoint(this.endpoint)) {
-      if (this.plugin) { this.plugin.connect(); return; }
+      if (this.plugin) {
+        this.plugin.connect();
+        return;
+      }
       this.isManualClose = false;
       if (this.pluginLoad) return;
       this.pluginLoad = loadConnectorPlugin(this.endpoint.scheme, {
-        serverUrl: this.endpoint.serverUrl, identity: this.identity,
+        serverUrl: this.endpoint.serverUrl,
+        identity: this.identity,
         reconnectInterval: this.options.reconnectInterval,
         maxReconnectAttempts: this.options.maxReconnectAttempts,
         failFast: this.options.failFast,
@@ -121,16 +126,24 @@ export class CloudConnector {
         },
         onStateChange: change => this.emitState(change),
         onInitialConnectionFailed: this.options.onInitialConnectionFailed,
-      }).then(plugin => {
-        if (this.isManualClose) { plugin.disconnect(); return; }
-        this.plugin = plugin;
-        plugin.connect();
-      }).catch(error => {
-        if (this.isManualClose) return;
-        const message = error instanceof Error ? error.message : String(error);
-        this.emitState({ state: 'failed', reason: message });
-        this.options.onInitialConnectionFailed?.(message);
-      }).finally(() => { this.pluginLoad = undefined; });
+      })
+        .then(plugin => {
+          if (this.isManualClose) {
+            plugin.disconnect();
+            return;
+          }
+          this.plugin = plugin;
+          plugin.connect();
+        })
+        .catch(error => {
+          if (this.isManualClose) return;
+          const message = error instanceof Error ? error.message : String(error);
+          this.emitState({ state: 'failed', reason: message });
+          this.options.onInitialConnectionFailed?.(message);
+        })
+        .finally(() => {
+          this.pluginLoad = undefined;
+        });
       return;
     }
 
@@ -282,7 +295,13 @@ export class CloudConnector {
       this.sendResponse({ id, success: true, data: result });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.sendResponse({ id, success: false, error: errorMessage });
+      const errorDetails = getDomainPermissionFailure(error);
+      this.sendResponse({
+        id,
+        success: false,
+        error: errorMessage,
+        ...(errorDetails ? { errorDetails } : {}),
+      });
     }
   }
 

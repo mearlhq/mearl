@@ -1,8 +1,9 @@
-import { shouldObservePageAction } from '@mearl/browser-core';
+import { DOMAIN_PERMISSION_ACTION_TIMEOUT_MS, shouldObservePageAction } from '@mearl/browser-core';
 
 const DEFAULT_TIMEOUT_MS = 15000;
 
 export function toTimeoutMs(action: string, data: any): number {
+  if (action === 'request_permission') return DOMAIN_PERMISSION_ACTION_TIMEOUT_MS;
   if (
     action === 'page_runtime' &&
     ['send', 'message_commit'].includes(data?.operation) &&

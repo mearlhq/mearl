@@ -61,4 +61,41 @@ describe('socket permission errors', () => {
     expect(createConnectionMock).toHaveBeenCalledWith(socketPath);
     expect(spawnMock).not.toHaveBeenCalled();
   });
+
+  it('preserves the permission check result from the native host', async () => {
+    vi.stubEnv('MEARL_SOCKET_PATH', '/tmp/mearl-permission.sock');
+    const errorDetails = {
+      code: 'DOMAIN_PERMISSION_REQUIRED',
+      requestDispatched: false,
+      domain: 'example.test',
+      action: 'tab_open',
+    };
+    createConnectionMock.mockImplementation(() => {
+      const socket = Object.assign(new EventEmitter(), {
+        end: vi.fn(),
+        write: vi.fn((request: string) => {
+          const { id } = JSON.parse(request);
+          queueMicrotask(() =>
+            socket.emit(
+              'data',
+              Buffer.from(
+                JSON.stringify({
+                  id,
+                  success: false,
+                  error: 'Permission required',
+                  errorDetails,
+                }) + '\n',
+              ),
+            ),
+          );
+        }),
+      });
+      queueMicrotask(() => socket.emit('connect'));
+      return socket;
+    });
+    await expect(invoke('tab_open', { url: 'https://example.test/' })).rejects.toMatchObject({
+      ...errorDetails,
+      message: 'Permission required',
+    });
+  });
 });

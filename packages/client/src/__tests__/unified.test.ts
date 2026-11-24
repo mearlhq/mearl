@@ -110,6 +110,39 @@ describe('global browser ids', () => {
 });
 
 describe('UnifiedClient browser routing', () => {
+  it('preserves remote permission errors as structured action failures', async () => {
+    const { client, send } = createConnectedClient();
+    const errorDetails = {
+      code: 'DOMAIN_PERMISSION_REQUIRED',
+      requestDispatched: false,
+      action: 'tab_open',
+      domain: 'example.test',
+    };
+    const result = client.invoke(
+      'tab_open',
+      { url: 'https://example.test/' },
+      {
+        browser: 'mearl:remote:node-a:browser',
+      },
+    );
+    const rejection = expect(result).rejects.toMatchObject({
+      ...errorDetails,
+      message: 'Permission required',
+    });
+    try {
+      await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1));
+      (client as any).handleResponse({
+        id: messageAt(send, 0).id,
+        success: false,
+        error: 'Permission required',
+        errorDetails,
+      });
+      await rejection;
+    } finally {
+      client.disconnect();
+    }
+  });
+
   it('rejects required page targets before browser routing', async () => {
     const client = new UnifiedClient();
 

@@ -34,6 +34,10 @@ async function plugin(invoke = vi.fn(), options = {}) {
   return { runtime, invoke, call: (tokens, input = {}) => runtime.run([], { command: 'site', input: { tokens, ...input } }) };
 }
 
+const permissionRequired = (action, domain = 'example.test') => Object.assign(
+  new Error('Permission required'), { code: 'DOMAIN_PERMISSION_REQUIRED', requestDispatched: false, action, domain },
+);
+
 beforeEach(() => {
   vi.mocked(homedir).mockReturnValue(directory());
 });
@@ -174,9 +178,9 @@ describe('bbrowser plugin commands and browser execution', () => {
       if (action === 'page_eval') return { result: await runInNewContext(`(${payload.expression})`, { window: { pageToken: 'page-state' } })(...payload.args) };
       throw new Error(`Unexpected action ${action}`);
     });
-    const { call } = await plugin(invoke, { browser: 'selected', ...(transport ? { transport } : {}) });
+    const { call } = await plugin(invoke, { browser: 'mearl:local:selected', ...(transport ? { transport } : {}) });
     await expect(call(['demo/read', '123'], { count: '0' })).resolves.toEqual({ result: { seller_id: '123', count: '0', token: 'page-state' } });
-    expect(invoke.mock.calls.every(([, , options]) => options.browser === 'selected')).toBe(true);
+    expect(invoke.mock.calls.every(([, , options]) => options.browser === 'mearl:local:selected')).toBe(true);
     expect(invoke).toHaveBeenLastCalledWith('page_eval', expect.objectContaining({ tabId: 12, executionWorld: 'main', awaitPromise: true, observe: false }), expect.any(Object));
   });
 
@@ -190,6 +194,138 @@ describe('bbrowser plugin commands and browser execution', () => {
     })[action]);
     await expect(executeAdapter(item, {}, { invoke })).resolves.toEqual({ result: false });
     expect(invoke.mock.calls.slice(1).every(([, , options]) => options.browser === 'fixed')).toBe(true);
+  });
+
+  it('requests permission on the selected browser and retries tab_open before executing the adapter', async () => {
+    adapter(adapterDirectories().sources.at(-1).directory);
+    const browserId = 'mearl:remote:node-a:fixed';
+    const session = { sessionId: 's_fixed', browserId };
+    let authorized = false;
+    const invoke = vi.fn(async (action, payload) => {
+      if (action === 'browser_list') return {
+        defaultBrowserId: 'mearl:remote:node-a:other',
+        browsers: [{ browserId, originalName: 'Work Chrome', status: 'connected' }],
+      };
+      if (action === 'tab_list') return { tabs: [] };
+      if (action === 'tab_open') {
+        if (!authorized) throw permissionRequired(action);
+        return { tabId: 12, url: payload.url, session };
+      }
+      if (action === 'request_permission') {
+        authorized = true;
+        return { granted: true };
+      }
+      if (action === 'page_eval') return { result: 'executed', session };
+      throw new Error(`Unexpected action ${action}`);
+    });
+    const { runtime } = await plugin(invoke, { browser: 'work chr', session: 'new' });
+    await expect(runtime.run(['site', 'demo/read'])).resolves.toEqual({ result: 'executed', session });
+    expect(invoke.mock.calls.map(([action]) => action)).toEqual([
+      'browser_list', 'tab_list', 'tab_open', 'request_permission', 'tab_open', 'page_eval',
+    ]);
+    expect(invoke.mock.calls.slice(1).every(([, , options]) => options.browser === browserId)).toBe(true);
+    expect(invoke.mock.calls[3]).toEqual(['request_permission', { domain: 'example.test' }, { browser: browserId, session: undefined }]);
+    expect(invoke.mock.calls[4]).toEqual(invoke.mock.calls[2]);
+    expect(invoke.mock.calls[5][2]).toEqual({ browser: browserId, session: 's_fixed' });
+  });
+
+  it('asks for a full browser ID when multiple profiles match a selector', async () => {
+    adapter(adapterDirectories().sources.at(-1).directory);
+    const invoke = vi.fn().mockResolvedValue({
+      browsers: [
+        { browserId: 'mearl:local:first', originalName: 'Chrome work', status: 'connected' },
+        { browserId: 'mearl:local:second', originalName: 'Chrome personal', status: 'connected' },
+      ],
+    });
+    const { call } = await plugin(invoke, { browser: 'chrome' });
+    await expect(call(['demo/read'])).rejects.toThrow('完整 browserId');
+    expect(invoke.mock.calls.map(([action]) => action)).toEqual(['browser_list']);
+  });
+
+  it('authorizes a selected tab before creating the requested control session', async () => {
+    const item = adapter(adapterDirectories().sources.at(-1).directory);
+    const browser = 'mearl:local:fixed';
+    const session = { sessionId: 's_fixed', browserId: browser };
+    let approved = false;
+    const invoke = vi.fn(async action => {
+      if (action === 'tab_list') return { tabs: [{ tabId: 12, url: 'https://example.test/' }] };
+      if (action === 'page_snapshot') {
+        if (!approved) throw permissionRequired(action);
+        return { session };
+      }
+      if (action === 'request_permission') {
+        approved = true;
+        return { granted: true };
+      }
+      return { result: 42, session };
+    });
+    await expect(executeAdapter(item, {}, { invoke, tabId: 12, options: { browser, session: 'new' } }))
+      .resolves.toEqual({ result: 42, session });
+    expect(invoke.mock.calls.map(([action, , routing]) => [action, routing.session])).toEqual([
+      ['tab_list', undefined],
+      ['page_snapshot', 'new'],
+      ['request_permission', undefined],
+      ['tab_list', undefined],
+      ['page_snapshot', 'new'],
+      ['page_eval', 's_fixed'],
+    ]);
+  });
+
+  it.each(['unchanged', 'during approval', 'after recheck', 'container frame'])('protects the approved tab against changes (%s)', async change => {
+    adapter(adapterDirectories().sources.at(-1).directory, 'demo/read', {}, 'async function() { executed(); return true; }');
+    let authorized = false;
+    const executed = vi.fn();
+    const invoke = vi.fn(async (action, payload) => {
+      if (action === 'tab_list') return { tabs: [{ tabId: 12, url: authorized && change === 'during approval' ? 'https://other.test/' : 'https://example.test/' }] };
+      if (action === 'request_permission') {
+        authorized = true;
+        return { granted: true };
+      }
+      if (action === 'page_eval' && authorized) {
+        const location = {
+          origin: change === 'unchanged' ? 'https://example.test' : 'https://other.test',
+          ancestorOrigins: change === 'container frame' ? ['https://example.test'] : [],
+        };
+        const evaluate = runInNewContext(`(${payload.expression})`, { window: { location }, executed });
+        return { result: await evaluate(...payload.args) };
+      }
+      throw permissionRequired(action);
+    });
+    const { call } = await plugin(invoke, { browser: 'mearl:local:fixed' });
+    const result = call(['demo/read'], { tab: 12 });
+    const runsAdapter = change === 'unchanged' || change === 'container frame';
+    if (runsAdapter) await expect(result).resolves.toEqual({ result: true });
+    else await expect(result).rejects.toThrow('目标标签页已关闭或切换站点');
+    expect(invoke.mock.calls.map(([action]) => action)).toEqual([
+      'tab_list', 'page_eval', 'request_permission', 'tab_list', ...(change === 'during approval' ? [] : ['page_eval']),
+    ]);
+    expect(executed).toHaveBeenCalledTimes(runsAdapter ? 1 : 0);
+  });
+
+  it.each([false, true])('stops after denial or a retry that is still blocked (granted: %s)', async granted => {
+    adapter(adapterDirectories().sources.at(-1).directory);
+    const invoke = vi.fn(async action => {
+      if (action === 'tab_list') return { tabs: [] };
+      if (action === 'request_permission') return { granted };
+      throw permissionRequired(action);
+    });
+    const { call } = await plugin(invoke, { browser: 'mearl:local:fixed' });
+    await expect(call(['demo/read'])).rejects.toThrow(granted ? 'Permission required' : '未获得 example.test 的访问权限');
+    expect(invoke.mock.calls.filter(([action]) => action === 'request_permission')).toHaveLength(1);
+    expect(invoke.mock.calls.filter(([action]) => action === 'tab_open')).toHaveLength(granted ? 2 : 1);
+  });
+
+  it.each([
+    new Error('Permission required'),
+    Object.assign(permissionRequired('tab_open'), { requestDispatched: true }),
+    permissionRequired('page_eval'),
+    permissionRequired('tab_open', 'other.test'),
+  ])('does not request authorization for unrelated or ambiguous failures', async error => {
+    adapter(adapterDirectories().sources.at(-1).directory);
+    const invoke = vi.fn().mockResolvedValueOnce({ tabs: [] }).mockRejectedValueOnce(error);
+    const { call } = await plugin(invoke, { browser: 'mearl:local:fixed' });
+    await expect(call(['demo/read'])).rejects.toBe(error);
+    expect(invoke.mock.calls.map(([action]) => action)).toEqual(['tab_list', 'tab_open']);
   });
 
   it('uses the toolbox host browser without discovering or overriding its routing', async () => {
@@ -212,7 +348,7 @@ describe('bbrowser plugin commands and browser execution', () => {
     const invoke = vi.fn(async action => action === 'tab_list' ? { tabs: [] } : action === 'tab_open'
       ? { tabId: 12, url: 'https://example.test/', session }
       : { result: '{"error":"HTTP 401","hint":"请登录"}', session });
-    await expect(executeAdapter(item, {}, { invoke, options: { session: 'new', browser: 'browser' } })).resolves.toMatchObject({ success: false, error: { message: 'HTTP 401' }, hint: '请登录', session });
+    await expect(executeAdapter(item, {}, { invoke, options: { session: 'new', browser: 'mearl:local:browser' } })).resolves.toMatchObject({ success: false, error: { message: 'HTTP 401' }, hint: '请登录', session });
     expect(invoke).toHaveBeenCalledTimes(3);
     expect(invoke.mock.calls[0][2]).toMatchObject({ session: undefined });
     expect(invoke.mock.calls[2][2]).toMatchObject({ session: 's_fixed' });
@@ -234,7 +370,7 @@ describe('bbrowser plugin commands and browser execution', () => {
       }
       throw new Error(`Unexpected action ${action}`);
     });
-    await expect(executeAdapter(item, {}, { invoke, options: { browser: 'browser' } })).resolves.toEqual({ result: { state: 'existing-page' } });
+    await expect(executeAdapter(item, {}, { invoke, options: { browser: 'mearl:local:browser' } })).resolves.toEqual({ result: { state: 'existing-page' } });
   });
 
   it('validates explicit tabs and redirects before dispatching adapter code', async () => {
@@ -242,7 +378,7 @@ describe('bbrowser plugin commands and browser execution', () => {
     const invoke = vi.fn(async action => action === 'tab_list'
       ? { tabs: [{ id: 12, url: 'https://other.test/' }] }
       : { tabId: 12, url: 'https://login.other.test/' });
-    for (const tabId of [12, undefined]) await expect(executeAdapter(item, {}, { invoke, options: { browser: 'browser' }, tabId })).rejects.toThrow(/不匹配|跳转/);
+    for (const tabId of [12, undefined]) await expect(executeAdapter(item, {}, { invoke, options: { browser: 'mearl:local:browser' }, tabId })).rejects.toThrow(/不匹配|跳转/);
     expect(invoke.mock.calls.some(([action]) => action === 'page_eval')).toBe(false);
     expect(domainMatches('https://sub.example.test/path', 'example.test')).toBe(true);
     expect(domainMatches('https://example.test.evil.test', 'example.test')).toBe(false);

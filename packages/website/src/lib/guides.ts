@@ -955,7 +955,7 @@ mearl session_manage --browser '<browserId>' --payload '{"operation":"end","keep
         {
           id: 'context',
           title: 'Run in the intended browser context',
-          text: 'Select the browser that owns the sign-in state. An adapter with a declared domain can reuse a matching tab or open one. The script runs in the page’s main world and can use its companion _helper.js. Site permissions, login prompts, and page changes still determine the outcome.',
+          text: 'Select the browser that owns the sign-in state. An adapter with a declared domain can reuse a matching tab or open one. When the extension blocks an operation for missing site access, it prompts in the selected browser and retries the blocked operation once after approval. The script runs in the page’s main world and can use its companion _helper.js.',
           links: [
             {
               label: 'Adapter compatibility and command reference',
@@ -1007,7 +1007,7 @@ mearl session_manage --browser '<browserId>' --payload '{"operation":"end","keep
         {
           id: 'context',
           title: '在正确的浏览器上下文运行',
-          text: '选择已经登录的浏览器。声明了域名的适配器可复用匹配的标签页，也可打开新页。脚本在页面主世界运行，可以加载同目录的 _helper.js。执行结果仍取决于站点权限、登录和当前页面状态。',
+          text: '选择已经登录的浏览器。声明了域名的适配器可复用匹配的标签页，也可打开新页。扩展因缺少站点权限拦住操作时，会在选定浏览器中发起授权，用户确认后自动重试被拦住的操作一次。脚本在页面主世界运行，可以加载同目录的 _helper.js。',
           links: [
             {
               label: '适配器兼容范围和命令参考',

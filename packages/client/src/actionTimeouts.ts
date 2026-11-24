@@ -1,4 +1,5 @@
 import {
+  DOMAIN_PERMISSION_ACTION_TIMEOUT_MS,
   PAGE_ACT_ACTIONS,
   PAGE_UPLOAD_FILE_TRANSFER_TIMEOUT_MS,
   type PageActAction,
@@ -30,6 +31,8 @@ export function resolveActionTimeoutSec(
   data: Record<string, any>,
   fallback = 15,
 ): number {
+  if (action === 'request_permission')
+    return Math.max(fallback, DOMAIN_PERMISSION_ACTION_TIMEOUT_MS / 1000);
   if (action === 'send_request') {
     const transferTimeoutMs =
       data.bodyFile !== undefined || (Array.isArray(data.files) && data.files.length > 0)

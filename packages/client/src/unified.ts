@@ -18,6 +18,7 @@ import {
 } from '@mearl/cloud-types';
 import { resolveActionTimeoutSec } from './actionTimeouts.js';
 import {
+  browserActionResponseError,
   validateRequiredActionTabId,
   parseBrowserListParams,
   parseBrowserManageParams,
@@ -1294,7 +1295,7 @@ export class UnifiedClient {
     clearTimeout(pending.timer);
     if (response.versionWarning) console.warn(response.versionWarning);
     if (response.success) pending.resolve(response.data);
-    else pending.reject(new Error(response.error || 'Unknown error from cloud-server'));
+    else pending.reject(browserActionResponseError(response, 'Unknown error from cloud-server'));
   }
 
   private async requestRemote(

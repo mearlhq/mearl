@@ -32,6 +32,7 @@ import {
 import { ensureInstalledProvidersRunning } from '@mearl/provider/runtime';
 import { Utf8LineBuffer } from './socketLines.js';
 import {
+  getDomainPermissionFailure,
   isAgentServiceAction,
   isExtensionBrowserAction,
   parseBrowserManageParams,
@@ -1530,11 +1531,13 @@ async function handleSocketRequest(socket: net.Socket, line: string): Promise<vo
     } else if (result.closeConnection) socket.end(encoded);
     else socket.write(encoded);
   } catch (error) {
+    const errorDetails = getDomainPermissionFailure(error);
     socket.write(
       JSON.stringify({
         id,
         success: false,
         error: error instanceof Error ? error.message : String(error),
+        ...(errorDetails ? { errorDetails } : {}),
       }) + '\n',
     );
   }

@@ -3,7 +3,8 @@ import { MAX_BUFFER_SIZE } from '@mearl/cloud-types';
 
 const { invoke } = vi.hoisted(() => ({ invoke: vi.fn().mockResolvedValue({ ok: true }) }));
 
-vi.mock('@mearl/client/local', () => ({
+vi.mock('@mearl/client/local', async importOriginal => ({
+  ...(await importOriginal<typeof import('@mearl/client/local')>()),
   invoke,
 }));
 
@@ -40,6 +41,34 @@ describe('CloudConnector', () => {
     expect(JSON.parse(send.mock.calls[0][0])).toMatchObject({
       id: 'request-1',
       success: true,
+    });
+  });
+
+  it('forwards domain permission details to the calling client', async () => {
+    const connector = new CloudConnector({
+      serverUrl: 'ws://localhost:8080',
+      connectorId: 'node-a',
+      connectorName: 'Browser node',
+    });
+    const send = vi.fn();
+    (connector as any).ws = { readyState: 1, send };
+    const errorDetails = {
+      code: 'DOMAIN_PERMISSION_REQUIRED',
+      requestDispatched: false,
+      action: 'tab_open',
+      domain: 'example.test',
+    };
+    invoke.mockRejectedValueOnce(Object.assign(new Error('Permission required'), errorDetails));
+    await (connector as any).handleCloudMessage({
+      id: 'permission',
+      action: 'tab_open',
+      data: { url: 'https://example.test/' },
+    });
+    expect(JSON.parse(send.mock.calls[0][0])).toEqual({
+      id: 'permission',
+      success: false,
+      error: 'Permission required',
+      errorDetails,
     });
   });
 

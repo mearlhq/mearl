@@ -27,6 +27,7 @@ interface CloudResponse {
   success: boolean;
   data?: any;
   error?: string;
+  errorDetails?: unknown;
   versionWarning?: string;
 }
 

@@ -15,3 +15,4 @@ export {
 export type { InvokeOptions } from './socket.js';
 export { listLiveBrowsers } from './browserRegistry.js';
 export type { LiveBrowser } from './browserRegistry.js';
+export { getDomainPermissionFailure } from '@mearl/browser-core';

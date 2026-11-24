@@ -21,6 +21,7 @@ describe('action timeouts', () => {
     expect(resolveActionTimeoutSec('page_upload', {})).toBe(208);
     expect(resolveActionTimeoutSec('page_upload', { observe: false })).toBe(195);
     expect(resolveActionTimeoutSec('tab_open', {})).toBe(40);
+    expect(resolveActionTimeoutSec('request_permission', {})).toBe(100);
     expect(resolveActionTimeoutSec('set_cookie', {})).toBe(15);
     expect(resolveActionTimeoutSec('set_cookie', { reload: true })).toBe(40);
     expect(resolveActionTimeoutSec('browser_manage', { operation: 'launch' })).toBe(90);
