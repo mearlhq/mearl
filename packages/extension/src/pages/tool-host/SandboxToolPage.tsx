@@ -1,4 +1,4 @@
-import { invokeToolboxHostCapability } from './toolboxHostCapabilities';
+import { invokeToolboxCommand, invokeToolboxHostCapability } from './toolboxHostCapabilities';
 import {
   useCallback,
   useEffect,
@@ -813,16 +813,12 @@ export function SandboxToolPage({
             postReply({ type: 'result', requestId: message.requestId, ok: true, result });
             return;
           }
-          const response = await requestToolbox('toolbox_tool_invoke', {
-            id: toolId,
-            command: message.command!,
-            input: message.input ?? {},
-          });
+          const result = await invokeToolboxCommand(toolId, message.command!, message.input ?? {});
           postReply({
             type: 'result',
             requestId: message.requestId,
             ok: true,
-            result: response.result,
+            result,
           });
         } catch (invokeError) {
           postReply({

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import { PluginPageResults } from '../plugin-page-results';
 
@@ -32,5 +32,22 @@ describe('native page reply resources', () => {
       store.read('one', 'result_chunk', { resultId: reference.resultId, index: 0 }),
     ).toThrow('not found');
     expect(() => store.wrap('one', 'x'.repeat(24 * 1024 * 1024))).toThrow('resource limits');
+  });
+
+  it('expires an abandoned result after the last successful chunk read', () => {
+    vi.useFakeTimers();
+    try {
+      const store = new PluginPageResults();
+      const { resultId } = store.store('one', Buffer.from('test'));
+      vi.advanceTimersByTime(29_000);
+      expect(store.read('one', 'result_chunk', { resultId, index: 0 })).toHaveProperty('data');
+      vi.advanceTimersByTime(29_000);
+      expect(vi.getTimerCount()).toBe(1);
+      vi.advanceTimersByTime(1_000);
+      expect(vi.getTimerCount()).toBe(0);
+      expect(() => store.read('one', 'result_chunk', { resultId, index: 0 })).toThrow('not found');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

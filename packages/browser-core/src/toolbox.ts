@@ -77,9 +77,28 @@ export interface ToolboxToolInvokeOptions {
   input?: Record<string, unknown>;
 }
 
-export interface ToolboxToolInvokeResult {
-  result: unknown;
+export const TOOLBOX_RESULT_CHUNK_BYTES = 192 * 1024;
+export const TOOLBOX_RESULT_MAX_BYTES = 24 * 1024 * 1024;
+
+export interface ToolboxResultReference {
+  kind: 'resource';
+  resultId: string;
+  bytes: number;
+  sha256: string;
+  chunks: number;
 }
+
+export interface ToolboxResultChunk extends Omit<ToolboxResultReference, 'kind'> {
+  index: number;
+  data: string;
+}
+
+export type ToolboxJsonReply = { kind: 'value'; value: unknown } | ToolboxResultReference;
+export type ToolboxToolInvokeResult = { result: unknown } | { resource: ToolboxResultReference };
+
+export type ToolboxResultRequest = { resultId: string } & (
+  { operation: 'result_chunk'; index: number } | { operation: 'result_release' }
+);
 
 export interface ToolboxTaskOptions {
   id: string;
@@ -160,8 +179,12 @@ export interface ToolboxServiceActionMap {
     response: ToolboxPageChunkResult;
   };
   toolbox_tool_invoke: {
-    request: ToolboxToolInvokeOptions;
+    request: ToolboxToolInvokeOptions & { acceptChunkedResult?: true };
     response: ToolboxToolInvokeResult;
+  };
+  toolbox_tool_result: {
+    request: { id: string } & ToolboxResultRequest;
+    response: ToolboxResultChunk | { released: true };
   };
   toolbox_task: {
     request: ToolboxTaskRequest;
@@ -187,6 +210,7 @@ export const TOOLBOX_SERVICE_ACTIONS = {
   toolbox_skill_set_enabled: true,
   toolbox_tool_page_chunk: true,
   toolbox_tool_invoke: true,
+  toolbox_tool_result: true,
   toolbox_task: true,
 } as const satisfies Record<ToolboxServiceAction, true>;
 

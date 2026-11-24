@@ -2,7 +2,90 @@ import { readToolboxClipboard, writeToolboxClipboardImage } from './toolboxClipb
 import { requestNativeHost } from '../sidepanel/nativeHostRequest';
 import { requestToolbox } from '../popup/toolboxRequest';
 import { showToast, type ToastType } from '../panel/utils/toast';
-import { isPluginTaskId } from '@mearl/browser-core';
+import {
+  isPluginTaskId,
+  TOOLBOX_RESULT_CHUNK_BYTES,
+  TOOLBOX_RESULT_MAX_BYTES,
+  type ToolboxJsonReply,
+  type ToolboxResultChunk,
+  type ToolboxResultRequest,
+} from '@mearl/browser-core';
+
+async function readToolboxReply(
+  reply: unknown,
+  request: (input: ToolboxResultRequest) => Promise<unknown>,
+): Promise<unknown> {
+  const result = reply as ToolboxJsonReply | undefined;
+  if (result?.kind === 'value') return result.value;
+  if (result?.kind !== 'resource' || typeof result.resultId !== 'string')
+    throw new Error('Invalid toolbox reply');
+
+  const { resultId, bytes: totalBytes, chunks, sha256 } = result;
+  try {
+    if (
+      !Number.isSafeInteger(totalBytes) ||
+      totalBytes < 1 ||
+      totalBytes > TOOLBOX_RESULT_MAX_BYTES ||
+      chunks !== Math.ceil(totalBytes / TOOLBOX_RESULT_CHUNK_BYTES) ||
+      typeof sha256 !== 'string' ||
+      !/^[a-f0-9]{64}$/.test(sha256)
+    )
+      throw new Error('Invalid toolbox reply');
+
+    const bytes = new Uint8Array(totalBytes);
+    for (let index = 0; index < chunks; index++) {
+      const chunk = (await request({
+        operation: 'result_chunk',
+        resultId,
+        index,
+      })) as ToolboxResultChunk | undefined;
+      if (
+        chunk?.resultId !== resultId ||
+        chunk.index !== index ||
+        chunk.bytes !== totalBytes ||
+        chunk.sha256 !== sha256 ||
+        chunk.chunks !== chunks ||
+        typeof chunk.data !== 'string'
+      )
+        throw new Error('Toolbox reply identity mismatch');
+      const offset = index * TOOLBOX_RESULT_CHUNK_BYTES;
+      const length = Math.min(TOOLBOX_RESULT_CHUNK_BYTES, totalBytes - offset);
+      if (chunk.data.length !== Math.ceil(length / 3) * 4)
+        throw new Error('Invalid toolbox reply chunk length');
+      const part = atob(chunk.data);
+      if (part.length !== length) throw new Error('Invalid toolbox reply chunk length');
+      bytes.set(
+        Uint8Array.from(part, value => value.charCodeAt(0)),
+        offset,
+      );
+    }
+    const actualHash = Array.from(
+      new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),
+      value => value.toString(16).padStart(2, '0'),
+    ).join('');
+    if (actualHash !== sha256) throw new Error('Toolbox reply integrity check failed');
+    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+  } finally {
+    await request({ operation: 'result_release', resultId }).catch(() => {});
+  }
+}
+
+export async function invokeToolboxCommand(
+  toolId: string,
+  command: string,
+  input: Record<string, unknown>,
+): Promise<unknown> {
+  const reply = await requestToolbox('toolbox_tool_invoke', {
+    id: toolId,
+    command,
+    input,
+    acceptChunkedResult: true,
+  });
+  if ('result' in reply) return reply.result;
+  return readToolboxReply(reply.resource, request =>
+    requestToolbox('toolbox_tool_result', { id: toolId, ...request }),
+  );
+}
 
 export async function invokeToolboxHostCapability(
   toolId: string,
@@ -28,51 +111,10 @@ export async function invokeToolboxHostCapability(
       ).includes(operation)
     )
       throw new Error('Invalid page host operation');
-    const result = (await requestToolbox(action, { id: toolId, operation, input })) as any;
-    if (result?.kind === 'value') return result.value;
-    if (
-      result?.kind !== 'resource' ||
-      !Number.isSafeInteger(result.bytes) ||
-      result.bytes < 1 ||
-      result.bytes > 24 * 1024 * 1024 ||
-      result.chunks !== Math.ceil(result.bytes / (192 * 1024))
-    )
-      throw new Error('Invalid plugin page reply');
-    try {
-      const bytes = new Uint8Array(result.bytes);
-      let offset = 0;
-      for (let index = 0; index < result.chunks; index++) {
-        const chunk = (await requestToolbox(action, {
-          id: toolId,
-          operation: 'result_chunk',
-          input: { resultId: result.resultId, index },
-        })) as any;
-        if (
-          chunk.resultId !== result.resultId ||
-          chunk.index !== index ||
-          chunk.bytes !== result.bytes ||
-          chunk.sha256 !== result.sha256 ||
-          chunk.chunks !== result.chunks
-        )
-          throw new Error('Plugin page reply identity mismatch');
-        const part = Uint8Array.from(atob(chunk.data), value => value.charCodeAt(0));
-        bytes.set(part, offset);
-        offset += part.length;
-      }
-      const sha256 = Array.from(
-        new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),
-        value => value.toString(16).padStart(2, '0'),
-      ).join('');
-      if (offset !== result.bytes || sha256 !== result.sha256)
-        throw new Error('Plugin page reply integrity check failed');
-      return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
-    } finally {
-      await requestToolbox(action, {
-        id: toolId,
-        operation: 'result_release',
-        input: { resultId: result.resultId },
-      }).catch(() => {});
-    }
+    const result = await requestToolbox(action, { id: toolId, operation, input });
+    return readToolboxReply(result, ({ operation, ...input }) =>
+      requestToolbox(action, { id: toolId, operation, input }),
+    );
   }
   switch (capability) {
     case 'host.tab.active': {

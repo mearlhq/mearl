@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { invokeToolboxHostCapability } from '../toolboxHostCapabilities';
+import { invokeToolboxCommand, invokeToolboxHostCapability } from '../toolboxHostCapabilities';
+import { TOOLBOX_RESULT_CHUNK_BYTES } from '@mearl/browser-core';
 
 const mocks = vi.hoisted(() => ({
   requestToolbox: vi.fn(),
@@ -82,43 +83,52 @@ it('returns only an active HTTP page as a tool target', async () => {
   });
 });
 
-it.each([false, true])(
-  'reads scoped page reply resources and checks integrity (tampered=%s)',
-  async tampered => {
-    const { webcrypto, createHash } = await import('node:crypto');
-    vi.stubGlobal('crypto', webcrypto);
-    const value = { text: '设计😀'.repeat(60000) };
-    const bytes = Buffer.from(JSON.stringify(value));
-    const reference = {
-      kind: 'resource',
-      resultId: 'result',
-      bytes: bytes.length,
-      chunks: Math.ceil(bytes.length / (192 * 1024)),
-      sha256: createHash('sha256').update(bytes).digest('hex'),
-    };
-    mocks.requestToolbox.mockImplementation(async (action, data) => {
-      expect(action).toBe('toolbox_page');
-      expect(data.id).toBe('plugin:sample');
-      if (data.operation === 'send') return reference;
-      if (data.operation === 'result_release') return { released: true };
-      const index = data.input.index;
-      const part = Buffer.from(bytes.subarray(index * 192 * 1024, (index + 1) * 192 * 1024));
-      if (tampered && index === 0) part[0] = 32;
-      return { ...reference, index, data: part.toString('base64') };
-    });
-    const pending = invokeToolboxHostCapability('plugin:sample', 'host.page.send', {
-      instanceId: 'page',
-      message: {},
-    });
-    if (tampered) await expect(pending).rejects.toThrow('integrity');
-    else await expect(pending).resolves.toEqual(value);
-    expect(mocks.requestToolbox).toHaveBeenLastCalledWith('toolbox_page', {
-      id: 'plugin:sample',
-      operation: 'result_release',
-      input: { resultId: 'result' },
-    });
-  },
-);
+it.each([
+  ['page', false],
+  ['page', true],
+  ['command', false],
+  ['command', true],
+])('reads scoped %s replies and checks integrity (tampered=%s)', async (source, tampered) => {
+  const { webcrypto, createHash } = await import('node:crypto');
+  vi.stubGlobal('crypto', webcrypto);
+  const value = { text: '设计😀'.repeat(60000) };
+  const bytes = Buffer.from(JSON.stringify(value));
+  const chunkSize = TOOLBOX_RESULT_CHUNK_BYTES;
+  const reference = {
+    kind: 'resource',
+    resultId: 'result',
+    bytes: bytes.length,
+    chunks: Math.ceil(bytes.length / chunkSize),
+    sha256: createHash('sha256').update(bytes).digest('hex'),
+  };
+  const resultAction = source === 'page' ? 'toolbox_page' : 'toolbox_tool_result';
+  mocks.requestToolbox.mockImplementation(async (action, data) => {
+    expect(data.id).toBe('plugin:sample');
+    if (action === 'toolbox_tool_invoke') return { resource: reference };
+    expect(action).toBe(resultAction);
+    if (data.operation === 'send') return reference;
+    if (data.operation === 'result_release') return { released: true };
+    const { resultId, index } = source === 'page' ? data.input : data;
+    expect(resultId).toBe(reference.resultId);
+    const part = Buffer.from(bytes.subarray(index * chunkSize, (index + 1) * chunkSize));
+    if (tampered && index === 0) part[0] = 32;
+    return { ...reference, index, data: part.toString('base64') };
+  });
+  const pending =
+    source === 'page'
+      ? invokeToolboxHostCapability('plugin:sample', 'host.page.send', {
+          instanceId: 'page',
+          message: {},
+        })
+      : invokeToolboxCommand('plugin:sample', 'catalog', {});
+  if (tampered) await expect(pending).rejects.toThrow('integrity');
+  else await expect(pending).resolves.toEqual(value);
+  expect(mocks.requestToolbox).toHaveBeenLastCalledWith(resultAction, {
+    id: 'plugin:sample',
+    operation: 'result_release',
+    ...(source === 'page' ? { input: { resultId: 'result' } } : { resultId: 'result' }),
+  });
+});
 
 it('scopes state and model capabilities to the hosting plugin', async () => {
   mocks.requestToolbox.mockResolvedValue({ kind: 'value', value: { version: 'a:0' } });

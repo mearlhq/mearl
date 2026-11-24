@@ -14,7 +14,9 @@ import {
 } from '@mearl/client/plugin';
 import { uninstallPlugin } from '@mearl/setup/plugin';
 import { runCommand } from '@mearl/daemon-core';
+import { TOOLBOX_RESULT_CHUNK_BYTES } from '@mearl/browser-core';
 import type {
+  ToolboxResultRequest,
   ToolboxTaskRequest,
   ToolboxServiceResponse,
   ToolboxPluginActionResult,
@@ -26,6 +28,7 @@ import type {
   ToolboxSkillUpdate,
   PluginTaskStartResult,
 } from '@mearl/browser-core';
+import type { PluginPageResults } from './plugin-page-results.js';
 
 const PLUGIN_TOOL_PREFIX = 'plugin:';
 const taskQueries = new Map<string, PluginTaskClient>();
@@ -45,6 +48,7 @@ export interface ToolboxServiceDependencies {
   readPageChunk?: typeof readPluginPageBundleChunk;
   refreshRegistration?: typeof refreshRegisteredPlugin;
   uninstallPlugin?: typeof uninstallPlugin;
+  invokeResults?: PluginPageResults;
 }
 
 export interface ToolboxAgentRuntime {
@@ -61,7 +65,7 @@ function pluginNameFromToolId(id: unknown): string {
   return plugin;
 }
 
-function jsonValue(value: unknown, label: string, maximumBytes: number): unknown {
+function serializeJson(value: unknown, label: string): string {
   let serialized: string | undefined;
   try {
     serialized = JSON.stringify(value);
@@ -69,6 +73,11 @@ function jsonValue(value: unknown, label: string, maximumBytes: number): unknown
     throw new Error(`${label} must be JSON serializable`);
   }
   if (serialized === undefined) throw new Error(`${label} must be JSON serializable`);
+  return serialized;
+}
+
+function jsonValue(value: unknown, label: string, maximumBytes: number): unknown {
+  const serialized = serializeJson(value, label);
   if (Buffer.byteLength(serialized, 'utf8') > maximumBytes) {
     throw new Error(`${label} is too large`);
   }
@@ -292,9 +301,24 @@ export async function invokeToolboxPluginTool(
     { command: prepared.command, input: prepared.input },
     context,
   );
-  return {
-    result: jsonValue(result, 'Tool result', 512 * 1024),
-  };
+  const { invokeResults } = dependencies;
+  if (!invokeResults) return { result: jsonValue(result, 'Tool result', 512 * 1024) };
+
+  const serialized = serializeJson(result, 'Tool result');
+  const bytes = Buffer.from(serialized);
+  if (bytes.length <= TOOLBOX_RESULT_CHUNK_BYTES) return { result: JSON.parse(serialized) };
+  return { resource: invokeResults.store(`command:${prepared.plugin}`, bytes) };
+}
+
+export function readToolboxPluginResult(
+  id: unknown,
+  request: ToolboxResultRequest,
+  results: PluginPageResults,
+): ToolboxServiceResponse<'toolbox_tool_result'> {
+  const plugin = pluginNameFromToolId(id);
+  if (request.operation !== 'result_chunk' && request.operation !== 'result_release')
+    throw new Error('Invalid toolbox reply operation');
+  return results.read(`command:${plugin}`, request.operation, request);
 }
 
 function taskClient(

@@ -103,6 +103,7 @@ import {
   listToolboxPluginTools,
   openToolboxPluginTool,
   readToolboxPluginPageChunk,
+  readToolboxPluginResult,
   uninstallToolboxPlugin,
   setToolboxSkillEnabled,
 } from './toolbox-service.js';
@@ -929,14 +930,15 @@ async function handleExtensionControlMessage(
       }
       case 'toolbox_state': {
         const plugin = String(data.id ?? '').replace(/^plugin:/, '');
+        const resultScope = `page:${plugin}`;
         if (['result_chunk', 'result_release'].includes(data.operation)) {
-          result = pluginPageResults.read(plugin, data.operation, data.input ?? {});
+          result = pluginPageResults.read(resultScope, data.operation, data.input ?? {});
           break;
         }
         if (!['get', 'get-many', 'list', 'transact'].includes(data.operation))
           throw new Error('Invalid toolbox state operation');
         result = pluginPageResults.wrap(
-          plugin,
+          resultScope,
           await callPluginStateService(
             plugin,
             { ...(data.input ?? {}), operation: data.operation },
@@ -947,8 +949,9 @@ async function handleExtensionControlMessage(
       }
       case 'toolbox_page': {
         const plugin = String(data.id ?? '').replace(/^plugin:/, '');
+        const resultScope = `page:${plugin}`;
         if (['result_chunk', 'result_release'].includes(data.operation)) {
-          result = pluginPageResults.read(plugin, data.operation, data.input ?? {});
+          result = pluginPageResults.read(resultScope, data.operation, data.input ?? {});
           break;
         }
         if (
@@ -958,7 +961,7 @@ async function handleExtensionControlMessage(
         )
           throw new Error('Invalid toolbox page operation');
         result = pluginPageResults.wrap(
-          plugin,
+          resultScope,
           await callPluginPageService(
             plugin,
             { ...(data.input ?? {}), operation: data.operation },
@@ -988,7 +991,12 @@ async function handleExtensionControlMessage(
         result = await handleToolboxTask(data, context);
         break;
       case 'toolbox_tool_invoke':
-        result = await invokeToolboxPluginTool(data?.id, data?.command, data?.input, context);
+        result = await invokeToolboxPluginTool(data?.id, data?.command, data?.input, context, {
+          invokeResults: data?.acceptChunkedResult === true ? pluginPageResults : undefined,
+        });
+        break;
+      case 'toolbox_tool_result':
+        result = readToolboxPluginResult(data?.id, data, pluginPageResults);
         break;
       default: {
         const unhandledAction: never = action;
