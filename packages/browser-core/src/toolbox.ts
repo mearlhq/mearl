@@ -179,7 +179,7 @@ export interface ToolboxServiceActionMap {
     response: ToolboxPageChunkResult;
   };
   toolbox_tool_invoke: {
-    request: ToolboxToolInvokeOptions & { acceptChunkedResult?: true };
+    request: ToolboxToolInvokeOptions;
     response: ToolboxToolInvokeResult;
   };
   toolbox_tool_result: {

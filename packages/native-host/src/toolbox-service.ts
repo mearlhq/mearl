@@ -14,7 +14,6 @@ import {
 } from '@mearl/client/plugin';
 import { uninstallPlugin } from '@mearl/setup/plugin';
 import { runCommand } from '@mearl/daemon-core';
-import { TOOLBOX_RESULT_CHUNK_BYTES } from '@mearl/browser-core';
 import type {
   ToolboxResultRequest,
   ToolboxTaskRequest,
@@ -28,9 +27,11 @@ import type {
   ToolboxSkillUpdate,
   PluginTaskStartResult,
 } from '@mearl/browser-core';
-import type { PluginPageResults } from './plugin-page-results.js';
+import { pluginPageResults } from './plugin-page-results.js';
 
 const PLUGIN_TOOL_PREFIX = 'plugin:';
+// The response envelope and length prefix share the native messaging limit.
+const INLINE_TOOL_RESULT_BYTES = 512 * 1024 - 256;
 const taskQueries = new Map<string, PluginTaskClient>();
 
 function globalSkillUpdate(entry: string): ToolboxSkillUpdate | undefined {
@@ -48,7 +49,6 @@ export interface ToolboxServiceDependencies {
   readPageChunk?: typeof readPluginPageBundleChunk;
   refreshRegistration?: typeof refreshRegisteredPlugin;
   uninstallPlugin?: typeof uninstallPlugin;
-  invokeResults?: PluginPageResults;
 }
 
 export interface ToolboxAgentRuntime {
@@ -301,24 +301,22 @@ export async function invokeToolboxPluginTool(
     { command: prepared.command, input: prepared.input },
     context,
   );
-  const { invokeResults } = dependencies;
-  if (!invokeResults) return { result: jsonValue(result, 'Tool result', 512 * 1024) };
-
   const serialized = serializeJson(result, 'Tool result');
-  const bytes = Buffer.from(serialized);
-  if (bytes.length <= TOOLBOX_RESULT_CHUNK_BYTES) return { result: JSON.parse(serialized) };
-  return { resource: invokeResults.store(`command:${prepared.plugin}`, bytes) };
+  if (Buffer.byteLength(serialized) <= INLINE_TOOL_RESULT_BYTES)
+    return { result: JSON.parse(serialized) };
+  return {
+    resource: pluginPageResults.store(`command:${prepared.plugin}`, Buffer.from(serialized)),
+  };
 }
 
 export function readToolboxPluginResult(
   id: unknown,
   request: ToolboxResultRequest,
-  results: PluginPageResults,
 ): ToolboxServiceResponse<'toolbox_tool_result'> {
   const plugin = pluginNameFromToolId(id);
   if (request.operation !== 'result_chunk' && request.operation !== 'result_release')
     throw new Error('Invalid toolbox reply operation');
-  return results.read(`command:${plugin}`, request.operation, request);
+  return pluginPageResults.read(`command:${plugin}`, request.operation, request);
 }
 
 function taskClient(

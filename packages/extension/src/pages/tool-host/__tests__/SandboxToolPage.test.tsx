@@ -1056,7 +1056,6 @@ describe('SandboxToolPage', () => {
         id: 'plugin:notebook',
         command: 'list',
         input: {},
-        acceptChunkedResult: true,
       }),
     );
     expect(FakeMessageChannel.latest.port1.postMessage).toHaveBeenCalledWith({

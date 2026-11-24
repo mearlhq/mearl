@@ -79,7 +79,6 @@ export async function invokeToolboxCommand(
     id: toolId,
     command,
     input,
-    acceptChunkedResult: true,
   });
   if ('result' in reply) return reply.result;
   return readToolboxReply(reply.resource, request =>

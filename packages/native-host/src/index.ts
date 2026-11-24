@@ -5,7 +5,7 @@ import { nativeCapabilities } from './native-capability-services.js';
 import { PresetBrowserTransfer } from '@mearl/setup/preset';
 import { PresetComponentInstaller } from './preset-components.js';
 import { NativePresetInstallation } from './preset-installation.js';
-import { PluginPageResults } from './plugin-page-results.js';
+import { pluginPageResults } from './plugin-page-results.js';
 import {
   callPluginPageService,
   callPluginStateService,
@@ -269,8 +269,6 @@ function extractChromeVersion(input: string): string | null {
   const parts = match[1]!.split('.');
   return parts.slice(0, 3).join('.');
 }
-
-const pluginPageResults = new PluginPageResults();
 
 function createNativePluginContext(interactive: boolean, pluginScope?: string) {
   const invokeBrowser = extensionProvider.createPluginInvoker(interactive);
@@ -991,12 +989,10 @@ async function handleExtensionControlMessage(
         result = await handleToolboxTask(data, context);
         break;
       case 'toolbox_tool_invoke':
-        result = await invokeToolboxPluginTool(data?.id, data?.command, data?.input, context, {
-          invokeResults: data?.acceptChunkedResult === true ? pluginPageResults : undefined,
-        });
+        result = await invokeToolboxPluginTool(data?.id, data?.command, data?.input, context);
         break;
       case 'toolbox_tool_result':
-        result = readToolboxPluginResult(data?.id, data, pluginPageResults);
+        result = readToolboxPluginResult(data?.id, data);
         break;
       default: {
         const unhandledAction: never = action;

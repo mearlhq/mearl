@@ -105,6 +105,7 @@ Commands capture their source and resources when accepted and execute in isolate
 - Preset validation and inheritance must run in browser and Node. Filesystem access, credentials, installation and permission grants belong to hosts.
 - Use published package dependencies or this repository's workspace packages. Do not depend on files in another checkout or commit credentials.
 - Preserve working behavior until its replacement is validated. Discuss low-reuse custom mechanisms when supporting a use case would add disproportionate complexity to the core.
+- Keep the common path simple. Add special-case handling only when a concrete supported requirement justifies the complexity it adds to the overall design.
 
 ## Styling Guidelines
 

@@ -3,7 +3,7 @@ import { homedir, tmpdir } from 'node:os';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { invokeRegisteredPlugin, loadPlugin, registerPlugin } from '@mearl/client/plugin';
-import { PluginPageResults } from '../plugin-page-results.js';
+import { pluginPageResults } from '../plugin-page-results.js';
 import {
   handleToolboxTask,
   invokeToolboxPluginTool,
@@ -345,34 +345,42 @@ describe('toolbox service', () => {
     ).rejects.toThrow('Tool command is not allowed');
   });
 
-  it('lets capable clients read a large command result without rerunning the command', async () => {
+  it('keeps results below the native message limit inline', async () => {
+    const value = { text: 'x'.repeat(500 * 1024) };
+    const reply = await invokeToolboxPluginTool(
+      'plugin:notebook',
+      'list',
+      {},
+      { invoke: vi.fn() },
+      {
+        findRegistration: () => toolboxRegistration(),
+        invokePlugin: vi.fn().mockResolvedValue(value),
+      },
+    );
+    expect(reply).toEqual({ result: value });
+  });
+
+  it('lets clients read a large command result without rerunning the command', async () => {
     const value = { description: '站点🌍'.repeat(60000) };
     const invokePlugin = vi.fn().mockResolvedValue(value);
     const findRegistration = () => toolboxRegistration();
     const context = { invoke: vi.fn() };
-    const results = new PluginPageResults();
     const id = 'plugin:notebook';
-
-    await expect(
-      invokeToolboxPluginTool(id, 'list', {}, context, { findRegistration, invokePlugin }),
-    ).rejects.toThrow('Tool result is too large');
-    invokePlugin.mockClear();
 
     const reply = await invokeToolboxPluginTool(id, 'list', {}, context, {
       findRegistration,
       invokePlugin,
-      invokeResults: results,
     });
     if (!('resource' in reply)) throw new Error('Expected a chunked result');
     const { resultId, chunks } = reply.resource;
     const first = { operation: 'result_chunk', resultId, index: 0 } as const;
-    expect(() => readToolboxPluginResult('plugin:other', first, results)).toThrow('not found');
-    expect(() => results.read('page:command:notebook', first.operation, first)).toThrow(
+    expect(() => readToolboxPluginResult('plugin:other', first)).toThrow('not found');
+    expect(() => pluginPageResults.read('page:command:notebook', first.operation, first)).toThrow(
       'not found',
     );
     const parts = [];
     for (let index = 0; index < chunks; index++) {
-      const chunk = readToolboxPluginResult(id, { ...first, index }, results);
+      const chunk = readToolboxPluginResult(id, { ...first, index });
       if (!('data' in chunk)) throw new Error('Expected a result chunk');
       expect(Buffer.byteLength(JSON.stringify({ success: true, data: chunk }))).toBeLessThan(
         512 * 1024,
@@ -381,12 +389,10 @@ describe('toolbox service', () => {
     }
     expect(JSON.parse(Buffer.concat(parts).toString('utf8'))).toEqual(value);
     expect(invokePlugin).toHaveBeenCalledTimes(1);
-    expect(readToolboxPluginResult(id, { resultId, operation: 'result_release' }, results)).toEqual(
-      {
-        released: true,
-      },
-    );
-    expect(() => readToolboxPluginResult(id, first, results)).toThrow('not found');
+    expect(readToolboxPluginResult(id, { resultId, operation: 'result_release' })).toEqual({
+      released: true,
+    });
+    expect(() => readToolboxPluginResult(id, first)).toThrow('not found');
   });
 
   it('delegates background execution to a scoped persistent task client', async () => {
