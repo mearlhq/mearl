@@ -94,8 +94,8 @@ export async function prepareRelease(directory, workspace, version, channel, env
   publishArgs(packages.map(({ value }) => ({ ...value, version })), { channel, env });
   const offset = relative(directory, workspace);
   if (!offset || (!isAbsolute(offset) && offset !== '..' && !offset.startsWith('..' + sep))) throw new Error('Release workspace must be outside the source checkout');
-  if (channel === 'stable' && (packages.some(({ value }) => value.version !== version) || !(await readFile(resolve(directory, `changelogs/v${version}.md`), 'utf8')).trim())) {
-    throw new Error('Stable releases require committed versions and release notes');
+  if (channel === 'stable' && packages.some(({ value }) => value.version !== version)) {
+    throw new Error('Stable releases require consistent committed versions');
   }
   if (channel === 'patch') {
     const [target, source] = [version, packages[0].value.version.split('-')[0]].map(value => stableVersions([value])[0]);
@@ -108,7 +108,7 @@ export async function prepareRelease(directory, workspace, version, channel, env
   await writeFile(archive, run('git', ['archive', 'HEAD'], directory));
   run('tar', ['-xf', archive, '-C', workspace], directory);
   // Generated versions belong to the exported build tree.
-  if (channel === 'beta' || channel === 'patch') await bumpVersion(version, workspace, { changelog: false });
+  if (channel === 'beta' || channel === 'patch') await bumpVersion(version, workspace);
 }
 
 async function zipFiles(directory, prefix = '') {
@@ -201,21 +201,35 @@ export function verifyTag(commit, expected) {
   if (commit !== expected) throw new Error('Existing release tag belongs to another source commit');
 }
 
-export function patchReleaseNotes(directory, version, isPublished) {
-  const [target] = stableVersions([version]);
-  const previous = stableVersions(taggedVersions(directory, true)).find(value =>
-    value.major === target.major && value.minor === target.minor && value.patch < target.patch && isPublished(`v${value.version}`),
-  );
-  const tag = previous && `v${previous.version}`;
-  const commits = run('git', [
-    'log', '--no-merges', '--format=- %s (%h)', ...(tag ? [`refs/tags/${tag}..HEAD`] : ['--max-count=20']),
-  ], directory).toString().trim();
-  const notes = [
-    '### 补丁发布 / Patch release',
-    commits || '本次发布与上一正式版使用同一源码。 / This patch uses the same source as the previous stable release.',
-  ];
-  if (tag) notes.push(`[完整变更 / Full changelog](https://github.com/${repository}/compare/${tag}...v${version})`);
-  return notes.join('\n\n') + '\n';
+export function releaseComparisonUrl(directory, version, channel, isPublished) {
+  const versions = taggedVersions(directory, true);
+  const [stableVersion, betaNumber] = version.split('-beta.');
+  const [target] = stableVersions([stableVersion]);
+  const tag = `v${version}`;
+  const previous = versions
+    .filter(value => value.startsWith(`${stableVersion}-beta.`) && Number(value.split('-beta.')[1]) < Number(betaNumber))
+    .sort((a, b) => Number(b.split('-beta.')[1]) - Number(a.split('-beta.')[1]))
+    .find(value => isPublished(`v${value}`, true)) ?? stableVersions(versions).find(value => {
+    const lower = value.major < target.major || (value.major === target.major && (
+      value.minor < target.minor || (value.minor === target.minor && value.patch < target.patch)
+    ));
+    const sameLine = value.major === target.major && value.minor === target.minor;
+    return lower && (channel !== 'patch' || sameLine) && isPublished(`v${value.version}`, false);
+  })?.version;
+  return `https://github.com/${repository}/${previous ? `compare/v${previous}...${tag}` : `tree/${tag}`}`;
+}
+
+export function formatReleaseNotes(zh, en, link) {
+  if (!zh?.trim() || !en?.trim()) throw new Error('Provide both Simplified Chinese and English release notes');
+  // GitHub prefixes explicit anchors and does not add heading anchors to releases.
+  const body = [
+    '[简体中文](#user-content-release-notes-zh) | [English](#user-content-release-notes-en)',
+    '<a name="release-notes-zh"></a>\n\n## 简体中文',
+    zh.trim(),
+    '<a name="release-notes-en"></a>\n\n## English',
+    en.trim(),
+  ].join('\n\n');
+  return `${body}${link ? `\n\n[完整变更 / Full changelog](${link})` : ''}\n`;
 }
 
 async function githubRelease(directory, output, channel, env) {
@@ -230,17 +244,12 @@ async function githubRelease(directory, output, channel, env) {
   } else run('gh', ['api', '--method', 'POST', `${api}/git/refs`, '-f', `ref=refs/tags/${tag}`, '-f', `sha=${release.sourceCommit}`], directory);
   const existing = github(`${api}/releases/tags/${tag}`);
   if (!existing) {
-    let notes;
-    let input;
-    if (channel === 'beta') notes = ['--notes', `Beta build from ${release.sourceCommit}.`];
-    else if (channel === 'patch') {
-      input = patchReleaseNotes(directory, release.version, previousTag => {
-        const previous = github(`${api}/releases/tags/${previousTag}`);
-        return previous && !previous.draft && !previous.prerelease;
-      });
-      notes = ['--notes-file', '-'];
-    } else notes = ['--notes-file', resolve(directory, `changelogs/${tag}.md`)];
-    run('gh', ['release', 'create', tag, '--repo', repository, '--verify-tag', '--title', tag, ...(channel === 'beta' ? ['--prerelease'] : []), ...notes, ...release.assets.map(item => resolve(output, item.file))], directory, input);
+    const link = releaseComparisonUrl(directory, release.version, channel, (previousTag, prerelease) => {
+      const previous = github(`${api}/releases/tags/${previousTag}`);
+      return previous && !previous.draft && previous.prerelease === prerelease;
+    });
+    const notes = formatReleaseNotes(env.RELEASE_NOTES_ZH, env.RELEASE_NOTES_EN, link);
+    run('gh', ['release', 'create', tag, '--repo', repository, '--verify-tag', '--title', tag, ...(channel === 'beta' ? ['--prerelease'] : []), '--notes-file', '-', ...release.assets.map(item => resolve(output, item.file))], directory, notes);
     return;
   }
   if (existing.draft || existing.prerelease !== (channel === 'beta')) throw new Error('Existing GitHub release has a different channel');
@@ -258,6 +267,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const [operation] = positionals;
   const output = values.artifacts && resolve(values.artifacts);
   if (operation === 'select') {
+    if (process.env.GITHUB_EVENT_NAME === 'workflow_dispatch') {
+      formatReleaseNotes(process.env.RELEASE_NOTES_ZH, process.env.RELEASE_NOTES_EN);
+    }
     const result = await selectRelease(root, resolve(values.selection), values.channel);
     if (process.env.GITHUB_OUTPUT) await writeFile(process.env.GITHUB_OUTPUT, `version=${result.version}\ncached=${result.cached}\n`, { flag: 'a' });
     console.log(JSON.stringify(result));

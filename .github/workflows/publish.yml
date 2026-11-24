@@ -25,6 +25,14 @@ on:
         options: [beta, stable, patch]
         default: beta
         required: true
+      notes_zh:
+        description: Simplified Chinese release notes (Markdown)
+        type: string
+        required: true
+      notes_en:
+        description: English release notes (Markdown)
+        type: string
+        required: true
 
 permissions:
   contents: read
@@ -69,6 +77,8 @@ jobs:
         id: version
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_NOTES_ZH: ${{ inputs.notes_zh }}
+          RELEASE_NOTES_EN: ${{ inputs.notes_en }}
         run: |
           if ! test -f scripts/ci-release.mjs; then
             printf '%s\n' 'Select a branch containing the complete Mearl source.' >&2
@@ -169,6 +179,8 @@ jobs:
       - name: Attach the immutable source tag and release downloads
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_NOTES_ZH: ${{ inputs.notes_zh }}
+          RELEASE_NOTES_EN: ${{ inputs.notes_en }}
         run: node scripts/ci-release.mjs github --channel "$RELEASE_CHANNEL" --artifacts "$RUNNER_TEMP/mearl-release-artifacts"
 
   website:

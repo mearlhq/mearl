@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
-import { packRelease, patchReleaseNotes, pendingPackages, prepareRelease, releaseVersion, selectRelease, verifyLatestPatch, verifyRelease, verifySelection, verifyTag } from '../ci-release.mjs';
+import { formatReleaseNotes, packRelease, pendingPackages, prepareRelease, releaseComparisonUrl, releaseVersion, selectRelease, verifyLatestPatch, verifyRelease, verifySelection, verifyTag } from '../ci-release.mjs';
 
 const temporary = [];
 afterEach(async () => { await Promise.all(temporary.splice(0).map(path => rm(path, { recursive: true, force: true }))); });
@@ -64,7 +64,7 @@ it('rejects dirty sources, nested build directories, wrong workflow identity and
   const { source, workspace, env } = await fixture();
   await expect(prepareRelease(source, resolve(source, '..nested'), '3.0.0-beta.2', 'beta', env)).rejects.toThrow('outside');
   await expect(prepareRelease(source, workspace, '3.0.0-beta.2', 'beta', { ...env, GITHUB_REPOSITORY: 'someone/mearl' })).rejects.toThrow('approved repository');
-  await expect(prepareRelease(source, workspace, '3.0.0', 'stable', { ...env, GITHUB_REF_NAME: 'main' })).rejects.toThrow('committed versions');
+  await expect(prepareRelease(source, workspace, '3.0.0', 'stable', { ...env, GITHUB_REF_NAME: 'main' })).rejects.toThrow('consistent committed versions');
   await expect(prepareRelease(source, workspace, '3.1.1', 'patch', { ...env, GITHUB_REF_NAME: 'main' })).rejects.toThrow('same version line');
   await writeFile(resolve(source, 'pending.txt'), 'pending');
   await expect(prepareRelease(source, workspace, '3.0.0-beta.2', 'beta', env)).rejects.toThrow('clean source');
@@ -87,18 +87,30 @@ it('stops a patch retry before writes when any package has a newer latest versio
   await expect(verifyLatestPatch(packages, '3.0.1', async url => String(url).includes('setup') ? Response.json({ version: '3.0.2' }) : current(url))).rejects.toThrow('newer stable version (3.0.2)');
 });
 
-it('lists direct commits since the published release while skipping a reserved tag', async () => {
+it('links to the previous published release and skips reserved tags', async () => {
   const { source } = await fixture();
-  const commit = message => git(source, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '--allow-empty', '-m', message);
-  git(source, 'tag', 'v3.0.0');
-  commit('fix: first patch change');
-  git(source, 'tag', 'v3.0.1');
-  commit('fix: second patch change');
-  const notes = patchReleaseNotes(source, '3.0.2', tag => tag === 'v3.0.0');
-  expect(notes).toContain('first patch change');
-  expect(notes).toContain('second patch change');
-  expect(notes).toContain('compare/v3.0.0...v3.0.2');
-  expect(notes).not.toContain('compare/v3.0.1');
+  for (const tag of ['v3.0.0', 'v3.0.1', 'v3.0.2-beta.3', 'v3.0.2-beta.10']) git(source, 'tag', tag);
+  const isPublished = (tag, prerelease) => prerelease ? tag === 'v3.0.2-beta.3' : tag === 'v3.0.0';
+  expect(releaseComparisonUrl(source, '3.0.2', 'patch', isPublished)).toContain('compare/v3.0.0...v3.0.2');
+  expect(releaseComparisonUrl(source, '3.0.2-beta.11', 'beta', isPublished)).toContain('compare/v3.0.2-beta.3...v3.0.2-beta.11');
+  expect(releaseComparisonUrl(source, '3.0.2-beta.0', 'beta', isPublished)).toContain('compare/v3.0.0...v3.0.2-beta.0');
+  expect(releaseComparisonUrl(source, '3.1.0', 'stable', isPublished)).toContain('compare/v3.0.0...v3.1.0');
+  expect(releaseComparisonUrl(source, '3.0.0', 'stable', isPublished)).toContain('tree/v3.0.0');
+});
+
+it('combines both languages into one Markdown body and rejects missing input', () => {
+  const link = 'https://example.test/compare/v3.0.0...v3.0.1';
+  const zh = '### 设备模拟\n\n- 显示设备外壳。';
+  const en = '### Device emulation\n\n- Show the device shell.';
+  expect(formatReleaseNotes(zh, en, link)).toBe([
+    '[简体中文](#user-content-release-notes-zh) | [English](#user-content-release-notes-en)',
+    '<a name="release-notes-zh"></a>\n\n## 简体中文',
+    zh,
+    '<a name="release-notes-en"></a>\n\n## English',
+    en,
+    `[完整变更 / Full changelog](${link})\n`,
+  ].join('\n\n'));
+  expect(() => formatReleaseNotes(zh, '  ')).toThrow('both Simplified Chinese and English');
 });
 
 it.each([
