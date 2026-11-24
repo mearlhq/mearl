@@ -48,9 +48,10 @@ export function storeRequest(publisherId, extensionId, token) {
   }
   return async (action, body) => {
     const upload = action === 'upload';
+    const cancel = action === 'cancelSubmission';
     const url = `${storeUrl}/${upload ? 'upload/' : ''}v2/publishers/${publisherId}/items/${extensionId}:${action}`;
     const options = {
-      method: body === undefined ? 'GET' : 'POST',
+      method: body === undefined && !cancel ? 'GET' : 'POST',
       headers: { Authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(upload ? 120_000 : 30_000),
       redirect: 'error',
@@ -66,6 +67,7 @@ export function storeRequest(publisherId, extensionId, token) {
       const result = await response.json().catch(() => ({}));
       throw new Error(`Chrome Web Store ${action} failed (HTTP ${response.status}): ${result.error?.message ?? response.statusText}`);
     }
+    if (cancel) return;
     return response.json();
   };
 }
@@ -84,22 +86,30 @@ function compareVersions(left, right) {
 }
 
 export async function submitReview(request, bytes, version, wait = delay) {
-  const current = await request('fetchStatus');
-  const published = current.publishedItemRevisionStatus?.distributionChannels ?? [];
-  if (published.some(channel => compareVersions(version, channel.crxVersion) < 0)) {
-    throw new Error('A newer extension version is already published.');
-  }
-  if (published.some(channel => compareVersions(version, channel.crxVersion) === 0)) return 'PUBLISHED';
+  // Recheck the item after cancellation before uploading, and cancel at most once per run.
+  for (const canCancel of [true, false]) {
+    const current = await request('fetchStatus');
+    const published = current.publishedItemRevisionStatus?.distributionChannels ?? [];
+    if (published.some(channel => compareVersions(version, channel.crxVersion) < 0)) {
+      throw new Error('A newer extension version is already published.');
+    }
+    if (published.some(channel => compareVersions(version, channel.crxVersion) === 0)) return 'PUBLISHED';
 
-  const submitted = current.submittedItemRevisionStatus;
-  if (['PENDING_REVIEW', 'STAGED'].includes(submitted?.state)) {
-    if (submitted.state === 'PENDING_REVIEW' && submitted.distributionChannels?.some(channel => channel.crxVersion === version)) {
+    const submitted = current.submittedItemRevisionStatus;
+    const pending = submitted?.state === 'PENDING_REVIEW' ? submitted.distributionChannels ?? [] : [];
+    if (pending.some(channel => channel.crxVersion === version)) {
       return submitted.state;
     }
+    if (current.lastAsyncUploadState === 'IN_PROGRESS') {
+      throw new Error('A Chrome Web Store upload is already in progress.');
+    }
+    if (submitted?.state !== 'PENDING_REVIEW' && submitted?.state !== 'STAGED') break;
+
+    if (canCancel && pending.length && pending.every(channel => compareVersions(version, channel.crxVersion) > 0)) {
+      await request('cancelSubmission');
+      continue;
+    }
     throw new Error(`An extension submission is ${submitted.state}. Check the Developer Dashboard before uploading.`);
-  }
-  if (current.lastAsyncUploadState === 'IN_PROGRESS') {
-    throw new Error('A Chrome Web Store upload is already in progress.');
   }
 
   const upload = await request('upload', bytes);

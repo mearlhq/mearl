@@ -40,6 +40,8 @@ The `patch` channel builds the extension with Analytics disabled. To enable Anal
 
 After npm publishing and GitHub Release creation, **Submit Chrome Web Store review** submits the same verified extension ZIP. The store publishes it automatically after approval. This job runs for manual `stable` and `patch` releases from `main`.
 
+If the version in review is older than this release, the workflow cancels that submission, then uploads and submits the new version for review. A rerun for a version already in review keeps the existing submission. If a newer version is in review or an approved version is waiting to be published, the workflow stops and directs you to the Developer Dashboard.
+
 Restrict the `chrome-webstore` GitHub environment to deployments from `main`. Set the publisher ID as the environment variable `CHROME_WEBSTORE_PUBLISHER_ID` and the authorized [Chrome Web Store service account](https://developer.chrome.com/docs/webstore/service-accounts) JSON as the environment secret `CHROME_WEBSTORE_SERVICE_ACCOUNT_JSON`. If submission fails, check the upload and review status in the Developer Dashboard. If the same version is already uploaded as a draft, submit it from the dashboard. Rerunning a failed job uses the original artifact.
 
 Repository visibility determines access to GitHub extension attachments. Development validation can load local `packages/extension/dist_chrome`; release validation uses the extracted matching prerelease ZIP.
