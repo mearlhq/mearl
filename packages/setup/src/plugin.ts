@@ -9,6 +9,7 @@ import {
 } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { parseArgs } from 'node:util';
 import {
   assertPluginName,
   findPluginDirectoryEntry,
@@ -27,12 +28,13 @@ import {
 import { preserveSkillDisabled } from './skillSources.js';
 import { claimPresetInstallation } from './presetInstallationLease.js';
 import { ensurePluginRuntime } from './pluginRuntime.js';
-import { captureSkillsCli, parseInstalledSkills, stripAnsi, type InstalledSkill } from './skills.js';
 import {
-  runCommand,
-  withOwnedCommands,
-  type CommandRunner,
-} from '@mearl/daemon-core';
+  captureSkillsCli,
+  parseInstalledSkills,
+  stripAnsi,
+  type InstalledSkill,
+} from './skills.js';
+import { runCommand, withOwnedCommands, type CommandRunner } from '@mearl/daemon-core';
 
 const registrationContext = {
   options: {},
@@ -96,10 +98,18 @@ export async function ensureOfficialPlugin(
   if (existing) {
     if (!accepted.selection || existing.managedBy !== OFFICIAL_PLUGIN_MANAGER) return 'existing';
     const cli = await captureSkillsCli({ runCommand: runner });
-    if (!cli || cli.selection?.path !== accepted.selection.path || cli.selection.sha256 !== accepted.selection.sha256) throw new Error('PLUGIN_CATALOG_SELECTION_CHANGED');
+    if (
+      !cli ||
+      cli.selection?.path !== accepted.selection.path ||
+      cli.selection.sha256 !== accepted.selection.sha256
+    )
+      throw new Error('PLUGIN_CATALOG_SELECTION_CHANGED');
     const declaration = cli.managedSkills[definition.skill];
-    if (!declaration?.source || declaration.source !== definition.installArgs[0]) throw new Error('PLUGIN_CATALOG_SKILL_UNDECLARED');
-    const status = cli.inspectGlobal(declaration.source, definition.skill, declaration.version, { migrateFrom: declaration.migrateFrom });
+    if (!declaration?.source || declaration.source !== definition.installArgs[0])
+      throw new Error('PLUGIN_CATALOG_SKILL_UNDECLARED');
+    const status = cli.inspectGlobal(declaration.source, definition.skill, declaration.version, {
+      migrateFrom: declaration.migrateFrom,
+    });
     if (status.state === 'ready') return 'existing';
     if (status.state === 'conflict') throw new Error(`${status.reason}: ${definition.skill}`);
   }
@@ -109,15 +119,22 @@ export async function ensureOfficialPlugin(
       const code = await installPlugins([...definition.installArgs], runner, {
         registrationManagedBy: OFFICIAL_PLUGIN_MANAGER,
         selection: accepted.selection,
-        ...(accepted.selection ? { expectedSkill: definition.skill, expectedPluginName: name } : {}),
-        confirm: () => { if (JSON.stringify(readOfficialPluginCatalog()) !== JSON.stringify(accepted)) throw new Error('PLUGIN_CATALOG_SELECTION_CHANGED'); },
+        ...(accepted.selection
+          ? { expectedSkill: definition.skill, expectedPluginName: name }
+          : {}),
+        confirm: () => {
+          if (JSON.stringify(readOfficialPluginCatalog()) !== JSON.stringify(accepted))
+            throw new Error('PLUGIN_CATALOG_SELECTION_CHANGED');
+        },
       });
       if (code !== 0) throw new Error(`官方插件 ${name} 安装失败 (exit ${code})`);
       const registration = findPluginRegistration(name);
       if (!registration) throw new Error(`官方插件 ${name} 安装完成后仍未注册`);
       return 'installed' as const;
     });
-  } finally { lease.release(); }
+  } finally {
+    lease.release();
+  }
 }
 
 export interface PluginUninstallResult {
@@ -221,9 +238,14 @@ export async function uninstallPlugin(
       return false;
     }
   });
-  if (options.preserveRegistrationsOutsideManager && unregisteredNames.some(pluginName =>
-    findPluginRegistration(pluginName)?.managedBy !== options.preserveRegistrationsOutsideManager,
-  )) {
+  if (
+    options.preserveRegistrationsOutsideManager &&
+    unregisteredNames.some(
+      pluginName =>
+        findPluginRegistration(pluginName)?.managedBy !==
+        options.preserveRegistrationsOutsideManager,
+    )
+  ) {
     unregisterPlugin(name);
     return { removed: true, unregisteredNames: [name] };
   }
@@ -242,12 +264,7 @@ export async function uninstallPlugin(
   let removed: Awaited<ReturnType<CommandRunner>>;
   try {
     removed = await cli.run(
-      [
-        'remove',
-        skillName,
-        ...(managedSkill.cwd ? [] : ['--global']),
-        '--yes',
-      ],
+      ['remove', skillName, ...(managedSkill.cwd ? [] : ['--global']), '--yes'],
       { tee: true, ...(managedSkill.cwd ? { cwd: managedSkill.cwd } : {}) },
     );
   } catch (error) {
@@ -265,12 +282,15 @@ export async function uninstallPlugin(
     }
   }
   if (removed.code !== 0) {
-    throw new Error(
-      `skills remove ${skillName} 失败（exit ${removed.code}）；插件注册已保留。`,
-    );
+    throw new Error(`skills remove ${skillName} 失败（exit ${removed.code}）；插件注册已保留。`);
   }
 
-  if (/Failed to remove\s+[1-9]\d*\s+skills?/i.test(stripAnsi(`${removed.stdout}\n${removed.stderr}`)) || existsSync(skillDirectory)) {
+  if (
+    /Failed to remove\s+[1-9]\d*\s+skills?/i.test(
+      stripAnsi(`${removed.stdout}\n${removed.stderr}`),
+    ) ||
+    existsSync(skillDirectory)
+  ) {
     throw new Error(`skills remove ${skillName} 未完成；插件注册已保留。`);
   }
 
@@ -304,10 +324,15 @@ export function parseInstalledPluginPaths(output: string, listed: InstalledSkill
     if (!item) continue;
     const value = item[1].trim().replaceAll('\\', '/');
     const copied = value.match(/^(.+?) \(copied\)$/);
-    const matches = copied ? listed.filter(skill => skill.scope === 'global' && skill.name === copied[1]) : [];
-    if (copied && matches.length !== 1) throw new Error('无法从 Skills JSON 清单确认复制的 Skill 安装路径。');
+    const matches = copied
+      ? listed.filter(skill => skill.scope === 'global' && skill.name === copied[1])
+      : [];
+    if (copied && matches.length !== 1)
+      throw new Error('无法从 Skills JSON 清单确认复制的 Skill 安装路径。');
     const installedPath = copied ? matches[0].path : value;
-    const skillPath = resolve(installedPath.startsWith('~/') ? join(homedir(), installedPath.slice(2)) : installedPath);
+    const skillPath = resolve(
+      installedPath.startsWith('~/') ? join(homedir(), installedPath.slice(2)) : installedPath,
+    );
     if (dirname(skillPath) !== join(homedir(), '.agents', 'skills')) {
       throw new Error(
         `无法识别全局 skill 安装路径: ${item[1]}。请使用 setup plugin [name] <path> 注册。`,
@@ -320,43 +345,83 @@ export function parseInstalledPluginPaths(output: string, listed: InstalledSkill
   return [...new Set(paths)];
 }
 
-function permitsEmptyInstallResult(args: string[], output: string): boolean {
-  return (
-    args.length === 0 ||
-    args.some(argument => ['--help', '-h', '--list'].includes(argument)) ||
-    /\b(?:installation\s+)?cancel(?:led|ed)\b/i.test(output)
-  );
-}
-
 export async function installPlugins(
   args: string[],
   runner: CommandRunner = runCommand,
-  options: { registrationManagedBy?: string; env?: NodeJS.ProcessEnv; selection?: PluginCatalogSelection; expectedSkill?: string; expectedPluginName?: string; confirm?: () => void | Promise<void> } = {},
+  options: {
+    registrationManagedBy?: string;
+    env?: NodeJS.ProcessEnv;
+    selection?: PluginCatalogSelection;
+    expectedSkill?: string;
+    expectedPluginName?: string;
+    confirm?: () => void | Promise<void>;
+  } = {},
 ): Promise<number> {
   if (args.includes('--')) {
     throw new Error('plugin install 不支持 -- 参数分隔符，以确保全局安装选项生效。');
   }
   const cli = await captureSkillsCli({ env: options.env, runCommand: runner });
   if (!cli) throw new Error('未找到 skills 或 npx，请检查 Node.js 安装。');
-  if (options.selection && (cli.selection?.path !== options.selection.path || cli.selection.sha256 !== options.selection.sha256)) throw new Error('PLUGIN_CATALOG_SELECTION_CHANGED');
+  if (
+    options.selection &&
+    (cli.selection?.path !== options.selection.path ||
+      cli.selection.sha256 !== options.selection.sha256)
+  )
+    throw new Error('PLUGIN_CATALOG_SELECTION_CHANGED');
   const declaration = options.expectedSkill ? cli.managedSkills[options.expectedSkill] : undefined;
-  if (options.expectedSkill && (!declaration?.source || declaration.source !== args[0])) throw new Error('PLUGIN_CATALOG_SKILL_UNDECLARED');
+  if (options.expectedSkill && (!declaration?.source || declaration.source !== args[0]))
+    throw new Error('PLUGIN_CATALOG_SKILL_UNDECLARED');
   const verifySkill = (registered = false) => {
     if (!options.expectedSkill || !declaration) return;
-    const status = cli.inspectGlobal(declaration.source!, options.expectedSkill, declaration.version);
-    if (status.state !== 'ready' && (registered || status.state !== 'registration')) throw new Error(`${status.reason}: ${options.expectedSkill}`);
+    const status = cli.inspectGlobal(
+      declaration.source!,
+      options.expectedSkill,
+      declaration.version,
+    );
+    if (status.state !== 'ready' && (registered || status.state !== 'registration'))
+      throw new Error(`${status.reason}: ${options.expectedSkill}`);
   };
   const assertSource = () => {
     if (!options.expectedSkill || !declaration) return;
-    const status = cli.inspectGlobal(declaration.source!, options.expectedSkill, declaration.version, {
-      migrateFrom: options.registrationManagedBy === OFFICIAL_PLUGIN_MANAGER ? declaration.migrateFrom : undefined,
-    });
+    const status = cli.inspectGlobal(
+      declaration.source!,
+      options.expectedSkill,
+      declaration.version,
+      {
+        migrateFrom:
+          options.registrationManagedBy === OFFICIAL_PLUGIN_MANAGER
+            ? declaration.migrateFrom
+            : undefined,
+      },
+    );
     if (status.state === 'conflict') throw new Error(`${status.reason}: ${options.expectedSkill}`);
   };
   assertSource();
   await options.confirm?.();
   assertSource();
-  const runInstall = () => cli.run(['add', ...args, '--global'], { tee: true });
+  const { values } = parseArgs({
+    args,
+    strict: false,
+    options: {
+      agent: { type: 'string', short: 'a' },
+      all: { type: 'boolean' },
+      help: { type: 'boolean', short: 'h' },
+      json: { type: 'boolean' },
+      list: { type: 'boolean', short: 'l' },
+      skill: { type: 'string', short: 's', multiple: true },
+      yes: { type: 'boolean', short: 'y' },
+    },
+  });
+  const query = values.help || values.list;
+  const hasSkill = values.skill?.some(
+    name => typeof name === 'string' && /^[^-]/.test(name.replace(/^=/, '').trim()),
+  );
+  const installArgs = ['add', ...args, '--global'];
+  // Automatic registration reads the Skills manager's text installation summary.
+  if (hasSkill && !query && !values.json && !values.all && !values.yes) {
+    installArgs.push('--yes');
+  }
+  const runInstall = () => cli.run(installArgs, { tee: true });
   const installed = await (options.expectedSkill
     ? preserveSkillDisabled(join(homedir(), '.agents', 'skills', options.expectedSkill), runInstall)
     : runInstall());
@@ -371,14 +436,17 @@ export async function installPlugins(
   }
   const paths = parseInstalledPluginPaths(output, listed);
   if (options.expectedSkill) {
-    if (paths.length !== 1 || paths[0] !== join(homedir(), '.agents', 'skills', options.expectedSkill)) throw new Error('PLUGIN_CATALOG_SKILL_RESULT_MISMATCH');
+    if (
+      paths.length !== 1 ||
+      paths[0] !== join(homedir(), '.agents', 'skills', options.expectedSkill)
+    )
+      throw new Error('PLUGIN_CATALOG_SKILL_RESULT_MISMATCH');
     verifySkill();
   }
   if (paths.length === 0) {
-    if (permitsEmptyInstallResult(args, output)) return 0;
-    throw new Error(
-      'Skills 安装成功但无法识别安装结果，请使用 setup plugin [name] <path> 注册。',
-    );
+    if (args.length === 0 || query || /\b(?:installation\s+)?cancel(?:led|ed)\b/i.test(output))
+      return 0;
+    throw new Error('Skills 安装成功但无法识别安装结果，请使用 setup plugin [name] <path> 注册。');
   }
 
   const plugins = new Map<
@@ -401,7 +469,8 @@ export async function installPlugins(
     const plugin = await loadPlugin(entry, registrationContext);
     const name = plugin.name || basename(skillPath);
     assertPluginName(name);
-    if (options.expectedPluginName && name !== options.expectedPluginName) throw new Error('PLUGIN_CATALOG_ALIAS_MISMATCH');
+    if (options.expectedPluginName && name !== options.expectedPluginName)
+      throw new Error('PLUGIN_CATALOG_ALIAS_MISMATCH');
     if (plugins.has(name))
       throw new Error(`多个 skill 使用插件名称 ${name}，请调整入口的 name metadata。`);
     plugins.set(name, {
@@ -429,7 +498,11 @@ export async function installPlugins(
     verifySkill();
     const hasUserRegistration = () => {
       const existing = findPluginRegistration(name);
-      return options.registrationManagedBy && existing && existing.managedBy !== options.registrationManagedBy;
+      return (
+        options.registrationManagedBy &&
+        existing &&
+        existing.managedBy !== options.registrationManagedBy
+      );
     };
     if (hasUserRegistration()) {
       console.error(`Plugin ${name}: existing user registration kept.`);

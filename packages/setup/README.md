@@ -47,11 +47,11 @@ npx @mearl/setup profile install https://example.com/profiles/bundle.json
 一个命令安装 skill 并注册它的 CLI、SDK 和 MCP 能力：
 
 ```bash
-npx @mearl/setup plugin install mearlhq/mearl --github --skill browser-tab-manager --yes
+npx @mearl/setup plugin install mearlhq/mearl --github --skill browser-tab-manager
 mearl tabs summary
 ```
 
-安装参数传给公共 Skills CLI，使用全局共享目录。默认由 `npx` 按当前 Node.js 版本解析 `skills`。公共 CLI 的默认 symlink 和复制模式都可注册；复制模式通过 list --global --json 确认本次成功结果对应的 canonical path，不猜测目录，也不扫描其他 Skills。自定义 CLI 可通过 MEARL_SKILLS_PATH 指定。参数不接受截断后置选项的 -- 分隔符。
+指定 `--skill <名称>` 时，安装器自动采用当前 Skills 管理器的默认选项。需要指定 Agent 时可传 `--agent <标识>`，需要交互选择时可省略 `--skill`。安装使用全局共享目录。默认由 `npx` 按当前 Node.js 版本解析 `skills`。公共 CLI 的默认 symlink 和复制模式都可注册；复制模式通过 list --global --json 确认本次成功结果对应的 canonical path，不猜测目录，也不扫描其他 Skills。自定义 CLI 可通过 MEARL_SKILLS_PATH 指定。参数不接受截断后置选项的 -- 分隔符。
 
 安装宿主提供的本地插件目录决定哪些组件由 Preset 管理。install/update 维护目录中的托管注册，保留用户自行注册的插件。卸载最后一个依赖环境时移除托管插件与 Mearl Skill；其他环境需要时保留。配置准备、宿主同步和实际安装状态共用 [安装合同](../../docs/preset-installation.md)。
 
@@ -136,7 +136,7 @@ npx @mearl/setup provider uninstall example-device
 - local/cloud 共用一份 `@mearl/client`；组合安装只处理一次，卸载单个环境时若另一个环境仍在使用则保留。
 - 从 2.5.x 更新 cloud 环境时会先卸载旧 `@mearl/cloud-client`，避免它遗留的 `mearl` bin 与统一 client 冲突。
 - local/cloud 共用的全局 mearl skill 通过 `skills` 的 JSON 清单定位，只处理一次。
-- 安装和更新通过 `skills add` 从公开仓库重新安装全局 mearl skill，并关联当前检测到的 Agent；更新须确认本次安装完成并核对全局 JSON 清单，不能仅依据第三方更新命令的退出码。
+- 安装和更新通过 `skills add` 从公开仓库安装全局 mearl skill，自动采用 Skills 管理器的默认选项；更新须确认本次安装完成并核对全局 JSON 清单，不能仅依据第三方更新命令的退出码。
   可用 `--skip-skill` 跳过。
 - 卸载一个环境但另一个仍依赖全局 mearl skill 时会保留 skill。
 - 已选择 preset 的自动维护保留用户注册；托管卸载遇到同目录的用户别名时只移除托管注册并保留共享 Skill。

@@ -47,11 +47,11 @@ In the extension's quick settings, open the App selector, choose **Add App emula
 Install a Skill and register its CLI, SDK, and MCP capabilities with one command:
 
 ```bash
-npx @mearl/setup plugin install mearlhq/mearl --github --skill browser-tab-manager --yes
+npx @mearl/setup plugin install mearlhq/mearl --github --skill browser-tab-manager
 mearl tabs summary
 ```
 
-Installation arguments pass to the public Skills CLI using the global shared directory. By default, `npx` resolves `skills` for the current Node.js version. Both default symlink and copy modes support registration. Copy mode uses list --global --json to confirm the canonical path for this successful install, without guessing directories or scanning other Skills. Set MEARL_SKILLS_PATH for a custom CLI. Arguments reject the -- separator, which would truncate trailing options.
+When you specify `--skill <name>`, Setup accepts the selected Skills manager's defaults. Use `--agent <id>` to target a specific agent, or omit `--skill` to choose interactively. Installation uses the global shared directory. By default, `npx` resolves `skills` for the current Node.js version. Both default symlink and copy modes support registration. Copy mode uses list --global --json to confirm the canonical path for this successful install, without guessing directories or scanning other Skills. Set MEARL_SKILLS_PATH for a custom CLI. Arguments reject the -- separator, which would truncate trailing options.
 
 The installation host's local plugin catalog determines preset-managed capabilities. install/update maintains managed registrations and preserves user registrations. Removing the last dependent environment removes managed plugins and the Mearl Skill; other dependent environments retain them. Configuration preparation, host synchronization, and actual status share the [installation contract](../../docs/preset-installation.en.md).
 
@@ -136,7 +136,7 @@ Registration clears only after successful package removal, allowing retries.
 - local/cloud share `@mearl/client`. Combined installation processes it once; removing one environment retains it if the other needs it.
 - Updating a 2.5.x cloud environment first removes `@mearl/cloud-client` to avoid its `mearl` bin conflicting with the unified client.
 - local/cloud share the global mearl Skill, located through the Skills JSON inventory and processed once.
-- Install/update reinstalls the global mearl Skill from the public repository through `skills add`, associating detected Agents. Updates must confirm this installation and check the global JSON inventory, not rely only on a third-party updater's exit code.
+- Install and update use `skills add` to install the global mearl Skill from the public repository with the Skills manager's defaults. Updates must confirm this installation and check the global JSON inventory, not rely only on a third-party updater's exit code.
   Skip with `--skip-skill`.
 - Removing one environment retains the global mearl Skill if another depends on it.
 - Automatic maintenance of selected presets preserves user registrations. Managed removal keeps shared Skill files when user aliases use the same directory.

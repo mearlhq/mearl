@@ -341,6 +341,7 @@ Integration commands:
   preset status                  Report detailed readiness as JSON (exit 3 when pending)
   preset uninstall               Remove the Preset from the local host and connected extensions
   plugin install <arguments...>   Install Skills and register their CLI plugins
+                                  Use --skill <name> to install without prompts
   plugin uninstall <name>        Uninstall one CLI plugin
   plugin [name] <path>            Register an existing plugin; name overrides metadata
   provider install <package>      Install and register a Provider package

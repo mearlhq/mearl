@@ -284,19 +284,10 @@ export async function runGlobalMearlSkillOperation(
       return null;
     }
   };
+  const installArgs = ['add', MEARL_SKILL_SOURCE, '--skill', 'mearl', '--global', '--yes'];
   if (operation === 'install') {
     writeLine('Installing the Mearl Skill...');
-    const installed = await run(
-      [
-        'add',
-        MEARL_SKILL_SOURCE,
-        '--skill',
-        'mearl',
-        '--global',
-        ...(options.yes ? ['--yes'] : []),
-      ],
-      options.yes === true,
-    );
+    const installed = await run(installArgs, options.yes === true);
     if (!installed) return false;
     if (installed.code !== 0) {
       const detail = commandDetail(installed);
@@ -319,10 +310,7 @@ export async function runGlobalMearlSkillOperation(
   if (paths.length === 0) return true;
 
   writeLine(operation === 'update' ? 'Updating the Mearl Skill...' : 'Removing the Mearl Skill...');
-  const args =
-    operation === 'update'
-      ? ['add', MEARL_SKILL_SOURCE, '--skill', 'mearl', '--global', '--yes']
-      : ['remove', 'mearl', '--global', '--yes'];
+  const args = operation === 'update' ? installArgs : ['remove', 'mearl', '--global', '--yes'];
   const result = await run(args, true);
   if (!result) return false;
   const detail = commandDetail(result);

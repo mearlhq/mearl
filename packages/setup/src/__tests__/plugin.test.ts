@@ -407,6 +407,26 @@ it('only runs add, forces global scope, and registers new default and named entr
   expect(findPluginEntry('ordinary')).toBeUndefined();
 });
 
+it.each([
+  { selection: ['--skill', 'sample'] },
+  { selection: ['-s', 'sample', '--agent', 'claude-code'] },
+  { selection: ['--skill=sample'] },
+  { selection: ['-gssample'] },
+])('installs explicitly selected Skills with defaults: $selection', async ({ selection }) => {
+  const args = ['example/repository', '--github', ...selection];
+  const runner = vi.fn(async () => {
+    installSkill('sample');
+    return { code: 0, stdout: report('sample'), stderr: '' };
+  });
+  expect(await installPlugins(args, runner)).toBe(0);
+  expect(runner).toHaveBeenCalledExactlyOnceWith(
+    expect.stringMatching(/npx(?:\.cmd)?$/),
+    ['-y', '--package=skills', '--', 'skills', 'add', ...args, '--global', '--yes'],
+    expect.objectContaining({ tee: true }),
+  );
+  expect(findPluginEntry('sample')).toBeDefined();
+});
+
 it('automatically registers an installed skill with a Python entry', async () => {
   let pythonEntry = '';
   const runner = vi.fn(async () => {
@@ -507,14 +527,32 @@ it('preserves add failures and does not register partially installed entries', a
   expect(findPluginEntry('partial')).toBeUndefined();
 });
 
+it('passes through JSON mode without accepting installation defaults', async () => {
+  const args = ['source', '--skill', 'sample', '--json'];
+  const runner = vi.fn().mockResolvedValue({ code: 1, stdout: '', stderr: 'JSON requires --yes' });
+  expect(await installPlugins(args, runner)).toBe(1);
+  expect(runner).toHaveBeenCalledExactlyOnceWith(
+    expect.stringMatching(/npx(?:\.cmd)?$/),
+    ['-y', '--package=skills', '--', 'skills', 'add', ...args, '--global'],
+    expect.objectContaining({ tee: true }),
+  );
+  expect(ensurePluginRuntime).not.toHaveBeenCalled();
+});
+
 it.each([
   { args: [], stdout: '' },
   { args: ['--help'], stdout: '' },
-  { args: ['source', '--list'], stdout: '' },
+  { args: ['source', '--skill', 'sample', '--list'], stdout: '' },
+  { args: ['source', '-s', 'sample', '-gl'], stdout: '' },
   { args: ['source'], stdout: 'Installation cancelled' },
 ])('does not update the runtime when add produces no entries: $args', async ({ args, stdout }) => {
   const runner = vi.fn().mockResolvedValue({ code: 0, stdout, stderr: '' });
   expect(await installPlugins(args, runner)).toBe(0);
+  expect(runner).toHaveBeenCalledExactlyOnceWith(
+    expect.stringMatching(/npx(?:\.cmd)?$/),
+    ['-y', '--package=skills', '--', 'skills', 'add', ...args, '--global'],
+    expect.objectContaining({ tee: true }),
+  );
   expect(ensurePluginRuntime).not.toHaveBeenCalled();
 });
 
@@ -694,7 +732,7 @@ it('keeps plugin installation, registration and removal on the locally selected 
   expect(findPluginRegistration('sample')?.managedBy).toBe('workspace-skills');
   expect(runner).toHaveBeenCalledWith(
     'private-cli',
-    ['add', 'https://github.com/example/skills', '--skill', 'sample', '--global'],
+    ['add', 'https://github.com/example/skills', '--skill', 'sample', '--global', '--yes'],
     { tee: true },
   );
   expect((await uninstallPlugin('sample', runner)).removed).toBe(true);

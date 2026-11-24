@@ -123,7 +123,7 @@ If browser synchronization fails after Node commit, the same page retains exact 
 
 ## Installation CLI and manager consistency
 
-`setup plugin install/uninstall`, existing-environment Mearl Skill installation/update/removal, and initial `setup --preset` share installed `skills.manager` selection. CLI captures it in-process, preserving arguments, terminal stdin, output, and exit codes without forwarding interaction over Native RPC. Caller timeouts remain; manual plugin installation has no extra two-minute cap. Agent/preset batches keep bounded execution.
+`setup plugin install/uninstall`, existing-environment Mearl Skill installation/update/removal, and initial `setup --preset` share installed `skills.manager` selection. The CLI captures the manager in-process and passes terminal input, output, and exit codes directly. Plugin installs with `--skill` and initial Mearl Skill installs and updates accept the manager's defaults. Plugin installs preserve caller timeouts, and Agent and Preset batches use bounded execution.
 
 Local capability stores can load modules for explicit hook sets while still verifying complete Node identity, target bytes, and commit guards. CLI loads only the `skills.manager` module, without starting other browser/Provider factories or claiming full activation acknowledgment. Corrupt/outdated managers missing CLI entries require retrying with `preset apply`. Each operation retains captured implementation; subsequent operations read new selections.
 

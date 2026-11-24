@@ -93,7 +93,7 @@ describe('runGlobalMearlSkillOperation', () => {
     expect(runCommand).toHaveBeenNthCalledWith(
       1,
       '/tools/skills',
-      ['add', MEARL_SKILL_SOURCE, '--skill', 'mearl', '--global'],
+      ['add', MEARL_SKILL_SOURCE, '--skill', 'mearl', '--global', '--yes'],
       expect.objectContaining({ capture: false }),
     );
     expect(runCommand).toHaveBeenNthCalledWith(
@@ -131,7 +131,7 @@ describe('runGlobalMearlSkillOperation', () => {
     );
   });
 
-  it('passes --yes to a non-interactive skill installation', async () => {
+  it('captures output for a non-interactive setup caller', async () => {
     const runCommand = vi.fn<CommandRunner>(async (_command, args) => ({
       code: 0,
       stdout:
@@ -159,7 +159,7 @@ describe('runGlobalMearlSkillOperation', () => {
     );
   });
 
-  it('does not report success when interactive installation was cancelled', async () => {
+  it('requires a tracked global skill even when installation exits successfully', async () => {
     const runCommand = vi.fn<CommandRunner>(async (_command, args) => ({
       code: 0,
       stdout: args[0] === 'list' ? '[]' : '',

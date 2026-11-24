@@ -123,7 +123,7 @@ Node 提交后若浏览器同步失败，同页保留确切安装身份并允许
 
 ## 安装 CLI 与管理器一致性
 
-`setup plugin install/uninstall`、已有环境的 Mearl Skill 安装/更新/卸载，以及 `setup --preset` 首次安装，共用已安装的 `skills.manager` 选择。安装 CLI 在本进程捕获管理器，保留原参数、终端 stdin、输出和退出码；不通过 Native RPC 转发交互。原始 CLI 保留调用方的超时设置，手动插件安装没有新增两分钟限制。Agent 与 preset 批次仍沿用其原有有界执行。
+`setup plugin install/uninstall`、已有环境的 Mearl Skill 安装/更新/卸载，以及 `setup --preset` 首次安装，共用已安装的 `skills.manager` 选择。安装 CLI 在本进程捕获管理器，直接传递终端输入、输出和退出码。插件安装明确指定 `--skill` 时自动采用管理器默认选项，Mearl Skill 的首次安装和更新也使用这些默认选项。插件安装保留调用方的超时设置，Agent 与 Preset 批次使用有界执行。
 
 本机能力仓库可按明确的 hook 集合加载所需模块，仍校验完整 Node 选择身份、目标字节与提交 guard；安装 CLI 只加载 `skills.manager` 所属模块，不启动其他浏览器/Provider 工厂，也不把局部加载当作整套能力激活回执。损坏或旧版管理器缺少 CLI 入口时明确要求修复 preset，不静默使用另一工具。一次操作保留已捕获实现，下一次操作再读取新选择。
 
