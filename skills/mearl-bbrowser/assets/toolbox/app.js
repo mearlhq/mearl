@@ -2,12 +2,12 @@
   const bridge = window.mearl, context = await bridge.ready();
   const { html, render, useState, useEffect, useRef } = bridge.ui;
   const messages = {
-    zh: { search: '搜索站点、描述或域名', install: '安装社区库', update: '更新社区库', empty: '尚无适配器。安装社区库后即可浏览和试用。', none: '没有匹配的适配器', choose: '选择左侧适配器，填写参数并试用', community: '社区', local: '本地', back: '返回列表', optional: '可选', required: '必填', noArgs: '无需参数', tab: '目标标签页 ID（可选）', auto: '自动匹配站点页面', execute: '执行', copy: '复制命令', copied: '命令已复制', command: '当前命令', result: '执行结果', busy: '处理中…', loaded: '社区库已就绪', failed: '操作失败', note: '使用浏览器当前登录态执行。请先阅读操作说明。', scope: '社区库按整库安装和更新。', readOnly: '声明为只读', write: '可能修改站点数据', unknown: '未声明操作类型' },
-    en: { search: 'Search sites, descriptions or domains', install: 'Install community library', update: 'Update library', empty: 'No adapters yet. Install the community library to browse and try them.', none: 'No matching adapters', choose: 'Select an adapter to enter arguments and try it', community: 'Community', local: 'Local', back: 'Back to list', optional: 'Optional', required: 'Required', noArgs: 'No arguments needed', tab: 'Target tab ID (optional)', auto: 'Automatically match a site page', execute: 'Execute', copy: 'Copy command', copied: 'Command copied', command: 'Current command', result: 'Result', busy: 'Working…', loaded: 'Community library is ready', failed: 'Operation failed', note: 'Runs with your browser’s current login. Read the operation description first.', scope: 'The community library is installed and updated as a whole.', readOnly: 'Declared read-only', write: 'May modify site data', unknown: 'Operation type not declared' },
+    zh: { search: '搜索站点、描述或域名', install: '安装社区库', update: '更新社区库', empty: '尚无适配器。安装社区库后即可浏览和试用。', none: '没有匹配的适配器', choose: '选择左侧适配器，填写参数并试用', community: '社区', local: '本地', back: '返回列表', optional: '可选', required: '必填', noArgs: '无需参数', execute: '执行', copy: '复制命令', copied: '命令已复制', command: '当前命令', result: '执行结果', busy: '处理中…', loaded: '社区库已就绪', failed: '操作失败', note: '使用浏览器当前登录态执行。请先阅读操作说明。', scope: '社区库按整库安装和更新。', readOnly: '声明为只读', write: '可能修改站点数据', unknown: '未声明操作类型' },
+    en: { search: 'Search sites, descriptions or domains', install: 'Install community library', update: 'Update library', empty: 'No adapters yet. Install the community library to browse and try them.', none: 'No matching adapters', choose: 'Select an adapter to enter arguments and try it', community: 'Community', local: 'Local', back: 'Back to list', optional: 'Optional', required: 'Required', noArgs: 'No arguments needed', execute: 'Execute', copy: 'Copy command', copied: 'Command copied', command: 'Current command', result: 'Result', busy: 'Working…', loaded: 'Community library is ready', failed: 'Operation failed', note: 'Runs with your browser’s current login. Read the operation description first.', scope: 'The community library is installed and updated as a whole.', readOnly: 'Declared read-only', write: 'May modify site data', unknown: 'Operation type not declared' },
   };
   function App() {
     const [locale, setLocale] = useState(context.locale), [catalog, setCatalog] = useState({ adapters: [], installed: false });
-    const [query, setQuery] = useState(''), [selected, setSelected] = useState(null), [values, setValues] = useState({}), [tab, setTab] = useState('');
+    const [query, setQuery] = useState(''), [selected, setSelected] = useState(null), [values, setValues] = useState({});
     const [busy, setBusy] = useState(''), [result, setResult] = useState(null);
     const locked = useRef(false);
     const t = key => messages[String(locale).startsWith('zh') ? 'zh' : 'en'][key];
@@ -25,13 +25,13 @@
       setSelected(current => current ? next.adapters.find(item => item.file === current.file) ?? null : null);
     };
     useEffect(() => { act('load', loadCatalog); return bridge.onContextChange(next => setLocale(next.locale)); }, []);
-    const choose = adapter => { setSelected(adapter); setValues({}); setTab(''); setResult(null); };
-    const command = selected ? window.bbrowserCommand(selected, values, tab) : null;
+    const choose = adapter => { setSelected(adapter); setValues({}); setResult(null); };
+    const command = selected ? window.bbrowserCommand(selected, values) : null;
     const copyCommand = (action = 'copy') => act(action, async () => {
       await bridge.invoke('host.clipboard.writeText', { text: command.text });
       await toast(t('copied'));
     });
-    const invalid = selected && (Object.entries(selected.args).some(([key, definition]) => definition.required && !values[key]) || (tab !== '' && (!/^\d+$/.test(tab) || !Number.isSafeInteger(Number(tab)))));
+    const invalid = selected && Object.entries(selected.args).some(([key, definition]) => definition.required && !values[key]);
     const groups = new Map();
     for (const adapter of catalog.adapters.filter(item => `${item.name} ${item.description} ${item.domain}`.toLowerCase().includes(query.toLowerCase()))) {
       const group = adapter.domain || adapter.name.split('/')[0];
@@ -61,7 +61,6 @@
             <div class="content"><p>${selected.description}</p><p class="muted">${t('note')}</p>
               <div class="fields">${Object.entries(selected.args).map(([key, definition]) => html`<label key=${key}>${key} · ${t(definition.required ? 'required' : 'optional')}<textarea rows="1" disabled=${busy} required=${!!definition.required} value=${values[key] ?? ''} placeholder=${String(typeof definition === 'string' ? definition : definition.description || key)} onInput=${e => setValues(previous => ({ ...previous, [key]: e.target.value }))} /></label>`)}
                 ${!Object.keys(selected.args).length && html`<small>${t('noArgs')}</small>`}
-                <label class="target-tab">${t('tab')}<input disabled=${busy} inputMode="numeric" value=${tab} placeholder=${t('auto')} onInput=${e => setTab(e.target.value)} /></label>
               </div>
               <section><h2>${t('command')}</h2><button class="command-copy" title=${t('copy')} aria-label=${t('copy')} aria-busy=${busy === 'command'} disabled=${!!busy} onClick=${() => copyCommand('command')}>${spinner('command')}<code>${command.text}</code></button></section>
               ${result !== null && html`<section><h2>${t('result')}</h2><pre>${typeof result === 'string' ? result : JSON.stringify(result, null, 2)}</pre></section>`}
