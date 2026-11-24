@@ -3458,9 +3458,6 @@
   "presetManagementLink": {
     "message": "Preset 链接"
   },
-  "presetManagementUseLink": {
-    "message": "使用链接"
-  },
   "presetManagementInvalidLink": {
     "message": "请输入有效的 Preset HTTPS 链接。"
   },

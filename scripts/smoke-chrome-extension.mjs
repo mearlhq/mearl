@@ -83,6 +83,8 @@ try {
             version: url.href === editedUrl ? '1.1.0' : '1.0.0',
             defaults: {
               extension: { messages: { presetInstallPurpose: { en: 'Chrome smoke test' } } },
+              skillCatalogSource: 'example/skills',
+              skillCatalog: { helper: { description: 'Local helper' } },
             },
           }),
         );
@@ -168,12 +170,16 @@ try {
       const agent = settings.querySelector('button[role=switch][aria-label="Agent 服务"], button[role=switch][aria-label="Agent Service"]');
       if (!input || !agent) return;
       const button = input.form.querySelector('button[type=submit]');
-      const { height: inputHeight, top: inputTop } = input.getBoundingClientRect();
+      const { height: inputHeight, top: inputTop, left: inputLeft } = input.getBoundingClientRect();
       const { height: buttonHeight, top: buttonTop } = button.getBoundingClientRect();
+      const heading = input.closest('section').querySelector('h2').getBoundingClientRect();
+      const presetCard = settings.defaultView.getComputedStyle(input.closest('section').firstElementChild);
+      const agentCard = settings.defaultView.getComputedStyle(agent.parentElement.parentElement);
       return {
         inputHeight, inputTop, buttonHeight, buttonTop,
-        presetHeight: input.closest('section').firstElementChild.getBoundingClientRect().height,
-        agentHeight: agent.parentElement.parentElement.getBoundingClientRect().height,
+        headingOverlapsInput: heading.bottom > inputTop && heading.right > inputLeft,
+        presetPadding: presetCard.paddingInline,
+        agentPadding: agentCard.paddingInline,
       };
     })()`,
       'Preset and Agent settings layout',
@@ -185,10 +191,8 @@ try {
       'Preset controls have equal height',
     );
     assert.equal(dimensions.inputTop, dimensions.buttonTop, 'Preset controls share a top edge');
-    assert.ok(
-      Math.abs(dimensions.presetHeight - dimensions.agentHeight) <= 8,
-      `Preset and Agent cards should have similar heights: ${JSON.stringify(dimensions)}`,
-    );
+    assert.equal(dimensions.headingOverlapsInput, false, 'Preset heading and input do not overlap');
+    assert.equal(dimensions.presetPadding, dimensions.agentPadding, 'Settings cards share side padding');
   };
   const click = async (pattern, doc = 'document') =>
     wait(
@@ -209,7 +213,7 @@ try {
       Object.getOwnPropertyDescriptor(type.prototype, 'value').set.call(input, ${JSON.stringify(source)});
       input.dispatchEvent(new Event('input', { bubbles: true }));
     })()`);
-    await click(/^(使用链接|Use link)$/, doc);
+    await click(/^(安装|Install|更新|Update)$/, `${doc}.getElementById('installed-presets')`);
     await wait("Boolean(document.querySelector('dialog[open]'))", 'Preset source consent');
     assert.equal(
       presetRequests.length,
@@ -218,6 +222,16 @@ try {
     );
     await click(/^(读取 Preset|Read Preset)$/);
     await click(/^(启用能力|Enable capabilities)$/);
+    const dialogResult = await wait(
+      `(() => {
+        const dialog = document.querySelector('dialog[open]');
+        if (!dialog) return;
+        if (dialog.querySelector('[role=alert]') || /Preset (已就绪|ready)/.test(dialog.innerText))
+          return { alert: dialog.querySelector('[role=alert]')?.textContent ?? null };
+      })()`,
+      `Preset ${version} installation result`,
+    );
+    assert.equal(dialogResult.alert, null, 'Preset reports successful browser installation');
     await until(
       async () => {
         const current = await status();

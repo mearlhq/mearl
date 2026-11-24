@@ -87,6 +87,18 @@ it('exposes setup guidance without affecting browser readiness', () => {
   });
 });
 
+it('applies browser defaults independently of the local Skill catalog', () => {
+  const defaults = {
+    simulation: { app: 'shop' },
+    skillCatalogSource: 'example/skills',
+    skillCatalog: { helper: { description: 'Local helper' } },
+  };
+  expect(resolveBrowserPresetSettings(defaults, {}, available)).toEqual({
+    simulation: { app: 'shop' },
+    pending: [],
+  });
+});
+
 it('merges service defaults and installer overrides without writing user preferences', () => {
   const defaults = { services: { reportsEnabled: true, accountsEnabled: true } };
   const overrides = { services: { reportsEnabled: false } };

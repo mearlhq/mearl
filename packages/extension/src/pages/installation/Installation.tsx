@@ -451,10 +451,10 @@ export function Installation({
     <section
       className={clsx(
         'flex min-h-0 max-h-full w-full flex-col overflow-hidden bg-bg-primary',
-        !embeddedSession && 'max-w-xl rounded-md border border-border shadow-xs dark:shadow-none',
+        !embeddedSession && 'h-full max-w-xl',
       )}
     >
-      <div className="min-h-0 space-y-3 overflow-y-auto p-4 sm:p-5">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 sm:p-5">
         <header className="flex items-center gap-3">
           <div className="shrink-0 rounded bg-bg-hover p-2 text-accent-blue">
             <PackagePlus aria-hidden="true" className="h-5 w-5" />
@@ -754,39 +754,39 @@ export function Installation({
             {error}
           </p>
         )}
-        {(phase === 'error' || phase === 'done') && !confirmReplacement && (
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              onClick={() => void refresh()}
-              className="flex items-center gap-1.5 rounded border border-border bg-bg-secondary px-3 py-1.5 text-xs hover:bg-bg-primary"
-            >
-              <RefreshCw className="w-3 h-3" />
-              {t('presetInstallRefresh')}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (embeddedSession) {
-                  void cancel();
-                  return;
-                }
-                void chrome.tabs
-                  .getCurrent()
-                  .then(tab => {
-                    if (tab?.id !== undefined) return chrome.tabs.remove(tab.id);
-                    window.close();
-                  })
-                  .catch(() => window.close());
-              }}
-              className="rounded border border-border bg-bg-secondary px-3 py-1.5 text-xs hover:bg-bg-primary"
-            >
-              {t('close')}
-            </button>
-          </div>
-        )}
       </div>
+      {(phase === 'error' || phase === 'done') && !confirmReplacement && (
+        <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border px-4 py-3 sm:px-5">
+          <button
+            onClick={() => void refresh()}
+            className="flex min-h-8 items-center gap-1.5 rounded border border-border px-3 py-1.5 text-xs text-text-secondary hover:bg-bg-hover hover:text-text-primary"
+          >
+            <RefreshCw className="w-3 h-3" />
+            {t('presetInstallRefresh')}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (embeddedSession) {
+                void cancel();
+                return;
+              }
+              void chrome.tabs
+                .getCurrent()
+                .then(tab => {
+                  if (tab?.id !== undefined) return chrome.tabs.remove(tab.id);
+                  window.close();
+                })
+                .catch(() => window.close());
+            }}
+            className="min-h-8 rounded border border-border px-3 py-1.5 text-xs hover:bg-bg-hover"
+          >
+            {t('close')}
+          </button>
+        </footer>
+      )}
       {view && (phase === 'source' || phase === 'permission') && (
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border px-4 py-3 sm:px-5">
+        <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border px-4 py-3 sm:px-5">
           {(embeddedSession ||
             phase === 'source' ||
             view.sourceRequest ||
@@ -812,7 +812,7 @@ export function Installation({
                 ? t('presetInstallAllow')
                 : t('presetInstallConfirmOnce')}
           </button>
-        </div>
+        </footer>
       )}
     </section>
   );
@@ -828,7 +828,7 @@ export function Installation({
       {content}
     </Modal>
   ) : (
-    <main className="flex h-dvh items-center justify-center overflow-hidden bg-bg-secondary p-4 text-text-primary sm:p-6">
+    <main className="flex h-dvh justify-center overflow-hidden bg-bg-primary text-text-primary">
       {content}
     </main>
   );

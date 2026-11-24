@@ -125,6 +125,7 @@ describe('Options settings', () => {
         </>,
       );
       const install = await screen.findByRole('button', { name: 'presetManagementInstall' });
+      await waitFor(() => expect(install).toBeEnabled());
       fireEvent.click(install);
       await waitFor(() =>
         expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
@@ -163,7 +164,7 @@ describe('Options settings', () => {
     const input = screen.getByRole('textbox', { name: 'presetManagementLink' });
     const source = 'https://example.test/team.json';
     fireEvent.change(input, { target: { value: source } });
-    fireEvent.click(screen.getByRole('button', { name: 'presetManagementUseLink' }));
+    fireEvent.click(screen.getByRole('button', { name: 'presetManagementInstall' }));
     expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
       action: PRESET_MANAGEMENT_ACTION,
       operation: 'install',
@@ -171,69 +172,89 @@ describe('Options settings', () => {
       source,
     });
   });
-  it('opens the installer for the current preset and waits for confirmation', async () => {
-    window.history.replaceState({}, '', '?iframe=1&tabId=7');
-    const preset = {
-      id: 'team',
-      version: '1.0.0',
-      source: 'https://example.test/team.json',
-      browserRevision: 'a'.repeat(64),
-      nativeRevision: 'b'.repeat(64),
-    };
-    const previous = vi.mocked(chrome.runtime.sendMessage).getMockImplementation()!;
-    vi.mocked(chrome.runtime.sendMessage).mockImplementation(async (message, ...args) => {
-      const request = message as unknown as { action?: string; operation?: string } | undefined;
-      if (request?.action === INSTALLATION_ACTION) {
-        if (request.operation === 'preview') return { success: true, data: {} };
-        return {
-          success: true,
-          data: {
-            session: 'preset-selector',
-            presetId: preset.id,
-            label: 'Team',
-            source: preset.source,
-            missingOrigins: [],
-            missingAuthorization: [],
-            needsInstall: request.operation !== 'install',
-            browserReady: request.operation === 'install',
-            presetChoices: [{ id: preset.id, label: 'Team' }],
-          },
-        };
-      }
-      if (request?.action !== PRESET_MANAGEMENT_ACTION) return previous(message, ...args);
-      if (request.operation === 'status') return { success: true, data: [preset] };
-      return { success: true, data: { session: 'preset-selector', inline: true } };
-    });
+  it.each([
+    ['https://example.test/team.json', undefined, 'https://example.test/team.json'],
+    [
+      'https://example.test/team.json',
+      'https://example.test/updated.json',
+      'https://example.test/updated.json',
+    ],
+    ['https://example.test/team.json', '', ''],
+    ['file:///tmp/team.json', undefined, ''],
+  ])(
+    'requires confirmation to update %s with a link override of %s',
+    async (installedSource, editedSource, expectedSource) => {
+      window.history.replaceState({}, '', '?iframe=1&tabId=7');
+      const preset = {
+        id: 'team',
+        version: '1.0.0',
+        source: installedSource,
+        browserRevision: 'a'.repeat(64),
+        nativeRevision: 'b'.repeat(64),
+      };
+      let selectedPreset = preset;
+      const previous = vi.mocked(chrome.runtime.sendMessage).getMockImplementation()!;
+      vi.mocked(chrome.runtime.sendMessage).mockImplementation(async (message, ...args) => {
+        const request = message as unknown as { action?: string; operation?: string } | undefined;
+        if (request?.action === INSTALLATION_ACTION) {
+          if (request.operation === 'preview') return { success: true, data: {} };
+          return {
+            success: true,
+            data: {
+              session: 'preset-selector',
+              presetId: preset.id,
+              label: 'Team',
+              source: preset.source,
+              missingOrigins: [],
+              missingAuthorization: [],
+              needsInstall: request.operation !== 'install',
+              browserReady: request.operation === 'install',
+              presetChoices: [{ id: preset.id, label: 'Team' }],
+            },
+          };
+        }
+        if (request?.action !== PRESET_MANAGEMENT_ACTION) return previous(message, ...args);
+        if (request.operation === 'status') return { success: true, data: [selectedPreset] };
+        return { success: true, data: { session: 'preset-selector', inline: true } };
+      });
 
-    render(<Options />);
-    expect(await screen.findByText('v1.0.0')).toBeVisible();
-    const update = screen.getByRole('button', { name: 'presetManagementUpdate' });
-    expect(screen.getByRole('textbox', { name: 'presetManagementLink' })).toHaveValue(
-      preset.source,
-    );
-    fireEvent.click(update);
-    const confirm = await screen.findByRole('button', { name: 'presetInstallConfirmOnce' });
-    expect(screen.getByRole('dialog')).toContainElement(confirm);
-    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
-      action: PRESET_MANAGEMENT_ACTION,
-      operation: 'install',
-      inline: true,
-      presetId: preset.id,
-    });
-    expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
-      expect.objectContaining({ action: INSTALLATION_ACTION, operation: 'install' }),
-    );
-    fireEvent.click(confirm);
-    await screen.findByText('presetInstallBrowserReady');
-    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: INSTALLATION_ACTION,
+      render(<Options />);
+      expect(await screen.findByText('v1.0.0')).toBeVisible();
+      const update = screen.getByRole('button', { name: 'presetManagementUpdate' });
+      const input = screen.getByRole('textbox', { name: 'presetManagementLink' });
+      expect(input).toHaveValue(editedSource === undefined ? expectedSource : installedSource);
+      if (editedSource !== undefined) fireEvent.change(input, { target: { value: editedSource } });
+      fireEvent.click(update);
+      const confirm = await screen.findByRole('button', { name: 'presetInstallConfirmOnce' });
+      expect(screen.getByRole('dialog')).toContainElement(confirm);
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        action: PRESET_MANAGEMENT_ACTION,
         operation: 'install',
-        presetId: preset.id,
-        authorize: true,
-      }),
-    );
-  });
+        inline: true,
+        ...(expectedSource ? { source: expectedSource } : { presetId: preset.id }),
+      });
+      expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: INSTALLATION_ACTION, operation: 'install' }),
+      );
+      fireEvent.click(confirm);
+      await screen.findByText('presetInstallBrowserReady');
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: INSTALLATION_ACTION,
+          operation: 'install',
+          presetId: preset.id,
+          authorize: true,
+        }),
+      );
+      if (editedSource === '') {
+        selectedPreset = { ...preset, version: '1.1.0', source: 'https://example.test/other.json' };
+        fireEvent.focus(window);
+        await screen.findByText('v1.1.0');
+        fireEvent.click(screen.getByRole('button', { name: 'close' }));
+        await waitFor(() => expect(input).toHaveValue(selectedPreset.source));
+      }
+    },
+  );
 
   it('uses the supplied preview tab for embedded settings', async () => {
     window.history.replaceState({}, '', '?iframe=1&tabId=7');

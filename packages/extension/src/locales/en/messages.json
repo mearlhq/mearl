@@ -3466,9 +3466,6 @@
   "presetManagementLink": {
     "message": "Preset link"
   },
-  "presetManagementUseLink": {
-    "message": "Use link"
-  },
   "presetManagementInvalidLink": {
     "message": "Enter a valid HTTPS link to a Preset."
   },

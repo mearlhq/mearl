@@ -37,6 +37,8 @@ export function resolveBrowserPresetSettings(
   const setup = parseSetupManagement(value.management);
   if (setup) settings.setup = setup;
   for (const key of Object.keys(value)) {
+    // The Skill catalog is consumed by the local CLI.
+    if (key === 'skillCatalog' || key === 'skillCatalogSource') continue;
     if (!['simulation', 'services', 'extension', 'capabilities', 'management'].includes(key))
       settings.pending.push(key);
   }
