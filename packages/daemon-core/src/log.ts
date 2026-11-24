@@ -5,11 +5,20 @@ import { join } from 'node:path';
 const DEFAULT_MAX_LOG_BYTES = 5 * 1024 * 1024;
 
 /** Keep recent diagnostics and every log with a corresponding daemon record. */
-export function pruneOrphanLogs(directory: string, retentionMs = 7 * 86400_000): void {
+export function pruneOrphanLogs(
+  directory: string,
+  retentionMs = 7 * 86400_000,
+  recordDirectories: readonly string[] = [directory],
+): void {
   try {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       const match = /^([a-f0-9]{16})\.log(?:\.1)?$/.exec(entry.name);
-      if (!entry.isFile() || !match || existsSync(join(directory, `${match[1]}.json`))) continue;
+      if (
+        !entry.isFile() ||
+        !match ||
+        recordDirectories.some(path => existsSync(join(path, `${match[1]}.json`)))
+      )
+        continue;
       const file = join(directory, entry.name);
       try {
         if (Date.now() - statSync(file).mtimeMs >= retentionMs) rmSync(file, { force: true });

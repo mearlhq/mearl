@@ -3,8 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pluginDirectory } from '../pluginRegistry.js';
 
-export function pluginHostPaths() {
-  const registry = pluginDirectory();
+export function pluginHostPaths(registry = pluginDirectory()) {
   const key = createHash('sha256').update(registry).digest('hex').slice(0, 16);
   const home = join(registry, '.host');
   return {

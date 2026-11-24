@@ -2,9 +2,12 @@ import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { closeSync, existsSync, mkdirSync, openSync } from 'node:fs';
 import { join } from 'node:path';
-import { hashKey, keyedDir, rotateLogIfNeeded } from '@mearl/daemon-core';
+import { hashKey, keyedDir, pruneOrphanLogs, rotateLogIfNeeded } from '@mearl/daemon-core';
 import {
+  INSTALLED_PROVIDERS_SUBDIR,
+  LIVE_PROVIDERS_SUBDIR,
   PROVIDER_START_TOKEN_ENV,
+  STARTING_PROVIDERS_SUBDIR,
   claimProviderStart,
   listInstalledProviders,
   listLiveProviders,
@@ -40,10 +43,13 @@ async function spawnProvider(
   logFile: string,
   startToken: string,
 ): Promise<number> {
-  mkdirSync(keyedDir(PROVIDER_LOGS_SUBDIR), { recursive: true, mode: 0o700 });
-  rotateLogIfNeeded(logFile);
-  const output = openSync(logFile, 'a');
+  let output: number | undefined;
   try {
+    if (process.env.MEARL_DEBUG === '1') {
+      mkdirSync(keyedDir(PROVIDER_LOGS_SUBDIR), { recursive: true, mode: 0o700 });
+      rotateLogIfNeeded(logFile);
+      output = openSync(logFile, 'a', 0o600);
+    }
     return await new Promise<number>((resolve, reject) => {
       const child = spawn(process.execPath, [manifest.entryPath], {
         cwd: manifest.packageRoot,
@@ -52,7 +58,7 @@ async function spawnProvider(
           [PROVIDER_START_TOKEN_ENV]: startToken,
         },
         detached: true,
-        stdio: ['ignore', output, output],
+        stdio: ['ignore', output ?? 'ignore', output ?? 'ignore'],
         windowsHide: true,
       });
       child.once('error', reject);
@@ -65,7 +71,7 @@ async function spawnProvider(
       });
     });
   } finally {
-    closeSync(output);
+    if (output !== undefined) closeSync(output);
   }
 }
 
@@ -78,6 +84,11 @@ export async function ensureInstalledProvidersRunning(
   const installed = listInstalledProviders().filter(
     provider => !selected || selected.has(provider.providerId),
   );
+  pruneOrphanLogs(keyedDir(PROVIDER_LOGS_SUBDIR), undefined, [
+    keyedDir(INSTALLED_PROVIDERS_SUBDIR),
+    keyedDir(LIVE_PROVIDERS_SUBDIR),
+    keyedDir(STARTING_PROVIDERS_SUBDIR),
+  ]);
   const starting = new Map<string, string | null>();
 
   for (const manifest of installed) {
@@ -114,8 +125,11 @@ export async function ensureInstalledProvidersRunning(
 
   if (starting.size === 0) return warnings;
   const startupTimeout = (providerId: string) =>
-    installed.find(manifest => manifest.providerId === providerId)?.browserType.controlSessionModes?.includes('external')
-      ? 12_000 : 2_000;
+    installed
+      .find(manifest => manifest.providerId === providerId)
+      ?.browserType.controlSessionModes?.includes('external')
+      ? 12_000
+      : 2_000;
   const deadlines = new Map([...starting.keys()].map(id => [id, Date.now() + startupTimeout(id)]));
   const remaining = new Set(starting.keys());
   const waiting = new Set(starting.keys());
@@ -146,7 +160,7 @@ export async function ensureInstalledProvidersRunning(
   for (const providerId of remaining) {
     const logFile = providerLogFile(providerId);
     warnings.push(
-      `provider ${providerId}: did not become ready within ${startupTimeout(providerId) / 1000}s${existsSync(logFile) ? `; see ${logFile}` : ''}`,
+      `provider ${providerId}: did not become ready within ${startupTimeout(providerId) / 1000}s${process.env.MEARL_DEBUG === '1' && existsSync(logFile) ? `; see ${logFile}` : ''}`,
     );
   }
   // A ready provider may still be publishing its first browser inventory.

@@ -28,6 +28,7 @@ export const PLUGIN_TASK_RESULT_CHUNK_BYTES = 192 * 1024;
 const MAX_EVENT_BYTES = 512 * 1024;
 const MAX_RESULT_BYTES = 64 * 1024 * 1024;
 const RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const PAGE_TASK_RETENTION_MS = 60 * 60 * 1000;
 
 export interface PluginTaskRecord {
   task: PluginTask;
@@ -46,17 +47,32 @@ export interface PluginTaskRecord {
   executorOwner?: { pid: number; processIdentity?: string };
 }
 
+export function pluginTaskExecutorAlive(record: PluginTaskRecord): boolean {
+  const owner = record.executorOwner;
+  return Boolean(
+    owner &&
+    (isProcessOwnerAlive(owner) ||
+      (process.platform !== 'win32' && isProcessGroupAlive(owner.pid))),
+  );
+}
+
 export function pluginTaskExecutionUnconfirmed(record: PluginTaskRecord): boolean {
   const owner = record.executorOwner;
-  if (owner && (!Number.isSafeInteger(owner.pid) || owner.pid < 1)) return true;
-  if (
-    (owner && isProcessOwnerAlive(owner)) ||
+  return Boolean(
+    (owner && (!Number.isSafeInteger(owner.pid) || owner.pid < 1)) ||
+    pluginTaskExecutorAlive(record) ||
     record.task.error?.details?.executionStopped === false ||
-    (process.platform === 'win32' && record.task.error?.code === 'PLUGIN_TASK_HOST_RESTARTED')
-  )
-    return true;
-  if (owner && process.platform !== 'win32') return isProcessGroupAlive(owner.pid);
-  return false;
+    (process.platform === 'win32' && record.task.error?.code === 'PLUGIN_TASK_HOST_RESTARTED'),
+  );
+}
+
+function canPruneTask(record: PluginTaskRecord, now: number): boolean {
+  const expiresAfter = record.access === 'runtime' ? PAGE_TASK_RETENTION_MS : RETENTION_MS;
+  return (
+    !isPluginTaskActive(record.task.state) &&
+    now - record.task.updatedAt >= expiresAfter &&
+    !pluginTaskExecutionUnconfirmed(record)
+  );
 }
 
 export class PluginTaskStore {
@@ -193,7 +209,7 @@ export class PluginTaskStore {
     return record.task;
   }
 
-  list(): PluginTaskRecord[] {
+  list({ allowMissing = false }: { allowMissing?: boolean } = {}): PluginTaskRecord[] {
     let names: string[];
     try {
       names = readdirSync(this.directory);
@@ -201,7 +217,17 @@ export class PluginTaskStore {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
       throw error;
     }
-    return names.filter(isPluginTaskId).map(name => this.read(name));
+    const records: PluginTaskRecord[] = [];
+    for (const name of names) {
+      if (!isPluginTaskId(name)) continue;
+      try {
+        records.push(this.read(name));
+      } catch (error) {
+        if (!allowMissing || (error as { code?: string }).code !== 'PLUGIN_TASK_NOT_FOUND')
+          throw error;
+      }
+    }
+    return records;
   }
 
   diagnosticRecords(taskId?: string): { records: PluginTaskRecord[]; limited: boolean } {
@@ -316,6 +342,7 @@ export class PluginTaskStore {
 
   recover(epoch: string): void {
     this.activeTaskIds = new Set();
+    const now = Date.now();
     for (const record of this.list()) {
       this.indexActive(record);
       const { task } = record;
@@ -328,11 +355,7 @@ export class PluginTaskStore {
               'The plugin execution service restarted; external operations may need reconciliation',
           },
         });
-      } else if (
-        !isPluginTaskActive(task.state) &&
-        Date.now() - task.updatedAt > RETENTION_MS &&
-        !pluginTaskExecutionUnconfirmed(record)
-      ) {
+      } else if (canPruneTask(record, now)) {
         rmSync(join(this.directory, task.taskId), { recursive: true, force: true });
         this.forgetDedupe(task.taskId);
       }
@@ -341,14 +364,9 @@ export class PluginTaskStore {
 
   prune(now = Date.now()): void {
     for (const record of this.list()) {
-      const { task } = record;
-      if (
-        !isPluginTaskActive(task.state) &&
-        now - task.updatedAt > RETENTION_MS &&
-        !pluginTaskExecutionUnconfirmed(record)
-      ) {
-        rmSync(join(this.directory, task.taskId), { recursive: true, force: true });
-        this.forgetDedupe(task.taskId);
+      if (canPruneTask(record, now)) {
+        rmSync(join(this.directory, record.task.taskId), { recursive: true, force: true });
+        this.forgetDedupe(record.task.taskId);
       }
     }
   }

@@ -523,7 +523,7 @@ export class PluginTaskManager {
             },
           }
         : {}),
-      input: request.input,
+      input: bridge.scope.access === 'runtime' ? {} : request.input,
       source: bridge.scope.source,
       cwd: request.cwd,
       state: 'queued',
@@ -1358,7 +1358,9 @@ export class PluginTaskManager {
         );
       await this.stopChildren(taskId);
       if (!page && request.kind !== 'model') await this.services?.releaseModels?.(taskId);
-      const reference = this.store.saveResult(taskId, result);
+      // Page handlers report completion through the page lifecycle and discard their return value.
+      const reference =
+        page && request.kind !== 'model' ? undefined : this.store.saveResult(taskId, result);
       this.update(taskId, { state: 'success', result: reference });
     } catch (cause) {
       await this.stopChildren(taskId);
@@ -1466,13 +1468,17 @@ export class PluginTaskManager {
       cursor = page.nextCursor;
       for (const event of page.events) if (event.type === 'progress') onProgress?.(event.progress);
       if (page.task.state === 'success') {
+        if (!page.task.result) {
+          if (page.task.source === 'runtime' && page.task.kind !== 'model') return undefined;
+          throw new Error('Plugin task has no successful result');
+        }
         const chunks = [];
-        for (let index = 0; index < page.task.result!.chunks; index++)
+        for (let index = 0; index < page.task.result.chunks; index++)
           chunks.push(Buffer.from(this.resultChunk(taskId, scope, index).data, 'base64'));
         const bytes = Buffer.concat(chunks);
         if (
-          bytes.length !== page.task.result!.bytes ||
-          createHash('sha256').update(bytes).digest('hex') !== page.task.result!.sha256
+          bytes.length !== page.task.result.bytes ||
+          createHash('sha256').update(bytes).digest('hex') !== page.task.result.sha256
         )
           throw new Error('Model task result integrity check failed');
         return JSON.parse(bytes.toString('utf8')).value;

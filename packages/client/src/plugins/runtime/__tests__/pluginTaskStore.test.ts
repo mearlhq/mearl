@@ -98,6 +98,30 @@ describe('persistent task records', () => {
     expect(store.findDedupe('explicit:one')).toBeUndefined();
   });
 
+  it('expires old page tasks and keeps active, recent and public tasks', () => {
+    const now = Date.now();
+    const aged = { ...task, state: 'success' as const, updatedAt: now - 60 * 60 * 1000 };
+    store.write({ task: aged, events: [], access: 'runtime' });
+    const fixtures = [
+      { task: { ...task, updatedAt: aged.updatedAt }, access: 'runtime' },
+      { task: { ...aged, updatedAt: now }, access: 'runtime' },
+      { task: aged, access: 'public' },
+      { task: aged, access: 'toolbox' },
+    ] as const;
+    const retained = fixtures.map(({ task, access }) => {
+      const entry = { ...task, taskId: `pt_${task.host.hostId}_${randomUUID()}` };
+      store.write({ task: entry, events: [], access });
+      return entry.taskId;
+    });
+    store.prune(now);
+    expect(
+      store
+        .list()
+        .map(record => record.task.taskId)
+        .sort(),
+    ).toEqual(retained.sort());
+  });
+
   it('retains old ownership evidence while a terminal execution cannot be confirmed stopped', () => {
     store.write({
       task: { ...task, state: 'interrupted' },

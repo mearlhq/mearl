@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { registerPlugin } from '../../pluginRegistry.js';
+import { capturePluginRevision } from '../pluginRevision.js';
 import { PluginTaskManager } from '../pluginTaskManager.js';
 import type { PluginTaskBridge, PluginTaskManagerOptions } from '../pluginTaskManager.js';
 import { isPluginTaskActive } from '@mearl/browser-core';
@@ -50,6 +51,51 @@ async function terminal(taskId: string) {
     cursor = page.nextCursor;
   }
 }
+
+it('records page handler completion without persisting its return value', async () => {
+  manager = new PluginTaskManager({
+    execute: async (_plugin, invocation, context, options) => {
+      if (options?.model) return { text: 'child result', provider: 'codex', mode: 'agent' };
+      expect(invocation.input).toEqual({ event: { value: 1 } });
+      const result = await context.invoke('plugin_model', {
+        plugin: 'fixture',
+        operation: 'run',
+        request: { provider: 'codex', mode: 'agent', permissions: 'read-only', prompt: 'test' },
+      });
+      expect(result).toMatchObject({ text: 'child result' });
+      return { ignored: true };
+    },
+  });
+  const { taskId } = manager.start(
+    {
+      plugin: 'fixture',
+      command: 'event',
+      input: { event: { value: 1 } },
+      cwd: directory,
+      environment: {},
+      options: {},
+    },
+    { ...bridge, scope: { ...bridge.scope, access: 'runtime', source: 'runtime' } },
+    {
+      revision: capturePluginRevision('fixture'),
+      page: {
+        instanceId: 'page',
+        target: {
+          browserSessionId: 'browser',
+          tabId: 1,
+          frameId: 0,
+          documentId: 'document',
+          url: 'https://example.test',
+        },
+      },
+    },
+  );
+  expect(await terminal(taskId)).toMatchObject({ state: 'success' });
+  const { input, result } = manager.store.read(taskId).task;
+  expect(input).toEqual({});
+  expect(result).toBeUndefined();
+  expect(existsSync(join(manager.store.directory, taskId, 'result.json'))).toBe(false);
+});
 
 it('forwards model child deltas only to their requesting call before the model completes', async () => {
   const received = { first: vi.fn(), second: vi.fn() };

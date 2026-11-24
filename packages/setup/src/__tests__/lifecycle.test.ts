@@ -1053,16 +1053,17 @@ describe('runMearlLifecycle', () => {
     expect(base.cleanupRuntime).toHaveBeenCalledOnce();
   });
 
-  it('runs residual cache cleanup even when nothing remains installed', async () => {
+  it('deletes local data even when nothing remains installed', async () => {
     const deps = { ...dependencies(new Map()), listPlugins: () => [], listProviders: () => [] };
     await expect(
       runMearlLifecycle({ operation: 'uninstall', full: true, yes: true }, deps),
     ).resolves.toBe(true);
     expect(deps.cleanupRuntime).toHaveBeenCalledOnce();
+    expect(deps.readManagement).not.toHaveBeenCalled();
     expect(deps.runCommand).not.toHaveBeenCalled();
   });
 
-  it('keeps shared runtime caches when another profile remains installed', async () => {
+  it('keeps local data when another profile remains installed', async () => {
     const deps = {
       ...dependencies(
         new Map([
@@ -1094,7 +1095,7 @@ describe('runMearlLifecycle', () => {
     await expect(
       runMearlLifecycle({ operation: 'uninstall', full: true, yes: true }, deps),
     ).resolves.toBe(false);
-    expect(deps.writeLine).toHaveBeenLastCalledWith('Runtime caches: service still running');
+    expect(deps.writeLine).toHaveBeenLastCalledWith('Mearl data directory: service still running');
   });
 
   it('supports full cleanup when no environment package remains', async () => {
@@ -1141,10 +1142,11 @@ describe('runMearlLifecycle', () => {
     );
 
     expect(base.confirm).toHaveBeenCalledExactlyOnceWith(
-      'Uninstall all CLI plugins and Providers?',
+      'Uninstall all CLI plugins and Providers? This permanently deletes ~/.mearl, including presets and user data.',
     );
     expect(uninstallPlugin).not.toHaveBeenCalled();
     expect(uninstallProvider).not.toHaveBeenCalled();
+    expect(base.cleanupRuntime).not.toHaveBeenCalled();
   });
 
   it('continues full cleanup after an individual integration fails', async () => {
@@ -1168,6 +1170,7 @@ describe('runMearlLifecycle', () => {
     ).resolves.toBe(false);
 
     expect(uninstallProvider).toHaveBeenCalledExactlyOnceWith('example-device');
+    expect(base.cleanupRuntime).not.toHaveBeenCalled();
     expect(base.writeLine).toHaveBeenCalledWith('CLI plugin broken: remove failed');
     expect(base.writeLine).toHaveBeenLastCalledWith(
       'Mearl setup incomplete. Review the messages above.',

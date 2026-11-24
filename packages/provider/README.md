@@ -27,6 +27,8 @@ Provider v2 分开表达实例状态与控制方式：
 
 ## 外部 Provider 安装
 
+需要排查按需启动时，可设置 `MEARL_DEBUG=1`，将新启动的 Provider 输出保存到 `~/.mearl/providers/logs`。发现 Provider 时会清理超过 7 天且没有安装或运行记录的孤立日志。
+
 外部 Provider 包将 `@mearl/provider` 声明为运行依赖：
 
 ```bash

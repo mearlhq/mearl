@@ -4,10 +4,7 @@ import type {
   HostStatus as PluginHostStatus,
 } from './pluginHostConnection.js';
 import type { PluginTaskCheckpoint } from '@mearl/browser-core';
-import type {
-  PluginDiagnosticOptions,
-  PluginDiagnosticReport,
-} from '@mearl/browser-core';
+import type { PluginDiagnosticOptions, PluginDiagnosticReport } from '@mearl/browser-core';
 import { createHash } from 'node:crypto';
 import { isProcessOwnerAlive, readRecord } from '@mearl/daemon-core';
 import { pluginHostPaths } from '../runtime/pluginHostPaths.js';
@@ -187,6 +184,13 @@ export class PluginTaskClient {
 
   async result(taskId: string): Promise<unknown> {
     const task = await this.get(taskId);
+    if (
+      task.state === 'success' &&
+      !task.result &&
+      task.source === 'runtime' &&
+      task.kind !== 'model'
+    )
+      return undefined;
     if (task.state !== 'success' || !task.result)
       throw new Error('Plugin task has no successful result');
     const parts: Buffer[] = [];

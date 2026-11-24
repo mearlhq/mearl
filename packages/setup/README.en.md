@@ -143,12 +143,10 @@ Registration clears only after successful package removal, allowing retries.
 - `uninstall --full` also removes every registered CLI plugin and browser Provider.
   Skills-installed plugins remove their Skills; manually registered external plugins only unregister, retaining source. Provider
   registrations clear only after successful npm removal. Individual failures do not block other cleanup, but the final exit is nonzero.
-  This does not remove the Chrome extension. `extension --full` still means installing the extension and complete local environment.
-- After all environments, plugins, and Providers are successfully removed, `uninstall --full` stops the plugin service,
-  confirms no active or uncertain-exit tasks remain, and removes task history, source snapshots, service logs, and page-session files of ended hosts. Partial removal, individual failures, or a restarted service retain shared caches.
-  Rerun to finish cache cleanup even after packages and registrations are gone. Custom `MEARL_PLUGIN_DIR` limits cleanup to that registry's execution cache.
-  Notes, iteration records, settings, identities, plugin persistent state, Provider-private data, browser profiles, and exported designs remain;
-  CDP tab-ID counters also remain so stale requests cannot target new tabs.
+  Chrome manages extensions installed through the Chrome Web Store. `extension --full` installs the extension and complete local environment.
+- After all environments, plugins, and Providers are successfully removed, `uninstall --full` stops local services and **permanently deletes all of `~/.mearl`**,
+  including the local Preset, settings, notes, browser profiles, unpacked extension files, and caches. Partial removal, individual failures, or processes still using the directory prevent its deletion.
+  Rerun to finish removing the directory even after packages and registrations are gone. Recursive directory removal applies to `~/.mearl`. Individual plugin uninstall steps handle registrations in external registries.
 - `@mearl/mcp-server` commands handle `--mcp` client configuration and cleanup.
 - Default `install` / `update` do not manage the browser extension. The separate `extension` command reads
   matching beta extension metadata from `https://github.com/mearlhq/mearl/releases/download/v<version>/` (stable setup uses `releases/latest/download/`) and downloads `mearl-chrome-v*.zip`, atomically extracting it into
@@ -258,7 +256,7 @@ npx @mearl/setup uninstall --local
 # Detect and uninstall without interaction
 npx @mearl/setup uninstall --yes
 
-# Uninstall environments and all CLI plugins and Providers
+# Fully uninstall Mearl and delete ~/.mearl
 npx @mearl/setup uninstall --full
 
 # Install an optional browser Provider

@@ -27,6 +27,8 @@ need not pretend to be connected browsers.
 
 ## External Provider installation
 
+Set `MEARL_DEBUG=1` to capture output from newly launched Providers in `~/.mearl/providers/logs` when troubleshooting startup. Provider discovery removes orphaned logs older than seven days.
+
 External Provider packages declare `@mearl/provider` as a runtime dependency:
 
 ```bash

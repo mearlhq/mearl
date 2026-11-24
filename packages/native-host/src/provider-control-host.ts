@@ -1,7 +1,12 @@
 import net from 'node:net';
 import { chmodSync, rmSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import { readRecord, writeRecordIfPid, removeRecordIfPid } from '@mearl/daemon-core';
+import {
+  processIdentity,
+  readRecord,
+  writeRecordIfPid,
+  removeRecordIfPid,
+} from '@mearl/daemon-core';
 import {
   providerControlHostFile,
   providerControlSocketPath,
@@ -30,9 +35,11 @@ export async function runProviderControlHost(token: string): Promise<void> {
   if (!owner || owner.token !== token)
     throw new Error('Provider control host startup ownership was lost');
   const socketPath = providerControlSocketPath(process.pid);
+  const identity = processIdentity(process.pid);
   if (
     !writeRecordIfPid(file, owner.pid, {
       pid: process.pid,
+      processIdentity: identity,
       socketPath,
       token,
       ready: false,
@@ -217,6 +224,7 @@ export async function runProviderControlHost(token: string): Promise<void> {
     if (
       !writeRecordIfPid(file, process.pid, {
         pid: process.pid,
+        processIdentity: identity,
         socketPath,
         token,
         ready: true,

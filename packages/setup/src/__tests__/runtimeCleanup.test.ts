@@ -1,4 +1,6 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -12,9 +14,10 @@ vi.mock('node:os', async importOriginal => ({
   homedir: () => state.home,
 }));
 vi.mock('@mearl/client/plugin', () => ({
-  cleanupPluginRuntime: vi.fn(async () => {}),
+  cleanupPluginRuntime: vi.fn(async ({ removeData }: { removeData: () => void }) => removeData()),
   pluginDirectory: () => join(home, customRegistry ? 'custom' : '.mearl/plugins'),
 }));
+vi.mock('@mearl/provider/host', () => ({ listInstalledProviders: () => [] }));
 import { cleanupUninstalledRuntime } from '../runtimeCleanup.js';
 import { cleanupPluginRuntime } from '@mearl/client/plugin';
 
@@ -34,45 +37,122 @@ function file(path: string) {
   return target;
 }
 
-it('removes generated caches and dead session records while retaining user and browser state', async () => {
-  const removed = [
-    'managed-browsers/aaaaaaaaaaaaaaaa.log',
-  ].map(file);
-  const kept = [
-    'adapter-sdk/module.js',
-    'image-tool/objects/image',
+it('deletes the entire data directory, including preset resources and user data', async () => {
+  for (const path of [
+    'capabilities/active-node.json',
+    'capabilities/rollback.json',
+    'capabilities/installations/receipt.json',
+    'capabilities/blobs/resource.bin',
+    'cli-auto-update-state.json',
+    'chrome-extension/manifest.json',
+    'plugins/.host/state/preferences.json',
+    'providers/data/private.json',
+    'providers/live/aaaaaaaaaaaaaaaa.json',
+    'providers/installed/incomplete.json',
     'notes/note.json',
-    'notebook-skill/notebook.json',
     'config.json',
     'managed-profiles/profile/data',
-    'design-overlay/export.png',
-    'cdp-targets/aaaaaaaaaaaaaaaa.json',
-  ].map(file);
-  const root = join(home, '.mearl/plugin-pages/aaaaaaaaaaaaaaaa.json.d');
-  mkdirSync(root, { recursive: true });
-  const dead = join(root, 'session-aaaaaaaaaaaaaaaa.json');
-  const live = join(root, 'session-bbbbbbbbbbbbbbbb.json');
-  const persistent = join(root, 'persistent-aaaaaaaaaaaaaaaa.json');
-  writeRecord(dead, { pid: 2147483647, identity: 'old' });
-  writeRecord(live, { pid: process.pid, identity: 'current' });
-  writeRecord(persistent, { pid: 2147483647, value: 'user rule' });
+    'plugin-pages/aaaaaaaaaaaaaaaa.json.d/persistent-bbbbbbbbbbbbbbbb.json',
+    'unknown/old-file',
+  ])
+    file(path);
+  const sibling = join(home, 'other.txt');
+  writeFileSync(sibling, 'outside Mearl');
   await cleanupUninstalledRuntime();
-  expect(cleanupPluginRuntime).toHaveBeenCalledOnce();
-  for (const path of [...removed, dead]) expect(existsSync(path)).toBe(false);
-  for (const path of [...kept, live, persistent]) expect(existsSync(path)).toBe(true);
+  expect(cleanupPluginRuntime).toHaveBeenCalledExactlyOnceWith({
+    removeData: expect.any(Function),
+    defaultRegistry: join(home, '.mearl', 'plugins'),
+  });
+  expect(existsSync(join(home, '.mearl'))).toBe(false);
+  expect(existsSync(sibling)).toBe(true);
+  await cleanupUninstalledRuntime();
+  expect(existsSync(join(home, '.mearl'))).toBe(false);
 });
 
-it('isolates custom plugin registries from default runtime caches', async () => {
+it('deletes default data with a separate plugin registry without recursively deleting that registry', async () => {
   customRegistry = true;
-  const cache = file('managed-browsers/aaaaaaaaaaaaaaaa.log');
+  const external = join(home, 'custom');
+  mkdirSync(external);
+  writeFileSync(join(external, 'personal.txt'), 'personal');
+  file('notes/note.json');
   await cleanupUninstalledRuntime();
-  expect(existsSync(cache)).toBe(true);
+  expect(cleanupPluginRuntime).toHaveBeenCalledExactlyOnceWith({
+    removeData: expect.any(Function),
+    defaultRegistry: join(home, '.mearl', 'plugins'),
+  });
+  expect(existsSync(join(home, '.mearl'))).toBe(false);
+  expect(existsSync(join(external, 'personal.txt'))).toBe(true);
 });
 
-it('retains shared SDK caches while a Provider is still running', async () => {
-  const cache = file('managed-browsers/aaaaaaaaaaaaaaaa.log');
-  const lease = file('providers/live/aaaaaaaaaaaaaaaa.json');
-  writeRecord(lease, { pid: process.pid });
-  await expect(cleanupUninstalledRuntime()).rejects.toThrow('Providers still use');
-  expect(existsSync(cache)).toBe(true);
+it('unlinks a symlinked data directory without traversing it', async () => {
+  const target = join(home, 'target');
+  mkdirSync(target);
+  const userData = join(target, 'personal.txt');
+  writeFileSync(userData, 'personal');
+  symlinkSync(target, join(home, '.mearl'), 'junction');
+  await cleanupUninstalledRuntime();
+  expect(existsSync(join(home, '.mearl'))).toBe(false);
+  expect(existsSync(userData)).toBe(true);
+  expect(cleanupPluginRuntime).not.toHaveBeenCalled();
+});
+
+it.each([
+  ['providers/live', 'Providers are still running'],
+  ['providers/starting', 'Providers are still running'],
+  ['managed-browsers', 'Managed browsers are still running'],
+  ['connectors', 'Cloud connectors are still running'],
+  ['browsers', 'Could not stop Mearl Native Host'],
+])(
+  'retains the directory while %s has an owner that cannot be stopped',
+  async (directory, error) => {
+    const note = file('notes/note.json');
+    const lease = file(`${directory}/aaaaaaaaaaaaaaaa.json`);
+    writeRecord(lease, { pid: process.pid, transport: 'extension' });
+    await expect(cleanupUninstalledRuntime()).rejects.toThrow(error);
+    expect(existsSync(note)).toBe(true);
+    expect(cleanupPluginRuntime).not.toHaveBeenCalled();
+  },
+);
+
+it('keeps local data available for retry when the plugin service cannot stop', async () => {
+  vi.mocked(cleanupPluginRuntime).mockRejectedValueOnce(new Error('plugin service still running'));
+  const note = file('notes/note.json');
+  await expect(cleanupUninstalledRuntime()).rejects.toThrow('plugin service still running');
+  expect(existsSync(note)).toBe(true);
+});
+
+it('rechecks for processes that start while the plugin service stops', async () => {
+  const note = file('notes/note.json');
+  vi.mocked(cleanupPluginRuntime).mockImplementationOnce(async options => {
+    writeRecord(file('providers/starting/aaaaaaaaaaaaaaaa.json'), { pid: process.pid });
+    options?.removeData?.();
+  });
+  await expect(cleanupUninstalledRuntime()).rejects.toThrow('Providers are still running');
+  expect(existsSync(note)).toBe(true);
+});
+
+it('does not signal a reused PID with a Native Host name in its arguments', async () => {
+  const child = spawn(
+    process.execPath,
+    ['-e', 'setInterval(() => {}, 1000)', 'mearl-native-host'],
+    {
+      stdio: 'ignore',
+    },
+  );
+  const exited = once(child, 'exit');
+  try {
+    await once(child, 'spawn');
+    expect(child.pid).toBeDefined();
+    writeRecord(file('browsers/aaaaaaaaaaaaaaaa.json'), {
+      pid: child.pid!,
+      transport: 'extension',
+      socketPath: join(home, `mearl-agent-${child.pid}.sock`),
+    });
+    await expect(cleanupUninstalledRuntime()).rejects.toThrow('Could not stop Mearl Native Host');
+    expect(child.exitCode).toBeNull();
+    expect(child.signalCode).toBeNull();
+  } finally {
+    child.kill();
+    await exited;
+  }
 });

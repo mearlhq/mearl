@@ -361,7 +361,8 @@ Environment options:
   --skip-skill                    Keep the independently managed Mearl Skill unchanged
 
 Uninstall options:
-  --full                          Remove all CLI plugins and Provider packages/registrations
+  --full                          Remove all CLI plugins and Providers and delete ~/.mearl
+                                  (including presets and user data) when no environment remains
 
 Extension options:
   --full                          Install the extension and complete local environment

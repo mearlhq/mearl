@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -19,6 +19,7 @@ vi.mock('node:child_process', () => ({
 import { ensureInstalledProvidersRunning } from '../launcher.js';
 import { MEARL_PROVIDER_PROTOCOL_VERSION } from '../types.js';
 import { liveProviderFile } from '../registry.js';
+import { hashKey } from '@mearl/daemon-core';
 
 const installedDir = join(testHome, '.mearl', 'providers', 'installed');
 const liveDir = join(testHome, '.mearl', 'providers', 'live');
@@ -27,42 +28,87 @@ beforeEach(() => {
   rmSync(testHome, { recursive: true, force: true });
   mkdirSync(installedDir, { recursive: true });
   mkdirSync(liveDir, { recursive: true });
+  vi.stubEnv('MEARL_DEBUG', '');
   vi.useFakeTimers();
   spawnMock.mockReset();
 });
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllEnvs();
   rmSync(testHome, { recursive: true, force: true });
 });
 
 describe('installed provider launcher', () => {
-  it.each([false, true])('extends only external-control startup for its control-host prerequisite (%s)', async external => {
-    const packageRoot = join(testHome, 'prerequisite-package');
-    const entryPath = join(packageRoot, 'runtime.js');
-    mkdirSync(packageRoot, { recursive: true });
-    writeFileSync(entryPath, 'export {};');
-    writeFileSync(join(installedDir, 'fixture.json'), JSON.stringify({
-      providerId: 'fixture', name: 'Fixture', version: '1.0.0',
-      protocolVersion: MEARL_PROVIDER_PROTOCOL_VERSION,
-      browserType: {
-        name: 'Fixture', inputSchema: { type: 'object', properties: {} },
-        ...(external ? { controlSessionModes: ['external'] } : {}),
-      },
-      packageName: 'fixture-package', packageRoot, entryPath,
-    }));
-    spawnMock.mockImplementation(() => {
-      setTimeout(() => writeFileSync(liveProviderFile('fixture'), JSON.stringify({
-        pid: process.pid, providerId: 'fixture', providerProtocolVersion: MEARL_PROVIDER_PROTOCOL_VERSION,
-      })), 3000);
-      const child = Object.assign(new EventEmitter(), { pid: process.pid, unref: vi.fn() });
-      queueMicrotask(() => child.emit('spawn'));
-      return child;
-    });
-    const result = ensureInstalledProvidersRunning(['fixture']);
-    await vi.runAllTimersAsync();
-    expect(await result).toEqual(external ? [] : [expect.stringContaining('within 2s')]);
+  it('prunes old orphan logs during discovery and keeps logs with a runtime owner', async () => {
+    const logs = join(testHome, '.mearl', 'providers', 'logs');
+    mkdirSync(logs);
+    const old = new Date(Date.now() - 8 * 86400_000);
+    const orphan = join(logs, `${hashKey('orphan')}.log`);
+    const active = join(logs, `${hashKey('active')}.log`);
+    const recent = join(logs, `${hashKey('recent')}.log`);
+    for (const file of [orphan, active, recent]) writeFileSync(file, 'diagnostics');
+    for (const file of [orphan, active]) utimesSync(file, old, old);
+    writeFileSync(liveProviderFile('active'), JSON.stringify({ pid: process.pid }));
+
+    await ensureInstalledProvidersRunning();
+    expect(existsSync(orphan)).toBe(false);
+    expect(existsSync(active)).toBe(true);
+    expect(existsSync(recent)).toBe(true);
   });
+
+  it.each([false, true])(
+    'extends only external-control startup for its control-host prerequisite (%s)',
+    async external => {
+      const packageRoot = join(testHome, 'prerequisite-package');
+      const entryPath = join(packageRoot, 'runtime.js');
+      mkdirSync(packageRoot, { recursive: true });
+      writeFileSync(entryPath, 'export {};');
+      writeFileSync(
+        join(installedDir, 'fixture.json'),
+        JSON.stringify({
+          providerId: 'fixture',
+          name: 'Fixture',
+          version: '1.0.0',
+          protocolVersion: MEARL_PROVIDER_PROTOCOL_VERSION,
+          browserType: {
+            name: 'Fixture',
+            inputSchema: { type: 'object', properties: {} },
+            ...(external ? { controlSessionModes: ['external'] } : {}),
+          },
+          packageName: 'fixture-package',
+          packageRoot,
+          entryPath,
+        }),
+      );
+      spawnMock.mockImplementation(() => {
+        setTimeout(
+          () =>
+            writeFileSync(
+              liveProviderFile('fixture'),
+              JSON.stringify({
+                pid: process.pid,
+                providerId: 'fixture',
+                providerProtocolVersion: MEARL_PROVIDER_PROTOCOL_VERSION,
+              }),
+            ),
+          3000,
+        );
+        const child = Object.assign(new EventEmitter(), { pid: process.pid, unref: vi.fn() });
+        queueMicrotask(() => child.emit('spawn'));
+        return child;
+      });
+      const result = ensureInstalledProvidersRunning(['fixture']);
+      await vi.runAllTimersAsync();
+      expect(await result).toEqual(external ? [] : [expect.stringContaining('within 2s')]);
+      expect(spawnMock).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Array),
+        expect.objectContaining({ stdio: ['ignore', 'ignore', 'ignore'] }),
+      );
+      expect(existsSync(join(testHome, '.mearl', 'providers', 'logs'))).toBe(false);
+    },
+  );
   it.each([undefined, MEARL_PROVIDER_PROTOCOL_VERSION - 1, MEARL_PROVIDER_PROTOCOL_VERSION])(
     'checks the running protocol %s even with an up-to-date installation',
     async providerProtocolVersion => {

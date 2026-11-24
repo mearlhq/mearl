@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -84,6 +84,84 @@ it.each(['unconfirmed', 'registered'])('retains caches with %s ownership', async
     writeFileSync(join(directory, 'fixture.json'), JSON.stringify({ entry: '/fixture.mjs' }));
   await expect(cleanupPluginRuntime()).rejects.toThrow();
   expect(existsSync(paths.tasks)).toBe(true);
+});
+
+it('discards a past cleanup failure while preserving records of a live executor', async () => {
+  const paths = pluginHostPaths();
+  const store = new PluginTaskStore();
+  const removeData = vi.fn(() => rmSync(paths.home, { recursive: true, force: true }));
+  const stale = {
+    ...task('error'),
+    error: {
+      code: 'PLUGIN_EXECUTOR_CLEANUP_FAILED',
+      message: 'Unable to confirm plugin process-tree cleanup',
+      details: { executionStopped: false },
+    },
+  };
+  store.write({
+    task: stale,
+    events: [],
+    access: 'public',
+    executorOwner: { pid: 2147483647 },
+  });
+  const active = task('running');
+  store.write({
+    task: active,
+    events: [],
+    access: 'public',
+    executorOwner: { pid: process.pid },
+  });
+  mkdirSync(join(paths.tasks, task().taskId));
+  await expect(cleanupPluginRuntime({ removeData })).rejects.toThrow(
+    'Plugin task executors are still running',
+  );
+  expect(existsSync(paths.tasks)).toBe(true);
+  rmSync(join(paths.tasks, active.taskId), { recursive: true });
+  expect(removeData).not.toHaveBeenCalled();
+  await cleanupPluginRuntime({ removeData });
+  expect(existsSync(paths.tasks)).toBe(false);
+});
+
+it('holds the startup lock during deletion without deleting an external linked cache', async () => {
+  const data = join(directory, 'data');
+  const external = join(directory, 'external');
+  vi.stubEnv('MEARL_PLUGIN_DIR', data);
+  const paths = pluginHostPaths();
+  mkdirSync(data);
+  mkdirSync(external);
+  symlinkSync(external, paths.home, 'junction');
+  const saved = task();
+  new PluginTaskStore().write({ task: saved, events: [], access: 'public' });
+  await cleanupPluginRuntime({
+    removeData: () => {
+      expect(readRecord(`${paths.lease}.start`)?.pid).toBe(process.pid);
+      rmSync(data, { recursive: true });
+    },
+  });
+  expect(existsSync(data)).toBe(false);
+  expect(existsSync(join(external, 'tasks', saved.taskId, 'task.json'))).toBe(true);
+  expect(existsSync(join(external, 'service.json.start'))).toBe(false);
+});
+
+it('checks runtime owners in the default registry when using a custom one', async () => {
+  const defaultRegistry = join(directory, 'default');
+  const local = pluginHostPaths(defaultRegistry);
+  const removeData = vi.fn();
+  writeRecord(local.lease, { pid: process.pid });
+  await expect(cleanupPluginRuntime({ defaultRegistry, removeData })).rejects.toThrow(
+    'default Mearl plugin service is running',
+  );
+  rmSync(local.lease);
+  new PluginTaskStore(local.tasks).write({
+    task: task('running'),
+    events: [],
+    access: 'public',
+    executorOwner: { pid: process.pid },
+  });
+  await expect(cleanupPluginRuntime({ defaultRegistry, removeData })).rejects.toThrow(
+    'Plugin task executors are still running',
+  );
+  expect(removeData).not.toHaveBeenCalled();
 });
 
 it('recovers abandoned active task records without starting a service', async () => {

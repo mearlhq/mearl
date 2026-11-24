@@ -92,7 +92,7 @@ export interface MearlLifecycleOptions {
   defaultPresetSource?: string;
   operation: MearlLifecycleOperation;
   cloudMode?: string;
-  /** Uninstall every registered CLI plugin and Provider in addition to selected environments. */
+  /** Remove all plugins and Providers, and delete local data when no environment remains. */
   full?: boolean;
   /** @deprecated Use profiles when selecting one or more composable environments. */
   profile?: MearlProfile;
@@ -332,10 +332,18 @@ export async function runMearlLifecycle(
       (() =>
         claimPresetInstallation(path.join(homedir(), '.agents', '.mearl-setup-lifecycle.json')))
     )();
+    const uninstallAll =
+      options.operation === 'uninstall' &&
+      options.full &&
+      !options.profile &&
+      !options.profiles?.length;
+    // Full removal can delete an incomplete preset without using it to select packages.
     const readManagement = () =>
-      (dependencies.readManagement ?? readInstallationManagement)({
-        directory: (options.env ?? process.env).MEARL_CAPABILITY_DIR,
-      });
+      uninstallAll
+        ? { revision: undefined, setup: undefined }
+        : (dependencies.readManagement ?? readInstallationManagement)({
+            directory: (options.env ?? process.env).MEARL_CAPABILITY_DIR,
+          });
     let acceptedRevision = (await readManagement()).revision;
     let selector = mearlPackageSelector(SETUP_VERSION, options.targetLine);
     const assertManagement = async (expected = acceptedRevision) => {
@@ -432,6 +440,10 @@ async function executeLifecycle(
     options.operation === 'uninstall'
       ? selected.filter(profile => detected.has(profile))
       : selected;
+  const removeData =
+    options.operation === 'uninstall' &&
+    options.full &&
+    PROFILE_ORDER.every(profile => !detected.has(profile) || lifecycleSelected.includes(profile));
   let fullPluginNames: string[] = [];
   let fullProviders: ReturnType<typeof listInstalledProviders> = [];
 
@@ -498,7 +510,11 @@ async function executeLifecycle(
               lifecycleSelected.length > 0
                 ? `Mearl environments (${lifecycleSelected.join(', ')}) and `
                 : ''
-            }all CLI plugins and Providers?`
+            }all CLI plugins and Providers?${
+              removeData
+                ? ' This permanently deletes ~/.mearl, including presets and user data.'
+                : ''
+            }`
           : `Uninstall Mearl environments: ${lifecycleSelected.join(', ')}?`,
       ))
     ) {
@@ -875,16 +891,14 @@ async function executeLifecycle(
   }
 
   if (packagesOk && skillOk && fullOk) {
-    if (
-      options.operation === 'uninstall' &&
-      options.full &&
-      PROFILE_ORDER.every(profile => !detected.has(profile) || lifecycleSelected.includes(profile))
-    ) {
+    if (removeData) {
       try {
         await (dependencies.cleanupRuntime ?? cleanupUninstalledRuntime)();
-        writeLine('Runtime caches: cleaned; user data and browser profiles were retained.');
+        writeLine('Mearl data directory removed (~/.mearl).');
       } catch (error) {
-        writeLine(`Runtime caches: ${error instanceof Error ? error.message : String(error)}`);
+        writeLine(
+          `Mearl data directory: ${error instanceof Error ? error.message : String(error)}`,
+        );
         return false;
       }
     }

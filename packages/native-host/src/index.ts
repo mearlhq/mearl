@@ -243,7 +243,6 @@ const LEGACY_SOCKET_PATH = socketPathFor('');
  */
 const INSTANCE_SOCKET_PATH = socketPathFor(`-${process.pid}`);
 
-const LOG_FILE = path.join(os.tmpdir(), 'mearl-native-host.log');
 const INVENTORY_IDLE_EXIT_MS = 1000;
 const ATTACH_REQUEST_IDLE_EXIT_MS = 10_000;
 const MAX_SOCKET_BUFFER_SIZE = 64 * 1024 * 1024;
@@ -522,12 +521,7 @@ function getControlSessionManager(): ControlSessionManager {
 }
 
 function log(...args: any[]): void {
-  const msg = `[${new Date().toISOString()}] [NativeHost] ${args.join(' ')}\n`;
-  try {
-    fs.appendFileSync(LOG_FILE, msg);
-  } catch {
-    // ignore logging errors
-  }
+  if (process.env.MEARL_DEBUG === '1') console.error('[NativeHost]', ...args);
 }
 
 const presetBrowserTransfer = new PresetBrowserTransfer();
@@ -1768,16 +1762,16 @@ async function main(): Promise<void> {
   process.on('SIGINT', () => cleanupAndExit(0));
   process.on('SIGTERM', () => cleanupAndExit(0));
   process.on('uncaughtException', (error: Error) => {
-    log('uncaughtException:', String(error));
+    console.error('[NativeHost] Uncaught exception:', error);
     cleanupAndExit(1);
   });
   process.on('unhandledRejection', (error: unknown) => {
-    log('unhandledRejection:', String(error));
+    console.error('[NativeHost] Unhandled rejection:', error);
     cleanupAndExit(1);
   });
 }
 
 main().catch((error: unknown) => {
-  log('main() failed:', String(error));
+  console.error('[NativeHost] Startup failed:', error);
   process.exit(1);
 });

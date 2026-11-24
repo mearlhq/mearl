@@ -32,6 +32,7 @@ import {
   claimRecord,
   writeRecordIfPid,
   isAlive,
+  processIdentity,
   type DaemonRecord,
 } from '@mearl/daemon-core';
 import type {
@@ -93,6 +94,7 @@ interface Identity {
   nativeHostVersion: string;
   transport: 'extension' | 'cdp';
   startedAt: string;
+  processIdentity?: string;
 }
 
 export function browserConnectionIdentity(
@@ -119,6 +121,7 @@ function persist(patch: Partial<BrowserRecord>): boolean {
   if (previous && previous.pid !== process.pid && isAlive(previous.pid)) return false;
   const record: BrowserRecord = {
     pid: process.pid,
+    processIdentity: identity.processIdentity,
     browserId: identity.browserId,
     socketPath: identity.socketPath,
     browserName: identity.browserName,
@@ -182,6 +185,7 @@ export function registerBrowser(info: {
     nativeHostVersion: info.nativeHostVersion,
     transport: info.transport,
     startedAt,
+    processIdentity: identity?.processIdentity ?? processIdentity(process.pid),
   };
   const previous = readRecord<BrowserRecord>(recordFileFor(info.browserId));
   const registered = persist({

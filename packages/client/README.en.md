@@ -363,7 +363,9 @@ try {
 }
 ```
 
-`wait` timeout or signal abort ends waiting only; `cancel(taskId)` cancels execution. Browser tasks require explicit `browser`, resolved to fixed IDs before acceptance. `get/list` return snapshots/result references; `list` has bounded pagination/`nextCursor`; `events` provides cursors, gaps, and snapshots; `subscribe` wraps long polling. `result(taskId)` losslessly reads and verifies chunks up to 64 MiB. Terminal records/results remain seven days.
+`wait` timeout or signal abort ends waiting only; `cancel(taskId)` cancels execution. Browser tasks require explicit `browser`, resolved to fixed IDs before acceptance. `get/list` return snapshots/result references; `list` has bounded pagination/`nextCursor`; `events` provides cursors, gaps, and snapshots; `subscribe` wraps long polling. `result(taskId)` losslessly reads and verifies chunks up to 64 MiB. Regular terminal records and results remain seven days. Page event and attach handlers use input during execution and record completion status. Regular cleanup can remove their records one hour after completion.
+
+To troubleshoot background plugin service startup, set `MEARL_DEBUG=1` in the launching process. It captures service output in `.host/service.log` under the plugin directory.
 
 Handshakes and `tasks.status()` return `version/buildId`; build IDs identify running code, while protocol versions determine compatibility. With matching protocols, different/missing version/build IDs do not interrupt tasks, models, pages, or state. To switch builds, confirm no active tasks/page operations, call `tasks.stopHost()`, and let the next business call start the current build. Reregistration does not restart services. After local client/host changes, root `pnpm build` generates matching fingerprints and both artifacts; `tsc --watch` alone does not.
 

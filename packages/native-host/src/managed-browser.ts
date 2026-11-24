@@ -445,9 +445,6 @@ export async function launchManagedBrowser(
       ? desktopChromeUserAgent(resolveChromeVersion(executablePath))
       : undefined;
   const userDataDir = profileDirectory(browserId, persistent);
-  const logDir = keyedDir(MANAGED_BROWSERS_SUBDIR);
-  mkdirSync(logDir, { recursive: true });
-  const logPath = join(logDir, `${hashKey(browserId)}.log`);
   let logFd: number | undefined;
 
   let chromePid = 0;
@@ -460,8 +457,13 @@ export async function launchManagedBrowser(
     await removeStoppedInstance(browserId);
     const existing = findManagedRecord(browserId);
     if (existing) throw new Error(`Managed browser already running: ${browserId}`);
-    rotateLogIfNeeded(logPath);
-    logFd = openSync(logPath, 'a', 0o600);
+    if (process.env.MEARL_DEBUG === '1') {
+      const logDir = keyedDir(MANAGED_BROWSERS_SUBDIR);
+      mkdirSync(logDir, { recursive: true, mode: 0o700 });
+      const logPath = join(logDir, `${hashKey(browserId)}.log`);
+      rotateLogIfNeeded(logPath);
+      logFd = openSync(logPath, 'a', 0o600);
+    }
     const exportedCookies =
       copyCookieDomains.length > 0
         ? await deps.exportCookies(copyCookieDomains)
@@ -471,7 +473,7 @@ export async function launchManagedBrowser(
     rmSync(join(userDataDir, 'DevToolsActivePort'), { force: true });
     const chrome = spawn(executablePath, chromeArgs, {
       detached: true,
-      stdio: ['ignore', 'ignore', logFd],
+      stdio: ['ignore', 'ignore', logFd ?? 'ignore'],
       windowsHide: headless,
     });
     await new Promise<void>((resolve, reject) => {

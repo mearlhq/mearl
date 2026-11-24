@@ -143,12 +143,10 @@ npx @mearl/setup provider uninstall example-device
 - `uninstall --full` 在环境卸载之外，还会逐项卸载所有已注册 CLI 插件与浏览器 Provider。
   Skills 安装的插件会同时移除 Skill；手工注册的外部插件只清除注册、保留源码；Provider
   只有在包管理器成功卸载 npm 包后才清除注册。单项失败不阻止其他项继续清理，命令最终返回非零。
-  该选项不删除 Chrome 扩展；`extension --full` 仍表示安装扩展及完整本地环境。
-- `uninstall --full` 在所有环境、插件与 Provider 成功移除后统一收尾：停止插件执行服务，
-  确认没有活跃或退出状态未明的任务，再删除任务历史、源码快照、服务日志和已结束宿主的页面会话文件。只卸载部分环境、单项失败或服务重新启动时保留共享缓存。
-  即使包和注册已移除，也可以再次运行该命令完成缓存收尾。自定义 `MEARL_PLUGIN_DIR` 只清理该注册表的执行缓存。
-  记事本、迭代记录、配置与身份、插件持久状态、Provider 私有数据、浏览器配置及用户导出的设计稿均保留；
-  CDP 标签 ID 计数也保留，防止旧请求命中新标签。
+  Chrome 商店安装的扩展由 Chrome 管理。`extension --full` 安装扩展及完整本地环境。
+- 所有环境、插件与 Provider 成功移除后，`uninstall --full` 会停止本地服务并**永久删除整个 `~/.mearl`**，
+  包括本地 Preset、配置、笔记、浏览器配置、扩展解压文件和所有缓存。只卸载部分环境、单项失败或仍有进程占用数据目录时会保留该目录。
+  在包和注册已移除后也可以再次运行该命令完成删除。目录级删除限于 `~/.mearl`，外部插件注册仍由各插件的卸载步骤处理。
 - `--mcp` 的客户端配置和清理由 `@mearl/mcp-server` 自己的命令完成。
 - 默认的 `install` / `update` 不处理浏览器扩展。`extension` 是独立命令：从
   `https://github.com/mearlhq/mearl/releases/download/v<version>/` 读取同版本 beta 扩展发行元数据（正式 setup 使用 `releases/latest/download/`）并下载对应的 `mearl-chrome-v*.zip`，原子解压到
@@ -258,7 +256,7 @@ npx @mearl/setup uninstall --local
 # 自动检测并无交互卸载
 npx @mearl/setup uninstall --yes
 
-# 卸载环境，并清理全部 CLI 插件与 Provider
+# 完整卸载并删除 ~/.mearl
 npx @mearl/setup uninstall --full
 
 # 安装可选浏览器 Provider

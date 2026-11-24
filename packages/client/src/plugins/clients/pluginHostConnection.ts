@@ -54,6 +54,14 @@ interface TaskConnection {
 }
 const starting = new Map<string, Promise<void>>();
 
+function hostNotReady(cause?: unknown): Error {
+  const diagnostic =
+    process.env.MEARL_DEBUG === '1'
+      ? 'Inspect the service.log file.'
+      : 'Retry with MEARL_DEBUG=1 to capture startup diagnostics.';
+  return new Error(`Plugin execution service did not become ready. ${diagnostic}`, { cause });
+}
+
 async function ensureHost(runtimePath: string): Promise<void> {
   const paths = pluginHostPaths();
   let work = starting.get(paths.registry);
@@ -77,13 +85,16 @@ async function ensureHost(runtimePath: string): Promise<void> {
       try {
         const owner = readRecord(paths.lease);
         if (owner && isProcessOwnerAlive(owner)) return;
-        mkdirSync(paths.home, { recursive: true, mode: 0o700 });
-        rotateLogIfNeeded(paths.log);
-        const log = openSync(paths.log, 'a', 0o600);
+        let log: number | undefined;
         try {
+          if (process.env.MEARL_DEBUG === '1') {
+            mkdirSync(paths.home, { recursive: true, mode: 0o700 });
+            rotateLogIfNeeded(paths.log);
+            log = openSync(paths.log, 'a', 0o600);
+          }
           const child = spawn(process.execPath, [runtimePath], {
             detached: true,
-            stdio: ['ignore', log, log],
+            stdio: ['ignore', log ?? 'ignore', log ?? 'ignore'],
             windowsHide: true,
           });
           await new Promise<void>((resolve, reject) => {
@@ -92,7 +103,7 @@ async function ensureHost(runtimePath: string): Promise<void> {
           });
           child.unref();
         } finally {
-          closeSync(log);
+          if (log !== undefined) closeSync(log);
         }
         const deadline = Date.now() + 10000;
         while (Date.now() < deadline) {
@@ -109,7 +120,7 @@ async function ensureHost(runtimePath: string): Promise<void> {
           if (ready) return;
           await new Promise(resolve => setTimeout(resolve, 50));
         }
-        throw new Error('Plugin execution service startup timed out');
+        throw hostNotReady();
       } finally {
         removeRecordIfPid(lock, process.pid);
       }
@@ -162,9 +173,7 @@ export class PluginHostConnection {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     } while (Date.now() < deadline);
-    throw new Error('Plugin execution service did not become ready; inspect its service.log', {
-      cause: failure,
-    });
+    throw hostNotReady(failure);
   }
 
   private async open(socketPath: string, generation: number): Promise<TaskConnection> {

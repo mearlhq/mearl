@@ -25,6 +25,7 @@ vi.mock('@mearl/daemon-core', () => ({
     return true;
   },
   isAlive: () => true,
+  processIdentity: () => 'fixture-identity',
 }));
 
 import {
@@ -74,6 +75,7 @@ describe('browser discovery focus rank', () => {
     });
 
     expect(records.get('cdp')?.lastFocusedAt).toBe(-1);
+    expect(records.get('cdp')?.processIdentity).toBe('fixture-identity');
     expect(listRegisteredBrowsers().map(browser => browser.browserId)).toEqual([
       'extension-a',
       'cdp',
