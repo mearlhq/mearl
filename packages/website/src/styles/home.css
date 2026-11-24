@@ -17,8 +17,35 @@
 }
 
 .product-hero {
-  padding-block: clamp(48px, 6vw, 84px) clamp(40px, 5vw, 64px);
+  position: relative;
+  isolation: isolate;
+  padding-block: clamp(58px, 7.25vw, 104px) clamp(44px, 5.5vw, 72px);
   text-align: center;
+}
+
+.product-hero::before,
+.product-hero::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  content: '';
+}
+
+.product-hero::before {
+  background:
+    radial-gradient(ellipse at 25% 40%, color-mix(in srgb, var(--blue) 9%, transparent), transparent 54%),
+    radial-gradient(ellipse at 78% 35%, color-mix(in srgb, var(--blue) 15%, transparent), transparent 56%);
+  mask-image: radial-gradient(ellipse at center, #000 18%, transparent 71%);
+}
+
+.product-hero::after {
+  background: repeating-radial-gradient(
+    ellipse at 71% 118%,
+    transparent 0 35px,
+    color-mix(in srgb, var(--blue) 13%, transparent) 35px 36px
+  );
+  mask-image: radial-gradient(ellipse at center, transparent 22%, #000 52%, transparent 71%);
 }
 
 .product-license {
@@ -49,7 +76,7 @@
 .product-lead {
   max-width: 59ch;
   margin: 22px auto 28px;
-  color: var(--muted);
+  color: color-mix(in srgb, var(--muted) 78%, var(--ink));
   font-size: clamp(16px, 1.5vw, 19px);
   line-height: 1.65;
   text-wrap: pretty;
