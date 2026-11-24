@@ -2,6 +2,7 @@
 import { ArrowRight } from '@lucide/astro';
 import DocsLayout from '../layouts/DocsLayout.astro';
 import CodeBlock from './CodeBlock.astro';
+import ExtensionInstallLinks from './ExtensionInstallLinks.astro';
 import ProductScreenshot from './ProductScreenshot.astro';
 import { docPath, sitePath, type Locale } from '../lib/site';
 import { siteCopy } from '../lib/site-copy';
@@ -23,6 +24,9 @@ const topics = [{ id: 'quiet-defaults', label: copy.quietTitle }, ...entryPoints
     <p class="docs-eyebrow"><span></span>{t.gettingStarted}</p>
     <h1>{t.chromeExtension}</h1>
     <p class="docs-lead">{t.extensionLead}</p>
+    <div class="extension-install-actions">
+      <ExtensionInstallLinks {locale} />
+    </div>
     <div class="docs-topic-grid docs-task-grid">
       {entryPoints.map(({ id, title, text }) => (
         <a href={`#${id}`}><strong>{title}<ArrowRight size={15} aria-hidden="true" /></strong><span>{text}</span></a>
@@ -103,6 +107,7 @@ const topics = [{ id: 'quiet-defaults', label: copy.quietTitle }, ...entryPoints
 </DocsLayout>
 
 <style>
+  .extension-install-actions { margin-top: 18px; }
   .popup-workflow + .popup-workflow {
     border-top: 1px solid var(--docs-border);
     margin-top: 24px;

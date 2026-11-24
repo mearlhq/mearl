@@ -144,7 +144,7 @@
 .docs-code-bar button { padding: 3px 9px; min-width: 5.5em; min-height: 30px; border: 1px solid var(--docs-border); border-radius: 5px; color: var(--muted); background: var(--docs-canvas); cursor: pointer; }
 .docs-code-bar button:hover { color: var(--blue); }
 .docs-code pre { margin: 0; padding: 13px 15px; overflow: auto; color: var(--docs-title); font-size: 13px; line-height: 1.7; }
-.docs-prompt { background: var(--docs-accent-surface); border-color: var(--accent-border); }
+.docs-prompt { border-color: var(--accent-border); }
 .docs-prompt > p { margin: 0; padding: 14px 16px; color: var(--docs-title); overflow-wrap: anywhere; }
 .docs-article a:not(.button) { color: var(--blue); }
 .docs-next { font-weight: 600; }

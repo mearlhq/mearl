@@ -44,6 +44,7 @@ const registerReportPlugin = `npx @mearl/setup plugin ./skills/report-export
 mearl report-export --help`;
 const adapterSetup =
   'npx @mearl/setup plugin install mearlhq/mearl --github --skill mearl-bbrowser';
+const adapterUpdate = 'mearl bbrowser site update';
 const adapterCommands = `mearl bbrowser site search bilibili
 mearl bbrowser site info bilibili/popular
 mearl bbrowser site bilibili/popular 10`;
@@ -934,9 +935,15 @@ mearl session_manage --browser '<browserId>' --payload '{"operation":"end","keep
           command: adapterSetup,
         },
         {
+          id: 'catalog',
+          title: 'Download or update the community catalog',
+          text: 'Run this command if you need to download the community catalog or refresh your local copy.',
+          command: adapterUpdate,
+        },
+        {
           id: 'run',
           title: 'Find an adapter and check its inputs',
-          text: 'Search the local catalog for Bilibili adapters, then use site info to check the arguments for bilibili/popular. The first argument, count, sets how many videos to fetch. The second, page, defaults to 1. The last command requests 10 popular videos from the first page. If the adapter is missing, run mearl bbrowser site update to download the community catalog.',
+          text: 'Search the local catalog for Bilibili adapters, then use site info to check the arguments for bilibili/popular. The first argument, count, sets how many videos to fetch. The second, page, defaults to 1. The last command requests 10 popular videos from the first page.',
           command: adapterCommands,
           links: [
             {
@@ -980,9 +987,15 @@ mearl session_manage --browser '<browserId>' --payload '{"operation":"end","keep
           command: adapterSetup,
         },
         {
+          id: 'catalog',
+          title: '下载或更新社区目录',
+          text: '需要下载社区适配器目录，或更新本地目录时，运行以下命令。',
+          command: adapterUpdate,
+        },
+        {
           id: 'run',
           title: '查找适配器并确认参数',
-          text: '先在本地目录搜索 B 站适配器，再用 site info 查看 bilibili/popular 的参数。第一个参数 count 是视频条数，第二个参数 page 是页码，默认从第 1 页开始。最后一条命令获取第 1 页的 10 条热门视频。如果找不到适配器，先运行 mearl bbrowser site update 下载社区目录。',
+          text: '先在本地目录搜索 B 站适配器，再用 site info 查看 bilibili/popular 的参数。第一个参数 count 是视频条数，第二个参数 page 是页码，默认从第 1 页开始。最后一条命令获取第 1 页的 10 条热门视频。',
           command: adapterCommands,
           links: [
             {
