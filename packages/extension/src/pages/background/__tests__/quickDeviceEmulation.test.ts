@@ -435,6 +435,7 @@ describe('quick device emulation', () => {
         splitScreen: true,
       }),
       expect.any(Function),
+      { startWithDeviceShell: true },
     );
   });
 

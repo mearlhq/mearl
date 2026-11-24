@@ -4,6 +4,7 @@ export interface WebViewNavigationClient {
 
 export interface WebViewNavigationRequest {
   requestId: string;
+  redirectedRequestId?: string;
   frameId?: string;
   resourceType?: string;
   responseStatusCode?: number;
@@ -123,6 +124,7 @@ export function createRootWebViewNavigation(options: RootWebViewNavigationOption
     { url: string; expiresAt: number; stage: 'request' | 'commit' | 'webview' } | undefined;
   let mainFrame: WebViewFrameTree['frame'] | undefined;
   let rootFrameId: string | undefined;
+  let firstWebViewRequestId: string | undefined;
   let committedRoot: { id: string; origin: string } | undefined;
   const directChildFrames = new Set<string>();
   let navigationHops = 0;
@@ -257,7 +259,7 @@ export function createRootWebViewNavigation(options: RootWebViewNavigationOption
   return {
     isSameOriginRootNavigation,
     preserveNavigationSource,
-    prepareShellReload(): (() => void) | undefined {
+    prepareShellReload(directNavigationUrl?: string): (() => void) | undefined {
       if (
         disposed ||
         !options.keepSameOriginNavigation ||
@@ -268,8 +270,9 @@ export function createRootWebViewNavigation(options: RootWebViewNavigationOption
       )
         return;
       const url = new URL(mainFrame.url);
-      // Reload URLs with parameters or fragments through the normal top navigation, including login callbacks.
-      if (url.search || url.hash || mainFrame.urlFragment) return;
+      // A parameterized URL needs evidence of a direct visit to the current document.
+      if (url.hash || mainFrame.urlFragment || (url.search && url.href !== directNavigationUrl))
+        return;
       const reload = {
         url: url.href,
         expiresAt: Date.now() + DOCUMENT_TTL_MS,
@@ -321,6 +324,7 @@ export function createRootWebViewNavigation(options: RootWebViewNavigationOption
           }
           mainFrame = frame;
           rootFrameId = undefined;
+          firstWebViewRequestId = undefined;
           committedRoot = undefined;
           directChildFrames.clear();
         } else if (mainFrame && frame.parentId === mainFrame.id) {
@@ -328,6 +332,7 @@ export function createRootWebViewNavigation(options: RootWebViewNavigationOption
           if (frame.id === rootFrameId || frame.name === '__mearl_root__') {
             rootFrameId = frame.id;
             if (/^https?:/.test(frame.url)) {
+              firstWebViewRequestId = undefined;
               navigationHops = 0;
               const hasPreviousDocument = committedRoot?.id === frame.id;
               const destination = new URL(frame.url);
@@ -431,6 +436,7 @@ export function createRootWebViewNavigation(options: RootWebViewNavigationOption
         shellReload = undefined;
         if (
           params.request.method === 'GET' &&
+          !params.redirectedRequestId &&
           !params.request.urlFragment &&
           destination.href === reload.url
         ) {
@@ -467,11 +473,13 @@ export function createRootWebViewNavigation(options: RootWebViewNavigationOption
         shellReload?.stage === 'webview' &&
         !responseStage &&
         params.request.method === 'GET' &&
+        !params.redirectedRequestId &&
         destination.href === shellReload.url &&
         directChildFrames.has(params.frameId)
       ) {
         // The shell contains a single initial WebView. Register it before its request can redirect.
         rootFrameId = params.frameId;
+        firstWebViewRequestId = params.requestId;
         committedRoot = { id: params.frameId, origin: destination.origin };
         shellReload = undefined;
         return false;
@@ -515,13 +523,16 @@ export function createRootWebViewNavigation(options: RootWebViewNavigationOption
       if (responseStage || params.frameId !== rootFrameId || params.request.method !== 'GET')
         return false;
       const current = new URL(mainFrame.url);
+      const redirectedFromFirstRequest =
+        firstWebViewRequestId !== undefined && params.redirectedRequestId === firstWebViewRequestId;
       if (
         !/^https?:$/.test(current.protocol) ||
-        isSameOriginRootNavigation(params) ||
+        (!redirectedFromFirstRequest && isSameOriginRootNavigation(params)) ||
         (await options.preserveOrigin?.(current, destination))
       )
         return false;
       if (navigationHops >= 20) return false;
+      firstWebViewRequestId = undefined;
       await requestClient.sendCommand('Fetch.fulfillRequest', {
         requestId: params.requestId,
         responseCode: 204,

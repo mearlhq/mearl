@@ -773,6 +773,7 @@ async function applyAppSimulation(
         reload: data.reload,
       },
       () => null,
+      { startWithDeviceShell: true },
     )) as unknown as Record<string, unknown>;
     return {
       ...appResult,

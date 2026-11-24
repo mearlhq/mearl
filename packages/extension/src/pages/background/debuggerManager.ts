@@ -55,6 +55,7 @@ import {
   getDeviceShellForTab,
   type DeviceShellEmulationConfig,
 } from './deviceShellRules';
+import { getDirectDeviceShellNavigationUrl } from './deviceShellNavigation';
 import { getAppProfileBootstrapHeaderForTab, getAppProfileForTab } from './utils/appProfileRules';
 import { getSimulationSitePattern, getSimulationSiteUrl } from '../../shared/permissionRequest';
 import {
@@ -1834,10 +1835,13 @@ export async function reloadTabInSession(
   options: { startWithDeviceShell?: boolean } = {},
 ): Promise<void> {
   await withDebuggerSession(tabId, 'emulation-reload', async () => {
+    const directNavigationUrl = options.startWithDeviceShell
+      ? await getDirectDeviceShellNavigationUrl(tabId).catch(() => undefined)
+      : undefined;
     const state = tabStates.get(tabId);
     const cancel =
       options.startWithDeviceShell && !state?.modificationActive
-        ? state?.rootWebViewNavigation?.prepareShellReload()
+        ? state?.rootWebViewNavigation?.prepareShellReload(directNavigationUrl)
         : undefined;
     try {
       await chrome.debugger.sendCommand({ tabId }, 'Page.reload', { ignoreCache: false });

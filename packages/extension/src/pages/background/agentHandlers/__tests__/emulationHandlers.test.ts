@@ -140,6 +140,7 @@ describe('device emulation handler', () => {
         reload: false,
       },
       () => null,
+      { startWithDeviceShell: true },
     );
 
     expect(deviceShellRuleMocks.applyDeviceShellForTab).toHaveBeenCalledWith(
@@ -156,7 +157,7 @@ describe('device emulation handler', () => {
       1,
       expect.objectContaining({ presetName: 'iphone-17-pro' }),
       'https://example.test/',
-      { devicePrepared: true },
+      { devicePrepared: true, startWithDeviceShell: true },
     );
     expect(enabled).toMatchObject({ deviceShell: true, reloaded: true });
 

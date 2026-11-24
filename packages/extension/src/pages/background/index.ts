@@ -314,6 +314,7 @@ import {
 import { captureAppSimulatorScreenshot } from './appSimulatorScreenshot';
 import { deleteQuickDeviceSimulationState } from './quickDeviceSimulationState';
 import { cleanupClosedTabDeviceShell, getDeviceShellForTab } from './deviceShellRules';
+import { clearDeviceShellNavigation, recordDeviceShellNavigation } from './deviceShellNavigation';
 
 // ==================== Agent 初始化 ====================
 
@@ -660,9 +661,10 @@ async function notifyPanelPageNavigation(details: {
 }
 
 chrome.webNavigation.onCommitted.addListener(details => {
-  if (details.frameId === 0)
+  if (details.frameId === 0) {
+    void recordDeviceShellNavigation(details).catch(() => {});
     notifyPanelDocumentCommit(details.tabId, details.url, details.timeStamp);
-  else void notifyPanelPageNavigation(details).catch(() => {});
+  } else void notifyPanelPageNavigation(details).catch(() => {});
 });
 
 chrome.webNavigation.onHistoryStateUpdated.addListener(details => {
@@ -2728,6 +2730,7 @@ chrome.webNavigation.onCreatedNavigationTarget.addListener(details => {
 
 // 清理已关闭的 tab
 chrome.tabs.onRemoved.addListener(tabId => {
+  void clearDeviceShellNavigation(tabId).catch(() => {});
   void clearSimulationSitePermission(tabId).catch(() => {});
   closeDevicePreviewPanel(tabId);
   void Promise.all([

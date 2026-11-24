@@ -1051,7 +1051,9 @@ export class AgentBridge {
         );
       case 'set_device_emulation':
         return runSerializedQuickSimulationUpdate(data.tabId, () =>
-          handleSetDeviceEmulation(data, () => this.getActiveTabId()),
+          handleSetDeviceEmulation(data, () => this.getActiveTabId(), {
+            startWithDeviceShell: true,
+          }),
         );
       case 'set_app_profile':
         return handleSetAppSimulation(data, () => this.getActiveTabId());

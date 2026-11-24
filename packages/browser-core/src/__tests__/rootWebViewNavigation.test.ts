@@ -132,6 +132,33 @@ describe('root WebView navigation', () => {
     navigation.dispose();
   });
 
+  it('streams a directly opened page with a query and promotes its first HTTP redirect', async () => {
+    const { navigation, sendCommand } = fixture();
+    const url = 'https://business.example/results?sort=recent&sort=price';
+    const frame = { id: 'main', url, mimeType: 'text/html' };
+    navigation.initialize({ frame });
+    expect(
+      navigation.prepareShellReload('https://business.example/results?sort=recent'),
+    ).toBeUndefined();
+    expect(navigation.prepareShellReload(url)).toBeTypeOf('function');
+    expect(await navigation.handle(request('main', url))).toBe(true);
+    navigation.handleFrameEvent('Page.frameNavigated', { frame });
+    navigation.handleFrameEvent('Page.frameAttached', { frameId: 'root', parentFrameId: 'main' });
+
+    const documentRequest = { ...request('root', url), requestId: 'initial-webview' };
+    expect(await navigation.handle(documentRequest)).toBe(false);
+    const callbackUrl = 'https://business.example/callback?ticket=once';
+    expect(
+      await navigation.handle({
+        ...request('root', callbackUrl),
+        redirectedRequestId: documentRequest.requestId,
+      }),
+    ).toBe(true);
+    expect(sendCommand).toHaveBeenLastCalledWith('Page.navigate', { url: callbackUrl });
+    expect(sendCommand).not.toHaveBeenCalledWith('Fetch.getResponseBody', expect.anything());
+    navigation.dispose();
+  });
+
   it.each([false, true])(
     'delivers a synthetic HTML response at the response/request stage (%s)',
     async requestStage => {
