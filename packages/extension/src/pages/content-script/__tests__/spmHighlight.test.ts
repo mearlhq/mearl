@@ -71,6 +71,25 @@ async function flushSpmMutation() {
 }
 
 describe('SPM full-page overlay', () => {
+  it('tracks elements when highlighting starts before the body is available', async () => {
+    const body = document.body;
+    body.remove();
+    const target = document.createElement('div');
+    target.setAttribute('data-spm-abcd', 'a.b.card.button');
+    body.appendChild(target);
+
+    highlighter = createSpmHighlighter();
+    try {
+      highlighter.toggleAllSpmOverlay(true);
+    } finally {
+      document.documentElement.appendChild(body);
+    }
+    await flushSpmMutation();
+    FakeIntersectionObserver.current?.show(target);
+
+    expect(document.querySelectorAll('[data-mtop-spm-all-overlay]')).toHaveLength(1);
+  });
+
   it('can be closed and reopened with a fresh overlay lifecycle', () => {
     const target = document.createElement('button');
     target.setAttribute('data-spm-abcd', 'a.b.comment.comment_rate');

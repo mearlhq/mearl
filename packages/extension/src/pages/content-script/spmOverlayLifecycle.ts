@@ -149,7 +149,7 @@ export function createSpmOverlayLifecycle(hooks: SpmOverlayLifecycleHooks): SpmO
       if (mutationTimer !== null) clearTimeout(mutationTimer);
       mutationTimer = setTimeout(flushMutations, MUTATION_DEBOUNCE_MS);
     });
-    mutationObserver.observe(document.body, {
+    mutationObserver.observe(document.body ?? document, {
       childList: true,
       subtree: true,
       attributes: true,
