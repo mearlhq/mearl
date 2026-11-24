@@ -13,6 +13,7 @@ import {
   selectElementPickerStartupFrames,
   selectInitialElementPickerFrame,
   setActiveElementPickerSession,
+  shouldKeepElementPickerSessionActive,
 } from '../elementPickerRuntime';
 
 describe('elementPickerRuntime', () => {
@@ -96,6 +97,7 @@ describe('elementPickerRuntime', () => {
     setActiveElementPickerSession(11, {
       traceMode: false,
       spmMode: true,
+      continuousSpmMode: true,
       commentMode: true,
       continuousCommentMode: true,
       topPage: { url: 'https://example.test/', title: 'Example' },
@@ -109,6 +111,7 @@ describe('elementPickerRuntime', () => {
       expect.objectContaining({
         action: 'startElementPicker',
         spmMode: true,
+        continuousSpmMode: true,
         commentMode: true,
         continuousCommentMode: true,
       }),
@@ -166,6 +169,25 @@ describe('elementPickerRuntime', () => {
 
     clearActiveElementPickerSession(11);
     expect(isCurrentElementPickerSessionMessage(11, 'current-session')).toBe(false);
+  });
+
+  it('keeps only continuous SPM sessions active after a selection', () => {
+    setActiveElementPickerSession(11, {
+      traceMode: false,
+      spmMode: true,
+      continuousSpmMode: true,
+      commentMode: false,
+    });
+
+    expect(shouldKeepElementPickerSessionActive(11, 'ELEMENT_PICKED')).toBe(true);
+    expect(shouldKeepElementPickerSessionActive(11, 'ELEMENT_PICK_CANCELLED')).toBe(false);
+
+    setActiveElementPickerSession(11, {
+      traceMode: false,
+      spmMode: true,
+      commentMode: false,
+    });
+    expect(shouldKeepElementPickerSessionActive(11, 'ELEMENT_PICKED')).toBe(false);
   });
 
   it('activates the top frame on pages and the deepest child in app simulation', () => {

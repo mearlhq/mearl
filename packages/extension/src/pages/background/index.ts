@@ -116,6 +116,7 @@ import {
   getActiveElementPickerSession,
   getElementPickerPreviewFrameIds,
   isCurrentElementPickerSessionMessage,
+  shouldKeepElementPickerSessionActive,
   restoreElementPickerSessionForFrame,
   selectElementPickerStartupFrames,
   selectInitialElementPickerFrame,
@@ -2046,9 +2047,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const traceOwner = sourceTraceOwners.get(tabId);
         if (message.type === 'TRACE_RESULT' && !traceOwner) return;
         if (traceOwner && !getActiveElementPickerSession(tabId)) return;
-        nextElementPickerStartGeneration(tabId);
-        clearActiveElementPickerSession(tabId);
-        void sendTabMessageToFramesSafe(tabId, { action: 'stopElementPicker' });
+        const keepSpmPickerActive = shouldKeepElementPickerSessionActive(tabId, message.type);
+        if (!keepSpmPickerActive) {
+          nextElementPickerStartGeneration(tabId);
+          clearActiveElementPickerSession(tabId);
+          void sendTabMessageToFramesSafe(tabId, { action: 'stopElementPicker' });
+        }
         if (traceOwner) {
           postToSourceTraceOwner(tabId, traceOwner.previewPort, {
             ...message,
@@ -2330,6 +2334,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const session = {
         traceMode: !!message.traceMode,
         spmMode: !!message.spmMode,
+        continuousSpmMode: !!message.continuousSpmMode,
         ...(typeof message.pickerSessionId === 'string'
           ? { pickerSessionId: message.pickerSessionId }
           : {}),

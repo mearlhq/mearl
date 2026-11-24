@@ -62,6 +62,55 @@ it('starts the shared picker in SPM-only mode', async () => {
   });
 });
 
+it('keeps a continuous SPM picker active after repeated selections', async () => {
+  const onPicked = vi.fn();
+  const listeners = vi.spyOn(chrome.runtime.onMessage, 'addListener');
+  const { result } = renderHook(() => useElementPicker({ onPicked, tabId: 42 }));
+
+  await act(async () => {
+    result.current.start({ spmMode: true, continuousSpmMode: true });
+  });
+  expect(sendMessageSafely).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      action: 'startElementPicker',
+      continuousSpmMode: true,
+    }),
+  );
+
+  const pickerSessionId = (vi.mocked(sendMessageSafely).mock.lastCall?.[0] as any).pickerSessionId;
+  const receive = listeners.mock.lastCall![0];
+  const sender = { tab: { id: 42 } } as chrome.runtime.MessageSender;
+  act(() => {
+    receive(
+      {
+        source: 'mearl-content-script',
+        type: 'ELEMENT_PICKED',
+        pickerSessionId,
+        frameToken: 'frame-1',
+        text: 'First',
+        spm: 'module.first',
+      },
+      sender,
+      vi.fn(),
+    );
+    receive(
+      {
+        source: 'mearl-content-script',
+        type: 'ELEMENT_PICKED',
+        pickerSessionId,
+        frameToken: 'frame-1',
+        text: 'Second',
+        spm: 'module.second',
+      },
+      sender,
+      vi.fn(),
+    );
+  });
+
+  expect(onPicked).toHaveBeenCalledTimes(2);
+  expect(result.current.isPicking).toBe(true);
+});
+
 it('forwards an SPM-only selection even when it has no text or element snapshot', async () => {
   const onPicked = vi.fn();
   const listeners = vi.spyOn(chrome.runtime.onMessage, 'addListener');

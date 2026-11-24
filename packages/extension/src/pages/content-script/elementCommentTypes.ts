@@ -63,6 +63,7 @@ export interface ElementCommentLabels {
 export interface ElementPickerOptions {
   traceMode?: boolean;
   spmMode?: boolean;
+  continuousSpmMode?: boolean;
   pickerSessionId?: string;
   commentMode?: boolean;
   continuousCommentMode?: boolean;

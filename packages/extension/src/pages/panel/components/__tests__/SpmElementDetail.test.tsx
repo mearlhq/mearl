@@ -28,4 +28,9 @@ it('shows DOM tracking configuration without requiring a captured event', () => 
   expect(container).toHaveTextContent('locaid=comment_rate');
   expect(container).toHaveTextContent('Rate comment');
   expect(container).toHaveTextContent('button#comment-rate');
+  const markup = container.querySelector('code.language-markup')!;
+  expect(markup.querySelector('.token.tag')).not.toBeNull();
+  expect(markup.querySelector('.token.attr-name')).not.toBeNull();
+  expect(markup.querySelector('.token.attr-value')).not.toBeNull();
+  expect(markup.querySelector('button')).toBeNull();
 });

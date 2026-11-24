@@ -149,6 +149,7 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
   const [rumEvents, setRumEvents] = useState<RumEvent[]>([]);
   const [selectedRumEventId, setSelectedRumEventId] = useState<string | null>(null);
   const [selectedSpmElement, setSelectedSpmElement] = useState<ElementPickerSelection | null>(null);
+  const [spmPickerContinuous, setSpmPickerContinuous] = useState(false);
   const handleSpmPicked = useCallback((_text: string, selection: ElementPickerSelection) => {
     if (!selection.spm) return;
     setSelectedRumEventId(null);
@@ -158,9 +159,13 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
     tabId,
     onPicked: handleSpmPicked,
     onPreview: handleSpmPicked,
+    onCancelled: () => setSpmPickerContinuous(false),
   });
   const spmPickerIsPickingRef = useRef(spmPicker.isPicking);
   spmPickerIsPickingRef.current = spmPicker.isPicking;
+  useEffect(() => {
+    if (!spmPicker.isPicking) setSpmPickerContinuous(false);
+  }, [spmPicker.isPicking]);
   useEffect(() => {
     if (mode === 'rum' && showAllSpm) return;
     if (spmPicker.isPicking) spmPicker.cancel();
@@ -884,10 +889,20 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
         accountsEnabled={accountsEnabled}
         onToggleSourceTrace={sourceTracer.toggle}
         sourceTraceActive={sourceTracer.isPicking}
-        onToggleSpmPicker={() =>
-          spmPicker.isPicking ? spmPicker.cancel() : spmPicker.start({ spmMode: true })
-        }
+        onToggleSpmPicker={() => {
+          if (spmPicker.isPicking) {
+            spmPicker.cancel();
+            return;
+          }
+          setSpmPickerContinuous(false);
+          spmPicker.start({ spmMode: true });
+        }}
+        onEnableContinuousSpmPicker={() => {
+          setSpmPickerContinuous(true);
+          spmPicker.start({ spmMode: true, continuousSpmMode: true });
+        }}
         spmPickerActive={spmPicker.isPicking}
+        spmPickerContinuous={spmPickerContinuous}
       />
       {!isDevtools && (
         <div

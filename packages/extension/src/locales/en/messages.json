@@ -128,7 +128,10 @@
     "message": "Highlight all SPM nodes on page (green=abcd, orange=click, blue=spm)"
   },
   "spmPickerTip": {
-    "message": "Pick an SPM highlight on the page to inspect its event details"
+    "message": "Click to pick once; double-click to keep picking"
+  },
+  "spmPickerContinuousTip": {
+    "message": "Continuous SPM picking is on; click again to stop"
   },
   "spmElementDetail": {
     "message": "Page tracking details"

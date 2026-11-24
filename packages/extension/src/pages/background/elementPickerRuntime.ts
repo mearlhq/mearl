@@ -21,6 +21,7 @@ type ElementPickerInjectionTarget =
 export interface ActiveElementPickerSession {
   traceMode: boolean;
   spmMode?: boolean;
+  continuousSpmMode?: boolean;
   pickerSessionId?: string;
   commentMode: boolean;
   continuousCommentMode?: boolean;
@@ -177,6 +178,11 @@ export function isCurrentElementPickerSessionMessage(
   return Boolean(session && session.pickerSessionId === pickerSessionId);
 }
 
+export function shouldKeepElementPickerSessionActive(tabId: number, messageType: string): boolean {
+  const session = activeElementPickerSessions.get(tabId);
+  return Boolean(messageType === 'ELEMENT_PICKED' && session?.spmMode && session.continuousSpmMode);
+}
+
 export function selectInitialElementPickerFrame(
   frameIds: number[],
   preferChildFrame: boolean,
@@ -222,6 +228,7 @@ export async function restoreElementPickerSessionForFrame(
         action: 'startElementPicker',
         traceMode: session.traceMode,
         spmMode: !!session.spmMode,
+        continuousSpmMode: !!session.continuousSpmMode,
         pickerSessionId: session.pickerSessionId,
         commentMode: session.commentMode,
         ...(session.continuousCommentMode !== undefined

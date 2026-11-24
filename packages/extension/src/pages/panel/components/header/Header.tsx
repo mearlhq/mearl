@@ -41,7 +41,9 @@ interface HeaderProps {
   onToggleSourceTrace?: () => void;
   sourceTraceActive?: boolean;
   onToggleSpmPicker?: () => void;
+  onEnableContinuousSpmPicker?: () => void;
   spmPickerActive?: boolean;
+  spmPickerContinuous?: boolean;
 }
 
 export const Header: FC<HeaderProps> = ({
@@ -72,7 +74,9 @@ export const Header: FC<HeaderProps> = ({
   onToggleSourceTrace,
   sourceTraceActive = false,
   onToggleSpmPicker,
+  onEnableContinuousSpmPicker,
   spmPickerActive = false,
+  spmPickerContinuous = false,
 }) => {
   const remoteConfig = useRemoteConfig();
   const integrationTitle = agentConnected
@@ -123,8 +127,10 @@ export const Header: FC<HeaderProps> = ({
         {mode === 'rum' && showAllSpm && onToggleSpmPicker && (
           <SpmPickerButton
             active={spmPickerActive}
+            continuous={spmPickerContinuous}
             onClick={onToggleSpmPicker}
-            title={t('spmPickerTip')}
+            onDoubleClick={onEnableContinuousSpmPicker}
+            title={spmPickerContinuous ? t('spmPickerContinuousTip') : t('spmPickerTip')}
           />
         )}
 

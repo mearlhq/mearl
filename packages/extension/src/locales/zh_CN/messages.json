@@ -124,7 +124,10 @@
     "message": "高亮页面中所有 SPM 节点（绿=abcd，橙=click，蓝=spm）"
   },
   "spmPickerTip": {
-    "message": "选取页面中的 SPM 高亮框并查看埋点详情"
+    "message": "单击选取一次，双击进入连续选取模式"
+  },
+  "spmPickerContinuousTip": {
+    "message": "连续选取 SPM 中；再次单击关闭"
   },
   "spmElementDetail": {
     "message": "页面埋点详情"

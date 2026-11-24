@@ -1,4 +1,6 @@
-import { FC, useState } from 'react';
+import { FC, useMemo, useState } from 'react';
+import Prism from './prismSetup';
+import 'prismjs/components/prism-markup';
 import type { ElementPickerSelection } from '../../content-script/elementCommentTypes';
 import { t } from '../utils/i18n';
 import { DetailRow } from './detail/DetailRow';
@@ -34,6 +36,14 @@ export const SpmElementDetail: FC<SpmElementDetailProps> = ({
     Object.entries(attributes).filter(([name]) => name.startsWith('data-spm')),
   );
   const pageUrl = selection.frame?.url ?? selection.page.url;
+  const domMarkup = useMemo(
+    () => element?.outerHTML?.replace(/\sdata-mtop-spm-source-id=(['"])[^'"]*\1/g, '') ?? '',
+    [element?.outerHTML],
+  );
+  const highlightedDom = useMemo(
+    () => (domMarkup ? Prism.highlight(domMarkup, Prism.languages.markup, 'markup') : ''),
+    [domMarkup],
+  );
 
   return (
     <div className="w-full h-full overflow-auto bg-bg-primary text-text-primary p-3">
@@ -79,9 +89,12 @@ export const SpmElementDetail: FC<SpmElementDetailProps> = ({
           />
           <DetailRow label="XPath" value={element.xpath} showCopy copyText={element.xpath} />
           <JsonViewer json={attributes} defaultExpandDepth={1} />
-          {element.outerHTML && (
-            <pre className="mt-2 rounded bg-bg-secondary p-2 text-xxs font-mono whitespace-pre-wrap break-all text-text-secondary">
-              {element.outerHTML.replace(/\sdata-mtop-spm-source-id=(['"])[^'"]*\1/g, '')}
+          {domMarkup && (
+            <pre className="prism-highlight mt-2 rounded bg-bg-secondary p-2 text-xxs font-mono whitespace-pre-wrap break-all text-text-secondary">
+              <code
+                className="language-markup"
+                dangerouslySetInnerHTML={{ __html: highlightedDom }}
+              />
             </pre>
           )}
         </DetailSection>

@@ -614,12 +614,6 @@ export function createElementPicker(coordinator: ElementPickerCoordinator = {}):
     document.documentElement.appendChild(highlight);
     pickerHighlight = highlight;
 
-    const isOwn = (el: Element) => el === highlight || isElementCommentMarker(el);
-    const resolveTarget = (clientX: number, clientY: number): Element | null => {
-      const target = document.elementFromPoint(clientX, clientY);
-      if (!target || isOwn(target)) return null;
-      return activeOptions.spmMode ? target.closest(SPM_OVERLAY_SELECTOR) : target;
-    };
     const resolveSpmSource = (overlay: Element): Element => {
       const sourceId = overlay.getAttribute(SPM_SOURCE_ID_ATTR);
       if (!sourceId) return overlay;
@@ -628,6 +622,71 @@ export function createElementPicker(coordinator: ElementPickerCoordinator = {}):
           `[${SPM_SOURCE_ID_ATTR}="${CSS.escape(sourceId)}"]:not([data-mtop-spm-all-overlay])`,
         ) ?? overlay
       );
+    };
+    const isOwn = (el: Element) => el === highlight || isElementCommentMarker(el);
+    let lastSpmCycle:
+      { x: number; y: number; candidateKey: string; selectedIndex: number } | undefined;
+    const resolveTarget = (
+      clientX: number,
+      clientY: number,
+      cycleOverlappingSpm = false,
+    ): Element | null => {
+      const target = document.elementFromPoint(clientX, clientY);
+      if (!target || isOwn(target)) return null;
+      if (!activeOptions.spmMode) return target;
+
+      const directOverlay = target.closest(SPM_OVERLAY_SELECTOR);
+      // The label may overflow the source rectangle. Clicking it should always select the
+      // overlay that owns the label, even when another tracked element is underneath.
+      if (directOverlay && target !== directOverlay) return directOverlay;
+
+      const stack =
+        typeof document.elementsFromPoint === 'function'
+          ? document.elementsFromPoint(clientX, clientY)
+          : [target];
+      const overlays = Array.from(
+        new Set(
+          stack
+            .map(element => element.closest(SPM_OVERLAY_SELECTOR))
+            .filter((element): element is Element => element !== null),
+        ),
+      );
+      if (overlays.length === 0) return null;
+
+      overlays.sort((left, right) => {
+        const leftSource = resolveSpmSource(left);
+        const rightSource = resolveSpmSource(right);
+        if (leftSource !== rightSource) {
+          if (leftSource.contains(rightSource)) return 1;
+          if (rightSource.contains(leftSource)) return -1;
+        }
+        const leftRect = left.getBoundingClientRect();
+        const rightRect = right.getBoundingClientRect();
+        return leftRect.width * leftRect.height - rightRect.width * rightRect.height;
+      });
+      const candidateKey = overlays
+        .map(
+          overlay =>
+            overlay.getAttribute(SPM_SOURCE_ID_ATTR) ||
+            overlay.getAttribute('data-mtop-spm-value') ||
+            '',
+        )
+        .join('|');
+      const isSamePoint = Boolean(
+        lastSpmCycle &&
+        Math.hypot(clientX - lastSpmCycle.x, clientY - lastSpmCycle.y) <= 8 &&
+        lastSpmCycle.candidateKey === candidateKey,
+      );
+      if (cycleOverlappingSpm) {
+        const selectedIndex = isSamePoint
+          ? ((lastSpmCycle?.selectedIndex ?? 0) + 1) % overlays.length
+          : 0;
+        lastSpmCycle = { x: clientX, y: clientY, candidateKey, selectedIndex };
+        return overlays[selectedIndex];
+      }
+      if (isSamePoint && lastSpmCycle) return overlays[lastSpmCycle.selectedIndex];
+      lastSpmCycle = undefined;
+      return overlays[0];
     };
 
     let hoveredElement: Element | null = null;
@@ -718,7 +777,10 @@ export function createElementPicker(coordinator: ElementPickerCoordinator = {}):
       if (selectionOptions.spmMode && !spm) return;
       const selectedTarget = spm ? resolveSpmSource(target) : target;
       const text = getDisplayText(selectedTarget);
-      removePickerSurface();
+      const keepSpmPickerActive = Boolean(
+        selectionOptions.spmMode && selectionOptions.continuousSpmMode,
+      );
+      if (!keepSpmPickerActive) removePickerSurface();
 
       if (wasTraceMode) {
         activeTraceMode = false;
@@ -791,7 +853,8 @@ export function createElementPicker(coordinator: ElementPickerCoordinator = {}):
         return;
       }
 
-      activeOptions = {};
+      if (!keepSpmPickerActive) activeOptions = {};
+      else updateHighlight(target);
       sendPickedElement(
         selectedTarget,
         text,
@@ -863,7 +926,7 @@ export function createElementPicker(coordinator: ElementPickerCoordinator = {}):
         }
         const touchedPoint = e.changedTouches[0];
         const touchedTarget = touchedPoint
-          ? resolveTarget(touchedPoint.clientX, touchedPoint.clientY)
+          ? resolveTarget(touchedPoint.clientX, touchedPoint.clientY, true)
           : null;
         if (touchedTarget && isElementCommentMarker(touchedTarget)) return;
         const target = touchedTarget || (activeOptions.spmMode ? null : hoveredElement);
@@ -896,7 +959,7 @@ export function createElementPicker(coordinator: ElementPickerCoordinator = {}):
         ) {
           return;
         }
-        const target = resolveTarget(e.clientX, e.clientY);
+        const target = resolveTarget(e.clientX, e.clientY, true);
         if (!target) {
           stopSpmEventPropagation(e, true);
           return;

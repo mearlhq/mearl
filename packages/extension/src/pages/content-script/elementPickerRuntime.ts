@@ -38,6 +38,7 @@ export function installElementPickerRuntime(): void {
       elementPicker.startElementPicker({
         traceMode: !!message.traceMode,
         spmMode: !!message.spmMode,
+        ...(message.continuousSpmMode ? { continuousSpmMode: true } : {}),
         ...(typeof message.pickerSessionId === 'string'
           ? { pickerSessionId: message.pickerSessionId }
           : {}),

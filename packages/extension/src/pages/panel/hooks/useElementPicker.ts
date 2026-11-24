@@ -69,6 +69,7 @@ export function useElementPicker({
     (selection: ElementPickerSelection) => {
       const text = selection.text.trim();
       if (text || selection.element || selection.spm) onPicked(text, selection);
+      if (pickerOptionsRef.current.spmMode && pickerOptionsRef.current.continuousSpmMode) return;
       pickingTabIdRef.current = null;
       pickerSessionIdRef.current = null;
       activeFrameTokenRef.current = null;
@@ -200,6 +201,7 @@ export function useElementPicker({
         pickerSessionId,
         ...(options.traceMode ? { traceMode: true } : {}),
         ...(options.spmMode ? { spmMode: true } : {}),
+        ...(options.continuousSpmMode ? { continuousSpmMode: true } : {}),
         ...(options.commentMode ? { commentMode: true } : {}),
         ...(options.continuousCommentMode !== undefined
           ? { continuousCommentMode: options.continuousCommentMode }

@@ -223,6 +223,76 @@ describe('elementPicker', () => {
     }
   });
 
+  it('prefers the deepest highlighted SPM point when overlays overlap', async () => {
+    document.body.innerHTML = `
+      <section id="module" data-spm="flight-home" data-mtop-spm-source-id="module-source">
+        <button id="child" data-spm-click="locaid=search" data-mtop-spm-source-id="child-source">
+          Search
+        </button>
+      </section>
+    `;
+    const moduleSource = document.querySelector('#module')!;
+    const childSource = document.querySelector('#child')!;
+    const moduleOverlay = document.createElement('div');
+    moduleOverlay.setAttribute('data-mtop-spm-all-overlay', '1');
+    moduleOverlay.setAttribute('data-mtop-spm-value', 'page.flight-home');
+    moduleOverlay.setAttribute('data-mtop-spm-source-id', 'module-source');
+    moduleOverlay.getBoundingClientRect = vi.fn(
+      () => ({ top: 0, left: 0, right: 400, bottom: 600, width: 400, height: 600 }) as DOMRect,
+    );
+    const childOverlay = document.createElement('div');
+    childOverlay.setAttribute('data-mtop-spm-all-overlay', '1');
+    childOverlay.setAttribute('data-mtop-spm-value', 'flight-home.search');
+    childOverlay.setAttribute('data-mtop-spm-source-id', 'child-source');
+    childOverlay.getBoundingClientRect = vi.fn(
+      () => ({ top: 200, left: 80, right: 320, bottom: 260, width: 240, height: 60 }) as DOMRect,
+    );
+    document.documentElement.append(moduleOverlay, childOverlay);
+
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: vi.fn(() => moduleOverlay),
+    });
+    Object.defineProperty(document, 'elementsFromPoint', {
+      configurable: true,
+      value: vi.fn(() => [moduleOverlay, childOverlay, childSource, moduleSource]),
+    });
+
+    const picker = createElementPicker();
+    picker.startElementPicker({ spmMode: true, continuousSpmMode: true });
+    document.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, cancelable: true, clientX: 160, clientY: 230 }),
+    );
+
+    await vi.waitFor(() =>
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'ELEMENT_PICKED',
+          spm: 'flight-home.search',
+          text: 'Search',
+          element: expect.objectContaining({ id: 'child' }),
+        }),
+      ),
+    );
+    expect(document.getElementById('mearl-pick-highlight')).not.toBeNull();
+
+    vi.mocked(chrome.runtime.sendMessage).mockClear();
+    document.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, cancelable: true, clientX: 160, clientY: 230 }),
+    );
+    await vi.waitFor(() =>
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'ELEMENT_PICKED',
+          spm: 'page.flight-home',
+          element: expect.objectContaining({ id: 'module' }),
+        }),
+      ),
+    );
+    expect(document.getElementById('mearl-pick-highlight')).not.toBeNull();
+    picker.stopElementPicker(false);
+  });
+
   it('picks an element from a touch tap without requiring touch movement', async () => {
     const target = document.querySelector('#submit')!;
     Object.defineProperty(document, 'elementFromPoint', {
