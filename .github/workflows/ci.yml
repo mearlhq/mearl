@@ -48,4 +48,5 @@ jobs:
           node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile --ignore-scripts
-      - run: pnpm --filter @mearl/daemon-core test src/__tests__/command.test.ts
+      - name: Verify Windows batch commands
+        run: pnpm --filter @mearl/daemon-core test src/__tests__/command.test.ts -t "Windows batch commands"
