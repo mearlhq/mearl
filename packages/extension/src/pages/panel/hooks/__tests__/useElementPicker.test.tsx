@@ -64,8 +64,9 @@ it('starts the shared picker in SPM-only mode', async () => {
 
 it('keeps a continuous SPM picker active after repeated selections', async () => {
   const onPicked = vi.fn();
+  const onPreview = vi.fn();
   const listeners = vi.spyOn(chrome.runtime.onMessage, 'addListener');
-  const { result } = renderHook(() => useElementPicker({ onPicked, tabId: 42 }));
+  const { result } = renderHook(() => useElementPicker({ onPicked, onPreview, tabId: 42 }));
 
   await act(async () => {
     result.current.start({ spmMode: true, continuousSpmMode: true });
@@ -84,11 +85,35 @@ it('keeps a continuous SPM picker active after repeated selections', async () =>
     receive(
       {
         source: 'mearl-content-script',
+        type: 'ELEMENT_PICK_PREVIEW',
+        pickerSessionId,
+        frameToken: 'frame-1',
+        text: 'Preview before selection',
+        spm: 'module.preview',
+      },
+      sender,
+      vi.fn(),
+    );
+    receive(
+      {
+        source: 'mearl-content-script',
         type: 'ELEMENT_PICKED',
         pickerSessionId,
         frameToken: 'frame-1',
         text: 'First',
         spm: 'module.first',
+      },
+      sender,
+      vi.fn(),
+    );
+    receive(
+      {
+        source: 'mearl-content-script',
+        type: 'ELEMENT_PICK_PREVIEW',
+        pickerSessionId,
+        frameToken: 'frame-1',
+        text: 'Hover after selection',
+        spm: 'module.hovered',
       },
       sender,
       vi.fn(),
@@ -108,6 +133,10 @@ it('keeps a continuous SPM picker active after repeated selections', async () =>
   });
 
   expect(onPicked).toHaveBeenCalledTimes(2);
+  expect(onPreview).toHaveBeenCalledExactlyOnceWith(
+    'Preview before selection',
+    expect.objectContaining({ spm: 'module.preview' }),
+  );
   expect(result.current.isPicking).toBe(true);
 });
 

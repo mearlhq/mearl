@@ -57,9 +57,6 @@ export const SpmPickerButton: FC<SpmPickerButtonProps> = ({
       title={title}
     >
       <MapPin size={14} />
-      {continuous && (
-        <span className="absolute right-0.5 top-0.5 h-1 w-1 rounded-full bg-current" />
-      )}
     </button>
   );
 };

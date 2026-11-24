@@ -44,6 +44,7 @@ it('distinguishes a delayed single click from continuous-mode double click', () 
     expect(onClick).not.toHaveBeenCalled();
     expect(onDoubleClick).toHaveBeenCalledOnce();
     expect(button).toHaveAttribute('data-continuous', 'true');
+    expect(button.querySelector('span')).toBeNull();
   } finally {
     vi.useRealTimers();
   }

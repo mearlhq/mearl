@@ -41,6 +41,7 @@ export function useElementPicker({
   const sessionSequenceRef = useRef(0);
   const pickerSessionIdRef = useRef<string | null>(null);
   const activeFrameTokenRef = useRef<string | null>(null);
+  const previewLockedRef = useRef(false);
   const pickingTabIdRef = useRef<number | null>(null);
   const pickerOptionsRef = useRef<ElementPickerOptions>({});
 
@@ -59,6 +60,7 @@ export function useElementPicker({
     pickingTabIdRef.current = null;
     pickerSessionIdRef.current = null;
     activeFrameTokenRef.current = null;
+    previewLockedRef.current = false;
     pickerOptionsRef.current = {};
     onCancelled?.();
     if (targetTabId === null) return;
@@ -69,7 +71,10 @@ export function useElementPicker({
     (selection: ElementPickerSelection) => {
       const text = selection.text.trim();
       if (text || selection.element || selection.spm) onPicked(text, selection);
-      if (pickerOptionsRef.current.spmMode && pickerOptionsRef.current.continuousSpmMode) return;
+      if (pickerOptionsRef.current.spmMode && pickerOptionsRef.current.continuousSpmMode) {
+        previewLockedRef.current = true;
+        return;
+      }
       pickingTabIdRef.current = null;
       pickerSessionIdRef.current = null;
       activeFrameTokenRef.current = null;
@@ -83,6 +88,7 @@ export function useElementPicker({
     pickingTabIdRef.current = null;
     pickerSessionIdRef.current = null;
     activeFrameTokenRef.current = null;
+    previewLockedRef.current = false;
     pickerOptionsRef.current = {};
     setIsPicking(false);
     onCancelled?.();
@@ -136,8 +142,9 @@ export function useElementPicker({
           page: message.page ?? { url: sender.tab?.url ?? '', title: sender.tab?.title ?? '' },
           ...(message.frame ? { frame: message.frame } : {}),
         };
-        if (message.type === 'ELEMENT_PICK_PREVIEW') onPreview?.(selection.text, selection);
-        else finish(selection);
+        if (message.type === 'ELEMENT_PICK_PREVIEW') {
+          if (!previewLockedRef.current) onPreview?.(selection.text, selection);
+        } else finish(selection);
       } else if (message.type === 'ELEMENT_COMMENT_CONFIRMED') {
         const comment = typeof message.comment === 'string' ? message.comment.trim() : '';
         const styleChanges =
@@ -180,6 +187,7 @@ export function useElementPicker({
       pickingTabIdRef.current = targetTabId;
       pickerSessionIdRef.current = pickerSessionId;
       activeFrameTokenRef.current = null;
+      previewLockedRef.current = false;
       pickerOptionsRef.current = options;
       setIsPicking(true);
       const resetFailedStart = () => {
@@ -192,6 +200,7 @@ export function useElementPicker({
         pickingTabIdRef.current = null;
         pickerSessionIdRef.current = null;
         activeFrameTokenRef.current = null;
+        previewLockedRef.current = false;
         pickerOptionsRef.current = {};
         setIsPicking(false);
       };
@@ -230,6 +239,7 @@ export function useElementPicker({
       pickingTabIdRef.current = null;
       pickerSessionIdRef.current = null;
       activeFrameTokenRef.current = null;
+      previewLockedRef.current = false;
       pickerOptionsRef.current = {};
       setIsPicking(false);
     };
@@ -284,6 +294,7 @@ export function useElementPicker({
       pickingTabIdRef.current = null;
       pickerSessionIdRef.current = null;
       activeFrameTokenRef.current = null;
+      previewLockedRef.current = false;
       pickerOptionsRef.current = {};
       if (targetTabId === null) return;
       void sendMessageSafely({ action: 'cancelElementPicker', tabId: targetTabId }).catch(() => {});
