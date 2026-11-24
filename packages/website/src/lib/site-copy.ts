@@ -40,7 +40,7 @@ export const siteCopy = {
     openSource: 'Open source · Apache-2.0',
     headline: 'Browser automation and debugging for AI agents',
     heroLead:
-      'Work in the browser you already use, with its open tabs and sign-in. Connect your agent through Skills or MCP, or use the CLI and TypeScript SDK directly.',
+      'Let your agent interact with pages, inspect network requests and console logs, and verify results. Reuse open tabs and signed-in sessions in Chrome.',
     mobileGuide: 'Device emulation guide',
     capabilityOverview: 'What you can do with Mearl',
     capabilityGroups: {
@@ -188,7 +188,7 @@ export const siteCopy = {
     openSource: '开源 · Apache-2.0',
     headline: '用 AI Agent 操作和调试网页',
     heroLead:
-      '使用你已经打开的浏览器，沿用现有标签页和登录态。通过 Skill 或 MCP 接入 Agent，也可以直接使用 CLI 或 TypeScript SDK。',
+      '让 Agent 在浏览器里操作页面、查看网络请求和控制台日志，并验证结果。接入日常使用的 Chrome，可沿用已有标签页和登录态。',
     mobileGuide: '设备模拟指南',
     capabilityOverview: '用 Mearl 可以做什么',
     capabilityGroups: {
