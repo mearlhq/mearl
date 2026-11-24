@@ -68,6 +68,9 @@ function installationError(error: unknown): string {
     return t('presetInstallHostUpdateRequired');
   if (text.includes('INVALID_SKILL_REPLACEMENT_SELECTION'))
     return t('presetInstallReplacementChanged');
+  const manifestPermission = 'INSTALLATION_MANIFEST_PERMISSION_REQUIRED ';
+  if (text.startsWith(manifestPermission))
+    return t('presetInstallManifestPermissionRequired', text.slice(manifestPermission.length));
   if (text === 'INSTALLATION_PERMISSION_RETRY') return t('presetInstallPermissionRetry');
   if (text.includes('PERMISSION')) return t('presetInstallPermissionFailed');
   if (text.includes('BUNDLE_INTEGRITY')) return t('presetInstallIntegrityFailed');
@@ -426,7 +429,9 @@ export function Installation({
     phase === 'permission' && view
       ? [...new Set([...view.missingOrigins, ...view.missingAuthorization])]
       : [];
-  const sourceHost = view?.sourceRequest && new URL(view.sourceRequest.requestingPage).host;
+  const sourceRequest = view?.sourceRequest;
+  const sourceHost =
+    sourceRequest && new URL(sourceRequest.requestingPage ?? sourceRequest.presetUrl).host;
   const presetChoices = view?.presetChoices ?? [];
   const showPresetSelector = phase === 'permission' && presetChoices.length > 1;
   let title = t('presetInstallTitle');
@@ -554,7 +559,9 @@ export function Installation({
         )}
         {phase === 'source' && (
           <p className="text-xs leading-relaxed text-text-secondary">
-            {t('presetInstallReadSourceHint')}
+            {sourceRequest?.presetUrl
+              ? t('presetInstallReadPresetHint')
+              : t('presetInstallReadSourceHint')}
           </p>
         )}
         {phase === 'permission' && view && (
@@ -594,19 +601,23 @@ export function Installation({
               {t('presetInstallSourceTitle')}
             </summary>
             <dl className="mt-2 space-y-2 rounded border border-border bg-bg-secondary p-3">
-              <div>
-                <dt>{t('presetInstallRequestingPage')}</dt>
-                <dd className="mt-1 break-all select-text text-text-primary">
-                  {view.sourceRequest.requestingPage}
-                </dd>
-              </div>
-              <div>
-                <dt>{t('presetInstallCatalogSource')}</dt>
-                <dd className="mt-1 break-all select-text text-text-primary">
-                  {view.sourceRequest.catalogUrl}
-                </dd>
-              </div>
-              {!view.needsSourceConfirmation && (
+              {view.sourceRequest.catalogUrl && (
+                <>
+                  <div>
+                    <dt>{t('presetInstallRequestingPage')}</dt>
+                    <dd className="mt-1 break-all select-text text-text-primary">
+                      {view.sourceRequest.requestingPage}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{t('presetInstallCatalogSource')}</dt>
+                    <dd className="mt-1 break-all select-text text-text-primary">
+                      {view.sourceRequest.catalogUrl}
+                    </dd>
+                  </div>
+                </>
+              )}
+              {(view.sourceRequest.presetUrl || !view.needsSourceConfirmation) && (
                 <div>
                   <dt>{t('presetInstallPresetSource')}</dt>
                   <dd className="mt-1 break-all select-text text-text-primary">{view.source}</dd>
@@ -794,7 +805,9 @@ export function Installation({
             className="min-h-8 rounded border border-transparent bg-accent-blue px-3 py-1.5 text-xs font-medium text-white hover:brightness-90 focus-visible:ring-2 focus-visible:ring-accent-blue dark:border-accent-blue/40 dark:bg-accent-bg dark:text-text-primary dark:hover:brightness-125"
           >
             {phase === 'source'
-              ? t('presetInstallReadSource')
+              ? sourceRequest?.presetUrl
+                ? t('presetInstallReadPreset')
+                : t('presetInstallReadSource')
               : view.missingOrigins.length
                 ? t('presetInstallAllow')
                 : t('presetInstallConfirmOnce')}

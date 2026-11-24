@@ -10,7 +10,7 @@ import { Button } from './Button';
 
 async function request<T>(
   operation: 'status' | 'install-available' | 'install',
-  options?: { inline: true; presetId?: string },
+  options?: { inline: true; presetId?: string; source?: string },
 ): Promise<T> {
   const response = await chrome.runtime.sendMessage({
     action: PRESET_MANAGEMENT_ACTION,
@@ -32,6 +32,8 @@ function installationDialogContainer() {
 
 export function InstalledPresets() {
   const [presets, setPresets] = useState<InstalledPreset[]>();
+  const [statusFailed, setStatusFailed] = useState(false);
+  const [sourceDraft, setSourceDraft] = useState<string>();
   const [canInstall, setCanInstall] = useState(false);
   const [installationSession, setInstallationSession] = useState<string>();
   const [opening, setOpening] = useState(false);
@@ -44,9 +46,13 @@ export function InstalledPresets() {
       const current = ++version;
       void request<InstalledPreset[]>('status').then(
         result => {
-          if (mounted && current === version && Array.isArray(result)) setPresets(result);
+          if (!mounted || current !== version) return;
+          setStatusFailed(!Array.isArray(result));
+          if (Array.isArray(result)) setPresets(result);
         },
-        () => {},
+        () => {
+          if (mounted && current === version) setStatusFailed(true);
+        },
       );
     };
     const onMessage = (message: { action?: string }) => {
@@ -85,12 +91,15 @@ export function InstalledPresets() {
     installTrigger.current = null;
   }, [installationSession]);
 
-  async function openInstall(trigger: HTMLButtonElement, presetId?: string) {
+  async function openInstall(
+    trigger: HTMLButtonElement,
+    selection: { presetId?: string; source?: string },
+  ) {
     setOpening(true);
     try {
       const opened = await request<InstallationOpening>('install', {
         inline: true,
-        ...(presetId ? { presetId } : {}),
+        ...selection,
       });
       if (opened.inline) {
         installTrigger.current = trigger;
@@ -99,17 +108,22 @@ export function InstalledPresets() {
     } catch (error) {
       const unavailable =
         error instanceof Error && error.message.includes('INSTALLATION_PRESET_UNAVAILABLE');
-      if (!unavailable) console.warn('[Installation] Could not open the preset selector', error);
-      showToast(
-        unavailable ? t('presetManagementNoPresets') : t('presetManagementOpenFailed'),
-        'error',
-      );
+      const invalid =
+        error instanceof Error && error.message.includes('INSTALLATION_SOURCE_DENIED');
+      if (!unavailable && !invalid)
+        console.warn('[Installation] Could not open the preset selector', error);
+      const message = invalid
+        ? t('presetManagementInvalidLink')
+        : unavailable
+          ? t('presetManagementNoPresets')
+          : t('presetManagementOpenFailed');
+      showToast(message, 'error');
     } finally {
       setOpening(false);
     }
   }
 
-  if (!presets || (isEmpty && !canInstall && !installationSession)) return null;
+  const source = sourceDraft ?? presets?.[0]?.source ?? '';
   const installer =
     installationSession &&
     createPortal(
@@ -120,7 +134,11 @@ export function InstalledPresets() {
           setInstallationSession(undefined);
           void request<InstalledPreset[]>('status')
             .then(result => {
-              if (Array.isArray(result)) setPresets(result);
+              if (Array.isArray(result)) {
+                setPresets(result);
+                setStatusFailed(false);
+                if (result[0]?.source !== presets?.[0]?.source) setSourceDraft(undefined);
+              }
             })
             .catch(() => {});
         }}
@@ -131,10 +149,13 @@ export function InstalledPresets() {
     <Button
       type="button"
       size="sm"
-      className="min-w-14 shrink-0"
+      className="h-5 min-w-14 shrink-0 py-0"
       disabled={opening}
       loading={opening}
-      onClick={event => void openInstall(event.currentTarget, presets[0]?.id)}
+      onClick={event => {
+        const presetId = presets?.[0]?.id;
+        void openInstall(event.currentTarget, presetId ? { presetId } : {});
+      }}
     >
       {isEmpty ? t('presetManagementInstall') : t('presetManagementUpdate')}
     </Button>
@@ -142,37 +163,74 @@ export function InstalledPresets() {
   return (
     <>
       <section id="installed-presets" className="space-y-3" aria-label={t('presetManagementTitle')}>
-        {(isEmpty ? [undefined] : presets).map((preset, index) => (
+        {(presets?.length ? presets : [undefined]).map((preset, index) => (
           <div
-            key={preset?.nativeRevision ?? preset?.browserRevision ?? 'empty'}
-            className="flex items-center justify-between gap-2 rounded border border-border bg-bg-secondary p-4"
+            key={index === 0 ? 'primary' : (preset?.nativeRevision ?? preset?.browserRevision)}
+            className="space-y-1 rounded border border-border bg-bg-secondary p-4"
           >
-            <div className="min-w-0 flex-1">
-              <h2 className="mb-1.5 truncate text-xs font-medium text-text-primary">
-                {index === 0 ? t('presetManagementTitle') : preset?.id}
-              </h2>
-              {preset ? (
-                <div className="flex items-baseline gap-x-1.5 text-xs text-text-secondary">
-                  {index === 0 && (
-                    <span className="max-w-[50%] shrink-0 truncate" title={preset.id}>
-                      {preset.id}
-                    </span>
-                  )}
-                  {preset.version && <span className="shrink-0">v{preset.version}</span>}
-                  {preset.nativeRevision && (
-                    <span className="min-w-0 truncate" title={t('presetManagementLocal')}>
-                      {t('presetManagementLocal')}
-                    </span>
-                  )}
-                  <span className="min-h-lh min-w-0 flex-1 truncate" title={preset.source}>
-                    {preset.source}
-                  </span>
-                </div>
-              ) : (
-                <p className="text-xs text-text-secondary">{t('presetManagementDescription')}</p>
-              )}
+            <div className="flex h-4 items-center justify-between gap-2">
+              <div className="flex min-w-0 flex-1 items-baseline gap-2">
+                <h2 className="shrink-0 text-xs font-medium text-text-primary">
+                  {index === 0 ? t('presetManagementTitle') : preset?.id}
+                </h2>
+                {preset ? (
+                  <div className="flex min-w-0 items-baseline gap-x-1.5 text-2xs text-text-secondary">
+                    {index === 0 && (
+                      <span className="min-w-0 truncate" title={preset.id}>
+                        {preset.id}
+                      </span>
+                    )}
+                    {preset.version && <span className="shrink-0">v{preset.version}</span>}
+                    {preset.nativeRevision && (
+                      <span className="min-w-0 truncate" title={t('presetManagementLocal')}>
+                        {t('presetManagementLocal')}
+                      </span>
+                    )}
+                    {index > 0 && (
+                      <span className="min-w-0 flex-1 truncate" title={preset.source}>
+                        {preset.source}
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <p className="truncate text-2xs text-text-secondary">
+                    {statusFailed
+                      ? t('presetManagementStatusFailed')
+                      : t('presetManagementDescription')}
+                  </p>
+                )}
+              </div>
+              {index === 0 && (presets?.length || canInstall) ? installButton : null}
             </div>
-            {index === 0 && installButton}
+            {index === 0 && (
+              <form
+                className="flex h-6 items-stretch gap-2"
+                onSubmit={event => {
+                  event.preventDefault();
+                  const trigger = event.currentTarget.querySelector<HTMLButtonElement>('button');
+                  if (trigger && !opening && source.trim())
+                    void openInstall(trigger, { source: source.trim() });
+                }}
+              >
+                <input
+                  type="url"
+                  maxLength={4096}
+                  aria-label={t('presetManagementLink')}
+                  placeholder={t('presetManagementLink')}
+                  className="min-w-0 flex-1 rounded border border-border bg-bg-primary px-2 text-xs text-text-primary focus-visible:outline focus-visible:outline-accent-blue"
+                  value={source}
+                  onChange={event => setSourceDraft(event.currentTarget.value)}
+                />
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="shrink-0 py-0"
+                  disabled={opening || !source.trim()}
+                >
+                  {t('presetManagementUseLink')}
+                </Button>
+              </form>
+            )}
           </div>
         ))}
       </section>

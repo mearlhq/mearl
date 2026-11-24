@@ -7,6 +7,7 @@ Use `@3` to select the latest stable 3.x installer and install matching runtime 
 One-time installation, updates, removal, and configuration for Mearl environments. No global setup installation is needed:
 
 Run `node --version` before installation to verify Node.js >= 20.18.0.
+In Windows PowerShell, use `npx.cmd`, for example `npx.cmd @mearl/setup`.
 
 ```bash
 npx @mearl/setup [install] [--local] [--cloud] [--cloud-mode <id>] [--mcp]

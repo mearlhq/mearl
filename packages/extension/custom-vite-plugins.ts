@@ -1,7 +1,8 @@
 import fs from 'fs';
 import { resolve, dirname } from 'path';
 import type { PluginOption } from 'vite';
-import { build } from 'vite';
+import { build, normalizePath } from 'vite';
+import ts from 'typescript';
 import { APP_PROFILE_RUNTIME_ASSET } from './src/shared/appProfileRuntimeAsset';
 
 /** 单独生成 classic script，供 manifest 同步加载以及后台读取 CDP 注入源码。 */
@@ -140,6 +141,38 @@ export function validateClassicContentScripts (): PluginOption {
         throw new Error(
           `${fileName} must be self-contained, but imports ${output.imports.join(', ')}`,
         );
+      }
+    },
+  };
+}
+
+// Chrome extension service workers only support static module imports.
+export function validateServiceWorkerModules(entry: string): PluginOption {
+  function hasDynamicImport(node: ts.Node): boolean {
+    return (
+      (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) ||
+      ts.forEachChild(node, hasDynamicImport) === true
+    );
+  }
+
+  return {
+    name: 'validate-service-worker-modules',
+    apply: 'build',
+    generateBundle(_, bundle) {
+      const entryId = normalizePath(fs.realpathSync(entry));
+      const root = Object.values(bundle).find(
+        output => output.type === 'chunk' && output.facadeModuleId === entryId,
+      );
+      if (!root) this.error(`Service worker entry was not emitted: ${entry}`);
+      const files = new Set([root.fileName]);
+      for (const file of files) {
+        const output = bundle[file];
+        if (output?.type !== 'chunk') continue;
+        const source = ts.createSourceFile(file, output.code, ts.ScriptTarget.Latest);
+        if (hasDynamicImport(source)) {
+          this.error(`Service worker dependency ${file} uses unsupported dynamic imports`);
+        }
+        for (const imported of output.imports) files.add(imported);
       }
     },
   };

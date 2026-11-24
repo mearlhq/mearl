@@ -114,7 +114,8 @@ export class ManagedAgentPrograms {
   }
 
   install(id: unknown, status: () => Promise<AgentChatStatus>): Promise<AgentChatStatus> {
-    if (typeof id !== 'string' || !canInstall(id)) throw new Error('Unsupported Agent installation');
+    if (typeof id !== 'string' || !canInstall(id))
+      throw new Error('Unsupported Agent installation');
     const active = this.installing.get(id);
     if (active) return active;
     const pending = this.installMissing(id, status).finally(() => this.installing.delete(id));
@@ -138,8 +139,11 @@ export class ManagedAgentPrograms {
       candidates: () => executableFileCandidates(qoderExecutableCandidatePaths({ env })),
       probe: async command => {
         const failed = 'Qoder CLI version check failed';
-        const result = await this.run(command, ['--version'], { env, capture: true, timeoutMs: 5_000 })
-          .catch(() => null);
+        const result = await this.run(command, ['--version'], {
+          env,
+          capture: true,
+          timeoutMs: 5_000,
+        }).catch(() => null);
         return result?.code === 0 ? null : failed;
       },
       notFoundError: 'Qoder CLI was not found',
@@ -152,6 +156,7 @@ export class ManagedAgentPrograms {
       env: { ...env, BROWSER: 'www-browser' },
       stdio: ['ignore', 'pipe', 'ignore'],
       windowsHide: true,
+      windowsVerbatimArguments: launch.windowsVerbatimArguments,
     });
     return new Promise((resolve, reject) => {
       const lines = createInterface({ input: child.stdout! });
@@ -192,7 +197,8 @@ export class ManagedAgentPrograms {
     }
     const provider = current.providers.find(candidate => candidate.id === id);
     if (provider?.available) return this.describe(current);
-    if (!provider || provider.acceptsNewSessions === false) throw new Error('Agent runtime is unavailable');
+    if (!provider || provider.acceptsNewSessions === false)
+      throw new Error('Agent runtime is unavailable');
 
     await this.installPackage(id, AGENT_PROGRAMS[id].packageName, this.executableFiles(id), false);
     current = await status();
@@ -228,7 +234,8 @@ export class ManagedAgentPrograms {
         npm,
         [
           'install',
-          '--prefix', staging,
+          '--prefix',
+          staging,
           '--global=false',
           '--no-save',
           '--no-package-lock',

@@ -3248,6 +3248,12 @@
   "presetInstallReadSource": {
     "message": "读取安装配置"
   },
+  "presetInstallReadPresetHint": {
+    "message": "允许 Mearl 读取这个 Preset，之后可查看能力及所需权限。"
+  },
+  "presetInstallReadPreset": {
+    "message": "读取 Preset"
+  },
   "presetInstallConfirmHint": {
     "message": "确认后，Mearl 会安装并启用这套能力。"
   },
@@ -3319,6 +3325,9 @@
   },
   "presetInstallPermissionRetry": {
     "message": "请再次点击授权按钮继续。"
+  },
+  "presetInstallManifestPermissionRequired": {
+    "message": "读取此 Preset 需要访问 $1。可使用同站点清单，或从安装目录选择此 Preset。"
   },
   "presetInstallPermissionFailed": {
     "message": "浏览器尚未允许所需站点。可以重新授权后继续，当前配置已保留。"
@@ -3438,13 +3447,25 @@
     "message": "Preset 管理"
   },
   "presetManagementDescription": {
-    "message": "安装团队 Preset，一次配置 Profile 和服务集成。"
+    "message": "尚未安装 Preset"
   },
   "presetManagementInstall": {
     "message": "安装"
   },
   "presetManagementNoPresets": {
     "message": "安装目录中暂无可用的能力配置。"
+  },
+  "presetManagementLink": {
+    "message": "Preset 链接"
+  },
+  "presetManagementUseLink": {
+    "message": "使用链接"
+  },
+  "presetManagementInvalidLink": {
+    "message": "请输入有效的 Preset HTTPS 链接。"
+  },
+  "presetManagementStatusFailed": {
+    "message": "暂时无法读取当前 Preset"
   },
   "presetManagementOpenFailed": {
     "message": "暂时无法打开安装弹窗，请重试。"

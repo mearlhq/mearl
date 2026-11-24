@@ -113,6 +113,7 @@ Commands capture their source and resources when accepted and execute in isolate
 - Use semantic text, background and border tokens for light/dark themes. Reserve explicit colors for brand and status semantics.
 - Use `lucide-react` icons, normally `w-4 h-4` or `w-3 h-3`.
 - Preserve entry points, layout, density, available space, shortcuts, focus, loading/error states and performance.
+- Match comparable components in the same surface. Reuse their sizing, spacing and text hierarchy, and let shared layout rules govern alignment. Check the rendered result in its actual host and relevant states before handing it off.
 
 ### Skill Toolbox UI
 

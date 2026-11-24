@@ -639,7 +639,8 @@ describe('createAgentChildEnv', () => {
       agentSpawnCommand('C:\\Program Files\\Codex\\codex.cmd', ['app-server'], 'win32', 'cmd.exe'),
     ).toEqual({
       command: 'cmd.exe',
-      args: ['/d', '/s', '/c', 'C:\\Program Files\\Codex\\codex.cmd', 'app-server'],
+      args: ['/d', '/s', '/c', '"C:\\Program^ Files\\Codex\\codex.cmd ^"app-server^""'],
+      windowsVerbatimArguments: true,
     });
     expect(agentSpawnCommand('/usr/local/bin/codex', ['app-server'], 'darwin')).toEqual({
       command: '/usr/local/bin/codex',

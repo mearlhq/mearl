@@ -650,6 +650,7 @@ export class QoderAgentProvider implements AgentProvider {
     const child = spawn(launch.command, launch.args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
+      windowsVerbatimArguments: launch.windowsVerbatimArguments,
       env: createAgentChildEnv(),
     });
     this.process = child;
@@ -1032,6 +1033,7 @@ export class QoderAgentProvider implements AgentProvider {
         cwd,
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsHide: true,
+        windowsVerbatimArguments: launch.windowsVerbatimArguments,
         env: createAgentChildEnv(),
       });
       let stdout = '';

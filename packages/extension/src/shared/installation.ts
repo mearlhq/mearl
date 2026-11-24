@@ -36,7 +36,9 @@ export interface InstallationView {
   localComponentCount: number;
   localStatus?: 'none' | 'setup-required' | 'ready' | 'pending';
   localIssues?: Array<{ id: string; reason: string }>;
-  sourceRequest?: { catalogUrl: string; requestingPage: string };
+  sourceRequest?:
+    | { catalogUrl: string; requestingPage: string; presetUrl?: never }
+    | { presetUrl: string; catalogUrl?: never; requestingPage?: never };
   needsSourceConfirmation?: boolean;
   presetChoices?: { id: string; label: string }[];
 }

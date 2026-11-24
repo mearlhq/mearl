@@ -6,6 +6,7 @@ import {
   findExecutable,
   npmExecEnvironment,
   prependPathDirectory,
+  resolveSpawnCommand,
   runCommand,
   withOwnedCommands,
   versionManagerExecutableCandidates,
@@ -14,12 +15,63 @@ import {
 it('retains command ownership in both outer setup and nested component leases', async () => {
   const outer = { started: vi.fn(), finished: vi.fn() };
   const inner = { started: vi.fn(), finished: vi.fn() };
-  const result = await withOwnedCommands(outer, () => withOwnedCommands(inner, () => runCommand(process.execPath, ['-e', 'process.stdout.write("ok")'], { capture: true })));
+  const result = await withOwnedCommands(outer, () =>
+    withOwnedCommands(inner, () =>
+      runCommand(process.execPath, ['-e', 'process.stdout.write("ok")'], { capture: true }),
+    ),
+  );
   expect(result.stdout).toBe('ok');
   expect(outer.started).toHaveBeenCalledOnce();
   expect(inner.started).toHaveBeenCalledWith(outer.started.mock.calls[0][0]);
   expect(outer.finished).toHaveBeenCalledWith(outer.started.mock.calls[0][0]);
   expect(inner.finished).toHaveBeenCalledWith(outer.started.mock.calls[0][0]);
+});
+
+describe('Windows batch commands', () => {
+  it('keeps a package-manager path with spaces inside the command interpreter payload', () => {
+    expect(
+      resolveSpawnCommand(
+        'C:\\Program Files\\nodejs\\npm.cmd',
+        ['install', '-g', '@mearl/client'],
+        'win32',
+        'cmd.exe',
+      ),
+    ).toEqual({
+      command: 'cmd.exe',
+      args: [
+        '/d',
+        '/s',
+        '/c',
+        '"C:\\Program^ Files\\nodejs\\npm.cmd ^"install^" ^"-g^" ^"@mearl/client^""',
+      ],
+      windowsVerbatimArguments: true,
+    });
+  });
+
+  it.skipIf(process.platform !== 'win32')(
+    'runs a batch wrapper and preserves arguments with spaces',
+    async () => {
+      const directory = mkdtempSync(path.join(tmpdir(), 'mearl command path '));
+      try {
+        writeFileSync(
+          path.join(directory, 'argv.cjs'),
+          'console.log(JSON.stringify(process.argv.slice(2)))',
+        );
+        const wrapper = path.join(directory, 'npm fixture.cmd');
+        writeFileSync(wrapper, '@echo off\r\n"%MEARL_TEST_NODE%" "%~dp0argv.cjs" %*\r\n');
+        const args = ['install', 'package with spaces', ''];
+        const result = await runCommand(wrapper, args, {
+          capture: true,
+          env: { ...process.env, MEARL_TEST_NODE: process.execPath },
+          timeoutMs: 10_000,
+        });
+        expect(result.code, result.stderr).toBe(0);
+        expect(JSON.parse(result.stdout)).toEqual(args);
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    },
+  );
 });
 
 describe('npmExecEnvironment', () => {

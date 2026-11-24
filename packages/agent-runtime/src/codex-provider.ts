@@ -1,5 +1,8 @@
 import type { PluginModelDiagnostic, PluginModelOption } from '@mearl/browser-core/pluginModels';
-import type { AgentInstalledSkill, AgentInstalledSkillScope } from '@mearl/browser-core/agentSkills';
+import type {
+  AgentInstalledSkill,
+  AgentInstalledSkillScope,
+} from '@mearl/browser-core/agentSkills';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -252,6 +255,7 @@ function codexExecutableVersion(executable: string): Promise<string | null> {
     const child = spawn(launch.command, launch.args, {
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
+      windowsVerbatimArguments: launch.windowsVerbatimArguments,
       env: createAgentChildEnv(),
     });
     const finish = (version: string | null): void => {
@@ -814,6 +818,7 @@ export class CodexAgentProvider implements AgentProvider {
     const child = spawn(launch.command, launch.args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
+      windowsVerbatimArguments: launch.windowsVerbatimArguments,
       env: childEnv,
     });
     this.process = child;

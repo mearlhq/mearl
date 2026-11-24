@@ -62,11 +62,10 @@ function sameSelection(left: InstallationSelection, right: InstallationSelection
     Object.entries(left.revisions).every(([id, revision]) => right.revisions[id] === revision)
   );
 }
-interface InstallationSession {
+type InstallationSession = {
   id: string;
   presetId: string;
   preset: InstallationPreset;
-  configuration: string;
   selection: InstallationSelection;
   expires: number;
   owner?: { tabId: number; frameId: number; documentId: string };
@@ -83,22 +82,23 @@ interface InstallationSession {
   localComponentCount?: number;
   catalogUrl?: string;
   requestingPage?: string;
-}
+} & (
+  { manualSource: true; configuration?: never } | { manualSource?: never; configuration: string }
+);
 type InstallationSourceRequest = {
   kind: 'source-request';
   id: string;
-  catalogUrl: string;
-  requestingPage: string;
   expires: number;
   viewTabId?: number;
   viewDocumentId?: string;
   viewUrl?: string;
   settingsViewKey?: string;
   preferredPresetId?: string;
-} & (
-  | (WebsiteIdentity & { presetId: string })
-  | { selection: InstallationSelection; owner?: never; presetId?: never }
-);
+} & NonNullable<InstallationView['sourceRequest']> &
+  (
+    | (WebsiteIdentity & { presetId: string })
+    | { selection: InstallationSelection; owner?: never; presetId?: never }
+  );
 interface WebsiteIdentity {
   owner: NonNullable<InstallationSession['owner']>;
   requestingPage: string;
@@ -111,6 +111,15 @@ function ownsInlineView(stored: StoredInstallation, sender: chrome.runtime.Messa
     : !sender.tab && Boolean(stored.viewUrl) && sender.url === stored.viewUrl;
 }
 
+function presetSourceUrl(value: unknown) {
+  if (typeof value !== 'string' || value.length > 4096 || !URL.canParse(value.trim()))
+    throw new Error('INSTALLATION_SOURCE_DENIED');
+  const url = new URL(value.trim());
+  if (url.protocol !== 'https:' || url.username || url.password || url.hash)
+    throw new Error('INSTALLATION_SOURCE_DENIED');
+  return url;
+}
+
 function validateSiteGrant(
   stored: StoredInstallation,
   sender: chrome.runtime.MessageSender,
@@ -119,7 +128,9 @@ function validateSiteGrant(
 ) {
   if (!ownsInlineView(stored, sender)) throw new Error('INSTALLATION_VIEW_REQUIRED');
   const sourceRequest = 'kind' in stored;
-  const scopes = sourceRequest ? [`${new URL(stored.catalogUrl).origin}/*`] : stored.preset.origins;
+  const scopes = sourceRequest
+    ? [`${new URL(stored.presetUrl ?? stored.catalogUrl).origin}/*`]
+    : stored.preset.origins;
   if (
     (sourceRequest ? presetId !== undefined : stored.completed || presetId !== stored.presetId) ||
     origins.some(origin => !scopes.includes(origin))
@@ -360,6 +371,11 @@ export function createInstallationService(dependencies: InstallationDependencies
   }
 
   function sessionCatalog(session: InstallationSession) {
+    if (session.manualSource)
+      return {
+        schemaVersion: 1,
+        presets: { [session.presetId]: session.preset },
+      } satisfies InstallationConfig;
     return parseInstallationConfig(JSON.parse(session.configuration), INSTALLATION_SITE.origin);
   }
 
@@ -370,8 +386,9 @@ export function createInstallationService(dependencies: InstallationDependencies
   async function readSession(id: unknown, refreshCatalog = true) {
     const value = await readStoredSession(id);
     if ('kind' in value) throw new Error('INSTALLATION_SOURCE_CONFIRMATION_REQUIRED');
+    if (value.manualSource) return value;
     // Read-only authorization previews use the catalog accepted when this session opened.
-    // Installation and resource access revalidate against the current trusted catalog.
+    // Catalog installations revalidate against the current trusted catalog.
     const config = refreshCatalog
       ? value.catalogUrl
         ? await loadRequestedCatalog(value.catalogUrl, value.requestingPage!)
@@ -509,14 +526,16 @@ export function createInstallationService(dependencies: InstallationDependencies
       label: session.preset.label,
       source: session.preset.source,
       origins: session.preset.origins,
-      ...(session.catalogUrl
-        ? {
-            sourceRequest: {
-              catalogUrl: session.catalogUrl,
-              requestingPage: session.requestingPage!,
-            },
-          }
-        : {}),
+      ...(session.manualSource
+        ? { sourceRequest: { presetUrl: session.preset.source } }
+        : session.catalogUrl
+          ? {
+              sourceRequest: {
+                catalogUrl: session.catalogUrl,
+                requestingPage: session.requestingPage!,
+              },
+            }
+          : {}),
       ...state,
       localStatus,
       localIssues,
@@ -759,27 +778,66 @@ export function createInstallationService(dependencies: InstallationDependencies
   }
 
   async function sourceView(request: InstallationSourceRequest): Promise<InstallationView> {
-    const origin = `${new URL(request.catalogUrl).origin}/*`;
+    const source = request.presetUrl ?? request.catalogUrl;
+    const origin = `${new URL(source).origin}/*`;
     return {
       session: request.id,
       presetId: request.presetId ?? '',
-      label: request.presetId ?? new URL(request.requestingPage).hostname,
-      source: request.catalogUrl,
+      label: request.presetId ?? new URL(request.requestingPage ?? source).hostname,
+      source,
       origins: [],
       missingOrigins: (await chrome.permissions.contains({ origins: [origin] })) ? [] : [origin],
       missingAuthorization: [],
       browserReady: false,
       needsInstall: true,
       localComponentCount: 0,
-      sourceRequest: { catalogUrl: request.catalogUrl, requestingPage: request.requestingPage },
+      sourceRequest:
+        request.presetUrl === undefined
+          ? { catalogUrl: request.catalogUrl, requestingPage: request.requestingPage }
+          : { presetUrl: request.presetUrl },
       needsSourceConfirmation: true,
+    };
+  }
+
+  async function loadManualPreset(source: string): Promise<InstallationConfig> {
+    const signal = AbortSignal.timeout(5_000);
+    const load = createBundleFetchLoader();
+    const preset = await resolvePreset(source, {
+      mearlApiVersion: BROWSER_BUNDLE_API_VERSION,
+      signal,
+      load: async reference => {
+        const url = presetSourceUrl(reference);
+        if (!(await chrome.permissions.contains({ origins: [`${url.origin}/*`] })))
+          throw new Error(`INSTALLATION_MANIFEST_PERMISSION_REQUIRED ${url.origin}`);
+        const bytes = await load(url.href, { maxBytes: 262_144, signal });
+        return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+      },
+    });
+    const origins = [
+      ...new Set([
+        ...preset.chain.map(entry => `${new URL(entry.source).origin}/*`),
+        ...Object.values(preset.packages).flatMap(entry =>
+          entry.enabled !== false && entry.source
+            ? [`${presetSourceUrl(entry.source).origin}/*`]
+            : [],
+        ),
+        ...preset.permissions.origins.map(validateInstallationOrigin),
+      ]),
+    ];
+    if (origins.length > 64) throw new Error('INSTALLATION_RESOURCE_DENIED');
+    return {
+      schemaVersion: 1,
+      presets: { [preset.id]: { label: preset.id, source, origins } },
     };
   }
 
   async function prepareSourceSession(request: InstallationSourceRequest) {
     const selection =
       'selection' in request ? request.selection : await registry().captureInstallationSelection();
-    const config = await loadRequestedCatalog(request.catalogUrl, request.requestingPage);
+    const config =
+      request.presetUrl === undefined
+        ? await loadRequestedCatalog(request.catalogUrl, request.requestingPage)
+        : await loadManualPreset(request.presetUrl);
     const presets = config.presets ?? {};
     const presetId = request.presetId ?? preferredPreset(presets, request.preferredPresetId);
     if (!presetId || !Object.hasOwn(presets, presetId))
@@ -802,7 +860,6 @@ export function createInstallationService(dependencies: InstallationDependencies
       id: request.id,
       presetId,
       preset: presets[presetId],
-      configuration: JSON.stringify(config),
       selection,
       expires: request.expires,
       owner: request.owner,
@@ -811,6 +868,9 @@ export function createInstallationService(dependencies: InstallationDependencies
       viewUrl: request.viewUrl,
       catalogUrl: request.catalogUrl,
       requestingPage: request.requestingPage,
+      ...(request.presetUrl === undefined
+        ? { configuration: JSON.stringify(config) }
+        : { manualSource: true }),
       ...(request.settingsViewKey
         ? { settingsViewKey: request.settingsViewKey }
         : 'selection' in request
@@ -830,13 +890,18 @@ export function createInstallationService(dependencies: InstallationDependencies
     return view(session);
   }
 
-  async function prepareSettingsSession(settingsViewKey: string, preferredPresetId?: string) {
+  async function prepareSettingsSession(
+    settingsViewKey: string,
+    preferredPresetId?: string,
+    presetUrl?: string,
+  ) {
     const selection = await registry().captureInstallationSelection();
     const sessions = await availableSessions();
     const current = sessions.find(
       ([, session]) =>
         session.settingsViewKey === settingsViewKey &&
         !session.completed &&
+        (session.manualSource ? session.preset.source : session.presetUrl) === presetUrl &&
         (running.has(session.id) || sameSelection(selection, session.selection)),
     )?.[1] as InstallationSession | InstallationSourceRequest | undefined;
     if (current) return current;
@@ -847,6 +912,8 @@ export function createInstallationService(dependencies: InstallationDependencies
       settingsViewKey,
       expires: now() + SESSION_LIFETIME,
     };
+    if (presetUrl)
+      return { ...seed, kind: 'source-request', presetUrl } satisfies InstallationSourceRequest;
     if (CUSTOM_INSTALL_PAGE_URL) {
       const catalog = new URL('public-installation.json', CUSTOM_INSTALL_PAGE_URL);
       const request: InstallationSourceRequest = {
@@ -1004,6 +1071,7 @@ export function createInstallationService(dependencies: InstallationDependencies
       sender: chrome.runtime.MessageSender,
       inline: boolean,
       preferredPresetId?: string,
+      source?: unknown,
     ): Promise<InstallationOpening> {
       const { documentId, tab, url } = sender;
       if (!isExtensionUiSender(sender, chrome.runtime.id) || !url)
@@ -1011,10 +1079,15 @@ export function createInstallationService(dependencies: InstallationDependencies
       // Messages from toolbar popup frames have no tab or document ID.
       const settingsViewKey = documentId ?? (inline && !tab ? url : undefined);
       if (!settingsViewKey) throw new Error('INSTALLATION_VIEW_REQUIRED');
+      const presetUrl = source === undefined ? undefined : presetSourceUrl(source).href;
       const next = opening
         .catch(() => {})
         .then(async () => {
-          const session = await prepareSettingsSession(settingsViewKey, preferredPresetId);
+          const session = await prepareSettingsSession(
+            settingsViewKey,
+            preferredPresetId,
+            presetUrl,
+          );
           if (!inline) return showView(session);
           delete session.viewTabId;
           if (documentId) {

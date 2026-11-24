@@ -6,9 +6,12 @@ import { cleanupEnvironmentRevisions } from './environmentRevisions';
 import { resolveBrowserDocumentSender } from './browserDocuments';
 import { initializePresetAutoUpdate } from './presetAutoUpdate';
 import { PRESET_MANAGEMENT_ACTION } from '../../shared/presetAutoUpdate';
-import { createLazyInstallationService } from './lazyInstallationService';
+import { createInstallationService } from './installationService';
+import { createNativeInstallationClient } from './nativeInstallationClient';
+import { openInstallPage } from './installPage';
 import { INSTALLATION_ACTION } from '../../shared/installation';
 import { handleBrowserTracking } from './browserTracking';
+import { getTranslationCache, translateJson } from '../panel/utils/translate';
 import { initializeBrowserPureCapabilities } from './browserPureCapabilities';
 import { handleBrowserUiService, initializeBrowserUiOperations } from './browserUiService';
 import { handleExtensionServiceRequest } from './extensionServiceHandler';
@@ -400,7 +403,10 @@ installAgentChatTabBindingObservers(async removed => {
 initializeAccountTracking();
 initializeBrowserRequestLogins();
 initializeBrowserControllers();
-const installationService = createLazyInstallationService(() => ensureNativeBridge(false));
+// Chrome extension service workers require static imports for installation modules.
+const installationService = createInstallationService({
+  native: createNativeInstallationClient(() => ensureNativeBridge(false)),
+});
 initializePresetAutoUpdate(() => installationService.autoUpdate());
 chrome.runtime.onMessageExternal.addListener((message, sender, reply) => {
   if (message?.action !== INSTALLATION_ACTION) return;
@@ -428,8 +434,7 @@ chrome.runtime.onUpdateAvailable.addListener(details => {
 
 chrome.runtime.onInstalled.addListener(details => {
   if (details.reason === 'install') {
-    void import('./installPage')
-      .then(({ openInstallPage }) => openInstallPage(details.reason))
+    void openInstallPage(details.reason)
       .then(guide => {
         if (guide) return installationService.installDefaultForGuide(guide);
       })
@@ -953,6 +958,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             sender,
             message.inline === true,
             typeof message.presetId === 'string' ? message.presetId : undefined,
+            message.source,
           );
         default:
           throw new Error('INVALID_INSTALLATION_REQUEST');
@@ -2622,32 +2628,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.action === 'getTranslationCache') {
-    void import('../panel/utils/translate')
-      .then(({ getTranslationCache }) =>
-        sendResponse({ success: true, cache: getTranslationCache() }),
-      )
-      .catch(error =>
-        sendResponse({
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        }),
-      );
-    return true;
+    sendResponse({ success: true, cache: getTranslationCache() });
+    return;
   }
 
   if (message.action === 'translateJson') {
-    import('../panel/utils/translate')
-      .then(({ translateJson }) =>
-        translateJson(message.data, message.targetLang, progress => {
-          chrome.runtime
-            .sendMessage({
-              action: 'translateProgress',
-              requestId: message.requestId,
-              progress,
-            })
-            .catch(() => {});
-        }),
-      )
+    void translateJson(message.data, message.targetLang, progress => {
+      chrome.runtime
+        .sendMessage({
+          action: 'translateProgress',
+          requestId: message.requestId,
+          progress,
+        })
+        .catch(() => {});
+    })
       .then(result => sendResponse(result))
       .catch(error =>
         sendResponse({

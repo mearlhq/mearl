@@ -6,7 +6,7 @@ import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { setTimeout as delay } from 'node:timers/promises';
+import { connect, until } from './chrome-smoke-helpers.mjs';
 
 // Registration and Chrome are confined to an ephemeral GitHub-hosted Windows runner.
 assert.equal(process.platform, 'win32');
@@ -36,40 +36,6 @@ let chrome;
 let cdp;
 let installationAttempted = false;
 const failures = [];
-
-async function until(operation, description, timeout = 60_000) {
-  const deadline = Date.now() + timeout;
-  let lastError;
-  while (Date.now() < deadline) {
-    try { const result = await operation(); if (result) return result; }
-    catch (error) { lastError = error; }
-    await delay(250);
-  }
-  throw new Error(`Timed out: ${description}`, { cause: lastError });
-}
-
-async function connect(url) {
-  const socket = new WebSocket(url);
-  await once(socket, 'open');
-  let sequence = 0;
-  const pending = new Map();
-  socket.addEventListener('message', event => {
-    const message = JSON.parse(String(event.data));
-    const request = pending.get(message.id);
-    if (!request) return;
-    pending.delete(message.id);
-    clearTimeout(request.timer);
-    if (message.error) request.reject(new Error(message.error.message));
-    else request.resolve(message.result);
-  });
-  const call = (method, params = {}, sessionId) => new Promise((resolve, reject) => {
-    const id = ++sequence;
-    const timer = setTimeout(() => { pending.delete(id); reject(new Error(`CDP timed out: ${method}`)); }, 10_000);
-    pending.set(id, { resolve, reject, timer });
-    socket.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
-  });
-  return { call, close: () => socket.close() };
-}
 
 function cli(...args) {
   return JSON.parse(execFileSync(process.execPath, [join(runtime, 'node_modules/@mearl/client/dist/bin.js'), ...args], {

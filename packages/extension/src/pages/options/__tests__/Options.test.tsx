@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Options from '../Options';
 import { ToastContainer } from '../../panel/components/ToastContainer';
@@ -150,6 +150,27 @@ describe('Options settings', () => {
       }
     },
   );
+  it('accepts a Preset link when the current status fails', async () => {
+    const previous = vi.mocked(chrome.runtime.sendMessage).getMockImplementation()!;
+    vi.mocked(chrome.runtime.sendMessage).mockImplementation(async (message, ...args) => {
+      const request = message as { action?: string; operation?: string };
+      if (request.action !== PRESET_MANAGEMENT_ACTION) return previous(message, ...args);
+      if (request.operation === 'status') return { success: false, error: 'Unavailable' };
+      return { success: true, data: {} };
+    });
+    render(<Options />);
+    expect(await screen.findByText('presetManagementStatusFailed')).toBeVisible();
+    const input = screen.getByRole('textbox', { name: 'presetManagementLink' });
+    const source = 'https://example.test/team.json';
+    fireEvent.change(input, { target: { value: source } });
+    fireEvent.click(screen.getByRole('button', { name: 'presetManagementUseLink' }));
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+      action: PRESET_MANAGEMENT_ACTION,
+      operation: 'install',
+      inline: true,
+      source,
+    });
+  });
   it('opens the installer for the current preset and waits for confirmation', async () => {
     window.history.replaceState({}, '', '?iframe=1&tabId=7');
     const preset = {
@@ -187,9 +208,9 @@ describe('Options settings', () => {
     render(<Options />);
     expect(await screen.findByText('v1.0.0')).toBeVisible();
     const update = screen.getByRole('button', { name: 'presetManagementUpdate' });
-    expect(
-      within(screen.getByRole('region', { name: 'presetManagementTitle' })).getAllByRole('button'),
-    ).toEqual([update]);
+    expect(screen.getByRole('textbox', { name: 'presetManagementLink' })).toHaveValue(
+      preset.source,
+    );
     fireEvent.click(update);
     const confirm = await screen.findByRole('button', { name: 'presetInstallConfirmOnce' });
     expect(screen.getByRole('dialog')).toContainElement(confirm);

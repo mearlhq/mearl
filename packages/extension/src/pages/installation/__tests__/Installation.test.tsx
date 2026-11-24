@@ -119,10 +119,11 @@ it('authorizes only Agent scopes without opening an unnecessary Chrome prompt', 
   expect(chrome.permissions.request).not.toHaveBeenCalled();
 });
 it('waits for source approval before reading and a second confirmation before installing with existing grants', async () => {
+  const catalogUrl = 'https://example.test/catalog.json';
   state = {
     ...state,
     sourceRequest: {
-      catalogUrl: 'https://example.test/catalog.json',
+      catalogUrl,
       requestingPage: 'https://example.test/installed.html',
     },
     needsSourceConfirmation: true,
@@ -144,7 +145,7 @@ it('waits for source approval before reading and a second confirmation before in
     'inspect',
     'confirmSource',
   ]);
-  expect(screen.getByText(state.sourceRequest!.catalogUrl)).toBeInTheDocument();
+  expect(screen.getByText(catalogUrl)).toBeInTheDocument();
   expect(screen.getByText(state.source)).toBeInTheDocument();
   expect(chrome.permissions.request).not.toHaveBeenCalled();
   fireEvent.click(confirm);

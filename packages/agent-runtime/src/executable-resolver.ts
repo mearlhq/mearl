@@ -8,8 +8,7 @@ import {
 } from './process-env.js';
 
 export type AgentExecutableResolution =
-  | { executable: string; error: null }
-  | { executable: null; error: string };
+  { executable: string; error: null } | { executable: null; error: string };
 
 interface AgentExecutableResolverOptions {
   candidates: () => string[];
@@ -235,6 +234,7 @@ export function probeAgentExecutable(
     const child = spawn(launch.command, launch.args, {
       stdio: ['ignore', 'ignore', 'pipe'],
       windowsHide: true,
+      windowsVerbatimArguments: launch.windowsVerbatimArguments,
       env: createAgentChildEnv(),
     });
     const finish = (error: string | null): void => {

@@ -1604,6 +1604,76 @@ describe('preset selection from settings', () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
+  it('reads a user-entered Preset after consent and enables it after separate confirmation', async () => {
+    const { service, install } = make();
+    const sender = settingsSender();
+    const source = 'https://custom.example.test/preset.json';
+    const origins = ['https://custom.example.test/*', 'https://api.example.test/*'];
+    vi.mocked(fetch).mockImplementation(async () =>
+      Response.json({
+        schemaVersion: 1,
+        id: 'custom',
+        version: '1.0.0',
+        permissions: { origins: [origins[1]] },
+      }),
+    );
+    await expect(
+      service.openPresetSelector(sender, true, undefined, 'http://custom.example.test/preset.json'),
+    ).rejects.toThrow('INSTALLATION_SOURCE_DENIED');
+    const { session } = await service.openPresetSelector(sender, true, undefined, source);
+    await expect(service.internal(internal('inspect', session), sender)).resolves.toMatchObject({
+      needsSourceConfirmation: true,
+      sourceRequest: { presetUrl: source },
+    });
+    await expect(service.internal(internal('install', session, true), sender)).rejects.toThrow(
+      'INSTALLATION_SOURCE_CONFIRMATION_REQUIRED',
+    );
+    expect(fetch).not.toHaveBeenCalled();
+
+    await expect(
+      service.internal(internal('confirmSource', session), sender),
+    ).resolves.toMatchObject({
+      presetId: 'custom',
+      source,
+      origins,
+      needsInstall: true,
+    });
+    expect(fetch).toHaveBeenCalledExactlyOnceWith(
+      source,
+      expect.objectContaining({ credentials: 'omit', redirect: 'error' }),
+    );
+    await expect(service.internal(internal('install', session), sender)).rejects.toThrow(
+      'INSTALLATION_AUTHORIZATION_REQUIRED',
+    );
+    expect(install).not.toHaveBeenCalled();
+    await service.internal(internal('install', session, true), sender);
+    expect(install).toHaveBeenCalledExactlyOnceWith(source, 'custom', origins);
+  });
+
+  it('reports the missing site permission before fetching an inherited manifest', async () => {
+    const { service } = make();
+    const sender = settingsSender();
+    const source = 'https://custom.example.test/preset.json';
+    const parent = 'https://parent.example.test/preset.json';
+    vi.mocked(chrome.permissions.contains).mockImplementation(
+      async ({ origins }) => !origins?.includes('https://parent.example.test/*'),
+    );
+    vi.mocked(fetch).mockResolvedValueOnce(
+      Response.json({
+        schemaVersion: 1,
+        id: 'custom',
+        version: '1.0.0',
+        extends: { source: parent },
+      }),
+    );
+    const { session } = await service.openPresetSelector(sender, true, undefined, source);
+
+    await expect(service.internal(internal('confirmSource', session), sender)).rejects.toThrow(
+      'INSTALLATION_MANIFEST_PERMISSION_REQUIRED https://parent.example.test',
+    );
+    expect(fetch).toHaveBeenCalledExactlyOnceWith(source, expect.anything());
+  });
+
   it('uses the embedded settings document and the chosen preset permissions', async () => {
     const { service, install } = make();
     const sender = settingsSender();

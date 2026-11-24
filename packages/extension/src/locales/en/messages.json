@@ -3256,6 +3256,12 @@
   "presetInstallReadSource": {
     "message": "Read installation settings"
   },
+  "presetInstallReadPresetHint": {
+    "message": "Let Mearl read this Preset. You can review the capabilities and required permissions next."
+  },
+  "presetInstallReadPreset": {
+    "message": "Read Preset"
+  },
   "presetInstallConfirmHint": {
     "message": "Confirm to install and enable these capabilities in Mearl."
   },
@@ -3327,6 +3333,9 @@
   },
   "presetInstallPermissionRetry": {
     "message": "Click the authorization button again to continue."
+  },
+  "presetInstallManifestPermissionRequired": {
+    "message": "Reading this Preset requires access to $1. Use manifests on the same site or choose the Preset in the installation catalog."
   },
   "presetInstallPermissionFailed": {
     "message": "Required site access was not granted. You can retry; your current configuration is preserved."
@@ -3446,13 +3455,25 @@
     "message": "Presets"
   },
   "presetManagementDescription": {
-    "message": "Install a team Preset to set up Profiles and service integrations together."
+    "message": "No Preset installed"
   },
   "presetManagementInstall": {
     "message": "Install"
   },
   "presetManagementNoPresets": {
     "message": "The installation catalog has no available configurations."
+  },
+  "presetManagementLink": {
+    "message": "Preset link"
+  },
+  "presetManagementUseLink": {
+    "message": "Use link"
+  },
+  "presetManagementInvalidLink": {
+    "message": "Enter a valid HTTPS link to a Preset."
+  },
+  "presetManagementStatusFailed": {
+    "message": "Unable to read the current Preset"
   },
   "presetManagementOpenFailed": {
     "message": "Could not open the installation popup. Try again."

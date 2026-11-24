@@ -4,19 +4,40 @@ import { spawn } from 'node:child_process';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { isProcessGroupAlive, isProcessOwnerAlive, processIdentity } from './process.js';
 
-export interface CommandProcessOwner { pid: number; processIdentity?: string; group?: number }
+export interface CommandProcessOwner {
+  pid: number;
+  processIdentity?: string;
+  group?: number;
+}
 export interface CommandLifecycle {
   started(owner: CommandProcessOwner): void;
   finished(owner: CommandProcessOwner): void;
 }
 const ownedCommands = new AsyncLocalStorage<CommandLifecycle>();
 /** Accepted installation commands retain process ownership until their complete process group exits. */
-export function withOwnedCommands<T>(lifecycle: CommandLifecycle, operation: () => Promise<T>): Promise<T> {
+export function withOwnedCommands<T>(
+  lifecycle: CommandLifecycle,
+  operation: () => Promise<T>,
+): Promise<T> {
   const parent = ownedCommands.getStore();
-  return ownedCommands.run(parent ? {
-    started(owner) { parent.started(owner); lifecycle.started(owner); },
-    finished(owner) { try { lifecycle.finished(owner); } finally { parent.finished(owner); } },
-  } : lifecycle, operation);
+  return ownedCommands.run(
+    parent
+      ? {
+          started(owner) {
+            parent.started(owner);
+            lifecycle.started(owner);
+          },
+          finished(owner) {
+            try {
+              lifecycle.finished(owner);
+            } finally {
+              parent.finished(owner);
+            }
+          },
+        }
+      : lifecycle,
+    operation,
+  );
 }
 
 export function isCommandProcessAlive(owner: CommandProcessOwner): boolean {
@@ -30,27 +51,37 @@ async function stopCommandProcess(owner: CommandProcessOwner): Promise<void> {
   if (process.platform === 'win32') {
     if (!isCommandProcessAlive(owner)) return;
     await new Promise<void>((resolve, reject) => {
-      const killer = spawn('taskkill', ['/pid', String(owner.pid), '/t', '/f'], { windowsHide: true, stdio: 'ignore' });
-      killer.once('error', reject); killer.once('close', () => resolve());
+      const killer = spawn('taskkill', ['/pid', String(owner.pid), '/t', '/f'], {
+        windowsHide: true,
+        stdio: 'ignore',
+      });
+      killer.once('error', reject);
+      killer.once('close', () => resolve());
     });
   } else {
     const signal = (value: NodeJS.Signals) => {
-      try { process.kill(-(owner.group ?? owner.pid), value); }
-      catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error; }
+      try {
+        process.kill(-(owner.group ?? owner.pid), value);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+      }
     };
     signal('SIGTERM');
     const grace = Date.now() + 250;
-    while (isCommandProcessAlive(owner) && Date.now() < grace) await new Promise(resolve => setTimeout(resolve, 20));
+    while (isCommandProcessAlive(owner) && Date.now() < grace)
+      await new Promise(resolve => setTimeout(resolve, 20));
     if (isCommandProcessAlive(owner)) signal('SIGKILL');
   }
   const deadline = Date.now() + 2000;
-  while (isCommandProcessAlive(owner) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 20));
+  while (isCommandProcessAlive(owner) && Date.now() < deadline)
+    await new Promise(resolve => setTimeout(resolve, 20));
   if (isCommandProcessAlive(owner)) throw new Error('Command process is still stopping');
 }
 
 export interface SpawnCommand {
   command: string;
   args: string[];
+  windowsVerbatimArguments?: true;
 }
 
 export interface CommandResult {
@@ -145,9 +176,20 @@ export function resolveSpawnCommand(
   commandInterpreter: string | undefined = process.env.ComSpec,
 ): SpawnCommand {
   if (platform === 'win32' && /\.(?:cmd|bat)$/i.test(executable)) {
+    // cmd /s removes the outer pair of quotes. Escape the remaining command
+    // for cmd and preserve quoting when arguments reach the batch script.
+    const metacharacters = /([()\][%!^`"<>&|;, \t*?])/g;
+    const escape = (value: string) => value.replace(metacharacters, '^$1');
+    const shim = /node_modules[\\/]\.bin[\\/][^\\/]+\.cmd$/i.test(executable);
+    const escapedArgs = args.map(arg => {
+      const quoted = `"${arg.replace(/(?=(\\+?)?)\1"/g, '$1$1\\"').replace(/\\+$/, '$&$&')}"`;
+      return shim ? escape(escape(quoted)) : escape(quoted);
+    });
+    const command = [escape(path.win32.normalize(executable)), ...escapedArgs].join(' ');
     return {
       command: commandInterpreter || 'cmd.exe',
-      args: ['/d', '/s', '/c', executable, ...args],
+      args: ['/d', '/s', '/c', `"${command}"`],
+      windowsVerbatimArguments: true,
     };
   }
   return { command: executable, args };
@@ -222,6 +264,7 @@ export const runCommand: CommandRunner = (command, args, options: RunCommandOpti
       env: options.env,
       stdio: capture ? [options.tee ? 'inherit' : 'ignore', 'pipe', 'pipe'] : 'inherit',
       windowsHide: true,
+      windowsVerbatimArguments: launch.windowsVerbatimArguments,
       ...(lifecycle && process.platform !== 'win32' ? { detached: true } : {}),
     });
     let stdout = '';
@@ -229,7 +272,14 @@ export const runCommand: CommandRunner = (command, args, options: RunCommandOpti
     let settled = false;
     let finalizing = false;
     let timedOut: Error | undefined;
-    const owner = lifecycle && child.pid ? { pid: child.pid, processIdentity: processIdentity(child.pid), ...(process.platform !== 'win32' ? { group: child.pid } : {}) } : undefined;
+    const owner =
+      lifecycle && child.pid
+        ? {
+            pid: child.pid,
+            processIdentity: processIdentity(child.pid),
+            ...(process.platform !== 'win32' ? { group: child.pid } : {}),
+          }
+        : undefined;
     const append = (current: string, chunk: string): string =>
       options.tee
         ? (current + chunk).slice(-MAX_CAPTURE_LENGTH)
@@ -251,7 +301,9 @@ export const runCommand: CommandRunner = (command, args, options: RunCommandOpti
         if (owner && isCommandProcessAlive(owner)) await stopCommandProcess(owner);
         if (owner) lifecycle!.finished(owner);
         finish(error ?? timedOut, code);
-      } catch (failure) { finish(failure instanceof Error ? failure : new Error(String(failure))); }
+      } catch (failure) {
+        finish(failure instanceof Error ? failure : new Error(String(failure)));
+      }
     };
     const timer =
       options.timeoutMs === undefined
@@ -259,7 +311,10 @@ export const runCommand: CommandRunner = (command, args, options: RunCommandOpti
         : setTimeout(() => {
             timedOut = new Error(`Command timed out after ${options.timeoutMs}ms`);
             if (lifecycle) void finishOwned(timedOut);
-            else { child.kill('SIGTERM'); finish(timedOut); }
+            else {
+              child.kill('SIGTERM');
+              finish(timedOut);
+            }
           }, options.timeoutMs);
 
     if (capture) {
@@ -272,10 +327,15 @@ export const runCommand: CommandRunner = (command, args, options: RunCommandOpti
         if (options.tee) process.stderr.write(chunk);
       });
     }
-    child.once('error', error => lifecycle ? void finishOwned(error) : finish(error));
-    child.once('close', code => lifecycle ? void finishOwned(undefined, code ?? 1) : finish(undefined, code ?? 1));
+    child.once('error', error => (lifecycle ? void finishOwned(error) : finish(error)));
+    child.once('close', code =>
+      lifecycle ? void finishOwned(undefined, code ?? 1) : finish(undefined, code ?? 1),
+    );
     if (lifecycle && owner) {
-      try { lifecycle.started(owner); }
-      catch (error) { void finishOwned(error instanceof Error ? error : new Error(String(error))); }
+      try {
+        lifecycle.started(owner);
+      } catch (error) {
+        void finishOwned(error instanceof Error ? error : new Error(String(error)));
+      }
     }
   });

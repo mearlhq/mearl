@@ -2,11 +2,13 @@ import { resolve } from 'path';
 import { mergeConfig, defineConfig } from 'vite';
 import { crx, ManifestV3Export } from '@crxjs/vite-plugin';
 import baseConfig, { baseManifest, baseBuildOptions } from './vite.config.base'
-import { restoreClassicContentScripts } from './custom-vite-plugins';
+import { restoreClassicContentScripts, validateServiceWorkerModules } from './custom-vite-plugins';
 
 const outDir = resolve(__dirname, 'dist_chrome');
 type StaticManifestV3 = Extract<ManifestV3Export, { manifest_version: number }>;
 const staticManifest = baseManifest as StaticManifestV3;
+const background = staticManifest.background;
+if (!background || !('service_worker' in background)) throw new Error('Missing Chrome service worker');
 const classicContentScripts = staticManifest.content_scripts ?? [];
 const crxManifest = { ...staticManifest };
 delete crxManifest.content_scripts;
@@ -20,6 +22,7 @@ export default mergeConfig(
         browser: 'chrome',
       }),
       restoreClassicContentScripts(classicContentScripts),
+      validateServiceWorkerModules(resolve(__dirname, background.service_worker)),
     ],
     build: {
       ...baseBuildOptions,

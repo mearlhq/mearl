@@ -7,6 +7,7 @@
 Mearl 环境的一次性安装、更新、卸载与配置工具。无需先全局安装 setup：
 
 安装前用 `node --version` 确认 Node.js >= 20.18.0。
+在 Windows PowerShell 中使用 `npx.cmd`，例如 `npx.cmd @mearl/setup`。
 
 ```bash
 npx @mearl/setup [install] [--local] [--cloud] [--cloud-mode <id>] [--mcp]

@@ -4,8 +4,8 @@ vi.mock('../requestInspection', async () => {
 });
 import { trackingEvent } from '../../../test/fixtures/tracking';
 const decoder = vi.hoisted(() => ({ decode: vi.fn() }));
-vi.mock('../browserTrackingClient', () => ({
-  captureBrowserTrackingDecoder: async () => decoder.decode,
+vi.mock('../browserTracking', () => ({
+  captureBrowserTrackingDecoder: () => decoder.decode,
 }));
 vi.mock('../../../shared/i18n', () => ({ getCurrentLanguage: () => 'en' }));
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

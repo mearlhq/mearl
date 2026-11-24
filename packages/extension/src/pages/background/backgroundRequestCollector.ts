@@ -34,7 +34,7 @@ import {
 } from '@mearl/browser-core';
 import { CapturedRequest, RumEvent } from '../panel/types';
 import type { TrackingRequestResult } from './browserTracking';
-import { captureBrowserTrackingDecoder } from './browserTrackingClient';
+import { captureBrowserTrackingDecoder } from './browserTracking';
 import { getCurrentLanguage } from '../../shared/i18n';
 import { inspectBrowserRequest } from './requestInspection';
 import type { RequestMetadata } from '@mearl/browser-core';
@@ -318,7 +318,7 @@ function handleDebuggerEvent(source: CollectorTarget, method: string, params: an
     };
     const decoder = captureBrowserTrackingDecoder();
     const decoded = Promise.all([
-      decoder.then(decode => decode(input)),
+      decoder(input),
       inspectBrowserRequest({ url: input.url, body: input.body }),
     ]);
     // The ordered commit attaches the rejection handler after preceding network events.
@@ -341,7 +341,7 @@ function handleDebuggerEvent(source: CollectorTarget, method: string, params: an
               .sendCommand(source, 'Network.getRequestPostData', { requestId: params.requestId })
               .catch(() => undefined)) as { postData?: string } | undefined;
             if (!collectingTabs.has(tabId) || captureStates.get(tabId) !== state) return;
-            if (body?.postData) result = await (await decoder)({ ...input, body: body.postData });
+            if (body?.postData) result = await decoder({ ...input, body: body.postData });
           }
           if (!collectingTabs.has(tabId) || captureStates.get(tabId) !== state) return;
           collectionErrors.delete(tabId);
