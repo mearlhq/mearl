@@ -4,7 +4,7 @@
 
 用 AI Agent 操作和调试网页。
 
-让 Agent 在浏览器里操作页面、查看网络请求和控制台日志，并验证结果。接入日常使用的 Chrome，可沿用已有标签页和登录态。
+让 Agent 在浏览器里操作页面、查看网络请求和控制台日志，并验证结果。也可接入日常使用的 Chrome，沿用已有标签页和登录态。
 
 [产品官网](https://mearlhq.github.io/mearl/) · [Chrome 应用商店](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm) · [GitHub Releases](https://github.com/mearlhq/mearl/releases)
 

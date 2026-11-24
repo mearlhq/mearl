@@ -188,7 +188,7 @@ export const siteCopy = {
     openSource: '开源 · Apache-2.0',
     headline: '用 AI Agent 操作和调试网页',
     heroLead:
-      '让 Agent 在浏览器里操作页面、查看网络请求和控制台日志，并验证结果。接入日常使用的 Chrome，可沿用已有标签页和登录态。',
+      '让 Agent 在浏览器里操作页面、查看网络请求和控制台日志，并验证结果。也可接入日常使用的 Chrome，沿用已有标签页和登录态。',
     mobileGuide: '设备模拟指南',
     capabilityOverview: '用 Mearl 可以做什么',
     capabilityGroups: {
