@@ -4,7 +4,7 @@
 
 Browser automation and debugging for AI agents.
 
-Mearl connects to the Chrome browser you already use, with its open tabs and sign-in. Connect your agent through Skills or MCP, or use the CLI and TypeScript SDK directly.
+Let your agent interact with pages, inspect network requests and console logs, and verify results. Reuse open tabs and signed-in sessions in Chrome.
 
 [Product website](https://mearlhq.github.io/mearl/en.html) · [Chrome Web Store](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm) · [GitHub Releases](https://github.com/mearlhq/mearl/releases)
 
