@@ -103,7 +103,6 @@ it('combines both languages into one Markdown body and rejects missing input', (
   const zh = '### 设备模拟\n\n- 显示设备外壳。';
   const en = '### Device emulation\n\n- Show the device shell.';
   expect(formatReleaseNotes(zh, en, link)).toBe([
-    '[简体中文](#user-content-release-notes-zh) | [English](#user-content-release-notes-en)',
     '<a name="release-notes-zh"></a>\n\n## 简体中文',
     zh,
     '<a name="release-notes-en"></a>\n\n## English',

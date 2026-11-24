@@ -8,7 +8,7 @@
 
 触发工作流前，根据审核过的候选提交与上一相关发布标签之间的差异，准备本次发布的简体中文和英文说明。使用三级标题按功能组织，写明用户可感知的改动，以及相关的升级、兼容性和数据删除事项。
 
-在 Publish 工作流的 `notes_zh` 和 `notes_en` 输入中分别填写两种语言的 Markdown 正文。提交多行说明时，可用 `gh workflow run publish.yml --ref main --json`，通过标准输入传入包含 `channel`、`notes_zh` 和 `notes_en` 的 JSON。工作流把两份说明写入同一条 GitHub Release，添加语言跳转和版本比较链接。首次发布链接到对应标签的源码。发布后核对标签与候选提交、两种语言的正文和比较链接。后续勘误直接编辑 GitHub Release 正文。
+在 Publish 工作流的 `notes_zh` 和 `notes_en` 输入中分别填写两种语言的 Markdown 正文。提交多行说明时，可用 `gh workflow run publish.yml --ref main --json`，通过标准输入传入包含 `channel`、`notes_zh` 和 `notes_en` 的 JSON。工作流把两份说明写入同一条 GitHub Release，分别以「简体中文」和「English」为标题，并添加版本比较链接。首次发布链接到对应标签的源码。发布后核对标签与候选提交、两种语言的正文和比较链接。后续勘误直接编辑 GitHub Release 正文。
 
 ## Beta
 

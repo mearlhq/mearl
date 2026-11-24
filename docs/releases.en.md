@@ -8,7 +8,7 @@ The main repository is `mearlhq/mearl`, and release source is merged into `main`
 
 Before dispatching the workflow, prepare Simplified Chinese and English notes from the diff between the reviewed candidate and the preceding relevant release tag. Group concrete user-visible changes under level-three headings and include applicable upgrade, compatibility, and data-loss information.
 
-Enter the Markdown for each language in the Publish workflow's `notes_zh` and `notes_en` inputs. To submit multiline notes, run `gh workflow run publish.yml --ref main --json` and pass a JSON object with `channel`, `notes_zh`, and `notes_en` on standard input. The workflow writes both languages into a single GitHub Release with section links and a version comparison link. An initial release links to its tagged source. Verify the tag and candidate commit, both sections, and the comparison link after publishing. Make corrections directly in the GitHub Release body.
+Enter the Markdown for each language in the Publish workflow's `notes_zh` and `notes_en` inputs. To submit multiline notes, run `gh workflow run publish.yml --ref main --json` and pass a JSON object with `channel`, `notes_zh`, and `notes_en` on standard input. The workflow writes both languages into a single GitHub Release under the headings “简体中文” and “English” and adds a version comparison link. An initial release links to its tagged source. Verify the tag and candidate commit, both sections, and the comparison link after publishing. Make corrections directly in the GitHub Release body.
 
 ## Beta
 

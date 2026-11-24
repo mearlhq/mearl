@@ -221,9 +221,8 @@ export function releaseComparisonUrl(directory, version, channel, isPublished) {
 
 export function formatReleaseNotes(zh, en, link) {
   if (!zh?.trim() || !en?.trim()) throw new Error('Provide both Simplified Chinese and English release notes');
-  // GitHub prefixes explicit anchors and does not add heading anchors to releases.
+  // Keep a direct link target for each language on the release page.
   const body = [
-    '[简体中文](#user-content-release-notes-zh) | [English](#user-content-release-notes-en)',
     '<a name="release-notes-zh"></a>\n\n## 简体中文',
     zh.trim(),
     '<a name="release-notes-en"></a>\n\n## English',
