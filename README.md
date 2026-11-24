@@ -2,53 +2,54 @@
 
 [简体中文](README.md) | [English](README.en.md)
 
-面向 Agent 的浏览器工作环境，在你选择的浏览器中执行任务、排查问题并验证结果。
+用 AI Agent 操作和调试网页。
 
-Mearl 把页面操作、网络请求、日志和环境模拟连接起来，让 Agent 执行任务、排查问题并验证结果。按任务需要接入日常浏览器、CDP 浏览器或 Provider 提供的远端环境；将验证过的流程沉淀为 Skill，通过 Agent、CLI 或工具箱再次使用。人也可以通过扩展的 DevTools 面板参与调试。
+Mearl 可以接入日常使用的 Chrome，沿用已有标签页和登录态。通过 Skill 或 MCP 接入 Agent，也可以直接使用 CLI 或 TypeScript SDK。
 
 [产品官网](https://mearlhq.github.io/mearl/) · [Chrome 应用商店](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm) · [GitHub Releases](https://github.com/mearlhq/mearl/releases)
 
+## 可以做什么
+
+- **操作网页**。读取页面、点击、填表、上传和下载文件，以及截取屏幕。
+- **调试和验证网页**。查看网络请求、响应和控制台日志，用 Mock 响应验证页面行为。
+- **发送带登录态的请求**。用浏览器中匹配目标地址的 Cookie 调用已知 HTTP 接口，或重放已捕获的请求。
+- **模拟移动设备**。切换视口、触摸输入、User-Agent 和时区。
+- **复用常用流程**。将重复任务做成 Skill，可包含 Agent 操作指引、可执行命令或工具箱界面。
+
 ## 开始使用
 
-### 1. 安装本机环境
+### 1. 安装 Chrome 扩展和本机组件
 
-需要 **Node.js ≥ 20.18.0**。先运行 setup，安装 CLI、Native Host 和 Mearl Skill，按提示选择 Agent 接入：
+在要接入的 Chrome 配置中安装 [Mearl 扩展](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm)。需要 Chrome 120 或更高版本。
+
+使用 Node.js 20.18.0 或更高版本运行安装器，按提示选择 Agent 接入方式。
 
 ```bash
 npx @mearl/setup
 ```
 
-也可以把这段交给支持 Skill 的 Agent：
+使用 MCP 客户端时，运行 `npx @mearl/setup --mcp`，然后重启客户端。[安装指南](https://mearlhq.github.io/mearl/installation.html) · [MCP 文档](packages/mcp-server/README.md)
 
-```text
-请运行 npx @mearl/setup 安装 Mearl，读取安装后的 Mearl Skill。
-按任务需要配置浏览器连接，需要我操作时告诉我具体步骤。
-完成后运行 mearl check 和 mearl browser_list，报告目标浏览器是否已连接。
-```
+### 2. 确认连接并运行首个任务
 
-使用 MCP 客户端时，运行 `npx @mearl/setup --mcp` 完成接入。[安装器文档](packages/setup/README.md) · [MCP 文档](packages/mcp-server/README.md)
-
-### 2. 选择浏览器接入方式
-
-- **日常浏览器**：可选安装 [Chrome 扩展](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm)，复用已有标签页和登录态，并使用工具箱与 DevTools。
-- **CDP Provider**：通过 `browser_manage` 的 `attach` 接入已开放远程调试的 Chrome 或 Electron。用返回的 `browserId` 操作现有页面。
-- **[Firefox Provider](https://github.com/mearlhq/provider-firefox)**：通过 WebDriver BiDi 接入已开放调试端口的 Firefox，无需扩展。独立仓库，发布后用 `npx @mearl/setup provider install @mearl/provider-firefox` 安装。
-- **远端浏览器或设备**：安装并配置对应 Provider，可用动作以该 Provider 声明为准。
-
-连接方式、权限和能力范围见 [CLI / SDK 文档](packages/client/README.md)。setup 准备本机工具；浏览器扩展安装和环境连接需按所选方式完成。
-
-### 3. 确认连接并执行首个任务
-
-保持目标环境运行，确认列表中出现要使用的浏览器：
+保持 Chrome 运行，确认列表中出现要使用的浏览器。
 
 ```bash
 mearl check
 mearl browser_list
 ```
 
-在已接入 Mearl 的 Agent 中试一句。连接多个环境时，附上目标 `browserId`：
+在已接入 Mearl 的 Agent 中试一句。连接多个浏览器时，附上目标 `browserId`。
 
-> 用 Mearl 在选中的浏览器里打开 <https://example.com>，告诉我页面标题，并截一张图。
+> 用 Mearl 打开 <https://example.com>，告诉我页面标题，并截一张图。
+
+### 其他浏览器接入方式
+
+- **CDP**。接入已开启远程调试的 Chrome 或 Electron。
+- **[Firefox Provider](https://github.com/mearlhq/provider-firefox)**。用 `npx @mearl/setup provider install @mearl/provider-firefox` 安装，通过 WebDriver BiDi 接入 Firefox。
+- **[外部 Provider](packages/provider/README.md)**。接入其他本地或远端浏览器和设备。可用动作取决于所选 Provider。
+
+更多连接方式和权限说明见 [CLI / SDK 文档](packages/client/README.md)。
 
 ## CLI 与 SDK
 
@@ -82,17 +83,6 @@ console.log(page.snapshot);
 ```
 
 更多动作、控制会话、脚本和插件示例见 [CLI / SDK 文档](packages/client/README.md)。
-
-## 可以做什么
-
-- **操作网页**，包括读取快照、点击、输入、滚动、上传、下载和截图。
-- **调试请求**，包括查看 HTTP 请求、响应和流式事件，重发请求，设置 Mock、重定向和请求头规则。
-- **检查页面**，读取控制台日志，检查元素尺寸、样式、遮挡和滚动容器，采集和查询埋点事件。
-- **模拟环境**，包括切换设备视口、触摸、User-Agent 和时区，以及通过 Profile 还原 App WebView。
-- 用 `mearl run` **编排任务**，在 JavaScript 中组合浏览器动作和 Skill 命令。
-- 通过本机扩展、CDP、云端 Connector 或 Provider **连接浏览器**。
-
-扩展提供 DevTools 面板、弹窗、侧边栏和工具箱。CLI、SDK 和 MCP 共用浏览器动作，可通过控制会话把多步任务保持在指定浏览器和标签页。[控制会话](packages/client/README.md#控制会话与文件)
 
 ## 扩展 Mearl
 

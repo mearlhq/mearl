@@ -1,172 +1,55 @@
 ---
-import { ArrowRight, ArrowUpRight, Braces, Cable, Check, Globe, Network, ScanSearch, Smartphone, FileSpreadsheet, Terminal } from '@lucide/astro';
+import { ArrowRight, Braces, Cable, Globe, Network, ScanSearch, Smartphone } from '@lucide/astro';
 import BaseLayout from '../layouts/BaseLayout.astro';
-import CodeBlock from './CodeBlock.astro';
-import ProductScreenshot from './ProductScreenshot.astro';
-import { setupCommand, sitePath, type Locale, type Page } from '../lib/site';
+import { sitePath, type Locale, type Page } from '../lib/site';
 import { siteCopy } from '../lib/site-copy';
 import '../styles/home.css';
 
 interface Props { locale: Locale }
 const { locale } = Astro.props;
 const t = siteCopy[locale];
-const useCaseLinks = [
-  sitePath(locale, 'emulation') + '#verify',
-  sitePath(locale, 'web-debugging') + '#trace',
-  sitePath(locale, 'reference/skills') + '#design-overlay',
-  sitePath(locale, 'skill-plugins') + '#reuse-workflow',
-];
 const capabilities: Array<{
   key: keyof typeof t.capabilityGroups;
   Icon: typeof Globe;
-  links: Array<{ page: Page; label: string; anchor?: string }>;
+  page: Page;
+  label: string;
+  anchor?: string;
 }> = [
-  { key: 'connect', Icon: Cable, links: [
-    { page: 'browsers', label: t.connections },
-    { page: 'ego-lite', label: 'EgoLite' },
-  ] },
-  { key: 'automate', Icon: Globe, links: [
-    { page: 'browser-automation', label: t.automation },
-    { page: 'reference/cli-sdk', label: t.cli },
-    { page: 'reference/mcp', label: t.mcp },
-  ] },
-  { key: 'request', Icon: Network, links: [
-    { page: 'authenticated-requests', label: t.authenticatedRequests },
-  ] },
-  { key: 'debug', Icon: ScanSearch, links: [
-    { page: 'web-debugging', label: t.debugging },
-    { page: 'reference/skills', label: t.designReview, anchor: '#design-overlay' },
-  ] },
-  { key: 'emulate', Icon: Smartphone, links: [
-    { page: 'emulation', label: t.mobileGuide, anchor: '#app' },
-  ] },
-  { key: 'reuse', Icon: Braces, links: [
-    { page: 'skill-plugins', label: t.reuseGuide, anchor: '#reuse-workflow' },
-    { page: 'bb-browser', label: t.bbAdapters },
-  ] },
+  { key: 'automate', Icon: Globe, page: 'browser-automation', label: t.automation },
+  { key: 'debug', Icon: ScanSearch, page: 'web-debugging', label: t.debugging },
+  { key: 'request', Icon: Network, page: 'authenticated-requests', label: t.authenticatedRequests },
+  { key: 'emulate', Icon: Smartphone, page: 'emulation', label: t.mobileGuide, anchor: '#device' },
+  { key: 'reuse', Icon: Braces, page: 'skill-plugins', label: t.reuseGuide, anchor: '#reuse-workflow' },
+  { key: 'connect', Icon: Cable, page: 'browsers', label: t.connections },
 ];
 ---
-<BaseLayout title={`Mearl · ${t.tagline}`} description={t.heroLead} {locale} page="home">
+<BaseLayout title={`Mearl · ${t.headline}`} description={t.heroLead} {locale} page="home">
   <div class="product-home docs-article">
     <section class="product-hero" aria-labelledby="hero-title">
-      <div class="product-hero-intro">
-        <span class="product-license">{t.positioning}</span>
-        <h1 id="hero-title">{t.headline[0]}<span>{t.headline[1]}</span></h1>
-        <p>{t.heroLead}</p>
-        <div class="product-actions">
-          <a class="button button-primary" href={sitePath(locale, 'installation')}>{t.homeInstall}<ArrowRight size={15} aria-hidden="true" /></a>
-          <a class="button button-secondary" href={sitePath(locale, 'introduction')}>{t.intro}<ArrowRight size={15} aria-hidden="true" /></a>
-        </div>
-        <p class="product-connection-note">{t.connectionLead}</p>
+      <p class="product-license">{t.openSource}</p>
+      <h1 id="hero-title">{t.headline}</h1>
+      <p class="product-lead">{t.heroLead}</p>
+      <div class="product-actions">
+        <a class="button button-primary" href={sitePath(locale, 'installation')}>{t.installTitle}<ArrowRight size={16} aria-hidden="true" /></a>
+        <a class="button button-secondary" href={sitePath(locale, 'introduction')}>{t.documentation}</a>
       </div>
-
-      <section class="product-demo" id="case" aria-labelledby="case-title">
-        <div class="product-demo-stage">
-          <div class="product-demo-title">
-            <h2 id="case-title">{t.demoTitle}</h2>
-            <span class="demo-preview-label">{t.casePreview}</span>
-          </div>
-          <fieldset class="demo-switcher">
-            <legend class="demo-sr-only">{t.demoTitle}</legend>
-            {t.demoTabs.map((label, index) => <label>
-              <input type="radio" name="demo-stage" value={index} checked={index === 1} />
-              <span><b>0{index + 1}</b>{label}</span>
-            </label>)}
-          </fieldset>
-          <div class="demo-task"><Terminal size={16} aria-hidden="true" /><p>{t.casePrompt}</p></div>
-          <div class="demo-scenes">
-            {t.demoScenes.map((scene, index) => (
-              <div class="demo-scene" data-scene={index}>
-                <div class="demo-browser">
-                  <div class="demo-page-content">
-                    <span class="demo-page-title"><Globe size={14} aria-hidden="true" />{t.demoPage}</span>
-                    <div class="demo-report"><span class="demo-report-icon"><FileSpreadsheet size={24} stroke-width={1.5} aria-hidden="true" /></span><div><strong>{t.demoItem}</strong><small>{t.demoItemDetail}</small></div></div>
-                    <div class="demo-artifact"><FileSpreadsheet size={14} aria-hidden="true" /><span>{scene.artifact}</span></div>
-                    <div class:list={['demo-feedback', { 'is-success': index > 0 }]}>
-                      <Check size={14} aria-hidden="true" />{scene.status}
-                    </div>
-                  </div>
-                </div>
-                <div class="demo-inspector">
-                  <span class="demo-inspector-label">{scene.label}</span>
-                  <h3>{scene.heading}</h3>
-                  <p>{scene.detail}</p>
-                  <pre><code>{scene.lines.join('\n')}</code></pre>
-                  <div class="demo-result"><span class="demo-result-dot"></span>{scene.result}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div class="product-demo-note">
-          <span>{t.openSource}</span>
-          <a href={sitePath(locale, 'browser-automation')}>{t.automation}<ArrowUpRight size={15} aria-hidden="true" /></a>
-        </div>
-      </section>
     </section>
 
-    <section class="product-section" id="capabilities">
-      <span class="product-kicker">{t.overview}</span>
-      <h2>{t.capabilityOverview}</h2>
+    <section class="product-section" id="capabilities" aria-labelledby="capabilities-title">
+      <h2 id="capabilities-title">{t.capabilityOverview}</h2>
       <ul class="product-capabilities" role="list">
-        {capabilities.map(({ key, Icon, links }) => {
+        {capabilities.map(({ key, Icon, page, label, anchor = '' }) => {
           const { title, text } = t.capabilityGroups[key];
           return (
             <li>
               <div class="product-capability-icon"><Icon size={20} aria-hidden="true" /></div>
               <h3>{title}</h3>
               <p>{text}</p>
-              <div class="product-links">
-                {links.map(({ page, label, anchor = '' }) => (
-                  <a href={sitePath(locale, page) + anchor}>{label}<ArrowRight size={14} aria-hidden="true" /></a>
-                ))}
-              </div>
+              <a href={sitePath(locale, page) + anchor}>{label}<ArrowRight size={14} aria-hidden="true" /></a>
             </li>
           );
         })}
       </ul>
-    </section>
-
-    <section class="product-section product-comparison" id="app-comparison" aria-labelledby="comparison-title">
-      <div class="product-comparison-copy">
-        <span class="product-kicker"><Smartphone size={15} aria-hidden="true" />{t.emulation}</span>
-        <h2 id="comparison-title">{t.comparisonTitle}<span>{t.comparisonTitleEnd}</span></h2>
-        <p>{t.comparisonLead}</p>
-        <ul class="product-emulation-features">
-          {t.comparisonFeatures.map(({ title, text }) => <li><strong>{title}</strong><span>{text}</span></li>)}
-        </ul>
-        <div class="product-comparison-links">
-          <a href={sitePath(locale, 'emulation') + '#device'}>{t.mobileGuide}<ArrowRight size={15} aria-hidden="true" /></a>
-        </div>
-      </div>
-      <div class="product-comparison-stage">
-        <ProductScreenshot screenshot="foldableEmulation" {locale} />
-      </div>
-    </section>
-
-    <section class="product-section" id="workflow">
-      <h2>{t.useCasesTitle}</h2>
-      <div class="product-role-links">
-        {t.useCases.map(({ title, text }, index) => (
-          <a href={useCaseLinks[index]}>
-            <strong>{title}<ArrowRight size={16} aria-hidden="true" /></strong>
-            <span>{text}</span>
-          </a>
-        ))}
-      </div>
-    </section>
-
-    <section class="product-section product-start" id="start">
-      <div>
-        <span class="product-kicker">{t.gettingStarted}</span>
-        <h2>{t.homeInstall}</h2>
-        <p>{t.startInstall}</p>
-        <div class="product-actions">
-          <a class="button button-primary" id="installation" href={sitePath(locale, 'installation')}>{t.install}<ArrowRight size={15} aria-hidden="true" /></a>
-          <a class="button button-secondary" id="quick-start" href={sitePath(locale, 'quick-start')}>{t.quickstart}</a>
-        </div>
-      </div>
-      <CodeBlock {locale} id="home-install-command" label={t.agentInstall} command={setupCommand} />
     </section>
   </div>
 </BaseLayout>

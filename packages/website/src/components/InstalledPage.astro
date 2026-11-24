@@ -56,14 +56,14 @@ const common = siteCopy[locale];
           <small class="installed-step-note">{t.agentNote}</small>
         </article>
       </div>
-      <p class="start-note"><a class="installed-role-link" href={`${sitePath(locale)}#workflow`}>{common.useCasesTitle}<ArrowUpRight size={13} aria-hidden="true" /></a></p>
+      <p class="start-note"><a class="installed-capabilities-link" href={`${sitePath(locale)}#capabilities`}>{common.capabilityOverview}<ArrowUpRight size={13} aria-hidden="true" /></a></p>
     </section>
   </div>
 </BaseLayout>
 
 <style>
-  .installed-role-link { display: inline-flex; align-items: center; gap: 5px; color: var(--blue); text-decoration: none; }
-  .installed-role-link:hover { color: var(--blue-hover); }
+  .installed-capabilities-link { display: inline-flex; align-items: center; gap: 5px; color: var(--blue); text-decoration: none; }
+  .installed-capabilities-link:hover { color: var(--blue-hover); }
   .installed-page { min-height: var(--hero-viewport-height); }
   .installed-start { min-height: var(--hero-viewport-height); }
   .installed-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; margin-bottom: 32px; }

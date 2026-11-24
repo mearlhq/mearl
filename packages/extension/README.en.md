@@ -53,7 +53,7 @@ Load into the browser:
 1. Open `chrome://extensions/` and enable **Developer mode**.
 2. Click **Load unpacked** and select `packages/extension/dist_chrome`.
 3. Press F12 on a web page and select the **Mearl** panel.
-4. To use CLI, SDK, or MCP control, enable Agent service in the extension and install the local environment with [setup](../setup/README.en.md).
+4. To use CLI, SDK, or MCP control, install the local environment with [setup](../setup/README.en.md). The extension connects to the local components automatically.
 
 ## Scripts
 

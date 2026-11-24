@@ -53,7 +53,7 @@ pnpm --filter @mearl/extension... build
 1. 打开 `chrome://extensions/` 并开启「开发者模式」
 2. 点击「加载已解压的扩展程序」，选择 `packages/extension/dist_chrome`
 3. 在网页按 F12 打开开发者工具，选择「Mearl」面板
-4. 需要 CLI、SDK 或 MCP 控制时，在扩展中开启 Agent 服务，并使用 [setup](../setup/README.md) 安装本机环境
+4. 需要 CLI、SDK 或 MCP 控制时，使用 [setup](../setup/README.md) 安装本机环境。扩展会自动连接本机组件。
 
 ## 脚本
 

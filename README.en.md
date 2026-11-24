@@ -2,53 +2,54 @@
 
 [简体中文](README.md) | [English](README.en.md)
 
-A browser work environment for AI agents: automate, debug, and verify in the browser of your choice.
+Browser automation and debugging for AI agents.
 
-Mearl connects page actions, network requests, logs, and environment emulation so agents can complete tasks, investigate issues, and verify results. Connect your everyday browser, a browser through CDP, or a remote environment through a Provider. Package verified workflows as Skills to reuse through an agent, the CLI, or the Toolbox. People can also inspect and debug pages in the extension’s DevTools panel.
+Mearl connects to the Chrome browser you already use, with its open tabs and sign-in. Connect your agent through Skills or MCP, or use the CLI and TypeScript SDK directly.
 
 [Product website](https://mearlhq.github.io/mearl/en.html) · [Chrome Web Store](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm) · [GitHub Releases](https://github.com/mearlhq/mearl/releases)
 
+## What you can do
+
+- **Automate pages.** Read pages, click, fill forms, upload and download files, and take screenshots.
+- **Debug and verify web pages.** Inspect network requests, responses, and console logs. Mock responses to verify page behavior.
+- **Make authenticated requests.** Use matching browser cookies to call a known HTTP endpoint, or replay a captured request.
+- **Emulate mobile devices.** Change the viewport, touch input, user agent, and time zone.
+- **Reuse workflows.** Package recurring tasks as Skills with instructions for agents, executable commands, or a Toolbox interface.
+
 ## Get started
 
-### 1. Set up the local environment
+### 1. Install the Chrome extension and local components
 
-Requires **Node.js ≥ 20.18.0**. Run setup to install the CLI, Native Host, and Mearl Skill. Select your agent integration when prompted:
+Install the [Mearl extension](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm) in the Chrome profile you want to use. It requires Chrome 120 or later.
+
+Run the installer with Node.js 20.18.0 or later. Follow the prompts to select your agent integration.
 
 ```bash
 npx @mearl/setup
 ```
 
-Or give this prompt to an agent that supports Skills:
+For MCP clients, run `npx @mearl/setup --mcp` and restart the client. [Installation guide](https://mearlhq.github.io/mearl/en/installation.html) · [MCP documentation](packages/mcp-server/README.en.md)
 
-```text
-Run npx @mearl/setup to install Mearl, then read the installed Mearl Skill.
-Configure a browser connection for the task. Tell me the steps if you need my input.
-Run mearl check and mearl browser_list, and report whether the intended browser is connected.
-```
+### 2. Verify the connection and run your first task
 
-For MCP clients, run `npx @mearl/setup --mcp` to configure the integration. [Setup documentation](packages/setup/README.en.md) · [MCP documentation](packages/mcp-server/README.en.md)
-
-### 2. Choose a browser connection
-
-- **Everyday browser**: optionally install the [Chrome extension](https://chromewebstore.google.com/detail/mearl/aoehhjnofngknnjefamjbplchbolghkm) to reuse open tabs and signed-in sessions and access the Toolbox and DevTools.
-- **CDP Provider**: use `browser_manage` with `attach` to connect to Chrome or Electron with remote debugging enabled. Use the returned `browserId` to control existing pages.
-- **[Firefox Provider](https://github.com/mearlhq/provider-firefox)**: attach to Firefox with a local WebDriver BiDi port. No extension is required. It lives in its own repository and, once published, installs with `npx @mearl/setup provider install @mearl/provider-firefox`.
-- **Remote browser or device**: install and configure the corresponding Provider. Available actions depend on its declared capabilities.
-
-See the [CLI / SDK documentation](packages/client/README.en.md) for connections, permissions, and supported capabilities. Setup prepares local tools; complete extension installation and environment connection for your selected route.
-
-### 3. Verify the connection and run your first task
-
-Keep your target environment running and confirm that the intended browser appears in the list:
+Keep Chrome running and check that your intended browser appears in the list.
 
 ```bash
 mearl check
 mearl browser_list
 ```
 
-Try this prompt in an agent connected to Mearl. Include the target `browserId` when multiple environments are connected:
+Try this prompt in an agent connected to Mearl. If multiple browsers are connected, give it the target `browserId`.
 
-> Use Mearl to open <https://example.com> in the selected browser, tell me the page title, and take a screenshot.
+> Use Mearl to open <https://example.com>, tell me the page title, and take a screenshot.
+
+### Other browser connections
+
+- **CDP.** Connect to Chrome or Electron with remote debugging enabled.
+- **[Firefox Provider](https://github.com/mearlhq/provider-firefox).** Install it with `npx @mearl/setup provider install @mearl/provider-firefox` and connect to Firefox through WebDriver BiDi.
+- **[External Providers](packages/provider/README.en.md).** Connect other local or remote browsers and devices. Available actions depend on the Provider.
+
+See the [CLI / SDK documentation](packages/client/README.en.md) for more connection options and permissions.
 
 ## CLI and SDK
 
@@ -82,17 +83,6 @@ console.log(page.snapshot);
 ```
 
 See the [CLI / SDK documentation](packages/client/README.en.md) for actions, control sessions, scripts, and plugins.
-
-## What you can do
-
-- **Automate pages** by reading snapshots, clicking, typing, scrolling, uploading, downloading, and taking screenshots.
-- **Debug requests** by inspecting HTTP requests, responses, and streaming events, replaying requests, and configuring mocks, redirects, and header rules.
-- **Inspect pages** by reading console logs, checking element dimensions, styles, occlusion, and scroll containers, and capturing and querying analytics events.
-- **Emulate environments** by changing the viewport, touch input, User-Agent, and time zone, or using App Profiles to emulate a WebView.
-- **Compose tasks** with `mearl run` by combining browser actions and Skill commands in JavaScript.
-- **Connect browsers** through the local extension, CDP, a cloud Connector, or a Provider.
-
-The extension provides a DevTools panel, popup, side panel, and toolbox. The CLI, SDK, and MCP share browser actions and can use control sessions to keep a task on the intended browser and tabs. [Control sessions](packages/client/README.en.md#control-sessions-and-files)
 
 ## Extend Mearl
 

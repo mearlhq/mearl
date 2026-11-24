@@ -8,12 +8,10 @@ export const siteCopy = {
     light: 'Switch to light mode',
     dark: 'Switch to dark mode',
     language: '简体中文',
-    tagline: 'A browser work environment for agents.',
     footerLead: 'Give agents the tools to act, investigate, and verify.',
     intro: 'Introduction',
     install: 'Installation',
     quickstart: 'Quick start',
-    overview: 'Overview',
     gettingStarted: 'Getting started',
     chromeExtension: 'Chrome extension',
     connections: 'Connections & sessions',
@@ -40,135 +38,44 @@ export const siteCopy = {
     copied: 'Copied',
     copyFailed: 'Copy failed',
     openSource: 'Open source · Apache-2.0',
-    positioning: 'A browser work environment for agents',
-    headline: ['Let your agent act,', ' investigate, and verify'],
+    headline: 'Browser automation and debugging for AI agents',
     heroLead:
-      'Connect page actions, requests, logs, and environment emulation so your agent can complete tasks and check the results. Turn proven workflows into reusable Skills.',
-    connectionLead:
-      'Choose the browser for your task. Connect through the extension, CDP, or an environment Provider.',
-    comparisonTitle: 'Test mobile pages',
-    comparisonTitleEnd: 'in your browser',
-    comparisonLead:
-      'Use device presets to check layouts on phones and foldables. Add an App Profile when a page depends on its host app.',
-    comparisonFeatures: [
-      {
-        title: 'Device presets',
-        text: 'Check portrait and landscape layouts, including folded and unfolded views on supported presets.',
-      },
-      {
-        title: 'Device shell',
-        text: 'See how content fits around system bars and safe areas.',
-      },
-      {
-        title: 'App Profiles',
-        text: 'Simulate the App’s User-Agent, WebView settings, and supported JSBridge calls.',
-      },
-    ],
-    homeInstall: 'Install Mearl',
+      'Work in the browser you already use, with its open tabs and sign-in. Connect your agent through Skills or MCP, or use the CLI and TypeScript SDK directly.',
     mobileGuide: 'Device emulation guide',
-    useCasesTitle: 'Find a workflow for your role',
-    useCases: [
-      {
-        title: 'Product · Check how a feature works',
-        text: 'Walk through a feature in a signed-in session. Check its behavior on mobile and capture screenshots for a bug report.',
-      },
-      {
-        title: 'Engineering · Diagnose a web issue',
-        text: 'Reproduce an issue in the same tab, see the requests and logs it triggered, then verify the fix with mocks or App emulation.',
-      },
-      {
-        title: 'Design · Compare the build with the design',
-        text: 'Overlay a design on the live page, compare pixels, and capture differences to share with engineering.',
-      },
-      {
-        title: 'Operations · Automate recurring work',
-        text: 'Ask an agent to look up orders or export reports. Package a verified workflow as a Skill your team can run again.',
-      },
-    ],
     capabilityOverview: 'What you can do with Mearl',
-    designReview: 'Design Overlay',
     capabilityGroups: {
-      connect: {
-        title: 'Connect browsers and devices',
-        text: 'Use the extension with everyday Chrome, CDP with a browser or Electron app, or a Provider with an external environment. Cloud requests can reach the browser host through a Connector.',
-      },
       automate: {
-        title: 'Operate web pages',
-        text: 'Ask your agent to read pages, fill forms, transfer files, or take screenshots. Run the same browser actions from the CLI, TypeScript SDK, or MCP.',
-      },
-      request: {
-        title: 'Call APIs with your browser sign-in',
-        text: 'Reuse a signed-in browser session to call a known HTTP endpoint, replay a request, or retrieve data for a report.',
+        title: 'Automate web pages',
+        text: 'Read pages, click, fill forms, upload and download files, and capture screenshots.',
       },
       debug: {
-        title: 'Debug pages and verify layouts',
-        text: 'Inspect requests, console logs, and tracking events. Mock responses to retest behavior, or overlay a design to compare pixels.',
+        title: 'Debug and verify',
+        text: 'Inspect network requests, responses, and console logs. Mock responses to verify how a page behaves.',
+      },
+      request: {
+        title: 'Make authenticated requests',
+        text: 'Use matching cookies from your browser to call a known HTTP endpoint, or replay a captured request.',
       },
       emulate: {
-        title: 'Test App WebViews',
-        text: 'Emulate a device, timezone, or App WebView to check JSBridge and container behavior.',
+        title: 'Emulate mobile devices',
+        text: 'Check how pages behave with different viewports and touch input. Set the user agent or time zone as needed.',
       },
       reuse: {
-        title: 'Reuse tools and workflows',
-        text: 'Install existing Skills and bb-browser adapters, or turn a proven workflow into a Skill you can run again from an agent, the CLI, or the Toolbox.',
+        title: 'Reuse workflows as Skills',
+        text: 'Package recurring tasks as Skills with instructions for agents, executable commands, or a Toolbox interface.',
+      },
+      connect: {
+        title: 'Connect browsers and devices',
+        text: 'Use the extension with Chrome, connect a browser or Electron through CDP, or reach an external environment through a Provider.',
       },
     },
-    startInstall:
-      'Run setup to prepare Mearl and connect your agent. Then choose a browser connection; the extension is optional for connecting your everyday browser.',
-    demoTitle: 'Let your agent export the weekly report',
-    demoTabs: ['Act', 'Inspect', 'Verify', 'Reuse'],
-    demoPage: 'Reports',
-    demoItem: 'Weekly report',
-    demoItemDetail: 'Last week · CSV',
-    demoScenes: [
-      {
-        status: 'Last week selected',
-        artifact: 'weekly-report.csv',
-        label: 'PAGE ACTION',
-        heading: 'Start with an everyday task',
-        detail: 'Open the reports page, select last week, and start the export.',
-        lines: ['Open reports', '→ Select last week', '→ Export CSV'],
-        result: 'Use the selected browser’s sign-in',
-      },
-      {
-        status: 'Report ready',
-        artifact: 'weekly-report.csv',
-        label: 'REQUEST + RESPONSE',
-        heading: 'Check what the page requested',
-        detail:
-          'Inspect the request and response to confirm that the export uses the selected dates.',
-        lines: ['GET /api/reports      200', 'range: last_week', 'format: csv'],
-        result: 'The request matches the selected date range',
-      },
-      {
-        status: 'Download checked',
-        artifact: 'weekly-report.csv',
-        label: 'DOWNLOAD + VERIFICATION',
-        heading: 'Verify the file you received',
-        detail: 'Save the CSV and check its dates and columns before reporting completion.',
-        lines: ['weekly-report.csv', '✓ Dates match last week', '✓ Expected columns present'],
-        result: 'A saved file with its contents checked',
-      },
-      {
-        status: 'Workflow saved',
-        artifact: 'weekly-report/SKILL.md',
-        label: 'REUSABLE SKILL',
-        heading: 'Make next week easier',
-        detail: 'Package the export and validation steps as a Skill with a date range input.',
-        lines: ['weekly-report/', '  SKILL.md', '  scripts/export.mjs'],
-        result: 'Run the Skill next time with a new date range',
-      },
-    ],
-    casePreview: 'Illustrative workflow · not a live run',
-    casePrompt:
-      'Export last week’s report, check its dates and columns, and save the workflow as a Skill.',
     reuseGuide: 'Turn a workflow into a Skill',
     installTitle: 'Install Mearl',
     installSummary:
-      'Run setup, choose a browser connection, then verify your first task. The Chrome extension is optional for connecting your everyday browser.',
+      'Run setup, connect a browser, and verify the connection. Use the Chrome extension to work with your existing tabs and sign-in.',
     installLead:
       'Run the installer. If you plan to use an agent, select its Skill integration when prompted.',
-    installExtension: 'Optional: connect your everyday browser',
+    installExtension: 'Install the Chrome extension',
     extensionInstallLead:
       'Install the extension in the Chrome profile whose tabs and sign-in you want to reuse. It also provides the Toolbox and DevTools panel. Requires Chrome 120 or later.',
     extensionTry: 'Explore the Toolbox',
@@ -179,7 +86,7 @@ export const siteCopy = {
     browserOptions: [
       {
         title: 'Everyday browser · extension',
-        text: 'Reuse open tabs and your existing sign-in. Follow the optional extension steps below.',
+        text: 'Install the extension in the Chrome profile you want to use.',
       },
       {
         title: 'Browser / Electron · CDP',
@@ -233,7 +140,7 @@ export const siteCopy = {
     verifyResult:
       'Confirm that your intended browser appears in the list. With multiple connections, give your agent its browserId.',
     verifySetupLead:
-      'Keep the selected environment running. If using the extension, enable Agent Service under Settings → Services in Mearl. Check the environment and list the connected browsers.',
+      'Keep the selected browser running and run the following commands. With the extension, Mearl connects to the local components automatically.',
     nextSteps: 'Explore Mearl',
     quickNote: 'Run mearl guide for the CLI workflow. Also see',
     extensionLead:
@@ -249,12 +156,10 @@ export const siteCopy = {
     light: '切换到亮色模式',
     dark: '切换到暗色模式',
     language: 'English',
-    tagline: '面向 Agent 的浏览器工作环境。',
     footerLead: '让 Agent 执行任务、排查问题、验证结果。',
     intro: '产品介绍',
     install: '安装',
     quickstart: '快速上手',
-    overview: '概览',
     gettingStarted: '入门',
     chromeExtension: 'Chrome 扩展',
     connections: '浏览器连接与会话',
@@ -281,125 +186,43 @@ export const siteCopy = {
     copied: '已复制',
     copyFailed: '复制失败',
     openSource: '开源 · Apache-2.0',
-    positioning: '面向 Agent 的浏览器工作环境',
-    headline: ['让 Agent 执行任务，', '也能排查与验证'],
+    headline: '用 AI Agent 操作和调试网页',
     heroLead:
-      '把页面操作、网络请求、日志和环境模拟连接起来，让 Agent 完成任务、检查结果，再将验证过的流程沉淀为可复用的 Skill。',
-    connectionLead: '选择你想用的浏览器，通过扩展、CDP 或 Provider 接入任务所需的环境。',
-    comparisonTitle: '在浏览器里，',
-    comparisonTitleEnd: '验证移动端页面',
-    comparisonLead:
-      '用设备预设检查手机和折叠屏上的页面布局。页面依赖 App 环境时，可以选用对应的 App Profile。',
-    comparisonFeatures: [
-      { title: '设备预设', text: '检查横竖屏布局，并在支持的预设中切换折叠态和展开态。' },
-      { title: '设备外壳', text: '检查页面内容与系统栏、安全区的适配。' },
-      {
-        title: 'App Profile',
-        text: '模拟 App 的 User-Agent、WebView 设置和支持的 JSBridge 调用。',
-      },
-    ],
-    homeInstall: '安装 Mearl',
+      '使用你已经打开的浏览器，沿用现有标签页和登录态。通过 Skill 或 MCP 接入 Agent，也可以直接使用 CLI 或 TypeScript SDK。',
     mobileGuide: '设备模拟指南',
-    useCasesTitle: '按角色找到适合的用法',
-    useCases: [
-      {
-        title: '产品 · 验收功能流程',
-        text: '沿用登录态跑一遍功能，在移动端视口核对表现，并截图记录问题。',
-      },
-      {
-        title: '研发 · 定位问题并验证修复',
-        text: '在同一个标签页复现问题，查看这次操作的请求和日志，再用 Mock 或 App 模拟验证修复。',
-      },
-      {
-        title: '设计 · 核对页面还原度',
-        text: '把设计稿叠到真实页面上，查看像素差异，截图和研发对齐。',
-      },
-      {
-        title: '业务 · 减少重复的平台操作',
-        text: '让 Agent 查订单、导报表，把验证过的常用流程做成团队可复用的 Skill。',
-      },
-    ],
     capabilityOverview: '用 Mearl 可以做什么',
-    designReview: '设计稿对比',
     capabilityGroups: {
-      connect: {
-        title: '连接浏览器与设备',
-        text: '通过扩展接入日常 Chrome，用 CDP 连接浏览器或 Electron，或用 Provider 接入外部环境。云端请求可经 Connector 到达浏览器所在主机。',
-      },
       automate: {
         title: '自动操作网页',
-        text: '让 Agent 读页面、填表、上传下载文件或截图，也可通过 CLI、TypeScript SDK 或 MCP 调用浏览器动作。',
-      },
-      request: {
-        title: '用浏览器登录态调用接口',
-        text: '复用浏览器里的登录态，直接调用已知 HTTP 接口，重放请求或读取报表数据。',
+        text: '读取页面、点击、填写表单、上传和下载文件，以及截取屏幕。',
       },
       debug: {
-        title: '调试网页与验收界面',
-        text: '查看请求、控制台日志和埋点，用 Mock 响应复测页面，或叠加设计稿对比像素差异。',
+        title: '调试和验证网页',
+        text: '查看网络请求、响应和控制台日志，用 Mock 响应验证页面行为。',
+      },
+      request: {
+        title: '发送带登录态的请求',
+        text: '用浏览器中匹配目标地址的 Cookie 调用已知 HTTP 接口，也可以重放已捕获的请求。',
       },
       emulate: {
-        title: '验证 App WebView',
-        text: '模拟设备、时区和 App WebView，检查 JSBridge 与容器行为。',
+        title: '模拟移动设备',
+        text: '切换视口和触摸输入，检查移动端页面表现。也可按需设置 User-Agent 或时区。',
       },
       reuse: {
-        title: '复用工具与工作流',
-        text: '安装现成的 Skills 和 bb-browser 适配器，或把验证过的流程做成 Skill，从 Agent、CLI 或工具箱再次运行。',
+        title: '把常用流程做成 Skill',
+        text: '将重复任务封装为 Skill，可包含 Agent 操作指引、可执行命令或工具箱界面。',
+      },
+      connect: {
+        title: '连接浏览器和设备',
+        text: '用扩展接入 Chrome，通过 CDP 接入浏览器或 Electron，也可用 Provider 连接外部环境。',
       },
     },
-    startInstall:
-      '先运行 setup，准备 Mearl 环境并接入 Agent，再选择浏览器连接方式。需要接入日常浏览器时，可选安装扩展。',
-    demoTitle: '让 Agent 导出每周报表',
-    demoTabs: ['执行', '观察', '验证', '复用'],
-    demoPage: '数据报表',
-    demoItem: '每周数据汇总',
-    demoItemDetail: '上周 · CSV 格式',
-    demoScenes: [
-      {
-        status: '已筛选上周数据',
-        artifact: 'weekly-report.csv',
-        label: 'PAGE ACTION',
-        heading: '从日常操作开始',
-        detail: '打开报表页面，选择上周的日期范围，执行导出。',
-        lines: ['打开报表页面', '→ 选择上周', '→ 导出 CSV'],
-        result: '沿用所选浏览器的登录态',
-      },
-      {
-        status: '报表已生成',
-        artifact: 'weekly-report.csv',
-        label: 'REQUEST + RESPONSE',
-        heading: '确认页面请求了什么',
-        detail: '读取导出请求和响应，确认日期范围与页面选择一致。',
-        lines: ['GET /api/reports      200', 'range: last_week', 'format: csv'],
-        result: '请求中的日期范围与筛选条件一致',
-      },
-      {
-        status: '下载完成，已核对',
-        artifact: 'weekly-report.csv',
-        label: 'DOWNLOAD + VERIFICATION',
-        heading: '拿到文件，再核对结果',
-        detail: '保存 CSV，检查文件中的日期和字段，再报告完成。',
-        lines: ['weekly-report.csv', '✓ 日期范围符合上周', '✓ 所需字段齐全'],
-        result: '交付已保存、已核对的报表文件',
-      },
-      {
-        status: '已保存操作流程',
-        artifact: 'weekly-report/SKILL.md',
-        label: 'REUSABLE SKILL',
-        heading: '下周，直接复用',
-        detail: '将导出和核对步骤做成带日期参数的 Skill。',
-        lines: ['weekly-report/', '  SKILL.md', '  scripts/export.mjs'],
-        result: '下次指定日期范围，调用 Skill 即可',
-      },
-    ],
-    casePreview: '工作流示意 · 非实时运行',
-    casePrompt: '帮我导出上周的报表，核对日期和字段，再把这套流程保存为 Skill。',
     reuseGuide: '把常用流程做成 Skill',
     installTitle: '安装 Mearl',
     installSummary:
-      '先运行 setup，再选择浏览器接入方式，最后验证首个任务。Chrome 扩展是接入日常浏览器的可选方案。',
+      '先运行 setup，接入浏览器，再确认连接。要使用 Chrome 中已有的标签页和登录态，请安装扩展。',
     installLead: '先运行安装器。打算使用 Agent 时，按提示选择对应的 Skill 接入。',
-    installExtension: '可选：接入日常浏览器',
+    installExtension: '安装 Chrome 扩展',
     extensionInstallLead:
       '在需要复用标签页和登录态的 Chrome 配置中安装扩展，同时获得工具箱和 DevTools 面板。需要 Chrome 120 或更高版本。',
     extensionTry: '查看工具箱用法',
@@ -407,7 +230,7 @@ export const siteCopy = {
     browserInstall: '2. 选择浏览器接入方式',
     browserInstallLead: 'setup 已准备好本机工具。选择你想用的浏览器，再按下列一种方式接入。',
     browserOptions: [
-      { title: '日常浏览器 · 扩展接入', text: '复用已有标签页和登录态，按下方可选步骤安装扩展。' },
+      { title: '日常浏览器 · 扩展接入', text: '在你要接入的 Chrome 配置中安装扩展。' },
       {
         title: '浏览器 / Electron · CDP',
         text: '接入已开放远程调试的浏览器或 Electron 客户端页面，无需安装 Mearl 扩展。',
@@ -451,8 +274,7 @@ export const siteCopy = {
     installMcpLead: '确认本机连接正常后，运行 MCP 安装命令，选择客户端并重启，让客户端加载工具。',
     verifySetup: '3. 确认连接',
     verifyResult: '确认列表中出现目标浏览器。连接多个环境时，将目标 browserId 告诉 Agent。',
-    verifySetupLead:
-      '保持所选环境运行。使用扩展时，在 Mearl 的「设置 → 服务集成」开启「Agent 服务」。检查环境并列出已连接的浏览器。',
+    verifySetupLead: '保持所选浏览器运行，再执行以下命令。使用扩展时，Mearl 会自动连接本机组件。',
     nextSteps: '探索 Mearl',
     quickNote: '运行 mearl guide 了解 CLI 工作流，或查阅',
     extensionLead: '从 Popup 打开常用工具，用 Agent 对话分析当前页面，或在 DevTools 追踪网页问题。',

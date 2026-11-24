@@ -57,13 +57,6 @@ export const screenshots = {
     en: 'The sample order list in the iPhone 17 Pro preset. The device frame includes the status bar and a mobile viewport.',
     'zh-CN': '在 iPhone 17 Pro 预设下打开示例订单列表，可以同时核对手机外壳、状态栏和移动端布局。',
   },
-  foldableEmulation: {
-    url: 'https://img.alicdn.com/imgextra/i1/O1CN01fQTj0qu2F8C4TRoA_!!6000000000937-2-tps-2204-1550.png',
-    width: 2204,
-    height: 1550,
-    en: 'MDN in the unfolded iPhone Duo preset, showing the landscape layout and system bars.',
-    'zh-CN': '在 iPhone Duo 展开态预设中查看 MDN 的横屏布局和系统栏。',
-  },
 } as const;
 
 export type Screenshot = keyof typeof screenshots;
