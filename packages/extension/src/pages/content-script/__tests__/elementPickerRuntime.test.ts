@@ -72,8 +72,14 @@ describe('elementPickerRuntime', () => {
 
     expect(elementPicker.startElementPicker).toHaveBeenCalledWith({
       traceMode: true,
+      spmMode: false,
       commentMode: false,
     });
+    expect(sendResponse).toHaveBeenCalledWith({ success: true });
+
+    sendResponse.mockClear();
+    listeners[0]?.({ action: 'stopElementPicker', cancelled: true }, {}, sendResponse);
+    expect(elementPicker.stopElementPicker).toHaveBeenCalledWith(true);
     expect(sendResponse).toHaveBeenCalledWith({ success: true });
   });
 

@@ -100,6 +100,7 @@ import {
   restoreSpmOverlayForFrame,
   setSpmOverlayEnabled,
 } from './spmOverlayState';
+import { enqueueSpmOverlayToggle } from './spmOverlayToggleQueue';
 import { scanQrCodeFromImage, scanQrCodeFromElement } from './qrCodeHandler';
 import {
   activateContentScriptsForOrigins,
@@ -114,6 +115,7 @@ import {
   ensureElementPickerMainRuntimeForFrames,
   getActiveElementPickerSession,
   getElementPickerPreviewFrameIds,
+  isCurrentElementPickerSessionMessage,
   restoreElementPickerSessionForFrame,
   selectElementPickerStartupFrames,
   selectInitialElementPickerFrame,
@@ -631,7 +633,9 @@ function postToSourceTraceOwner(
 
 // 面板按业务文档的跨文档导航分段。设备壳内的根 WebView 由 CDP 上报。
 function notifyPanelDocumentCommit(tabId: number, url: string, timestampMs: number): void {
-  if (sourceTraceOwners.has(tabId)) void stopTabElementPicker(tabId);
+  if (sourceTraceOwners.has(tabId) || getActiveElementPickerSession(tabId)) {
+    void stopTabElementPicker(tabId, true);
+  }
   const message = { action: 'mainFrameCommitted', url, timestampMs };
   notifyDevicePreviewPanel(tabId, message);
   void navigateDevicePreviewPanel(tabId, timestampMs, url);
@@ -703,10 +707,13 @@ function nextElementPickerStartGeneration(tabId: number): number {
   return generation;
 }
 
-function stopTabElementPicker(tabId: number) {
+function stopTabElementPicker(tabId: number, cancelled = false) {
   nextElementPickerStartGeneration(tabId);
   clearActiveElementPickerSession(tabId);
-  return sendTabMessageToFramesSafe(tabId, { action: 'stopElementPicker' });
+  return sendTabMessageToFramesSafe(tabId, {
+    action: 'stopElementPicker',
+    ...(cancelled ? { cancelled: true } : {}),
+  });
 }
 
 // 初始化 Override Notifier（避免循环依赖）
@@ -2005,10 +2012,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return;
       }
       if (message.type === 'ELEMENT_PICKER_PAUSED') {
+        if (!isCurrentElementPickerSessionMessage(tabId, message.pickerSessionId)) return;
         void sendTabMessageToFramesSafe(tabId, { action: 'pauseElementPicker' });
         return;
       }
       if (message.type === 'ELEMENT_PICKER_RESUMED') {
+        if (!isCurrentElementPickerSessionMessage(tabId, message.pickerSessionId)) return;
         void sendTabMessageToFramesSafe(tabId, { action: 'resumeElementPicker' });
         return;
       }
@@ -2016,6 +2025,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         message.type === 'ELEMENT_PICKER_FRAME_ACTIVE' &&
         typeof message.frameToken === 'string'
       ) {
+        if (!isCurrentElementPickerSessionMessage(tabId, message.pickerSessionId)) return;
         void sendTabMessageToFramesSafe(tabId, {
           action: 'setElementPickerFrameActive',
           frameToken: message.frameToken,
@@ -2027,6 +2037,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         message.type === 'ELEMENT_PICK_CANCELLED' ||
         message.type === 'TRACE_RESULT'
       ) {
+        if (
+          message.type !== 'TRACE_RESULT' &&
+          !isCurrentElementPickerSessionMessage(tabId, message.pickerSessionId)
+        ) {
+          return;
+        }
         const traceOwner = sourceTraceOwners.get(tabId);
         if (message.type === 'TRACE_RESULT' && !traceOwner) return;
         if (traceOwner && !getActiveElementPickerSession(tabId)) return;
@@ -2313,6 +2329,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         .catch(() => undefined);
       const session = {
         traceMode: !!message.traceMode,
+        spmMode: !!message.spmMode,
+        ...(typeof message.pickerSessionId === 'string'
+          ? { pickerSessionId: message.pickerSessionId }
+          : {}),
         commentMode: !!message.commentMode,
         ...(message.continuousCommentMode !== undefined
           ? { continuousCommentMode: !!message.continuousCommentMode }
@@ -2533,24 +2553,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ success: false });
       return;
     }
-    setSpmOverlayEnabled(tabId, Boolean(message.enabled));
-    if (!message.enabled) {
-      void sendTabMessageToFramesSafe(tabId, {
-        action: 'toggleSpmOverlay',
-        enabled: false,
-      }).then(results => sendResponse({ success: results.length > 0 }));
-      return true;
-    }
-    void ensureFrameVisualRuntime(tabId)
-      .then(frameIds =>
-        sendTabMessageToFrameIdsSafe(
-          tabId,
-          frameIds,
-          { action: 'toggleSpmOverlay', enabled: true },
-          { notifyOnUnreachable: true },
-        ),
-      )
-      .then(results => sendResponse({ success: results.length > 0 }));
+    const enabled = Boolean(message.enabled);
+    setSpmOverlayEnabled(tabId, enabled);
+    void enqueueSpmOverlayToggle(tabId, async () => {
+      if (!enabled) {
+        const results = await sendTabMessageToFramesSafe(tabId, {
+          action: 'toggleSpmOverlay',
+          enabled: false,
+        });
+        return { success: results.length > 0 };
+      }
+      const frameIds = await ensureFrameVisualRuntime(tabId);
+      const results = await sendTabMessageToFrameIdsSafe(
+        tabId,
+        frameIds,
+        { action: 'toggleSpmOverlay', enabled: true },
+        { notifyOnUnreachable: true },
+      );
+      return { success: results.length > 0 };
+    }).then(sendResponse, () => sendResponse({ success: false }));
     return true;
   }
 

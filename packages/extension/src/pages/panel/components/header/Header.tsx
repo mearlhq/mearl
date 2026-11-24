@@ -8,6 +8,7 @@ import { QuickSettingsMenu } from './QuickSettingsMenu';
 import { Banner } from './Banner';
 import { SpmOverlayMenu } from './SpmOverlayMenu';
 import { HeatmapButton } from './HeatmapButton';
+import { SpmPickerButton } from './SpmPickerButton';
 import type { HeatmapErrorCode, HeatmapMeasure, HeatmapStatus } from '../../utils/heatmap';
 import { useRemoteConfig } from '../../hooks/useRemoteConfig';
 
@@ -39,6 +40,8 @@ interface HeaderProps {
   accountsEnabled?: boolean;
   onToggleSourceTrace?: () => void;
   sourceTraceActive?: boolean;
+  onToggleSpmPicker?: () => void;
+  spmPickerActive?: boolean;
 }
 
 export const Header: FC<HeaderProps> = ({
@@ -68,6 +71,8 @@ export const Header: FC<HeaderProps> = ({
   accountsEnabled = false,
   onToggleSourceTrace,
   sourceTraceActive = false,
+  onToggleSpmPicker,
+  spmPickerActive = false,
 }) => {
   const remoteConfig = useRemoteConfig();
   const integrationTitle = agentConnected
@@ -115,8 +120,16 @@ export const Header: FC<HeaderProps> = ({
           </button>
         )}
 
+        {mode === 'rum' && showAllSpm && onToggleSpmPicker && (
+          <SpmPickerButton
+            active={spmPickerActive}
+            onClick={onToggleSpmPicker}
+            title={t('spmPickerTip')}
+          />
+        )}
+
         {/* 热度数据 */}
-        {mode === 'rum' && heatmapAvailable && (
+        {mode === 'rum' && !showAllSpm && heatmapAvailable && (
           <HeatmapButton
             pageSpmAB={pageSpmAB}
             heatmapMeasures={heatmapMeasures}

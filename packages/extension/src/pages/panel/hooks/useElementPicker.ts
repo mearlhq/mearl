@@ -16,6 +16,7 @@ export const ElementPickerTabContext = createContext<number | null | undefined>(
 
 interface UseElementPickerOptions {
   onPicked: (text: string, selection: ElementPickerSelection) => void;
+  onPreview?: (text: string, selection: ElementPickerSelection) => void;
   onCommented?: (
     comment: string,
     styleChanges: ElementCommentStyleChanges,
@@ -28,6 +29,7 @@ interface UseElementPickerOptions {
 
 export function useElementPicker({
   onPicked,
+  onPreview,
   onCommented,
   onCancelled,
   tabId: explicitTabId,
@@ -36,6 +38,9 @@ export function useElementPicker({
   const tabId = explicitTabId === undefined ? previewTabId : explicitTabId;
   const [isPicking, setIsPicking] = useState(false);
   const ownerIdRef = useRef(createElementPickerOwnerId());
+  const sessionSequenceRef = useRef(0);
+  const pickerSessionIdRef = useRef<string | null>(null);
+  const activeFrameTokenRef = useRef<string | null>(null);
   const pickingTabIdRef = useRef<number | null>(null);
   const pickerOptionsRef = useRef<ElementPickerOptions>({});
 
@@ -52,6 +57,8 @@ export function useElementPicker({
     setIsPicking(false);
     const targetTabId = pickingTabIdRef.current ?? resolveTabId();
     pickingTabIdRef.current = null;
+    pickerSessionIdRef.current = null;
+    activeFrameTokenRef.current = null;
     pickerOptionsRef.current = {};
     onCancelled?.();
     if (targetTabId === null) return;
@@ -61,8 +68,10 @@ export function useElementPicker({
   const finish = useCallback(
     (selection: ElementPickerSelection) => {
       const text = selection.text.trim();
-      if (text || selection.element) onPicked(text, selection);
+      if (text || selection.element || selection.spm) onPicked(text, selection);
       pickingTabIdRef.current = null;
+      pickerSessionIdRef.current = null;
+      activeFrameTokenRef.current = null;
       pickerOptionsRef.current = {};
       setIsPicking(false);
     },
@@ -71,6 +80,8 @@ export function useElementPicker({
 
   const handleCancelled = useCallback(() => {
     pickingTabIdRef.current = null;
+    pickerSessionIdRef.current = null;
+    activeFrameTokenRef.current = null;
     pickerOptionsRef.current = {};
     setIsPicking(false);
     onCancelled?.();
@@ -92,13 +103,40 @@ export function useElementPicker({
       ) {
         return;
       }
-      if (message.type === 'ELEMENT_PICKED') {
-        finish({
+      const isSessionMessage =
+        message.type === 'ELEMENT_PICKER_FRAME_ACTIVE' ||
+        message.type === 'ELEMENT_PICKED' ||
+        message.type === 'ELEMENT_PICK_PREVIEW' ||
+        message.type === 'ELEMENT_PICK_CANCELLED';
+      if (
+        isSessionMessage &&
+        (typeof message.pickerSessionId !== 'string' ||
+          message.pickerSessionId !== pickerSessionIdRef.current)
+      ) {
+        return;
+      }
+      if (message.type === 'ELEMENT_PICKER_FRAME_ACTIVE') {
+        if (typeof message.frameToken === 'string') {
+          activeFrameTokenRef.current = message.frameToken;
+        }
+        return;
+      }
+      if (message.type === 'ELEMENT_PICKED' || message.type === 'ELEMENT_PICK_PREVIEW') {
+        if (typeof message.frameToken === 'string') {
+          if (activeFrameTokenRef.current && activeFrameTokenRef.current !== message.frameToken) {
+            return;
+          }
+          activeFrameTokenRef.current = message.frameToken;
+        }
+        const selection: ElementPickerSelection = {
           text: typeof message.text === 'string' ? message.text : '',
           element: message.element ?? null,
+          ...(typeof message.spm === 'string' && message.spm ? { spm: message.spm } : {}),
           page: message.page ?? { url: sender.tab?.url ?? '', title: sender.tab?.title ?? '' },
           ...(message.frame ? { frame: message.frame } : {}),
-        });
+        };
+        if (message.type === 'ELEMENT_PICK_PREVIEW') onPreview?.(selection.text, selection);
+        else finish(selection);
       } else if (message.type === 'ELEMENT_COMMENT_CONFIRMED') {
         const comment = typeof message.comment === 'string' ? message.comment.trim() : '';
         const styleChanges =
@@ -129,27 +167,39 @@ export function useElementPicker({
         handleCancelled();
       }
     },
-    [finish, handleCancelled, onCommented, resolveTabId],
+    [finish, handleCancelled, onCommented, onPreview, resolveTabId],
   );
 
   const start = useCallback(
     (options: ElementPickerOptions = {}) => {
       const targetTabId = resolveTabId();
       if (targetTabId === null) return;
+      const pickerSessionId = `${ownerIdRef.current}:${++sessionSequenceRef.current}`;
       announceElementPickerSession(ownerIdRef.current);
       pickingTabIdRef.current = targetTabId;
+      pickerSessionIdRef.current = pickerSessionId;
+      activeFrameTokenRef.current = null;
       pickerOptionsRef.current = options;
       setIsPicking(true);
       const resetFailedStart = () => {
-        if (pickingTabIdRef.current !== targetTabId) return;
+        if (
+          pickingTabIdRef.current !== targetTabId ||
+          pickerSessionIdRef.current !== pickerSessionId
+        ) {
+          return;
+        }
         pickingTabIdRef.current = null;
+        pickerSessionIdRef.current = null;
+        activeFrameTokenRef.current = null;
         pickerOptionsRef.current = {};
         setIsPicking(false);
       };
       void sendMessageSafely<{ success?: boolean }>({
         action: 'startElementPicker',
         tabId: targetTabId,
+        pickerSessionId,
         ...(options.traceMode ? { traceMode: true } : {}),
+        ...(options.spmMode ? { spmMode: true } : {}),
         ...(options.commentMode ? { commentMode: true } : {}),
         ...(options.continuousCommentMode !== undefined
           ? { continuousCommentMode: options.continuousCommentMode }
@@ -176,6 +226,8 @@ export function useElementPicker({
     const handleSessionStarted = (event: Event) => {
       if (getElementPickerSessionOwner(event) === ownerIdRef.current) return;
       pickingTabIdRef.current = null;
+      pickerSessionIdRef.current = null;
+      activeFrameTokenRef.current = null;
       pickerOptionsRef.current = {};
       setIsPicking(false);
     };
@@ -228,6 +280,8 @@ export function useElementPicker({
     () => () => {
       const targetTabId = pickingTabIdRef.current;
       pickingTabIdRef.current = null;
+      pickerSessionIdRef.current = null;
+      activeFrameTokenRef.current = null;
       pickerOptionsRef.current = {};
       if (targetTabId === null) return;
       void sendMessageSafely({ action: 'cancelElementPicker', tabId: targetTabId }).catch(() => {});

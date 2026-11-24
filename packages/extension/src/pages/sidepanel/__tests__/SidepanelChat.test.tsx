@@ -583,10 +583,20 @@ describe('SidepanelChat', () => {
       'bg-blue-500/15',
     );
     expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
-      { action: 'startElementPicker', tabId: 11 },
+      {
+        action: 'startElementPicker',
+        tabId: 11,
+        pickerSessionId: expect.any(String),
+      },
       undefined,
       expect.any(Function),
     );
+    const pickerSessionId = (
+      vi
+        .mocked(chrome.runtime.sendMessage)
+        .mock.calls.find(([message]) => (message as any)?.action === 'startElementPicker')?.[0] as
+        { pickerSessionId?: string } | undefined
+    )?.pickerSessionId;
 
     await waitFor(() => expect(chrome.runtime.onMessage.addListener).toHaveBeenCalled());
     const listeners = vi
@@ -598,6 +608,8 @@ describe('SidepanelChat', () => {
           {
             source: 'mearl-content-script',
             type: 'ELEMENT_PICKED',
+            pickerSessionId,
+            frameToken: 'frame-1',
             text: 'Wrong tab',
             element: { tagName: 'div', selector: '#wrong-tab' },
           },
@@ -614,6 +626,8 @@ describe('SidepanelChat', () => {
           {
             source: 'mearl-content-script',
             type: 'ELEMENT_PICKED',
+            pickerSessionId,
+            frameToken: 'frame-1',
             text: 'Submit order',
             page: { url: 'https://example.com/checkout', title: 'Checkout' },
             element: {
@@ -1227,12 +1241,21 @@ describe('SidepanelChat', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Select page element' }));
     await waitFor(() => expect(chrome.runtime.onMessage.addListener).toHaveBeenCalled());
+    const pickerSessionId = (
+      vi
+        .mocked(chrome.runtime.sendMessage)
+        .mock.calls.findLast(
+          ([message]) => (message as any)?.action === 'startElementPicker',
+        )?.[0] as { pickerSessionId?: string } | undefined
+    )?.pickerSessionId;
     act(() => {
       for (const [listener] of vi.mocked(chrome.runtime.onMessage.addListener).mock.calls) {
         listener(
           {
             source: 'mearl-content-script',
             type: 'ELEMENT_PICKED',
+            pickerSessionId,
+            frameToken: 'frame-1',
             text: 'Draft target',
             page: { url: 'https://example.com/draft', title: 'Draft' },
             element: { tagName: 'button', selector: 'button.draft-target' },

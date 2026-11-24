@@ -123,6 +123,39 @@
   "showAllSpmNodesTooltip": {
     "message": "高亮页面中所有 SPM 节点（绿=abcd，橙=click，蓝=spm）"
   },
+  "spmPickerTip": {
+    "message": "选取页面中的 SPM 高亮框并查看埋点详情"
+  },
+  "spmElementDetail": {
+    "message": "页面埋点详情"
+  },
+  "spmElementType": {
+    "message": "埋点类型"
+  },
+  "spmElementClick": {
+    "message": "点击埋点"
+  },
+  "spmElementAnchor": {
+    "message": "锚点埋点"
+  },
+  "spmElementFullPoint": {
+    "message": "完整 SPM 点"
+  },
+  "spmElementNode": {
+    "message": "SPM 节点"
+  },
+  "spmElementDomNode": {
+    "message": "DOM 节点"
+  },
+  "spmElementText": {
+    "message": "元素文本"
+  },
+  "spmElementConfig": {
+    "message": "埋点配置"
+  },
+  "spmElementDomDetail": {
+    "message": "DOM 详情"
+  },
   "heatmap": {
     "message": "热度数据"
   },

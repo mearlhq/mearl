@@ -127,6 +127,39 @@
   "showAllSpmNodesTooltip": {
     "message": "Highlight all SPM nodes on page (green=abcd, orange=click, blue=spm)"
   },
+  "spmPickerTip": {
+    "message": "Pick an SPM highlight on the page to inspect its event details"
+  },
+  "spmElementDetail": {
+    "message": "Page tracking details"
+  },
+  "spmElementType": {
+    "message": "Tracking type"
+  },
+  "spmElementClick": {
+    "message": "Click tracking"
+  },
+  "spmElementAnchor": {
+    "message": "Anchor tracking"
+  },
+  "spmElementFullPoint": {
+    "message": "Full SPM point"
+  },
+  "spmElementNode": {
+    "message": "SPM node"
+  },
+  "spmElementDomNode": {
+    "message": "DOM node"
+  },
+  "spmElementText": {
+    "message": "Element text"
+  },
+  "spmElementConfig": {
+    "message": "Tracking configuration"
+  },
+  "spmElementDomDetail": {
+    "message": "DOM details"
+  },
   "heatmap": {
     "message": "Heatmap data"
   },

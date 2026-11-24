@@ -71,6 +71,27 @@ async function flushSpmMutation() {
 }
 
 describe('SPM full-page overlay', () => {
+  it('can be closed and reopened with a fresh overlay lifecycle', () => {
+    const target = document.createElement('button');
+    target.setAttribute('data-spm-abcd', 'a.b.comment.comment_rate');
+    document.body.appendChild(target);
+
+    highlighter = createSpmHighlighter();
+    highlighter.toggleAllSpmOverlay(true);
+    FakeIntersectionObserver.current?.show(target);
+    expect(document.querySelectorAll('[data-mtop-spm-all-overlay]')).toHaveLength(1);
+
+    highlighter.toggleAllSpmOverlay(false);
+    expect(document.querySelectorAll('[data-mtop-spm-all-overlay]')).toHaveLength(0);
+
+    highlighter.toggleAllSpmOverlay(true);
+    FakeIntersectionObserver.current?.show(target);
+    expect(document.querySelectorAll('[data-mtop-spm-all-overlay]')).toHaveLength(1);
+    expect(document.querySelector('[data-mtop-spm-all-overlay]')?.textContent).toBe(
+      'comment.comment_rate',
+    );
+  });
+
   it('refreshes the label when a tracked element reuses the same DOM node', async () => {
     const target = document.createElement('div');
     target.setAttribute('data-spm-abcd', '0.0.cross-merge-traffic.book-flight');
@@ -81,11 +102,11 @@ describe('SPM full-page overlay', () => {
     FakeIntersectionObserver.current?.show(target);
 
     const getOverlay = () => document.querySelector<HTMLElement>('[data-mtop-spm-all-overlay]');
-    expect(getOverlay()?.textContent).toBe('book-flight');
+    expect(getOverlay()?.textContent).toBe('cross-merge-traffic.book-flight');
 
     target.setAttribute('data-spm-abcd', '0.0.cross-merge-traffic.book-airpickup');
     await flushSpmMutation();
-    expect(getOverlay()?.textContent).toBe('book-airpickup');
+    expect(getOverlay()?.textContent).toBe('cross-merge-traffic.book-airpickup');
 
     target.setAttribute('data-spm-abcd', '');
     await flushSpmMutation();
@@ -93,7 +114,29 @@ describe('SPM full-page overlay', () => {
 
     target.setAttribute('data-spm-abcd', '0.0.cross-merge-traffic.book-train');
     await flushSpmMutation();
-    expect(getOverlay()?.textContent).toBe('book-train');
+    expect(getOverlay()?.textContent).toBe('cross-merge-traffic.book-train');
+  });
+
+  it('shows the parent C point with a click D point', () => {
+    document.body.innerHTML =
+      '<section data-spm="product-card"><button data-spm-click="locaid=book-now">Book</button></section>';
+    const target = document.querySelector('[data-spm-click]')!;
+
+    highlighter = createSpmHighlighter();
+    highlighter.toggleAllSpmOverlay(true);
+    FakeIntersectionObserver.current?.show(target);
+
+    expect(document.querySelector<HTMLElement>('[data-mtop-spm-all-overlay]')?.textContent).toBe(
+      'product-card.book-now',
+    );
+    const overlay = document.querySelector<HTMLElement>('[data-mtop-spm-all-overlay]')!;
+    expect(overlay.getAttribute('data-mtop-spm-source-id')).toBeTruthy();
+    expect(target.getAttribute('data-mtop-spm-source-id')).toBe(
+      overlay.getAttribute('data-mtop-spm-source-id'),
+    );
+
+    highlighter.clearAllSpmOverlay();
+    expect(target.hasAttribute('data-mtop-spm-source-id')).toBe(false);
   });
 });
 
@@ -103,7 +146,9 @@ describe('SPM locate highlight', () => {
     target.setAttribute('data-spm-abcd', 'a.b.card.button');
     document.body.appendChild(target);
     let top = 500;
-    target.getBoundingClientRect = vi.fn(() => ({ top, left: 30, right: 230, bottom: top + 80, width: 200, height: 80 } as DOMRect));
+    target.getBoundingClientRect = vi.fn(
+      () => ({ top, left: 30, right: 230, bottom: top + 80, width: 200, height: 80 }) as DOMRect,
+    );
     target.scrollIntoView = vi.fn();
     highlighter = createSpmHighlighter();
     expect(highlighter.highlightSpmOnPage('a.b.card.button')).toBe(1);
@@ -125,7 +170,8 @@ describe('SPM locate highlight', () => {
   it('replaces a previous locate loop and releases animation work after the original timeout', async () => {
     const target = document.createElement('div');
     target.setAttribute('data-spm-abcd', 'a.b.card.button');
-    target.scrollIntoView = vi.fn(); document.body.appendChild(target);
+    target.scrollIntoView = vi.fn();
+    document.body.appendChild(target);
     const read = vi.spyOn(target, 'getBoundingClientRect');
     highlighter = createSpmHighlighter();
     highlighter.highlightSpmOnPage('a.b.card.button');

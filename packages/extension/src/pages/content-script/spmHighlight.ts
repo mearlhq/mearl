@@ -18,6 +18,7 @@ export type SpmHighlighter = {
 
 const HOTZONE_SELECTOR = '[data-mtop-spm-hotzone]';
 const ALL_OVERLAY_SELECTOR = '[data-mtop-spm-all-overlay]';
+const SPM_SOURCE_ID_ATTR = 'data-mtop-spm-source-id';
 export const SPM_SELECTOR = '[data-spm-abcd],[data-spm-anchor-id],[data-spm-click],[data-spm]';
 export const VISIBILITY_MARGIN = 200;
 
@@ -118,10 +119,23 @@ function parseSpmInput(rawInput: string): string {
 
 function getAllOverlaySpmLabel(spmValue: string): string {
   const parts = spmValue.split('.');
-  if (parts.length === 5) {
-    return parts[3] || spmValue;
-  }
-  return parts[parts.length - 1] || spmValue;
+  return parts.slice(-2).join('.') || spmValue;
+}
+
+function getElementSpm(el: Element): string {
+  const spmAbcd = el.getAttribute('data-spm-abcd') || el.getAttribute('data-spm-anchor-id');
+  if (spmAbcd) return spmAbcd;
+
+  const spmClick = el.getAttribute('data-spm-click');
+  const locaid = spmClick?.match(/locaid=([^,;|&]+)/)?.[1];
+  const ownSpm = locaid || el.getAttribute('data-spm') || '';
+  if (!ownSpm) return '';
+
+  const parentSpm = el.parentElement?.closest('[data-spm]')?.getAttribute('data-spm');
+  if (!parentSpm) return ownSpm;
+  const c = parentSpm.split('.').filter(Boolean).at(-1);
+  const d = ownSpm.split('.').filter(Boolean).at(-1);
+  return c && d && c !== d ? `${c}.${d}` : ownSpm;
 }
 
 function getHotzoneSpmLabel(spmValue: string): string {
@@ -140,6 +154,7 @@ export function createSpmHighlighter(): SpmHighlighter {
   let spmHotzoneRafId: number | null = null;
 
   let spmAllOverlayCleanup: Cleanup | null = null;
+  let spmSourceSequence = 0;
 
   function clearHotzoneState() {
     if (spmHotzoneRafId !== null) {
@@ -171,23 +186,8 @@ export function createSpmHighlighter(): SpmHighlighter {
   }
 
   function getSpmLabel(el: Element): string {
-    const spmAbcd = el.getAttribute('data-spm-abcd') || el.getAttribute('data-spm-anchor-id');
-    if (spmAbcd) {
-      return getAllOverlaySpmLabel(spmAbcd);
-    }
-
-    const spmClick = el.getAttribute('data-spm-click');
-    if (spmClick) {
-      const m = spmClick.match(/locaid=([^,;|&]+)/);
-      return m ? m[1] : spmClick;
-    }
-
-    const spm = el.getAttribute('data-spm');
-    if (spm) {
-      return getAllOverlaySpmLabel(spm);
-    }
-
-    return '';
+    const spm = getElementSpm(el);
+    return spm ? getAllOverlaySpmLabel(spm) : '';
   }
 
   function showAllSpmOverlay() {
@@ -198,6 +198,10 @@ export function createSpmHighlighter(): SpmHighlighter {
     function removeOverlayForEl(el: Element) {
       const o = overlayMap.get(el);
       if (!o) return;
+      const sourceId = o.getAttribute(SPM_SOURCE_ID_ATTR);
+      if (sourceId && el.getAttribute(SPM_SOURCE_ID_ATTR) === sourceId) {
+        el.removeAttribute(SPM_SOURCE_ID_ATTR);
+      }
       o.remove();
       overlayMap.delete(el);
     }
@@ -216,6 +220,9 @@ export function createSpmHighlighter(): SpmHighlighter {
       o.style.background = style.bg;
 
       const labelText = getSpmLabel(el);
+      const spm = getElementSpm(el);
+      if (spm) o.setAttribute('data-mtop-spm-value', spm);
+      else o.removeAttribute('data-mtop-spm-value');
       let label = o.querySelector(':scope > span') as HTMLSpanElement | null;
       if (!labelText) {
         label?.remove();
@@ -239,6 +246,9 @@ export function createSpmHighlighter(): SpmHighlighter {
 
       const o = document.createElement('div');
       o.setAttribute('data-mtop-spm-all-overlay', '1');
+      const sourceId = `${Date.now().toString(36)}-${++spmSourceSequence}`;
+      el.setAttribute(SPM_SOURCE_ID_ATTR, sourceId);
+      o.setAttribute(SPM_SOURCE_ID_ATTR, sourceId);
       const zIndex = getEffectiveZIndex(el);
       o.style.cssText = `position:fixed;z-index:${zIndex};pointer-events:none;box-sizing:border-box;border:1px solid ${style.border};background:${style.bg};`;
       overlayMap.set(el, o);
@@ -284,8 +294,7 @@ export function createSpmHighlighter(): SpmHighlighter {
 
     spmAllOverlayCleanup = () => {
       lifecycle.stop();
-      for (const o of overlayMap.values()) o.remove();
-      overlayMap.clear();
+      for (const el of Array.from(overlayMap.keys())) removeOverlayForEl(el);
     };
   }
 
@@ -325,7 +334,10 @@ export function createSpmHighlighter(): SpmHighlighter {
 
     function updateHotzonePositions() {
       spmHotzoneRafId = null;
-      if (!overlays.some(({ el }) => el.isConnected)) { clearHotzoneState(); return; }
+      if (!overlays.some(({ el }) => el.isConnected)) {
+        clearHotzoneState();
+        return;
+      }
       const vw = window.innerWidth;
       for (const { el, o, lb } of overlays) {
         const r = el.getBoundingClientRect();

@@ -13,6 +13,7 @@ import { RequestList } from './components/RequestList';
 import { RequestDetail } from './components/RequestDetail';
 import { EventList } from './components/EventList';
 import { EventDetail } from './components/EventDetail';
+import { SpmElementDetail } from './components/SpmElementDetail';
 import { Header, HostPermissionBanner } from './components/header';
 import { BottomStatusBar } from './components/BottomStatusBar';
 import { StatusPanel } from './components/StatusPanel';
@@ -29,7 +30,8 @@ import { useModificationStatus } from './hooks/useModificationStatus';
 import { useAgentBridgeStatus } from './hooks/useAgentBridgeStatus';
 import { useCloudConnectorStatus } from './hooks/useCloudConnectorStatus';
 import { usePanelPortBridge } from './hooks/usePanelPortBridge';
-import { ElementPickerTabContext } from './hooks/useElementPicker';
+import { ElementPickerTabContext, useElementPicker } from './hooks/useElementPicker';
+import type { ElementPickerSelection } from '../content-script/elementCommentTypes';
 import { useDevtoolsRequestHandler } from './hooks/useDevtoolsRequestHandler';
 import { usePanelActions } from './hooks/usePanelActions';
 import { useHostPermissionPrompt } from './hooks/useHostPermissionPrompt';
@@ -146,6 +148,24 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
   // RUM 模式状态
   const [rumEvents, setRumEvents] = useState<RumEvent[]>([]);
   const [selectedRumEventId, setSelectedRumEventId] = useState<string | null>(null);
+  const [selectedSpmElement, setSelectedSpmElement] = useState<ElementPickerSelection | null>(null);
+  const handleSpmPicked = useCallback((_text: string, selection: ElementPickerSelection) => {
+    if (!selection.spm) return;
+    setSelectedRumEventId(null);
+    setSelectedSpmElement(selection);
+  }, []);
+  const spmPicker = useElementPicker({
+    tabId,
+    onPicked: handleSpmPicked,
+    onPreview: handleSpmPicked,
+  });
+  const spmPickerIsPickingRef = useRef(spmPicker.isPicking);
+  spmPickerIsPickingRef.current = spmPicker.isPicking;
+  useEffect(() => {
+    if (mode === 'rum' && showAllSpm) return;
+    if (spmPicker.isPicking) spmPicker.cancel();
+    setSelectedSpmElement(null);
+  }, [mode, showAllSpm, spmPicker.cancel, spmPicker.isPicking]);
   const [rumFilterText, setRumFilterText] = useState<string>('');
   const [rumSelectedTypes, setRumSelectedTypes] = useLocalStorage<string[]>('rum-selected-types', [
     'rum/view',
@@ -387,6 +407,8 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
         typeof detail?.timestampMs === 'number' && Number.isFinite(detail.timestampMs)
           ? detail.timestampMs
           : Date.now();
+      if (spmPickerIsPickingRef.current) spmPicker.cancel();
+      setSelectedSpmElement(null);
       if (!preserveLog) {
         requestCaptureStateRef.current = { ...requestCaptureStateRef.current };
         setRequests([]);
@@ -408,7 +430,7 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
       chrome.devtools.network.onRequestFinished.removeListener(handleDevtoolsRequest);
       window.removeEventListener('mearl-main-frame-committed', handleMainFrameCommitted);
     };
-  }, [handleDevtoolsRequest, preserveLog, isDevtools]);
+  }, [handleDevtoolsRequest, preserveLog, isDevtools, spmPicker.cancel]);
 
   const clearRequests = () => {
     if (!isDevtools) clearPreview();
@@ -419,6 +441,7 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
     setSelectedRequestId(null);
     setRumEvents([]);
     setSelectedRumEventId(null);
+    setSelectedSpmElement(null);
     setNonCapturedRequests([]);
     setNavigationDividers([]);
     // 注意：不清空 pinnedFields，它们是用户配置的持久化数据
@@ -446,6 +469,7 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
     spmOverlayRevision.current++;
     const next = !showAllSpm;
     setShowAllSpm(next);
+    if (!next) setSelectedSpmElement(null);
     toggleSpmOverlay(tabId, next);
   };
 
@@ -860,6 +884,10 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
         accountsEnabled={accountsEnabled}
         onToggleSourceTrace={sourceTracer.toggle}
         sourceTraceActive={sourceTracer.isPicking}
+        onToggleSpmPicker={() =>
+          spmPicker.isPicking ? spmPicker.cancel() : spmPicker.start({ spmMode: true })
+        }
+        spmPickerActive={spmPicker.isPicking}
       />
       {!isDevtools && (
         <div
@@ -909,7 +937,10 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
               totalEventCount={rumEvents.length}
               onClear={clearRequests}
               selectedEventId={selectedRumEventId}
-              onSelectEvent={setSelectedRumEventId}
+              onSelectEvent={eventId => {
+                setSelectedSpmElement(null);
+                setSelectedRumEventId(eventId);
+              }}
               filterText={rumFilterText}
               onFilterChange={setRumFilterText}
               availableTypes={rumAvailableTypes}
@@ -922,15 +953,22 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
             />
           }
           rightPanel={
-            <EventDetail
-              event={selectedRumEvent}
-              tabId={tabId}
-              trackingMetadataEnabled={trackingMetadataEnabled}
-              pinnedEventFields={currentPinnedEventFields}
-              onPinEventField={pinEventField}
-              onUnpinEventField={unpinEventField}
-              onReorderPinnedEventFields={reorderPinnedEventFields}
-            />
+            selectedSpmElement ? (
+              <SpmElementDetail
+                selection={selectedSpmElement}
+                trackingMetadataEnabled={trackingMetadataEnabled}
+              />
+            ) : (
+              <EventDetail
+                event={selectedRumEvent}
+                tabId={tabId}
+                trackingMetadataEnabled={trackingMetadataEnabled}
+                pinnedEventFields={currentPinnedEventFields}
+                onPinEventField={pinEventField}
+                onUnpinEventField={unpinEventField}
+                onReorderPinnedEventFields={reorderPinnedEventFields}
+              />
+            )
           }
           defaultLeftWidth={30}
           minLeftWidth={15}

@@ -10,12 +10,14 @@ export function installElementPickerRuntime(): void {
   runtimeWindow[ELEMENT_PICKER_RUNTIME_FLAG] = true;
 
   const elementPicker = createElementPicker({
-    onFrameActive: () => {
+    frameToken: FRAME_TOKEN,
+    onFrameActive: pickerSessionId => {
       chrome.runtime
         .sendMessage({
           source: 'mearl-content-script',
           type: 'ELEMENT_PICKER_FRAME_ACTIVE',
           frameToken: FRAME_TOKEN,
+          pickerSessionId,
         })
         .catch(() => {});
     },
@@ -35,6 +37,10 @@ export function installElementPickerRuntime(): void {
     } else if (message.action === 'startElementPicker') {
       elementPicker.startElementPicker({
         traceMode: !!message.traceMode,
+        spmMode: !!message.spmMode,
+        ...(typeof message.pickerSessionId === 'string'
+          ? { pickerSessionId: message.pickerSessionId }
+          : {}),
         commentMode: !!message.commentMode,
         ...(message.continuousCommentMode !== undefined
           ? { continuousCommentMode: !!message.continuousCommentMode }
@@ -53,7 +59,7 @@ export function installElementPickerRuntime(): void {
       elementPicker.setPickerFrameActive(message.frameToken === FRAME_TOKEN);
       sendResponse({ success: true });
     } else if (message.action === 'stopElementPicker') {
-      elementPicker.stopElementPicker(false);
+      elementPicker.stopElementPicker(Boolean(message.cancelled));
       sendResponse({ success: true });
     } else if (message.action === 'editElementComment') {
       if (typeof message.commentId === 'string') {

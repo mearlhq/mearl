@@ -36,6 +36,7 @@ export interface ElementPickerPage {
 export interface ElementPickerSelection {
   text: string;
   element: ElementInfo | null;
+  spm?: string;
   page: ElementPickerPage;
   frame?: {
     url: string;
@@ -61,6 +62,8 @@ export interface ElementCommentLabels {
 
 export interface ElementPickerOptions {
   traceMode?: boolean;
+  spmMode?: boolean;
+  pickerSessionId?: string;
   commentMode?: boolean;
   continuousCommentMode?: boolean;
   commentLabels?: ElementCommentLabels;

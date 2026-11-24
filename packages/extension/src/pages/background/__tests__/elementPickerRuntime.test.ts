@@ -8,6 +8,7 @@ import {
   ensureElementPickerMainRuntime,
   ensureElementPickerMainRuntimeForFrames,
   getElementPickerPreviewFrameIds,
+  isCurrentElementPickerSessionMessage,
   restoreElementPickerSessionForFrame,
   selectElementPickerStartupFrames,
   selectInitialElementPickerFrame,
@@ -54,14 +55,20 @@ describe('elementPickerRuntime', () => {
       { frameId: 9, parentFrameId: 7 },
       { frameId: 12, parentFrameId: 0 },
     ]);
-    setActiveElementPickerSession(11, { traceMode: false, commentMode: false, previewRootFrameId: 7 });
+    setActiveElementPickerSession(11, {
+      traceMode: false,
+      commentMode: false,
+      previewRootFrameId: 7,
+    });
     vi.mocked(chrome.tabs.sendMessage).mockResolvedValue({ success: true });
 
     await expect(getElementPickerPreviewFrameIds(11, 7)).resolves.toEqual([7, 9]);
     await expect(restoreElementPickerSessionForFrame(11, 0)).resolves.toBe(false);
     await expect(restoreElementPickerSessionForFrame(11, 12)).resolves.toBe(false);
     await expect(restoreElementPickerSessionForFrame(11, 9)).resolves.toBe(true);
-    expect(chrome.tabs.sendMessage).toHaveBeenCalledExactlyOnceWith(11, expect.any(Object), { frameId: 9 });
+    expect(chrome.tabs.sendMessage).toHaveBeenCalledExactlyOnceWith(11, expect.any(Object), {
+      frameId: 9,
+    });
   });
 
   it('injects and verifies each requested frame independently', async () => {
@@ -88,6 +95,7 @@ describe('elementPickerRuntime', () => {
     vi.mocked(chrome.tabs.sendMessage).mockResolvedValue({ success: true });
     setActiveElementPickerSession(11, {
       traceMode: false,
+      spmMode: true,
       commentMode: true,
       continuousCommentMode: true,
       topPage: { url: 'https://example.test/', title: 'Example' },
@@ -100,6 +108,7 @@ describe('elementPickerRuntime', () => {
       11,
       expect.objectContaining({
         action: 'startElementPicker',
+        spmMode: true,
         commentMode: true,
         continuousCommentMode: true,
       }),
@@ -142,6 +151,21 @@ describe('elementPickerRuntime', () => {
 
     expect(executeScript).not.toHaveBeenCalled();
     expect(chrome.tabs.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('rejects delayed messages from an older picker session', () => {
+    setActiveElementPickerSession(11, {
+      traceMode: false,
+      pickerSessionId: 'current-session',
+      commentMode: false,
+    });
+
+    expect(isCurrentElementPickerSessionMessage(11, 'current-session')).toBe(true);
+    expect(isCurrentElementPickerSessionMessage(11, 'old-session')).toBe(false);
+    expect(isCurrentElementPickerSessionMessage(11, undefined)).toBe(false);
+
+    clearActiveElementPickerSession(11);
+    expect(isCurrentElementPickerSessionMessage(11, 'current-session')).toBe(false);
   });
 
   it('activates the top frame on pages and the deepest child in app simulation', () => {

@@ -93,6 +93,136 @@ describe('elementPicker', () => {
     expect(document.querySelector('#mearl-pick-highlight')).toBeNull();
   });
 
+  it('only picks SPM nodes in SPM mode and returns their C.D point', async () => {
+    document.body.innerHTML =
+      '<button id="plain">Plain</button><button id="tracked" data-spm-click="locaid=book-now" data-mtop-spm-source-id="source-1">Book now</button>';
+    const plain = document.querySelector('#plain')!;
+    const overlay = document.createElement('div');
+    overlay.setAttribute('data-mtop-spm-all-overlay', '1');
+    overlay.setAttribute('data-mtop-spm-value', 'product-card.book-now');
+    overlay.setAttribute('data-mtop-spm-source-id', 'source-1');
+    const label = document.createElement('span');
+    label.textContent = 'product-card.book-now';
+    overlay.appendChild(label);
+    overlay.getBoundingClientRect = vi.fn(
+      () => ({ top: 30, left: 30, right: 130, bottom: 70, width: 100, height: 40 }) as DOMRect,
+    );
+    document.documentElement.appendChild(overlay);
+    const elementFromPoint = vi.fn((): Element | null => plain);
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: elementFromPoint,
+    });
+
+    createElementPicker().startElementPicker({ spmMode: true });
+    const outsideClick = new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 10,
+      clientY: 20,
+    });
+    document.dispatchEvent(outsideClick);
+    expect(outsideClick.defaultPrevented).toBe(true);
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'ELEMENT_PICKED' }),
+    );
+
+    // 标题条可能伸出元素框本身，命中其 span 时也应选中所属高亮项。
+    elementFromPoint.mockReturnValue(label);
+    const delegatedPointerDown = vi.fn();
+    const delegatedClick = vi.fn();
+    document.addEventListener('pointerdown', delegatedPointerDown);
+    document.addEventListener('click', delegatedClick);
+    const pointerDown = new PointerEvent('pointerdown', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 50,
+      clientY: 50,
+    });
+    document.dispatchEvent(pointerDown);
+    expect(pointerDown.defaultPrevented).toBe(true);
+    const touchStart = new Event('touchstart', { bubbles: true, cancelable: true });
+    Object.defineProperty(touchStart, 'touches', { value: [{ clientX: 50, clientY: 50 }] });
+    document.dispatchEvent(touchStart);
+    expect(touchStart.defaultPrevented).toBe(true);
+    document.dispatchEvent(
+      new PointerEvent('pointermove', { bubbles: true, clientX: 50, clientY: 50 }),
+    );
+
+    await vi.waitFor(() =>
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'ELEMENT_PICK_PREVIEW',
+          spm: 'product-card.book-now',
+          text: 'Book now',
+          element: expect.objectContaining({ id: 'tracked' }),
+        }),
+      ),
+    );
+    document.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, cancelable: true, clientX: 50, clientY: 50 }),
+    );
+
+    await vi.waitFor(() =>
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: 'mearl-content-script',
+          type: 'ELEMENT_PICKED',
+          spm: 'product-card.book-now',
+          text: 'Book now',
+          element: expect.objectContaining({
+            id: 'tracked',
+            attributes: expect.objectContaining({ 'data-spm-click': 'locaid=book-now' }),
+          }),
+        }),
+      ),
+    );
+    expect(delegatedPointerDown).not.toHaveBeenCalled();
+    expect(delegatedClick).not.toHaveBeenCalled();
+    document.removeEventListener('pointerdown', delegatedPointerDown);
+    document.removeEventListener('click', delegatedClick);
+  });
+
+  it('drops a delayed SPM preview from an earlier picker session', async () => {
+    vi.useFakeTimers();
+    try {
+      document.body.innerHTML =
+        '<button id="tracked" data-spm-click="locaid=book-now" data-mtop-spm-source-id="source-1">Book now</button>';
+      const overlay = document.createElement('div');
+      overlay.setAttribute('data-mtop-spm-all-overlay', '1');
+      overlay.setAttribute('data-mtop-spm-value', 'product-card.book-now');
+      overlay.setAttribute('data-mtop-spm-source-id', 'source-1');
+      document.documentElement.appendChild(overlay);
+      Object.defineProperty(document, 'elementFromPoint', {
+        configurable: true,
+        value: vi.fn(() => overlay),
+      });
+
+      const picker = createElementPicker();
+      picker.startElementPicker({ spmMode: true });
+      document.dispatchEvent(new PointerEvent('pointermove', { clientX: 10, clientY: 10 }));
+      picker.stopElementPicker(false);
+      picker.startElementPicker({ spmMode: true });
+
+      await vi.advanceTimersByTimeAsync(100);
+      expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'ELEMENT_PICK_PREVIEW' }),
+      );
+
+      document.dispatchEvent(new PointerEvent('pointermove', { clientX: 10, clientY: 10 }));
+      await vi.advanceTimersByTimeAsync(100);
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'ELEMENT_PICK_PREVIEW',
+          spm: 'product-card.book-now',
+        }),
+      );
+      picker.stopElementPicker(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('picks an element from a touch tap without requiring touch movement', async () => {
     const target = document.querySelector('#submit')!;
     Object.defineProperty(document, 'elementFromPoint', {

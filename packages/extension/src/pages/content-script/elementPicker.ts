@@ -36,7 +36,8 @@ export type ElementPicker = {
 };
 
 interface ElementPickerCoordinator {
-  onFrameActive?: () => void;
+  frameToken?: string;
+  onFrameActive?: (pickerSessionId?: string) => void;
 }
 
 interface InlineStyleValue {
@@ -59,6 +60,8 @@ interface ConfirmedElementComment {
 
 const TRACE_ATTR = 'data-mtop-trace-target';
 const PICKED_ELEMENT_ATTR = 'data-mtop-element-target';
+const SPM_OVERLAY_SELECTOR = '[data-mtop-spm-all-overlay][data-mtop-spm-value]';
+const SPM_SOURCE_ID_ATTR = 'data-mtop-spm-source-id';
 const ELEMENT_COLLECTION_TIMEOUT_MS = 500;
 
 const FALLBACK_COMMENT_LABELS: ElementCommentLabels = {
@@ -216,6 +219,7 @@ async function getSelection(
   clientX?: number,
   clientY?: number,
   topPage?: ElementPickerPage,
+  spm?: string,
 ): Promise<ElementPickerSelection> {
   const currentDocument = {
     url: window.location.href,
@@ -228,6 +232,7 @@ async function getSelection(
   return {
     text,
     element: await collectPickedElement(target, clientX, clientY),
+    ...(spm ? { spm } : {}),
     page: topPage ?? currentDocument,
     ...(topPage ? { frame: currentDocument } : {}),
   };
@@ -239,16 +244,44 @@ function sendPickedElement(
   clientX?: number,
   clientY?: number,
   topPage?: ElementPickerPage,
+  spm?: string,
+  pickerSessionId?: string,
+  frameToken?: string,
 ): void {
-  void getSelection(target, text, clientX, clientY, topPage).then(selection =>
+  void getSelection(target, text, clientX, clientY, topPage, spm).then(selection =>
     chrome.runtime
       .sendMessage({
         source: 'mearl-content-script',
         type: 'ELEMENT_PICKED',
+        ...(pickerSessionId ? { pickerSessionId } : {}),
+        ...(frameToken ? { frameToken } : {}),
         ...selection,
       })
       .catch(() => {}),
   );
+}
+
+function sendSpmPreview(
+  target: Element,
+  text: string,
+  spm: string,
+  topPage?: ElementPickerPage,
+  pickerSessionId?: string,
+  frameToken?: string,
+  isCurrent: () => boolean = () => true,
+): void {
+  void getSelection(target, text, undefined, undefined, topPage, spm).then(selection => {
+    if (!isCurrent()) return;
+    return chrome.runtime
+      .sendMessage({
+        source: 'mearl-content-script',
+        type: 'ELEMENT_PICK_PREVIEW',
+        ...(pickerSessionId ? { pickerSessionId } : {}),
+        ...(frameToken ? { frameToken } : {}),
+        ...selection,
+      })
+      .catch(() => {});
+  });
 }
 
 export function createElementPicker(coordinator: ElementPickerCoordinator = {}): ElementPicker {
@@ -256,6 +289,7 @@ export function createElementPicker(coordinator: ElementPickerCoordinator = {}):
   let pickerHighlight: HTMLDivElement | null = null;
   let pickerHint: HTMLDivElement | null = null;
   let pickerFrameActive = false;
+  let pickerPreviewEpoch = 0;
   let activeTraceMode = false;
   let activeOptions: ElementPickerOptions = {};
   let commentOverlay: ElementCommentOverlay | null = null;
@@ -290,6 +324,10 @@ export function createElementPicker(coordinator: ElementPickerCoordinator = {}):
       .sendMessage({
         source: 'mearl-content-script',
         type,
+        ...(activeOptions.pickerSessionId
+          ? { pickerSessionId: activeOptions.pickerSessionId }
+          : {}),
+        ...(coordinator.frameToken ? { frameToken: coordinator.frameToken } : {}),
       })
       .catch(() => {});
   }
@@ -346,6 +384,8 @@ export function createElementPicker(coordinator: ElementPickerCoordinator = {}):
   }
 
   function stopElementPicker(cancelled = false) {
+    const cancelledSessionId = activeOptions.pickerSessionId;
+    pickerPreviewEpoch += 1;
     removePickerSurface();
     commentGeneration += 1;
     commentOverlay?.destroy();
@@ -366,6 +406,8 @@ export function createElementPicker(coordinator: ElementPickerCoordinator = {}):
         .sendMessage({
           source: 'mearl-content-script',
           type: 'ELEMENT_PICK_CANCELLED',
+          ...(cancelledSessionId ? { pickerSessionId: cancelledSessionId } : {}),
+          ...(coordinator.frameToken ? { frameToken: coordinator.frameToken } : {}),
         })
         .catch(() => {});
     }
@@ -474,6 +516,7 @@ export function createElementPicker(coordinator: ElementPickerCoordinator = {}):
   function setPickerFrameActive(active: boolean) {
     const changed = pickerFrameActive !== active;
     pickerFrameActive = active;
+    if (changed) pickerPreviewEpoch += 1;
     if (pickerHighlight) pickerHighlight.style.visibility = active ? 'visible' : 'hidden';
     if (pickerHint) pickerHint.style.visibility = active ? 'visible' : 'hidden';
     if (changed && activeTraceMode) {
@@ -490,7 +533,7 @@ export function createElementPicker(coordinator: ElementPickerCoordinator = {}):
   function activatePickerFrame() {
     if (pickerFrameActive) return;
     setPickerFrameActive(true);
-    coordinator.onFrameActive?.();
+    coordinator.onFrameActive?.(activeOptions.pickerSessionId);
   }
 
   function startElementPicker(options: ElementPickerOptions = {}) {
@@ -501,6 +544,7 @@ export function createElementPicker(coordinator: ElementPickerCoordinator = {}):
     removePickerNodesById('mearl-pick-highlight');
     activeOptions = options;
     activeTraceMode = !!options.traceMode;
+    pickerPreviewEpoch += 1;
 
     const ac = new AbortController();
     pickAbortController = ac;
@@ -511,6 +555,12 @@ export function createElementPicker(coordinator: ElementPickerCoordinator = {}):
     style.textContent = [
       '* { cursor: crosshair !important; }',
       'html, body { touch-action: none !important; }',
+      ...(options.spmMode
+        ? [
+            `${SPM_OVERLAY_SELECTOR} { pointer-events: auto !important; }`,
+            `${SPM_OVERLAY_SELECTOR} > span { pointer-events: auto !important; }`,
+          ]
+        : []),
       '#mearl-pick-hint { top: calc(env(safe-area-inset-top, 0px) + 12px) !important; }',
     ].join('\n');
     document.head.appendChild(style);
@@ -565,10 +615,28 @@ export function createElementPicker(coordinator: ElementPickerCoordinator = {}):
     pickerHighlight = highlight;
 
     const isOwn = (el: Element) => el === highlight || isElementCommentMarker(el);
+    const resolveTarget = (clientX: number, clientY: number): Element | null => {
+      const target = document.elementFromPoint(clientX, clientY);
+      if (!target || isOwn(target)) return null;
+      return activeOptions.spmMode ? target.closest(SPM_OVERLAY_SELECTOR) : target;
+    };
+    const resolveSpmSource = (overlay: Element): Element => {
+      const sourceId = overlay.getAttribute(SPM_SOURCE_ID_ATTR);
+      if (!sourceId) return overlay;
+      return (
+        document.querySelector(
+          `[${SPM_SOURCE_ID_ATTR}="${CSS.escape(sourceId)}"]:not([data-mtop-spm-all-overlay])`,
+        ) ?? overlay
+      );
+    };
 
     let hoveredElement: Element | null = null;
     let rafPending = false;
     let pendingTarget: Element | null = null;
+    let previewTarget: Element | null = null;
+    let previewTimer: ReturnType<typeof setTimeout> | null = null;
+    let previewGeneration = 0;
+    let scheduledPreviewEpoch = pickerPreviewEpoch;
 
     const flushHighlight = () => {
       rafPending = false;
@@ -589,12 +657,67 @@ export function createElementPicker(coordinator: ElementPickerCoordinator = {}):
         rafPending = true;
         requestAnimationFrame(flushHighlight);
       }
+      if (
+        activeOptions.spmMode &&
+        (previewTarget !== el || scheduledPreviewEpoch !== pickerPreviewEpoch)
+      ) {
+        previewTarget = el;
+        scheduledPreviewEpoch = pickerPreviewEpoch;
+        const pickerEpoch = scheduledPreviewEpoch;
+        const generation = ++previewGeneration;
+        if (previewTimer !== null) clearTimeout(previewTimer);
+        previewTimer = setTimeout(() => {
+          previewTimer = null;
+          if (previewTarget !== el || !activeOptions.spmMode) return;
+          const spm = el.getAttribute('data-mtop-spm-value');
+          if (!spm) return;
+          const source = resolveSpmSource(el);
+          sendSpmPreview(
+            source,
+            getDisplayText(source),
+            spm,
+            activeOptions.topPage,
+            activeOptions.pickerSessionId,
+            coordinator.frameToken,
+            () =>
+              previewGeneration === generation &&
+              previewTarget === el &&
+              pickerPreviewEpoch === pickerEpoch &&
+              pickerFrameActive &&
+              !!activeOptions.spmMode,
+          );
+        }, 80);
+      }
+    };
+
+    const clearHighlight = () => {
+      pendingTarget = null;
+      hoveredElement = null;
+      previewTarget = null;
+      previewGeneration++;
+      if (previewTimer !== null) {
+        clearTimeout(previewTimer);
+        previewTimer = null;
+      }
+      highlight.style.display = 'none';
+    };
+
+    const stopSpmEventPropagation = (event: Event, preventDefault = false) => {
+      if (!activeOptions.spmMode) return;
+      if (preventDefault && event.cancelable) event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
     };
 
     const selectElement = (target: Element, clientX?: number, clientY?: number) => {
-      const text = getDisplayText(target);
       const wasTraceMode = activeTraceMode;
       const selectionOptions = activeOptions;
+      const spm = selectionOptions.spmMode
+        ? target.getAttribute('data-mtop-spm-value') || undefined
+        : undefined;
+      if (selectionOptions.spmMode && !spm) return;
+      const selectedTarget = spm ? resolveSpmSource(target) : target;
+      const text = getDisplayText(selectedTarget);
       removePickerSurface();
 
       if (wasTraceMode) {
@@ -669,18 +792,36 @@ export function createElementPicker(coordinator: ElementPickerCoordinator = {}):
       }
 
       activeOptions = {};
-      sendPickedElement(target, text, clientX, clientY, selectionOptions.topPage);
+      sendPickedElement(
+        selectedTarget,
+        text,
+        clientX,
+        clientY,
+        selectionOptions.topPage,
+        spm,
+        selectionOptions.pickerSessionId,
+        coordinator.frameToken,
+      );
     };
 
     document.addEventListener(
       'pointermove',
       (e: PointerEvent) => {
         activatePickerFrame();
-        const target = document.elementFromPoint(e.clientX, e.clientY);
-        if (target && !isOwn(target)) updateHighlight(target);
+        const target = resolveTarget(e.clientX, e.clientY);
+        if (target) updateHighlight(target);
+        else clearHighlight();
+        stopSpmEventPropagation(e);
       },
       { capture: true, signal: ac.signal },
     );
+
+    for (const eventName of ['pointerdown', 'pointerup', 'mousedown', 'mouseup'] as const) {
+      document.addEventListener(eventName, event => stopSpmEventPropagation(event, true), {
+        capture: true,
+        signal: ac.signal,
+      });
+    }
 
     document.addEventListener(
       'touchstart',
@@ -688,10 +829,12 @@ export function createElementPicker(coordinator: ElementPickerCoordinator = {}):
         activatePickerFrame();
         const touch = e.touches[0] || e.changedTouches[0];
         if (!touch) return;
-        const target = document.elementFromPoint(touch.clientX, touch.clientY);
-        if (target && !isOwn(target)) updateHighlight(target);
+        const target = resolveTarget(touch.clientX, touch.clientY);
+        if (target) updateHighlight(target);
+        else clearHighlight();
+        stopSpmEventPropagation(e, true);
       },
-      { capture: true, passive: true, signal: ac.signal } as AddEventListenerOptions,
+      { capture: true, passive: false, signal: ac.signal } as AddEventListenerOptions,
     );
 
     document.addEventListener(
@@ -701,8 +844,10 @@ export function createElementPicker(coordinator: ElementPickerCoordinator = {}):
         activatePickerFrame();
         const touch = e.touches[0];
         if (!touch) return;
-        const target = document.elementFromPoint(touch.clientX, touch.clientY);
-        if (target && !isOwn(target)) updateHighlight(target);
+        const target = resolveTarget(touch.clientX, touch.clientY);
+        if (target) updateHighlight(target);
+        else clearHighlight();
+        stopSpmEventPropagation(e, true);
       },
       { capture: true, passive: false, signal: ac.signal } as AddEventListenerOptions,
     );
@@ -718,13 +863,15 @@ export function createElementPicker(coordinator: ElementPickerCoordinator = {}):
         }
         const touchedPoint = e.changedTouches[0];
         const touchedTarget = touchedPoint
-          ? document.elementFromPoint(touchedPoint.clientX, touchedPoint.clientY)
+          ? resolveTarget(touchedPoint.clientX, touchedPoint.clientY)
           : null;
         if (touchedTarget && isElementCommentMarker(touchedTarget)) return;
-        const target = touchedTarget && !isOwn(touchedTarget) ? touchedTarget : hoveredElement;
-        if (!target || isOwn(target)) return;
-        if (e.cancelable) e.preventDefault();
-        e.stopPropagation();
+        const target = touchedTarget || (activeOptions.spmMode ? null : hoveredElement);
+        if (!target || isOwn(target)) {
+          stopSpmEventPropagation(e, true);
+          return;
+        }
+        stopSpmEventPropagation(e, true);
         selectElement(target, touchedPoint?.clientX, touchedPoint?.clientY);
       },
       { capture: true, passive: false, signal: ac.signal } as AddEventListenerOptions,
@@ -743,15 +890,22 @@ export function createElementPicker(coordinator: ElementPickerCoordinator = {}):
     document.addEventListener(
       'click',
       (e: MouseEvent) => {
+        activatePickerFrame();
         if (
           e.composedPath().some(node => node instanceof Element && isElementCommentMarker(node))
         ) {
           return;
         }
-        const target = document.elementFromPoint(e.clientX, e.clientY);
-        if (!target || isOwn(target)) return;
-        e.preventDefault();
-        e.stopPropagation();
+        const target = resolveTarget(e.clientX, e.clientY);
+        if (!target) {
+          stopSpmEventPropagation(e, true);
+          return;
+        }
+        if (activeOptions.spmMode) stopSpmEventPropagation(e, true);
+        else {
+          e.preventDefault();
+          e.stopPropagation();
+        }
         selectElement(target, e.clientX, e.clientY);
       },
       { capture: true, signal: ac.signal },
