@@ -11,6 +11,7 @@ import {
   announceElementPickerSession,
   createElementPickerOwnerId,
   getElementPickerSessionOwner,
+  releaseElementPickerSession,
 } from '../utils/elementPickerSession';
 
 interface SourceLocation {
@@ -539,6 +540,7 @@ export function useSourceTracer({
   useEffect(
     () => () => {
       traceRevisionRef.current++;
+      releaseElementPickerSession(ownerIdRef.current);
     },
     [tabId],
   );
@@ -547,6 +549,10 @@ export function useSourceTracer({
     if (isPicking) cancel();
     else start();
   }, [isPicking, cancel, start]);
+
+  useEffect(() => {
+    if (!isPicking) releaseElementPickerSession(ownerIdRef.current);
+  }, [isPicking]);
 
   useEffect(() => {
     const handleSessionStarted = (event: Event) => {

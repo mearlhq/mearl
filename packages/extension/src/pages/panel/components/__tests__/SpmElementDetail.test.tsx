@@ -28,9 +28,25 @@ it('shows DOM tracking configuration without requiring a captured event', () => 
   expect(container).toHaveTextContent('locaid=comment_rate');
   expect(container).toHaveTextContent('Rate comment');
   expect(container).toHaveTextContent('button#comment-rate');
-  const markup = container.querySelector('code.language-markup')!;
-  expect(markup.querySelector('.token.tag')).not.toBeNull();
-  expect(markup.querySelector('.token.attr-name')).not.toBeNull();
-  expect(markup.querySelector('.token.attr-value')).not.toBeNull();
-  expect(markup.querySelector('button')).toBeNull();
+  expect(container.querySelector('code.language-markup')).toBeNull();
+  expect(container).not.toHaveTextContent('data-mtop-spm-source-id');
+});
+
+it('replaces icon-font text with an accessible element label', () => {
+  const selection = {
+    text: '\ue900',
+    spm: 'header.menu',
+    page: { url: 'https://example.test', title: 'Example' },
+    element: {
+      tagName: 'button',
+      selector: 'button.menu',
+      xpath: '/html/body/button',
+      attributes: { 'aria-label': '打开菜单' },
+    },
+  } as unknown as ElementPickerSelection;
+
+  const { container } = render(<SpmElementDetail selection={selection} />);
+
+  expect(container).toHaveTextContent('打开菜单');
+  expect(container).not.toHaveTextContent('\ue900');
 });

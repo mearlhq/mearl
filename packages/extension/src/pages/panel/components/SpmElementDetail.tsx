@@ -1,6 +1,4 @@
-import { FC, useMemo, useState } from 'react';
-import Prism from './prismSetup';
-import 'prismjs/components/prism-markup';
+import { FC, useState } from 'react';
 import type { ElementPickerSelection } from '../../content-script/elementCommentTypes';
 import { t } from '../utils/i18n';
 import { DetailRow } from './detail/DetailRow';
@@ -21,6 +19,24 @@ function getTrackingKind(attributes: Record<string, string>): string {
   return t('spmElementNode');
 }
 
+function getMeaningfulElementText(
+  text: string,
+  attributes: Record<string, string>,
+): string {
+  const candidates = [
+    text,
+    attributes['aria-label'],
+    attributes.title,
+    attributes.alt,
+    attributes.placeholder,
+  ];
+  for (const candidate of candidates) {
+    const normalized = candidate?.replace(/\p{Co}/gu, '').replace(/\s+/g, ' ').trim() ?? '';
+    if (/[\p{L}\p{N}]/u.test(normalized)) return normalized;
+  }
+  return '';
+}
+
 export const SpmElementDetail: FC<SpmElementDetailProps> = ({
   selection,
   trackingMetadataEnabled = false,
@@ -36,14 +52,7 @@ export const SpmElementDetail: FC<SpmElementDetailProps> = ({
     Object.entries(attributes).filter(([name]) => name.startsWith('data-spm')),
   );
   const pageUrl = selection.frame?.url ?? selection.page.url;
-  const domMarkup = useMemo(
-    () => element?.outerHTML?.replace(/\sdata-mtop-spm-source-id=(['"])[^'"]*\1/g, '') ?? '',
-    [element?.outerHTML],
-  );
-  const highlightedDom = useMemo(
-    () => (domMarkup ? Prism.highlight(domMarkup, Prism.languages.markup, 'markup') : ''),
-    [domMarkup],
-  );
+  const elementText = getMeaningfulElementText(selection.text, attributes);
 
   return (
     <div className="w-full h-full overflow-auto bg-bg-primary text-text-primary p-3">
@@ -60,7 +69,7 @@ export const SpmElementDetail: FC<SpmElementDetailProps> = ({
             value={`<${element.tagName}>${element.id ? `#${element.id}` : ''}`}
           />
         )}
-        {selection.text && <DetailRow label={t('spmElementText')} value={selection.text} />}
+        {elementText && <DetailRow label={t('spmElementText')} value={elementText} />}
         {pageUrl && <DetailRowUrl label="URL" value={pageUrl} />}
         {trackingMetadataEnabled && selection.spm && <SpmQueryParam spmValue={selection.spm} />}
       </DetailSection>
@@ -89,14 +98,6 @@ export const SpmElementDetail: FC<SpmElementDetailProps> = ({
           />
           <DetailRow label="XPath" value={element.xpath} showCopy copyText={element.xpath} />
           <JsonViewer json={attributes} defaultExpandDepth={1} />
-          {domMarkup && (
-            <pre className="prism-highlight mt-2 rounded bg-bg-secondary p-2 text-xxs font-mono whitespace-pre-wrap break-all text-text-secondary">
-              <code
-                className="language-markup"
-                dangerouslySetInnerHTML={{ __html: highlightedDom }}
-              />
-            </pre>
-          )}
         </DetailSection>
       )}
     </div>

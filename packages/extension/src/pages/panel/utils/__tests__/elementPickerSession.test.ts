@@ -3,7 +3,9 @@ import {
   ELEMENT_PICKER_SESSION_STARTED_EVENT,
   announceElementPickerSession,
   createElementPickerOwnerId,
+  getActiveElementPickerSessionOwner,
   getElementPickerSessionOwner,
+  releaseElementPickerSession,
 } from '../elementPickerSession';
 
 describe('elementPickerSession', () => {
@@ -16,6 +18,9 @@ describe('elementPickerSession', () => {
 
     expect(listener).toHaveBeenCalledOnce();
     expect(getElementPickerSessionOwner(listener.mock.calls[0]![0])).toBe(ownerId);
+    expect(getActiveElementPickerSessionOwner()).toBe(ownerId);
+    releaseElementPickerSession(ownerId);
+    expect(getActiveElementPickerSessionOwner()).toBeNull();
     window.removeEventListener(ELEMENT_PICKER_SESSION_STARTED_EVENT, listener);
   });
 });

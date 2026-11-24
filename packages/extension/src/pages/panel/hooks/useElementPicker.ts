@@ -10,6 +10,7 @@ import {
   announceElementPickerSession,
   createElementPickerOwnerId,
   getElementPickerSessionOwner,
+  releaseElementPickerSession,
 } from '../utils/elementPickerSession';
 
 export const ElementPickerTabContext = createContext<number | null | undefined>(undefined);
@@ -234,6 +235,10 @@ export function useElementPicker({
   }, [isPicking, cancel, start]);
 
   useEffect(() => {
+    if (!isPicking) releaseElementPickerSession(ownerIdRef.current);
+  }, [isPicking]);
+
+  useEffect(() => {
     const handleSessionStarted = (event: Event) => {
       if (getElementPickerSessionOwner(event) === ownerIdRef.current) return;
       pickingTabIdRef.current = null;
@@ -296,6 +301,7 @@ export function useElementPicker({
       activeFrameTokenRef.current = null;
       previewLockedRef.current = false;
       pickerOptionsRef.current = {};
+      releaseElementPickerSession(ownerIdRef.current);
       if (targetTabId === null) return;
       void sendMessageSafely({ action: 'cancelElementPicker', tabId: targetTabId }).catch(() => {});
     },
