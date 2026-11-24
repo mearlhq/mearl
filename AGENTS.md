@@ -114,6 +114,7 @@ Commands capture their source and resources when accepted and execute in isolate
 - Use `lucide-react` icons, normally `w-4 h-4` or `w-3 h-3`.
 - Preserve entry points, layout, density, available space, shortcuts, focus, loading/error states and performance.
 - Match comparable components in the same surface. Reuse their sizing, spacing and text hierarchy, and let shared layout rules govern alignment. Check the rendered result in its actual host and relevant states before handing it off.
+- For extension UI changes, read [the extension design guide](packages/extension/DESIGN.md) before editing. Use it to choose references, review the rendered result, and decide whether human feedback adds reusable guidance.
 
 ### Skill Toolbox UI
 

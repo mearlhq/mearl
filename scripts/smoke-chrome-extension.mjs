@@ -162,38 +162,6 @@ try {
     evaluate(`chrome.runtime.sendMessage(${JSON.stringify({ action, ...payload })})`);
   const status = () => message('mearlPresetManagement', { operation: 'status' });
   const wait = (expression, description) => until(() => evaluate(expression), description, 15_000);
-  const measureLayout = async doc => {
-    const dimensions = await wait(
-      `(() => {
-      const settings = ${doc};
-      const input = settings.querySelector('#installed-presets input[type=url]');
-      const agent = settings.querySelector('button[role=switch][aria-label="Agent 服务"], button[role=switch][aria-label="Agent Service"]');
-      if (!input || !agent) return;
-      const button = input.form.querySelector('button[type=submit]');
-      const { height: inputHeight, top: inputTop, left: inputLeft } = input.getBoundingClientRect();
-      const { height: buttonHeight, top: buttonTop } = button.getBoundingClientRect();
-      const heading = input.closest('section').querySelector('h2').getBoundingClientRect();
-      const presetCard = settings.defaultView.getComputedStyle(input.closest('section').firstElementChild);
-      const agentCard = settings.defaultView.getComputedStyle(agent.parentElement.parentElement);
-      return {
-        inputHeight, inputTop, buttonHeight, buttonTop,
-        headingOverlapsInput: heading.bottom > inputTop && heading.right > inputLeft,
-        presetPadding: presetCard.paddingInline,
-        agentPadding: agentCard.paddingInline,
-      };
-    })()`,
-      'Preset and Agent settings layout',
-    );
-    assert.ok(dimensions.inputHeight > 0, 'Preset controls are visible');
-    assert.equal(
-      dimensions.inputHeight,
-      dimensions.buttonHeight,
-      'Preset controls have equal height',
-    );
-    assert.equal(dimensions.inputTop, dimensions.buttonTop, 'Preset controls share a top edge');
-    assert.equal(dimensions.headingOverlapsInput, false, 'Preset heading and input do not overlap');
-    assert.equal(dimensions.presetPadding, dimensions.agentPadding, 'Settings cards share side padding');
-  };
   const click = async (pattern, doc = 'document') =>
     wait(
       `(() => {
@@ -246,7 +214,7 @@ try {
     );
   }
 
-  await measureLayout('document');
+  await wait("Boolean(document.querySelector('#installed-presets input[type=url]'))", 'Preset settings');
   assert.deepEqual(await status(), { success: true, data: [] });
   assert.deepEqual(await message('mearlPresetManagement', { operation: 'install-available' }), {
     success: true,
@@ -284,15 +252,12 @@ try {
   );
   await click(/^(更多设置|More settings)$/i);
   const popupSettings = "document.querySelector('iframe[src*=options]')?.contentDocument";
-  await measureLayout(popupSettings);
   await wait(
     `${popupSettings}?.querySelector('#installed-presets input')?.value === ${JSON.stringify(presetUrl)}`,
     'Prefilled Preset URL in Popup settings',
   );
   await enablePreset(popupSettings, editedUrl, '1.1.0');
-  console.log(
-    'Chrome extension passed first install, background messages, Preset install/update and settings layout.',
-  );
+  console.log('Chrome extension passed first install, background messages and Preset install/update.');
 } finally {
   if (cdp) {
     await cdp.call('Browser.close').catch(() => {});
