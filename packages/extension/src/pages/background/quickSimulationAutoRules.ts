@@ -218,7 +218,7 @@ export function setQuickDeviceSimulationWithAutoRuleSync({
         : null,
     () =>
       normalizedSelection
-        ? setQuickDeviceEmulation({ tabId, ...normalizedSelection })
+        ? setQuickDeviceEmulation({ tabId, ...normalizedSelection }, { startWithDeviceShell: true })
         : clearQuickDeviceEmulation(tabId, { clearUnownedDevice: true }),
   );
 }

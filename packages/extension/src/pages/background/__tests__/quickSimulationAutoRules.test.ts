@@ -203,10 +203,10 @@ describe('quickSimulationAutoRules', () => {
 
     await setQuickDeviceSimulationWithAutoRuleSync({ tabId: 7, deviceSelection });
 
-    expect(quickSimulationMocks.setQuickDeviceEmulation).toHaveBeenCalledWith({
-      tabId: 7,
-      ...normalizedSelection,
-    });
+    expect(quickSimulationMocks.setQuickDeviceEmulation).toHaveBeenCalledWith(
+      { tabId: 7, ...normalizedSelection },
+      { startWithDeviceShell: true },
+    );
   });
 
   it('normalizes an adaptive automatic rule so navigation does not reapply it forever', async () => {
