@@ -147,6 +147,7 @@ function initInterception(config: {
   let allowAgentChatNewTabs = false;
   let appProfileConfig: InjectedAppProfileConfig | null = null;
   let deviceShellConfig: DeviceShellBootstrapConfig | null = null;
+  let deviceShellFragment = '';
   let deviceShellSplitScreen = false;
   // SSE 监听默认启用，Server-Timing 里明确 sse: false 时才禁用
   let sseMonitoringEnabled = true;
@@ -157,6 +158,7 @@ function initInterception(config: {
   if (navEntries.length > 0) {
     const nav = navEntries[0] as PerformanceNavigationTiming;
     for (const timing of nav.serverTiming) {
+      if (timing.name === 'mearl-device-shell-start') deviceShellFragment = timing.description;
       // 全局 SSE 配置
       if (timing.name === CONFIG_SERVER_TIMING_KEY && timing.description) {
         try {
@@ -245,6 +247,19 @@ function initInterception(config: {
           // 配置损坏时保留普通页面，避免只出现半个设备外壳。
         }
       }
+    }
+  }
+
+  if (deviceShellConfig && deviceShellFragment && window === window.top) {
+    try {
+      const fragment = decodeURIComponent(deviceShellFragment);
+      if (fragment.startsWith('#')) {
+        const url = new URL(location.href);
+        url.hash = fragment;
+        history.replaceState(history.state, '', url.href);
+      }
+    } catch {
+      // An invalid fragment leaves the shell at the current URL.
     }
   }
 

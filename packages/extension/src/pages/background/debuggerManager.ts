@@ -55,7 +55,6 @@ import {
   getDeviceShellForTab,
   type DeviceShellEmulationConfig,
 } from './deviceShellRules';
-import { getDirectDeviceShellNavigationUrl } from './deviceShellNavigation';
 import { getAppProfileBootstrapHeaderForTab, getAppProfileForTab } from './utils/appProfileRules';
 import { getSimulationSitePattern, getSimulationSiteUrl } from '../../shared/permissionRequest';
 import {
@@ -1835,18 +1834,27 @@ export async function reloadTabInSession(
   options: { startWithDeviceShell?: boolean } = {},
 ): Promise<void> {
   await withDebuggerSession(tabId, 'emulation-reload', async () => {
-    const directNavigationUrl = options.startWithDeviceShell
-      ? await getDirectDeviceShellNavigationUrl(tabId).catch(() => undefined)
+    const tab = options.startWithDeviceShell
+      ? await chrome.tabs.get(tabId).catch(() => undefined)
       : undefined;
     const state = tabStates.get(tabId);
-    const cancel =
-      options.startWithDeviceShell && !state?.modificationActive
-        ? state?.rootWebViewNavigation?.prepareShellReload(directNavigationUrl)
+    const shell =
+      tab?.url && !state?.modificationActive
+        ? state?.rootWebViewNavigation?.prepareShellReload(tab.url)
         : undefined;
-    try {
+    if (!shell) {
       await chrome.debugger.sendCommand({ tabId }, 'Page.reload', { ignoreCache: false });
+      return;
+    }
+    try {
+      // Navigate with GET so opening the shell never repeats a previous form submission.
+      // A fragment can trigger same-document navigation, so the shell restores it on commit.
+      const result = (await chrome.debugger.sendCommand({ tabId }, 'Page.navigate', {
+        url: shell.url,
+      })) as { errorText?: string } | undefined;
+      if (result?.errorText) throw new Error(result.errorText);
     } catch (error) {
-      cancel?.();
+      shell.cancel();
       throw error;
     }
   });

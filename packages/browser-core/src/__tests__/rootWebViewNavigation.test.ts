@@ -92,7 +92,7 @@ describe('root WebView navigation', () => {
     const url = 'https://login.example/start';
     const frame = { id: 'main', url, mimeType: 'text/html' };
     navigation.initialize({ frame });
-    expect(navigation.prepareShellReload()).toBeTypeOf('function');
+    expect(navigation.prepareShellReload(url)?.url).toBe(url);
     expect(await navigation.handle(request('main', url))).toBe(true);
     expect(sendCommand).toHaveBeenCalledExactlyOnceWith(
       'Fetch.fulfillRequest',
@@ -115,15 +115,12 @@ describe('root WebView navigation', () => {
     navigation.dispose();
   });
 
-  it('keeps callback URLs and form submissions on the original top-level request path', async () => {
+  it('only intercepts the GET navigation armed for the shell', async () => {
     const { navigation, sendCommand } = fixture();
     const url = 'https://login.example/start';
     const frame = { id: 'main', url, mimeType: 'text/html' };
-    navigation.initialize({ frame: { ...frame, url: url + '?code=once' } });
-    expect(navigation.prepareShellReload()).toBeUndefined();
-
     navigation.initialize({ frame });
-    navigation.prepareShellReload();
+    navigation.prepareShellReload(url);
     const post = request('main', url);
     post.request.method = 'POST';
     expect(await navigation.handle(post)).toBe(false);
@@ -132,20 +129,26 @@ describe('root WebView navigation', () => {
     navigation.dispose();
   });
 
-  it('streams a directly opened page with a query and promotes its first HTTP redirect', async () => {
+  it('opens the shell at the current URL and keeps the first same-origin redirect in the WebView', async () => {
     const { navigation, sendCommand } = fixture();
     const url = 'https://business.example/results?sort=recent&sort=price';
     const frame = { id: 'main', url, mimeType: 'text/html' };
-    navigation.initialize({ frame });
-    expect(
-      navigation.prepareShellReload('https://business.example/results?sort=recent'),
-    ).toBeUndefined();
-    expect(navigation.prepareShellReload(url)).toBeTypeOf('function');
+    navigation.initialize({ frame: { ...frame, url: 'https://business.example/start' } });
+    expect(navigation.prepareShellReload(url + '#details')?.url).toBe(url);
     expect(await navigation.handle(request('main', url))).toBe(true);
+    expect(sendCommand).toHaveBeenCalledExactlyOnceWith(
+      'Fetch.fulfillRequest',
+      expect.objectContaining({
+        responseHeaders: expect.arrayContaining([
+          { name: 'Server-Timing', value: 'mearl-device-shell-start;desc="%23details"' },
+        ]),
+      }),
+    );
     navigation.handleFrameEvent('Page.frameNavigated', { frame });
     navigation.handleFrameEvent('Page.frameAttached', { frameId: 'root', parentFrameId: 'main' });
 
-    const documentRequest = { ...request('root', url), requestId: 'initial-webview' };
+    const documentRequest = request('root', url);
+    documentRequest.request.urlFragment = '#details';
     expect(await navigation.handle(documentRequest)).toBe(false);
     const callbackUrl = 'https://business.example/callback?ticket=once';
     expect(
@@ -153,9 +156,8 @@ describe('root WebView navigation', () => {
         ...request('root', callbackUrl),
         redirectedRequestId: documentRequest.requestId,
       }),
-    ).toBe(true);
-    expect(sendCommand).toHaveBeenLastCalledWith('Page.navigate', { url: callbackUrl });
-    expect(sendCommand).not.toHaveBeenCalledWith('Fetch.getResponseBody', expect.anything());
+    ).toBe(false);
+    expect(sendCommand).toHaveBeenCalledTimes(1);
     navigation.dispose();
   });
 

@@ -2506,42 +2506,61 @@ describe('session 内重载与模拟态读取', () => {
     cleanupTab(4301);
   });
 
-  it('keeps top-level request handling when response modification starts during navigation lookup', async () => {
-    const tabId = 4308;
-    chrome.debugger.attach = vi.fn().mockResolvedValue(undefined);
-    chrome.debugger.sendCommand = vi.fn().mockResolvedValue({});
-    chrome.tabs.sendMessage = vi.fn().mockResolvedValue(undefined);
-    const { cleanupTab, enableModificationForTab, getTabState, reloadTabInSession } =
-      await import('../debuggerManager');
-    await enableModificationForTab(tabId);
-    const state = getTabState(tabId)!;
-    state.modificationActive = false;
-    const navigation = createRootWebViewNavigation({
-      client: { sendCommand: vi.fn() },
-      shellHeaders: vi.fn(),
-    });
-    state.rootWebViewNavigation = navigation;
-    const prepareShell = vi.spyOn(navigation, 'prepareShellReload');
-    const originalSession = chrome.storage.session;
-    chrome.storage.session = {
-      get: vi.fn(async () => {
-        state.modificationActive = true;
-        return {};
-      }),
-    } as unknown as typeof chrome.storage.session;
-
-    try {
-      await reloadTabInSession(tabId, { startWithDeviceShell: true });
-
-      expect(prepareShell).not.toHaveBeenCalled();
-      expect(chrome.debugger.sendCommand).toHaveBeenCalledWith({ tabId }, 'Page.reload', {
-        ignoreCache: false,
+  it.each([false, true])(
+    'starts a fresh shell navigation unless response modification is active (%s)',
+    async modificationActive => {
+      const tabId = 4308;
+      chrome.debugger.attach = vi.fn().mockResolvedValue(undefined);
+      chrome.debugger.sendCommand = vi.fn().mockResolvedValue({});
+      chrome.tabs.sendMessage = vi.fn().mockResolvedValue(undefined);
+      const { cleanupTab, enableModificationForTab, getTabState, reloadTabInSession } =
+        await import('../debuggerManager');
+      await enableModificationForTab(tabId);
+      const state = getTabState(tabId)!;
+      state.modificationActive = false;
+      const url = 'https://example.test/form?submitted=1';
+      const navigation = createRootWebViewNavigation({
+        client: { sendCommand: vi.fn() },
+        keepSameOriginNavigation: true,
+        shellHeaders: vi.fn(),
       });
-    } finally {
-      chrome.storage.session = originalSession;
-      cleanupTab(tabId);
-    }
-  });
+      navigation.initialize({ frame: { id: 'main', url, mimeType: 'text/html' } });
+      state.rootWebViewNavigation = navigation;
+      const prepareShell = vi.spyOn(navigation, 'prepareShellReload');
+      const originalTabs = chrome.tabs;
+      chrome.tabs = {
+        ...originalTabs,
+        get: vi.fn(async () => {
+          state.modificationActive = modificationActive;
+          return { url: url + '#details' };
+        }),
+      } as unknown as typeof chrome.tabs;
+
+      try {
+        await reloadTabInSession(tabId, { startWithDeviceShell: true });
+
+        if (modificationActive) {
+          expect(prepareShell).not.toHaveBeenCalled();
+          expect(chrome.debugger.sendCommand).toHaveBeenCalledWith({ tabId }, 'Page.reload', {
+            ignoreCache: false,
+          });
+        } else {
+          expect(prepareShell).toHaveBeenCalledWith(url + '#details');
+          expect(chrome.debugger.sendCommand).toHaveBeenCalledWith({ tabId }, 'Page.navigate', {
+            url,
+          });
+          expect(chrome.debugger.sendCommand).not.toHaveBeenCalledWith(
+            { tabId },
+            'Page.reload',
+            expect.anything(),
+          );
+        }
+      } finally {
+        chrome.tabs = originalTabs;
+        cleanupTab(tabId);
+      }
+    },
+  );
 
   it('读取模拟态走 lease，session 已断时返回 null 而不是抛错', async () => {
     chrome.debugger.attach = vi.fn().mockRejectedValue(new Error('Cannot attach to this target.'));

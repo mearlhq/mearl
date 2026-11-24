@@ -121,10 +121,10 @@ export function createRootWebViewNavigation(options: RootWebViewNavigationOption
   let handoff: { url: string; headers?: Record<string, string> } | undefined;
   let localReload: { frameId: string; url: string } | undefined;
   let shellReload:
-    { url: string; expiresAt: number; stage: 'request' | 'commit' | 'webview' } | undefined;
+    | { url: string; fragment: string; expiresAt: number; stage: 'request' | 'commit' | 'webview' }
+    | undefined;
   let mainFrame: WebViewFrameTree['frame'] | undefined;
   let rootFrameId: string | undefined;
-  let firstWebViewRequestId: string | undefined;
   let committedRoot: { id: string; origin: string } | undefined;
   const directChildFrames = new Set<string>();
   let navigationHops = 0;
@@ -259,28 +259,33 @@ export function createRootWebViewNavigation(options: RootWebViewNavigationOption
   return {
     isSameOriginRootNavigation,
     preserveNavigationSource,
-    prepareShellReload(directNavigationUrl?: string): (() => void) | undefined {
+    prepareShellReload(currentUrl: string) {
       if (
         disposed ||
         !options.keepSameOriginNavigation ||
         rootFrameId ||
         !mainFrame ||
+        !/^https?:/.test(currentUrl) ||
         !/^https?:/.test(mainFrame.url) ||
         !/^(text\/html|application\/xhtml\+xml)$/.test(mainFrame.mimeType ?? '')
       )
         return;
-      const url = new URL(mainFrame.url);
-      // A parameterized URL needs evidence of a direct visit to the current document.
-      if (url.hash || mainFrame.urlFragment || (url.search && url.href !== directNavigationUrl))
-        return;
+      const url = new URL(currentUrl);
+      if (url.origin !== new URL(mainFrame.url).origin) return;
+      const fragment = url.hash;
+      url.hash = '';
       const reload = {
         url: url.href,
+        fragment,
         expiresAt: Date.now() + DOCUMENT_TTL_MS,
         stage: 'request' as const,
       };
       shellReload = reload;
-      return () => {
-        if (shellReload === reload) shellReload = undefined;
+      return {
+        url: reload.url,
+        cancel() {
+          if (shellReload === reload) shellReload = undefined;
+        },
       };
     },
     allowLocalReload(frameId: string, url: string): () => void {
@@ -324,7 +329,6 @@ export function createRootWebViewNavigation(options: RootWebViewNavigationOption
           }
           mainFrame = frame;
           rootFrameId = undefined;
-          firstWebViewRequestId = undefined;
           committedRoot = undefined;
           directChildFrames.clear();
         } else if (mainFrame && frame.parentId === mainFrame.id) {
@@ -332,7 +336,6 @@ export function createRootWebViewNavigation(options: RootWebViewNavigationOption
           if (frame.id === rootFrameId || frame.name === '__mearl_root__') {
             rootFrameId = frame.id;
             if (/^https?:/.test(frame.url)) {
-              firstWebViewRequestId = undefined;
               navigationHops = 0;
               const hasPreviousDocument = committedRoot?.id === frame.id;
               const destination = new URL(frame.url);
@@ -433,6 +436,7 @@ export function createRootWebViewNavigation(options: RootWebViewNavigationOption
       if (shellReload && Date.now() >= shellReload.expiresAt) shellReload = undefined;
       if (shellReload?.stage === 'request' && !responseStage && params.frameId === mainFrame?.id) {
         const reload = shellReload;
+        const frame = mainFrame;
         shellReload = undefined;
         if (
           params.request.method === 'GET' &&
@@ -441,13 +445,7 @@ export function createRootWebViewNavigation(options: RootWebViewNavigationOption
           destination.href === reload.url
         ) {
           const headers = await options.shellHeaders(true);
-          if (
-            !headers ||
-            disposed ||
-            params.frameId !== mainFrame?.id ||
-            mainFrame.url !== reload.url
-          )
-            return false;
+          if (!headers || disposed || mainFrame !== frame) return false;
           reload.stage = 'commit';
           shellReload = reload;
           try {
@@ -458,7 +456,12 @@ export function createRootWebViewNavigation(options: RootWebViewNavigationOption
                 { name: 'Content-Type', value: 'text/html; charset=utf-8' },
                 { name: 'Cache-Control', value: 'no-store' },
                 ...headers,
-                { name: 'Server-Timing', value: 'mearl-device-shell-start' },
+                {
+                  name: 'Server-Timing',
+                  value: reload.fragment
+                    ? `mearl-device-shell-start;desc="${encodeURIComponent(reload.fragment)}"`
+                    : 'mearl-device-shell-start',
+                },
               ],
               body: SHELL_BODY,
             });
@@ -477,9 +480,8 @@ export function createRootWebViewNavigation(options: RootWebViewNavigationOption
         destination.href === shellReload.url &&
         directChildFrames.has(params.frameId)
       ) {
-        // The shell contains a single initial WebView. Register it before its request can redirect.
+        // Register the shell's initial WebView before applying the regular navigation rules.
         rootFrameId = params.frameId;
-        firstWebViewRequestId = params.requestId;
         committedRoot = { id: params.frameId, origin: destination.origin };
         shellReload = undefined;
         return false;
@@ -523,16 +525,13 @@ export function createRootWebViewNavigation(options: RootWebViewNavigationOption
       if (responseStage || params.frameId !== rootFrameId || params.request.method !== 'GET')
         return false;
       const current = new URL(mainFrame.url);
-      const redirectedFromFirstRequest =
-        firstWebViewRequestId !== undefined && params.redirectedRequestId === firstWebViewRequestId;
       if (
         !/^https?:$/.test(current.protocol) ||
-        (!redirectedFromFirstRequest && isSameOriginRootNavigation(params)) ||
+        isSameOriginRootNavigation(params) ||
         (await options.preserveOrigin?.(current, destination))
       )
         return false;
       if (navigationHops >= 20) return false;
-      firstWebViewRequestId = undefined;
       await requestClient.sendCommand('Fetch.fulfillRequest', {
         requestId: params.requestId,
         responseCode: 204,
