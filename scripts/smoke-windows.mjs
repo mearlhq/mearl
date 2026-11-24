@@ -122,8 +122,12 @@ try {
   assert.equal(status.version, version);
   assert.equal(status.status.status.nativeHostVersion, version);
   proof.chromeHandshake = true;
-  const browsers = cli('browser_list');
-  const connected = browsers.browsers.filter(browser => browser.status === 'connected' && browser.extensionVersion === version && browser.nativeHostVersion === version);
+  // The Native Messaging handshake precedes Agent access negotiation and browser discovery.
+  const connected = await until(() => {
+    const { browsers } = cli('browser_list');
+    const matches = browsers.filter(browser => browser.status === 'connected' && browser.extensionVersion === version && browser.nativeHostVersion === version);
+    return matches.length ? matches : undefined;
+  }, 'CLI discovery of the matching Chrome extension');
   assert.equal(connected.length, 1);
   const tabs = cli('tab_list', '--browser', connected[0].browserId);
   assert.ok(Array.isArray(tabs.tabs) && tabs.tabs.length > 0, 'CLI did not receive Chrome tabs');
