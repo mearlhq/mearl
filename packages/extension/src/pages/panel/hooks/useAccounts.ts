@@ -32,7 +32,7 @@ interface UseAccountsResult {
 /**
  * 管理账号列表的拉取、缓存和错误状态。
  */
-export function useAccounts(): UseAccountsResult {
+export function useAccounts(readCachedAccounts = false): UseAccountsResult {
   const settings = useBrowserUiSettings();
   const [accounts, setAccounts, storageReady] = useLocalStorage<BrowserAccountItem[]>(
     accountStateStorageKeys(settings).cacheKey,
@@ -42,6 +42,8 @@ export function useAccounts(): UseAccountsResult {
   const generation = useRef(0);
   const fetching = useRef(false);
   const [visibleAccounts, setVisibleAccounts] = useState<BrowserAccountItem[]>([]);
+  const [requested, setRequested] = useState(false);
+  const needsCachedAccounts = requested || readCachedAccounts;
   const [initialized, setInitialized] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -63,7 +65,12 @@ export function useAccounts(): UseAccountsResult {
     };
   }, [settings]);
   useEffect(() => {
-    if (!storageReady) return;
+    if (!needsCachedAccounts || !storageReady) return;
+    if (!accounts.length) {
+      setVisibleAccounts([]);
+      setInitialized(true);
+      return;
+    }
     let current = true;
     void normalizeAccounts(accounts)
       .then(result => {
@@ -83,10 +90,11 @@ export function useAccounts(): UseAccountsResult {
     return () => {
       current = false;
     };
-  }, [storageReady, accounts, setAccounts, settings]);
+  }, [needsCachedAccounts, storageReady, accounts, setAccounts, settings]);
   const doFetch = useCallback(
     async (origin?: string) => {
       if (fetching.current) return;
+      setRequested(true);
       const accepted = generation.current;
       fetching.current = true;
       setLoading(true);

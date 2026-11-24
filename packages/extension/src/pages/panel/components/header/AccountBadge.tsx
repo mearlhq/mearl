@@ -47,8 +47,6 @@ export const AccountBadge: FC<AccountBadgeProps> = ({
   iconSize = 14,
   className,
 }) => {
-  const { accounts, loading, error, requestAccounts, retryAccounts } = useAccounts();
-
   const login = useBrowserUiLogin('accounts');
   const settings = useBrowserUiSettings();
   const cacheScope = getBrowserUiSettingsCacheScope(settings);
@@ -59,6 +57,9 @@ export const AccountBadge: FC<AccountBadgeProps> = ({
   const [identityWatch, setIdentityWatch] = useState<Array<{ name: string; domain: string }>>([]);
   const [accountIdentity, setAccountIdentity] = useState('');
   const [cachedLoginId, setCachedLoginId] = useState(() => readAccountLabelCache(cacheScope));
+  const needsCachedLabel = Boolean(accountIdentity && !cachedLoginId);
+  const { accounts, loading, error, requestAccounts, retryAccounts } =
+    useAccounts(needsCachedLabel);
   const [showCount, setShowCount] = useState<boolean>(false);
   const {
     open: dropdownOpen,

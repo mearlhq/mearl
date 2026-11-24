@@ -6,6 +6,7 @@ import {
   browserHostPermissionError,
 } from '../../../../shared/browserCapabilityPermissions';
 const fixture = vi.hoisted(() => ({
+  cached: [] as Array<{ id: number; loginId: string }>,
   settings: {},
   fetch: vi.fn(),
   normalize: vi.fn(),
@@ -18,7 +19,7 @@ vi.mock('../../utils/browserUiSettings', () => ({ useBrowserUiSettings: () => fi
 vi.mock('../../utils/i18n', () => ({ t: (key: string) => key }));
 vi.mock('../useLocalStorage', async () => {
   const { useState } = await import('react');
-  return { useLocalStorage: () => [...useState([]), true] };
+  return { useLocalStorage: () => [...useState(fixture.cached), true] };
 });
 vi.mock('../../utils/accounts', () => ({
   fetchAccounts: fixture.fetch,
@@ -26,6 +27,7 @@ vi.mock('../../utils/accounts', () => ({
   withAccountAutoLogin: async (operation: () => unknown) => ({ result: await operation() }),
 }));
 beforeEach(() => {
+  fixture.cached = [];
   fixture.settings = {};
   fixture.permissions.mockReset().mockResolvedValue({
     missingOrigins: ['https://accounts.example.test/*'],
@@ -38,6 +40,33 @@ beforeEach(() => {
     .mockReset()
     .mockImplementation(async (accounts: unknown[]) => ({ success: true, data: accounts }));
   vi.mocked(chrome.runtime.sendMessage).mockReset();
+});
+
+it('leaves the cached list untouched until accounts are requested', async () => {
+  fixture.cached = [{ id: 1, loginId: 'cached' }];
+  fixture.fetch.mockResolvedValue({ success: false, error: 'Network unavailable' });
+  const { result } = renderHook(() => useAccounts());
+  expect(fixture.normalize).not.toHaveBeenCalled();
+  expect(fixture.fetch).not.toHaveBeenCalled();
+
+  await act(async () => {
+    await result.current.requestAccounts();
+  });
+  expect(fixture.normalize).toHaveBeenCalledExactlyOnceWith(fixture.cached);
+  expect(result.current.accounts).toEqual(fixture.cached);
+  expect(result.current.error).toBe('Network unavailable');
+});
+
+it('reads cached accounts without a network request when a verified badge needs a label', async () => {
+  fixture.cached = [{ id: 1, loginId: 'cached' }];
+  const { result, rerender } = renderHook(readCache => useAccounts(readCache), {
+    initialProps: false,
+  });
+  expect(fixture.normalize).not.toHaveBeenCalled();
+  rerender(true);
+  await waitFor(() => expect(result.current.accounts).toEqual(fixture.cached));
+  expect(fixture.normalize).toHaveBeenCalledExactlyOnceWith(fixture.cached);
+  expect(fixture.fetch).not.toHaveBeenCalled();
 });
 
 it.each(['browser-first', 'authorization-first'])(
@@ -155,7 +184,6 @@ it('drops account results accepted before a preset switch and allows the next pr
       }),
   );
   const { result, rerender } = renderHook(() => useAccounts());
-  await waitFor(() => expect(result.current.initialized).toBe(true));
   let pending!: Promise<void>;
   act(() => {
     pending = result.current.requestAccounts();
@@ -186,7 +214,6 @@ it('keeps another provider’s stored records hidden when normalization fails', 
     data: { accountList: [{ id: 1, loginId: 'old' }] },
   });
   const { result, rerender } = renderHook(() => useAccounts());
-  await waitFor(() => expect(result.current.initialized).toBe(true));
   await act(async () => {
     await result.current.requestAccounts();
   });
