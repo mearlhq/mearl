@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
-import { useHoldMetaPicker } from '../useHoldMetaPicker';
+import { getPickerModifierKey, useHoldModifierPicker } from '../useHoldModifierPicker';
 import {
   announceElementPickerSession,
   createElementPickerOwnerId,
@@ -10,7 +10,15 @@ import {
 it('starts on Command down and cancels on Command up', () => {
   const onStart = vi.fn();
   const onCancel = vi.fn();
-  renderHook(() => useHoldMetaPicker({ enabled: true, isPicking: false, onStart, onCancel }));
+  renderHook(() =>
+    useHoldModifierPicker({
+      enabled: true,
+      isPicking: false,
+      onStart,
+      onCancel,
+      modifierKey: 'Meta',
+    }),
+  );
 
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta' })));
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta', repeat: true })));
@@ -23,7 +31,15 @@ it('starts on Command down and cancels on Command up', () => {
 it('does not take ownership of an existing picker', () => {
   const onStart = vi.fn();
   const onCancel = vi.fn();
-  renderHook(() => useHoldMetaPicker({ enabled: true, isPicking: true, onStart, onCancel }));
+  renderHook(() =>
+    useHoldModifierPicker({
+      enabled: true,
+      isPicking: true,
+      onStart,
+      onCancel,
+      modifierKey: 'Meta',
+    }),
+  );
 
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta' })));
   act(() => window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Meta' })));
@@ -35,7 +51,13 @@ it('does not take ownership of an existing picker', () => {
 it('cancels its picker when the panel loses focus', () => {
   const onCancel = vi.fn();
   renderHook(() =>
-    useHoldMetaPicker({ enabled: true, isPicking: false, onStart: vi.fn(), onCancel }),
+    useHoldModifierPicker({
+      enabled: true,
+      isPicking: false,
+      onStart: vi.fn(),
+      onCancel,
+      modifierKey: 'Meta',
+    }),
   );
 
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta' })));
@@ -47,7 +69,13 @@ it('cancels its picker when the panel loses focus', () => {
 it('can relinquish ownership when a button starts a new picker session', () => {
   const onCancel = vi.fn();
   const { result } = renderHook(() =>
-    useHoldMetaPicker({ enabled: true, isPicking: false, onStart: vi.fn(), onCancel }),
+    useHoldModifierPicker({
+      enabled: true,
+      isPicking: false,
+      onStart: vi.fn(),
+      onCancel,
+      modifierKey: 'Meta',
+    }),
   );
 
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta' })));
@@ -62,7 +90,13 @@ it('does not replace another active picker session', () => {
   const otherOwner = createElementPickerOwnerId();
   announceElementPickerSession(otherOwner);
   renderHook(() =>
-    useHoldMetaPicker({ enabled: true, isPicking: false, onStart, onCancel: vi.fn() }),
+    useHoldModifierPicker({
+      enabled: true,
+      isPicking: false,
+      onStart,
+      onCancel: vi.fn(),
+      modifierKey: 'Meta',
+    }),
   );
 
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta' })));
@@ -76,11 +110,12 @@ it('does not cancel a picker session that takes over while Command is held', () 
   const otherOwner = createElementPickerOwnerId();
   const onCancel = vi.fn();
   renderHook(() =>
-    useHoldMetaPicker({
+    useHoldModifierPicker({
       enabled: true,
       isPicking: false,
       onStart: () => announceElementPickerSession(temporaryOwner),
       onCancel,
+      modifierKey: 'Meta',
     }),
   );
 
@@ -90,4 +125,34 @@ it('does not cancel a picker session that takes over while Command is held', () 
 
   expect(onCancel).not.toHaveBeenCalled();
   releaseElementPickerSession(otherOwner);
+});
+
+it('uses Control on Windows and Linux and Command on Apple platforms', () => {
+  expect(getPickerModifierKey('Win32')).toBe('Control');
+  expect(getPickerModifierKey('Linux x86_64')).toBe('Control');
+  expect(getPickerModifierKey('MacIntel')).toBe('Meta');
+  expect(getPickerModifierKey('iPhone')).toBe('Meta');
+});
+
+it('starts and cancels with Control on Windows', () => {
+  const onStart = vi.fn();
+  const onCancel = vi.fn();
+  renderHook(() =>
+    useHoldModifierPicker({
+      enabled: true,
+      isPicking: false,
+      onStart,
+      onCancel,
+      modifierKey: 'Control',
+    }),
+  );
+
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta' })));
+  expect(onStart).not.toHaveBeenCalled();
+
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Control' })));
+  expect(onStart).toHaveBeenCalledOnce();
+
+  act(() => window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Control' })));
+  expect(onCancel).toHaveBeenCalledOnce();
 });

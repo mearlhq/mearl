@@ -124,7 +124,7 @@
     "message": "高亮页面中所有 SPM 节点（绿=abcd，橙=click，蓝=spm）"
   },
   "spmPickerTip": {
-    "message": "单击选取一次，双击连续选取；按住 ⌘ 临时选取"
+    "message": "单击选取一次，双击连续选取；macOS 按住 ⌘、Windows/Linux 按住 Ctrl 可临时选取"
   },
   "spmPickerContinuousTip": {
     "message": "连续选取 SPM 中；再次单击关闭"

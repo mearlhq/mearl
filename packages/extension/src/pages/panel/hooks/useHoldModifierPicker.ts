@@ -4,23 +4,36 @@ import {
   getActiveElementPickerSessionOwner,
 } from '../utils/elementPickerSession';
 
-interface UseHoldMetaPickerOptions {
+export type PickerModifierKey = 'Meta' | 'Control';
+
+interface UseHoldModifierPickerOptions {
   enabled: boolean;
   isPicking: boolean;
   onStart: () => void;
   onCancel: () => void;
+  modifierKey?: PickerModifierKey;
+}
+
+export function getPickerModifierKey(platform: string): PickerModifierKey {
+  return /mac|iphone|ipad|ipod/i.test(platform) ? 'Meta' : 'Control';
+}
+
+function getCurrentPlatform(): string {
+  const currentNavigator = navigator as Navigator & { userAgentData?: { platform?: string } };
+  return currentNavigator.userAgentData?.platform || currentNavigator.platform || '';
 }
 
 /**
- * Temporarily owns a picker while the Meta (Command) key is held.
+ * Temporarily owns a picker while the platform modifier key is held.
  * Existing button-started picker sessions are left untouched.
  */
-export function useHoldMetaPicker({
+export function useHoldModifierPicker({
   enabled,
   isPicking,
   onStart,
   onCancel,
-}: UseHoldMetaPickerOptions) {
+  modifierKey = getPickerModifierKey(getCurrentPlatform()),
+}: UseHoldModifierPickerOptions) {
   const ownsPickerRef = useRef(false);
   const isPickingRef = useRef(isPicking);
   const onStartRef = useRef(onStart);
@@ -49,7 +62,7 @@ export function useHoldMetaPicker({
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
-        event.key !== 'Meta' ||
+        event.key !== modifierKey ||
         event.repeat ||
         ownsPickerRef.current ||
         isPickingRef.current ||
@@ -66,7 +79,7 @@ export function useHoldMetaPicker({
       }
     };
     const handleKeyUp = (event: KeyboardEvent) => {
-      if (event.key === 'Meta') cancelOwnedPicker();
+      if (event.key === modifierKey) cancelOwnedPicker();
     };
     const handleSessionStarted = () => {
       if (ownsPickerRef.current && !startingPickerRef.current) relinquish();
@@ -83,7 +96,7 @@ export function useHoldMetaPicker({
       window.removeEventListener(ELEMENT_PICKER_SESSION_STARTED_EVENT, handleSessionStarted);
       cancelOwnedPicker();
     };
-  }, [enabled, relinquish]);
+  }, [enabled, modifierKey, relinquish]);
 
   return relinquish;
 }

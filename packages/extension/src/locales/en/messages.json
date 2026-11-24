@@ -128,7 +128,7 @@
     "message": "Highlight all SPM nodes on page (green=abcd, orange=click, blue=spm)"
   },
   "spmPickerTip": {
-    "message": "Click to pick once; double-click to keep picking; hold Command to pick temporarily"
+    "message": "Click to pick once; double-click to keep picking; hold Command on macOS or Ctrl on Windows/Linux to pick temporarily"
   },
   "spmPickerContinuousTip": {
     "message": "Continuous SPM picking is on; click again to stop"

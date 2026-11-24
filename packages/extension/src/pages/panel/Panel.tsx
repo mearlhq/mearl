@@ -31,7 +31,7 @@ import { useAgentBridgeStatus } from './hooks/useAgentBridgeStatus';
 import { useCloudConnectorStatus } from './hooks/useCloudConnectorStatus';
 import { usePanelPortBridge } from './hooks/usePanelPortBridge';
 import { ElementPickerTabContext, useElementPicker } from './hooks/useElementPicker';
-import { useHoldMetaPicker } from './hooks/useHoldMetaPicker';
+import { useHoldModifierPicker } from './hooks/useHoldModifierPicker';
 import type { ElementPickerSelection } from '../content-script/elementCommentTypes';
 import { useDevtoolsRequestHandler } from './hooks/useDevtoolsRequestHandler';
 import { usePanelActions } from './hooks/usePanelActions';
@@ -164,7 +164,7 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
   });
   const spmPickerIsPickingRef = useRef(spmPicker.isPicking);
   spmPickerIsPickingRef.current = spmPicker.isPicking;
-  const relinquishMetaSpmPicker = useHoldMetaPicker({
+  const relinquishModifierSpmPicker = useHoldModifierPicker({
     enabled: mode === 'rum' && showAllSpm,
     isPicking: spmPicker.isPicking,
     onStart: () => {
@@ -900,7 +900,7 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
         onToggleSourceTrace={sourceTracer.toggle}
         sourceTraceActive={sourceTracer.isPicking}
         onToggleSpmPicker={() => {
-          relinquishMetaSpmPicker();
+          relinquishModifierSpmPicker();
           if (spmPicker.isPicking) {
             spmPicker.cancel();
             return;
@@ -909,7 +909,7 @@ export const Panel: FC<PanelProps> = ({ previewToken }) => {
           spmPicker.start({ spmMode: true });
         }}
         onEnableContinuousSpmPicker={() => {
-          relinquishMetaSpmPicker();
+          relinquishModifierSpmPicker();
           setSpmPickerContinuous(true);
           spmPicker.start({ spmMode: true, continuousSpmMode: true });
         }}
