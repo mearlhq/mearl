@@ -139,6 +139,12 @@ Commands capture their source and resources when accepted and execute in isolate
 - Keys must be string literals. Use a switch with literal `t('...')` calls instead of computed keys; helpers needing fallback text accept an already resolved translation.
 - Skill tools use the locale supplied by `window.mearl.ready()` and their own translation dictionaries.
 
+## 对外文案
+
+1. **先定主次。** 想清楚读者第一眼需要知道什么，再决定其余信息放在哪里。
+2. **用自然的中文把意思说清楚。** 写完连着标题读一遍。句子不顺时，可以调整整句的结构。
+3. **改字也要重读。** 换一个词、调一下顺序，都可能改变读者对重点、条件或能力范围的理解。改完按第一次看到这段话的方式再读一遍。
+
 ## Code Style
 
 - Use functional components with Hooks and direct React API imports.
