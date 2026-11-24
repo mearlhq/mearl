@@ -590,6 +590,25 @@ async function closeControlledTabs(scope?: number[]): Promise<void> {
   }
 }
 
+async function getWorkWindowReplacement(scope?: number[]) {
+  const windowId = await getAgentGroupWindowId();
+  if (windowId === undefined) return undefined;
+  try {
+    const [tabs, tabIds] = await Promise.all([
+      chrome.tabs.query({ windowId }),
+      scope ?? listControlledTabIds(),
+    ]);
+    const closing = new Set(tabIds);
+    // Keep the native focus transition in windows with tabs that will stay open.
+    if (tabs.length > 0 && tabs.every(tab => tab.id !== undefined && closing.has(tab.id))) {
+      return { windowId, tabIds };
+    }
+  } catch (error) {
+    console.warn('[AgentBridge] Failed to inspect the work window for replacement:', error);
+  }
+  return undefined;
+}
+
 async function rollbackOpenedTab(tabId: number): Promise<void> {
   await setBackgroundPageActivity(tabId, false).catch(() => {});
   await chrome.tabs.remove(tabId).catch(() => {});
@@ -770,12 +789,20 @@ export async function handleTabOpen(
 
   let targetWindowId: number | undefined;
   let openerTab: chrome.tabs.Tab | undefined;
+  let replacedTabIds: number[] | undefined;
+  const foreground = active && !preventForeground;
 
-  // Optionally close all existing agent-controlled tabs before opening a new one
   if (closeExisting) {
-    await closeControlledTabs((data as any).__mearlSessionTabIds);
-    const currentWindow = await chrome.windows.getCurrent();
-    targetWindowId = currentWindow.id;
+    const scope: number[] | undefined = (data as any).__mearlSessionTabIds;
+    const replacement =
+      group === undefined && !foreground ? await getWorkWindowReplacement(scope) : undefined;
+    if (replacement) {
+      targetWindowId = replacement.windowId;
+      replacedTabIds = replacement.tabIds;
+    } else {
+      await closeControlledTabs(scope);
+      targetWindowId = (await chrome.windows.getCurrent()).id;
+    }
   } else if (openerTabId !== undefined) {
     openerTab = await chrome.tabs.get(openerTabId);
     targetWindowId = openerTab.windowId;
@@ -784,18 +811,16 @@ export async function handleTabOpen(
     // tabs clustered in one window.
     targetWindowId = await getControlledWindowId();
   }
-  if (group === undefined) {
+  if (group === undefined && !replacedTabIds) {
     targetWindowId = (await getAgentGroupWindowId(openerTab?.incognito)) ?? targetWindowId;
   }
 
   const restoreTarget =
-    active && !preventForeground && restoreFocusOnClose
-      ? await getActiveTabForRestore()
-      : undefined;
+    foreground && restoreFocusOnClose ? await getActiveTabForRestore() : undefined;
 
   const tab = await chrome.tabs.create({
     url: 'about:blank',
-    active: active && !preventForeground,
+    active: foreground,
     windowId: targetWindowId,
     ...(openerTab && openerTab.windowId === targetWindowId ? { openerTabId: openerTab.id } : {}),
   });
@@ -817,7 +842,9 @@ export async function handleTabOpen(
     // silent no-op and the real document gets injected after load.
     await markTabControlled(tabId, controlSource);
 
-    await groupOpenedAgentTab(tabId, group, active && !preventForeground);
+    await groupOpenedAgentTab(tabId, group, foreground);
+    // The replacement keeps the window and group open until the old tabs close.
+    if (replacedTabIds) await closeControlledTabs(replacedTabIds);
 
     // 先 attach debugger 并启用 Network，首个请求即可采集。
     await startRequestCollection(tabId);

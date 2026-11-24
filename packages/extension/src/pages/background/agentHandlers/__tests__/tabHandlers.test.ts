@@ -414,6 +414,53 @@ describe('extension tab lifecycle', () => {
     expect(chrome.tabGroups.update).toHaveBeenCalledWith(55, { collapsed: input.collapsed });
   });
 
+  it.each([false, true])(
+    'replaces a work tab with a surviving tab in its window (%s)',
+    async leavesTab => {
+      const previous = { id: 11, windowId: 9, groupId: 44, active: true } as chrome.tabs.Tab;
+      const replacement = { id: 7, windowId: 9, status: 'complete' } as chrome.tabs.Tab;
+      const survivor = { id: 12, windowId: 9, groupId: -1, active: false } as chrome.tabs.Tab;
+      chrome.storage.session = {
+        get: vi.fn().mockResolvedValue({ agentControlledTabs: { '11': 1 } }),
+        set: vi.fn().mockResolvedValue(undefined),
+      } as any;
+      chrome.tabs.create = vi.fn().mockResolvedValue(replacement);
+      vi.mocked(chrome.tabs.get).mockResolvedValue(replacement);
+      vi.mocked(chrome.tabs.query).mockResolvedValue(leavesTab ? [previous, survivor] : [previous]);
+      chrome.tabs.onUpdated = { addListener: vi.fn(), removeListener: vi.fn() } as any;
+      chrome.tabs.group = vi.fn().mockResolvedValue(leavesTab ? 45 : 44);
+      chrome.windows.getCurrent = vi.fn().mockResolvedValue({ id: 9 });
+      let closed = false;
+      vi.mocked(chrome.tabs.remove).mockImplementation(async () => {
+        closed = true;
+      });
+      chrome.tabGroups = {
+        query: vi.fn(async () => (closed ? [] : [{ id: 44, title: 'Mearl', windowId: 9 }])),
+        update: vi.fn().mockResolvedValue(undefined),
+      } as any;
+
+      await handleTabOpen({ url: 'https://example.test/target', closeExisting: true });
+
+      expect(chrome.tabs.create).toHaveBeenCalledWith({
+        url: 'about:blank',
+        active: false,
+        windowId: 9,
+      });
+      if (leavesTab) {
+        expect(chrome.tabs.remove).toHaveBeenCalledBefore(vi.mocked(chrome.tabs.create));
+        expect(chrome.tabs.group).toHaveBeenCalledExactlyOnceWith({
+          tabIds: [7],
+          createProperties: { windowId: 9 },
+        });
+      } else {
+        expect(chrome.tabs.group).toHaveBeenCalledExactlyOnceWith({ tabIds: [7], groupId: 44 });
+        expect(chrome.tabs.group).toHaveBeenCalledBefore(vi.mocked(chrome.tabs.remove));
+      }
+      expect(chrome.tabs.remove).toHaveBeenCalledExactlyOnceWith(11);
+      expect(chrome.tabs.remove).toHaveBeenCalledBefore(vi.mocked(navigateTabInSession));
+    },
+  );
+
   it('does not retain pre-navigation visibility when the final page cannot be verified', async () => {
     chrome.tabs.create = vi.fn().mockResolvedValue({
       id: 7,
