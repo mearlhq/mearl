@@ -4,11 +4,17 @@
 
 The main repository is `mearlhq/mearl`, and release source is merged into `main`. In GitHub Actions, choose **Publish → Run workflow**, select `main`, and choose `beta`, `stable`, or `patch`.
 
+## Release notes
+
+Before dispatching the workflow, prepare Simplified Chinese and English notes from the diff between the reviewed candidate and the preceding relevant release tag. Group concrete user-visible changes under level-three headings and include applicable upgrade, compatibility, and data-loss information.
+
+Finalize the comparison link once the release tag is known. An initial release can link to its tagged source. For `stable`, commit both notes with the version files. After `patch` or `beta` selects and publishes the version, verify the tag and candidate commit, commit the notes under `changelogs/<tag>.md` and `changelogs/<tag>.en.md`, and update the GitHub Release body with the Chinese note. Use absolute links to both languages in the Release body. Verify the published text, language links, and comparison link before closing delivery.
+
 ## Beta
 
-Beta builds are iteration artifacts. The Action queries npm versions for all public packages and selects the highest published beta number plus one for the source target version, starting at beta.0. It exports the selected source commit into an independent build directory, synchronizes npm package versions, the extension Manifest, MCP metadata, and Skill directory versions, then builds, checks, tests, and packages. Version files are not written back to the source branch, and no stable changelog or separate version commit is generated.
+Beta builds are iteration artifacts. The Action queries npm versions for all public packages and selects the highest published beta number plus one for the source target version, starting at beta.0. It exports the selected source commit into an independent build directory, synchronizes npm package versions, the extension Manifest, MCP metadata, and Skill directory versions, then builds, checks, tests, and packages. Version files are written only to the exported build directory.
 
-Source is identified by commit and prerelease tag; artifacts by the automatically selected beta version. The source-version field in a tag may retain the development version. GitHub prereleases record the corresponding commit and attach the extension ZIP and license. The `toolbox.json` catalog is deployed with the website. npm uses the `beta` tag.
+The commit and prerelease tag identify the source. The automatically selected beta version identifies the artifacts. The source-version field in a tag may retain the development version. The workflow initially records the build commit in the GitHub prerelease and attaches the extension ZIP and license. The releaser then adds the user-facing notes. The `toolbox.json` catalog is deployed with the website. npm uses the `beta` tag.
 
 The extension, CLI checks, and stable setup read default update configuration from the website's `/mearl/config.json`. The website deploys automatically after npm and GitHub Release publication succeeds, independently of store review submission. Regular builds read the deployed GitHub Pages configuration; stable and patch releases supply the newly published version, while beta releases preserve the existing default update configuration. Resolution failure stops deployment and preserves the live configuration. Beta setup downloads the extension ZIP matching its own version directly. ZIP downloads still use immutable Release URLs; releases do not attach update configuration.
 
@@ -26,7 +32,7 @@ Manually select `stable` on `main`. First prepare, review, and commit consistent
 
 Manually select `patch` on `main`. The workflow checks public npm package versions and Git tags, then increments the highest occupied patch on the latest stable release line. The candidate must match the source's major and minor and match or advance its patch number. For example, when the source and latest stable release are 3.0.0, the workflow selects 3.0.1. Use `stable` to start a new major or minor release line.
 
-The version is written only to the exported build directory. The Git tag points to the original source commit. The workflow generates GitHub release notes from commits since the previous published release on the current version line. npm uses `latest`. A failed-job retry reuses the workflow's retained version and artifacts. If the store already has a manually uploaded package for the same version, verify its status and origin in the Developer Dashboard.
+The version is written only to the exported build directory. The Git tag points to the original source commit. The workflow initially lists commits since the previous stable release on that version line. The releaser then updates the GitHub Release with the reviewed notes. npm uses `latest`. A failed-job retry reuses the workflow's retained version and artifacts. If the store already has a manually uploaded package for the same version, verify its status and origin in the Developer Dashboard.
 
 ### Store review
 
