@@ -4,16 +4,13 @@ Mearl 单独使用时沿用主 Skill 的页面操作流程。任务已有 Ego、
 
 ## EgoLite
 
-使用独立 `@mearl/provider-ego` 0.1.1+，安装入口和支持范围以 Provider 自身 README 为准。Mearl 3.0.7+ 可用 `{{setup}} provider install @mearl/provider-ego` 安装并注册；源码构建后可指定 `@mearl/provider-ego@/absolute/path/to/provider-ego`，也可指定带包名的 GitHub Release 安装包地址。
+使用 `{{setup}} provider install @mearl/provider-ego` 安装并注册独立 Ego Provider。在支持 Provider 任务会话的宿主上，`browser_list` 会发现正在运行的 EgoLite 实例。
 
-- 无需浏览器扩展。已有扩展可关闭 Agent 服务，保留人工调试面板。Mearl 本地运行时仍负责 Provider 路由和已安装 App 资源解析。
-- 一个 Provider 浏览器对应一个 Ego Space。启动时传 `providerOptions.name`；已有任务传数字 `providerOptions.spaceId`。只关联 Agent 所有的 Space，不隐式认领用户 Space。
-- 使用 Provider 返回的完整 `browserId` 和页面 `tabId`，不需要 Agent 手工匹配扩展标签页。不传 Mearl `--session`。
-- Space 交接、恢复和完成统一使用 `mearl session_manage --browser '<browserId>' --payload '{"operation":"handoff"}'`；operation 支持 `handoff`、`resume`、`end`。end 可带 `keepTabIds` 保留数字 ID 对应的结果页。仅在用户明确交还后 resume。
-- 所有页面操作经过 Ego 原生通道；用户接管、Space 失活时由 Ego 阻断，不改走扩展。连接断开或效果未知时不重放动作。
-- 设备和 App 分别通过 `set_device_emulation`、`set_app_profile` 设置。App 来自已安装目录，使用当前已解析版本；UA、声明式全局变量和页面桥通过原生 CDP 安装。导航、截图继续使用同一个 Provider。
-- 共享原生页面宿主提供设备外壳、根 WebView、网络控制和已安装 App 的协议/授权桥。真实授权仍需用户批准；接管会取消待授权会话，交还不恢复旧请求。不提供扩展专属请求/日志入口，其他参数限制以 Provider 指引为准。
-- `end` 默认不保留 Agent 页面；需要保留结果时显式传 `keepTabIds`。`browser_manage detach` 只解绑，不结束 Space、不清除模拟；需要普通页面时先清除模拟再 end。
+- 用完整 `browserId` 执行 `session_manage` 的 `new`，并保存返回的 `sessionId`。可选的 `providerOptions.name` 用于新 Space，数字 `providerOptions.spaceId` 用于关联已有 Agent Space。
+- 扩展已连接、开启 Agent 服务且能匹配同一个物理页面时，Mearl 优先由扩展执行页面操作。Provider 负责 Space 生命周期和标签页范围。页面通道在会话建立时确定，见 `session.task.pageTransport`。
+- 后续操作传 `--session <sessionId>` 和当前会话返回的页面 `tabId`。以 `get_capabilities` 核对当前通道能力。
+- 交接、恢复和完成使用 `session_manage` 的 `handoff`、`resume`、`end`。仅在用户明确交还后恢复。已有页面会保留，用 `keepTabIds` 留下本次会话新建的结果页。
+- 旧版宿主可沿用 `browser_manage` 的 `launch`，然后使用返回的完整任务 `browserId`。这种任务的 `session_manage` 同样按该 `browserId` 路由。
 
 ## agent-browser 等其他工具
 

@@ -13,8 +13,9 @@ import { assertProviderProtocolVersion, type ProviderHostContextData } from '@me
 import { isAbsolute } from 'node:path';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { providerRequestTimeoutMs } from './provider-request-timeout.js';
+import { ProviderTaskSessions, type ProviderTaskRoutes } from './provider-task-sessions.js';
 
-interface Dependencies {
+interface ProviderControlDependencies {
   browsers: () => BrowserRecord[];
   request: (
     browser: BrowserRecord,
@@ -42,7 +43,21 @@ export class ProviderControlService {
   private readonly controls = new Map<string, BrowserControl>();
   private readonly retired = new Set<Promise<void>>();
 
-  constructor(private readonly dependencies: Dependencies) {}
+  private readonly tasks: ProviderTaskSessions | undefined;
+
+  constructor(
+    private readonly dependencies: ProviderControlDependencies,
+    taskRoutes?: ProviderTaskRoutes,
+  ) {
+    if (taskRoutes)
+      this.tasks = new ProviderTaskSessions({
+        ...taskRoutes,
+        browsers: dependencies.browsers,
+        notify: dependencies.notify,
+        request: (browser, action, data, origin, deadline) =>
+          this.deadlines.run(deadline, () => this.request(browser, action, data, origin)),
+      });
+  }
 
   private retire(manager: ControlSessionManager) {
     const cleanup = Promise.all(
@@ -53,6 +68,7 @@ export class ProviderControlService {
   }
 
   private reap() {
+    this.tasks?.reap();
     const browsers = this.dependencies.browsers();
     for (const [browserId, control] of this.controls) {
       const browser = browsers.find(item => item.browserId === browserId);
@@ -79,7 +95,10 @@ export class ProviderControlService {
 
   list(): ControlSessionInfo[] {
     this.reap();
-    return [...this.controls.values()].flatMap(control => control.manager.registry.list());
+    return [
+      ...[...this.controls.values()].flatMap(control => control.manager.registry.list()),
+      ...(this.tasks?.list() ?? []),
+    ];
   }
 
   find(sessionId: string): ControlSessionInfo | undefined {
@@ -89,11 +108,12 @@ export class ProviderControlService {
       .filter((session): session is ControlSessionInfo => session !== undefined);
     if (sessions.length > 1)
       throw new Error('CONTROL_SESSION_AMBIGUOUS: multiple browsers own this id');
-    return sessions[0];
+    return sessions[0] ?? this.tasks?.find(sessionId);
   }
 
   async userControl(sessionId: string, operation: 'handoff' | 'resume' | 'release') {
     this.reap();
+    if (this.tasks?.find(sessionId)) return this.tasks.userControl(sessionId, operation);
     for (const [browserId, control] of this.controls) {
       try {
         control.manager.registry.info(sessionId);
@@ -270,6 +290,14 @@ export class ProviderControlService {
       if (deadline !== undefined) providerRequestTimeoutMs(action, data, deadline);
       this.reap();
       const browser = this.browser(browserId);
+      if (browser.details?.taskSessionScope === 'session')
+        throw new Error('Select this task with its session ID');
+      if (browser.details?.taskSessionScope === 'browser') {
+        if (sessionId === undefined && ['get_versions', 'get_capabilities'].includes(action))
+          return this.request(browser, action, data, origin, host);
+        if (!this.tasks) throw new Error('Provider task sessions are unavailable');
+        return this.tasks.invoke(browser, action, data, sessionId, origin, deadline);
+      }
       const external = browser.capabilities?.controlSessionMode === 'external';
       if (external && sessionId !== undefined)
         throw new Error(
@@ -338,6 +366,7 @@ export class ProviderControlService {
 
   async dispose() {
     await Promise.all([
+      this.tasks?.dispose(),
       ...this.retired,
       ...[...this.controls.values()].map(async ({ manager }) => {
         await Promise.all(

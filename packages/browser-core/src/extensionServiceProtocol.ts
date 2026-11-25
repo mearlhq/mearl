@@ -186,6 +186,8 @@ export function isExtensionUiServiceAction(value: unknown): value is ExtensionUi
 }
 
 export interface HostToExtensionActionMap {
+  __provider_task_target: { request: { targetId: string }; response: { tabId: number } | null };
+  __provider_task_authorize_open: { request: { url: string }; response: { authorized: true } };
   __browser_enhancement: {
     request: BrowserEnhancementRequest;
     response: BrowserEnhancementResponse;
@@ -258,6 +260,8 @@ export interface HostToExtensionActionMap {
   };
 }
 export const HOST_TO_EXTENSION_ACTIONS = {
+  __provider_task_target: true,
+  __provider_task_authorize_open: true,
   __browser_enhancement: true,
   __preset_installation: true,
   __profile_install: true,

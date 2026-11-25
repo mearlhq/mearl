@@ -1,8 +1,9 @@
-import type {
-  BrowserInfo,
-  BrowserListResult,
-  BrowserProviderIdentity,
-  ManagedBrowserInfo,
+import {
+  isDiscoverableBrowser,
+  type BrowserInfo,
+  type BrowserListResult,
+  type BrowserProviderIdentity,
+  type ManagedBrowserInfo,
 } from '@mearl/browser-core';
 import type { ProviderBrowser, ProviderDescriptor, ProviderRuntime } from '@mearl/provider';
 import { listRegisteredBrowsers, type BrowserRecord } from './browser-registry.js';
@@ -116,11 +117,13 @@ export function mergeBrowserInventory(
   providerBrowsers: ProviderInventoryBrowser[],
 ): BrowserInventoryResult {
   const providerById = new Map(
-    providerBrowsers.map(entry => [entry.browser.browserId, entry] as const),
+    providerBrowsers
+      .filter(entry => isDiscoverableBrowser(entry.browser))
+      .map(entry => [entry.browser.browserId, entry] as const),
   );
   const browsers: BrowserInfo[] = [];
 
-  for (const route of routes) {
+  for (const route of routes.filter(isDiscoverableBrowser)) {
     const providerEntry = providerById.get(route.browserId);
     if (providerEntry) {
       providerById.delete(route.browserId);

@@ -12,14 +12,15 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type {
-  BrowserCapabilities,
-  BrowserDetails,
-  BrowserPairingInfo,
-  BrowserProviderIdentity,
-  BrowserProviderOperation,
-  BrowserReference,
-  BrowserTransport,
+import {
+  isDiscoverableBrowser,
+  type BrowserCapabilities,
+  type BrowserDetails,
+  type BrowserPairingInfo,
+  type BrowserProviderIdentity,
+  type BrowserProviderOperation,
+  type BrowserReference,
+  type BrowserTransport,
 } from '@mearl/browser-core';
 
 /** Must match @mearl/daemon-core's DAEMON_HOME + the native-host 'browsers' subdir. */
@@ -83,7 +84,13 @@ export function listLiveBrowsers(): LiveBrowser[] {
       // Corrupt or mid-write (a writer may be renaming it in); skip.
       continue;
     }
-    if (rec && typeof rec.pid === 'number' && rec.socketPath && isAlive(rec.pid)) {
+    if (
+      rec &&
+      typeof rec.pid === 'number' &&
+      rec.socketPath &&
+      isDiscoverableBrowser(rec) &&
+      isAlive(rec.pid)
+    ) {
       out.push(rec);
     }
   }

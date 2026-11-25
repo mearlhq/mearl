@@ -176,7 +176,7 @@ It supports `signal` cancellation and `executionTimeoutSec`, sharing executors w
 
 ### Control sessions and files
 
-Use `session_list` to find control sessions. Use `session_manage` with `handoff` or `resume` and pass `--session <sessionId>` or a payload `sessionId`. For external Providers such as Ego, select the task with `--browser`.
+Use `session_list` to find control sessions. Use `session_manage` with `handoff` or `resume` and pass `--session <sessionId>` or a payload `sessionId`. A Provider that supports task sessions can bind that session to a native task, such as an Ego Space. For an external task exposed directly as a browser, select it with `--browser`.
 
 Use `session_manage --browser <browserId> --payload '{"operation":"new"}'` to create an empty session, or pass `--session new` on the first `tab_open`, `page_snapshot`, or `page_screenshot`. Use the returned `sessionId` for subsequent calls.
 
@@ -199,7 +199,7 @@ New extension background tabs join a collapsed `Mearl` group; foreground tabs jo
 
 Ending a session closes its created tabs by default. Reused user tabs always stay open. Set `keepTabIds` to retain specific result tabs or `closeCreatedTabs:false` to keep all tabs. Providers without tab closing support keep tabs open and release the session by default. Retained tabs keep their mocks and emulation by default. Set `preserveEnvironment:false` to clear the session tabs' environment. Active sessions block browser-wide release and close.
 
-`page_download` listens before clicking and returns a browser artifact. CLI `--output` or SDK `saveArtifact(artifact, absolutePath, { session })` exports in 256 KiB chunks. `page_upload.files` accepts caller absolute `{filePath}` or browser `{artifactId}`; `filePaths` remains browser-host paths. Files are limited to 256 MiB. Caller-saved outputs are independent of temporary artifacts. Session release cleans temporary artifacts; `keepArtifactIds` retains selected ones. Sessionless artifacts expire after one idle hour; host exit clears staging.
+`page_download` listens before clicking and returns a browser artifact. CLI `--output` or SDK `saveArtifact(artifact, absolutePath, { session })` exports in 256 KiB chunks. `page_upload.files` accepts caller absolute `{filePath}` or browser `{artifactId}`; `filePaths` refers to browser-host paths. Files are limited to 256 MiB. Caller-saved outputs are independent of temporary artifacts. Session release cleans temporary artifacts. Ordinary sessions support `keepArtifactIds`; save artifacts before ending a Provider task session. Sessionless artifacts expire after one idle hour and host exit clears staging.
 
 Through the Chrome extension, `files` transfers up to 256 MiB total per upload in chunks to file inputs in HTTP(S) documents without **Allow access to file URLs**. With `filePaths`, Chrome reads host files directly. This supports large files and sites that require native file selection events. The extension requires the setting for `filePaths`. Direct CDP uploads do not require the extension setting.
 

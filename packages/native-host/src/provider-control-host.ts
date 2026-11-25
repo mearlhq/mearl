@@ -15,6 +15,14 @@ import {
 import { browserConnectionIdentity, listRegisteredBrowsers } from './browser-registry.js';
 import { requestBrowserSocket } from './browser-socket-request.js';
 import { ProviderControlService } from './provider-control.js';
+import {
+  authorizeProviderTaskOpen,
+  findProviderTaskExtension,
+  invokeProviderTaskExtension,
+  reserveProviderTaskPage,
+  updateProviderTaskExtension,
+} from './provider-task-extension.js';
+import { launchProviderBrowser } from './browser-provider.js';
 import { ProviderEnhancementService } from './provider-enhancements.js';
 import {
   BROWSER_ENHANCEMENT_PROTOCOL_VERSION,
@@ -22,6 +30,8 @@ import {
   BROWSER_ENHANCEMENT_PREPARATION_VERSION,
   BROWSER_ENHANCEMENT_HOST_ENVIRONMENT_VERSION,
   PROVIDER_APP_RESOURCE_PROTOCOL_VERSION,
+  PROVIDER_TASK_SESSION_VERSION,
+  getDomainPermissionFailure,
 } from '@mearl/browser-core';
 import { acceptedAppResources, ProviderAppResourceService } from './provider-app-resources.js';
 import { Utf8LineBuffer } from './socketLines.js';
@@ -48,33 +58,56 @@ export async function runProviderControlHost(token: string): Promise<void> {
   )
     throw new Error('Provider control host startup ownership was lost');
   const connections = new Set<net.Socket>();
-  const service = new ProviderControlService({
-    browsers: listRegisteredBrowsers,
-    request: (browser, action, data, origin, host, deadline) =>
-      requestBrowserSocket(
-        browser.socketPath,
-        action,
-        data,
-        NATIVE_HOST_VERSION,
-        providerRequestTimeoutMs(action, data, deadline),
-        browser.providerBrowserId,
-        host,
-        { controlSource: origin, deadline },
-      ),
-    notify: () => {
-      for (const browser of listRegisteredBrowsers()) {
-        if (browser.transport === 'extension') {
-          void requestBrowserSocket(
-            browser.socketPath,
-            'provider_control_sessions_changed',
-            {},
-            NATIVE_HOST_VERSION,
-            5000,
-          ).catch(() => {});
+  const service = new ProviderControlService(
+    {
+      browsers: listRegisteredBrowsers,
+      request: (browser, action, data, origin, host, deadline) =>
+        requestBrowserSocket(
+          browser.socketPath,
+          action,
+          data,
+          NATIVE_HOST_VERSION,
+          providerRequestTimeoutMs(action, data, deadline),
+          browser.providerBrowserId,
+          host,
+          { controlSource: origin, deadline },
+        ),
+      notify: () => {
+        for (const browser of listRegisteredBrowsers()) {
+          if (browser.transport === 'extension') {
+            void requestBrowserSocket(
+              browser.socketPath,
+              'provider_control_sessions_changed',
+              {},
+              NATIVE_HOST_VERSION,
+              5000,
+            ).catch(() => {});
+          }
         }
-      }
+      },
     },
-  });
+    {
+      open: async (browser, options, deadline) =>
+        (
+          await launchProviderBrowser({
+            provider: browser.provider!.id,
+            providerOptions: options,
+            taskSession: { browserId: browser.providerBrowserId! },
+            deadline,
+          })
+        ).browserId,
+      findExtension: (task, tabId, deadline) =>
+        findProviderTaskExtension(token, task, tabId, deadline),
+      reserveExtensionPage: (task, extension, tabId, deadline) =>
+        reserveProviderTaskPage(token, task, extension, tabId, deadline),
+      authorizeOpen: (task, extension, url, origin, deadline) =>
+        authorizeProviderTaskOpen(token, task, extension, url, origin, deadline),
+      invokeExtension: (task, extension, action, data, origin, deadline) =>
+        invokeProviderTaskExtension(token, task, extension, action, data, origin, deadline),
+      updateExtension: (task, extension, operation, deadline) =>
+        updateProviderTaskExtension(token, task, extension, operation, deadline),
+    },
+  );
   const enhancements = new ProviderEnhancementService({
     browsers: listRegisteredBrowsers,
     request: (browser, action, data, deadline) =>
@@ -201,12 +234,14 @@ export async function runProviderControlHost(token: string): Promise<void> {
       if (!socket.destroyed)
         socket.write(JSON.stringify({ id, success: true, data: result }) + '\n');
     } catch (error) {
+      const errorDetails = getDomainPermissionFailure(error);
       if (!socket.destroyed)
         socket.write(
           JSON.stringify({
             id,
             success: false,
             error: error instanceof Error ? error.message : String(error),
+            ...(errorDetails ? { errorDetails } : {}),
           }) + '\n',
         );
     }
@@ -230,6 +265,7 @@ export async function runProviderControlHost(token: string): Promise<void> {
         ready: true,
         protocolVersion: MEARL_PROVIDER_PROTOCOL_VERSION,
         controlSessionModes: ['mearl', 'external'],
+        taskSessionProtocolVersion: PROVIDER_TASK_SESSION_VERSION,
         enhancementProtocolVersion: BROWSER_ENHANCEMENT_PROTOCOL_VERSION,
         enhancementNavigationOriginVersion: BROWSER_ENHANCEMENT_NAVIGATION_ORIGIN_VERSION,
         enhancementPreparationVersion: BROWSER_ENHANCEMENT_PREPARATION_VERSION,

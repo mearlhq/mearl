@@ -1,6 +1,7 @@
 import net from 'node:net';
 import { Utf8LineBuffer } from './socketLines.js';
 import { MEARL_PROVIDER_PROTOCOL_VERSION, type ProviderHostContextData } from '@mearl/provider';
+import { browserActionResponseError } from '@mearl/browser-core';
 
 const MAX_RESPONSE_BUFFER_SIZE = 64 * 1024 * 1024;
 
@@ -9,6 +10,7 @@ interface SocketResponse {
   success?: boolean;
   data?: any;
   error?: string;
+  errorDetails?: unknown;
 }
 
 export function requestBrowserSocket(
@@ -19,7 +21,14 @@ export function requestBrowserSocket(
   timeoutMs = 60_000,
   browserId?: string,
   host?: ProviderHostContextData,
-  routing?: { providerTarget?: string; controlSource?: string; providerControlToken?: string; providerSourceIdentity?: string; providerPageId?: number; deadline?: number },
+  routing?: {
+    providerTarget?: string;
+    controlSource?: string;
+    providerControlToken?: string;
+    providerSourceIdentity?: string;
+    providerPageId?: number;
+    deadline?: number;
+  },
 ): Promise<any> {
   const deadline = routing?.deadline ?? Date.now() + timeoutMs;
   const remaining = deadline - Date.now();
@@ -59,9 +68,15 @@ export function requestBrowserSocket(
           deadline,
           controlSource: routing?.controlSource ?? 'local',
           ...(routing?.providerTarget ? { providerTarget: routing.providerTarget } : {}),
-          ...(routing?.providerControlToken ? { providerControlToken: routing.providerControlToken } : {}),
-          ...(routing?.providerSourceIdentity ? { providerSourceIdentity: routing.providerSourceIdentity } : {}),
-          ...(routing?.providerPageId !== undefined ? { providerPageId: routing.providerPageId } : {}),
+          ...(routing?.providerControlToken
+            ? { providerControlToken: routing.providerControlToken }
+            : {}),
+          ...(routing?.providerSourceIdentity
+            ? { providerSourceIdentity: routing.providerSourceIdentity }
+            : {}),
+          ...(routing?.providerPageId !== undefined
+            ? { providerPageId: routing.providerPageId }
+            : {}),
           ...(browserId ? { browserId } : {}),
           ...(host ? { host } : {}),
         })}\n`,
@@ -82,7 +97,7 @@ export function requestBrowserSocket(
         }
         if (response.id !== id) continue;
         if (response.success) finish(undefined, response.data);
-        else finish(new Error(response.error || 'Browser request failed'));
+        else finish(browserActionResponseError(response, 'Browser request failed'));
         return;
       }
     });

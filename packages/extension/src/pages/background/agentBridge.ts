@@ -1045,6 +1045,15 @@ export class AgentBridge {
         });
       case 'page_frames':
         return handlePageFrames(data, () => this.getActiveTabId());
+      case '__provider_task_target': {
+        const target = (await chrome.debugger.getTargets()).find(
+          item => item.id === data?.targetId,
+        );
+        return target?.tabId === undefined ? null : { tabId: target.tabId };
+      }
+      case '__provider_task_authorize_open':
+        await this.assertAgentActionAuthorized('tab_open', { url: data.url });
+        return { authorized: true };
       case '__browser_enhancement':
         return handleBrowserEnhancement(data, (tabId, action, origin) =>
           this.assertEnhancementActionAuthorized(tabId, action, origin),
@@ -1165,11 +1174,31 @@ export class AgentBridge {
       }
 
       validateRequiredActionTabId(message.action, message.data);
-      const actionData = message.data;
+      const { __mearlExpectedTargetId: expectedTargetId, ...taskData } = message.data ?? {};
+      const actionData = expectedTargetId === undefined ? message.data : taskData;
       const controlSource = normalizeControlSource(message.controlSource);
+      const assertTaskTarget = async () => {
+        if (
+          !message.trustedInternal ||
+          typeof expectedTargetId !== 'string' ||
+          !(await chrome.debugger.getTargets()).some(
+            target => target.id === expectedTargetId && target.tabId === actionData.tabId,
+          )
+        )
+          throw new Error(
+            'PAGE_IDENTITY_CHANGED: the extension target does not match the task page',
+          );
+      };
+      if (expectedTargetId !== undefined) await assertTaskTarget();
 
       // Unified domain authorization check
-      if (message.action !== '__browser_enhancement') {
+      if (expectedTargetId !== undefined) {
+        await this.assertEnhancementActionAuthorized(
+          actionData.tabId,
+          message.action,
+          message.action === 'page_navigate' ? actionData.url : undefined,
+        );
+      } else if (message.action !== '__browser_enhancement') {
         await this.assertAgentActionAuthorized(
           message.action,
           actionData,
@@ -1186,6 +1215,7 @@ export class AgentBridge {
 
       const targetTabId = actionData?.tabId;
       const execute = async () => {
+        if (expectedTargetId !== undefined) await assertTaskTarget();
         signal.throwIfAborted();
         if (
           (AgentBridge.REQUEST_CAPTURING_ACTIONS.has(message.action) &&

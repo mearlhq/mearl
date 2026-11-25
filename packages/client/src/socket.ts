@@ -184,6 +184,14 @@ function isConnectedBrowser(browser: LiveBrowser): boolean {
 
 function supportsAction(browser: LiveBrowser, action: string, data: Record<string, any>): boolean {
   if (action === 'browser_release') return false;
+  if (
+    browser.details?.taskSessionScope === 'browser' &&
+    (data as any)[SESSION_OPTION] &&
+    (isBrowserCapabilityAction(action) ||
+      action === 'run_actions' ||
+      action.startsWith('__artifact_'))
+  )
+    return true;
   if (browser.transport === 'provider') {
     if (
       action === 'session_manage' ||
@@ -523,6 +531,29 @@ export function invoke(
     });
   }
   const selector = browser ?? defaultBrowser ?? process.env.MEARL_BROWSER ?? undefined;
+  const sessionId = options.controlSessionId;
+  if (
+    !selector &&
+    !options.socketPath &&
+    !process.env.MEARL_SOCKET_PATH?.trim() &&
+    sessionId &&
+    sessionId !== 'new'
+  ) {
+    return resolveControlSession(sessionId, timeoutSec, controlSource, options.deadline).then(
+      ({ session }) => {
+        if (!session?.browserId) throw new Error('CONTROL_SESSION_NOT_FOUND');
+        return dispatchInvoke(
+          action,
+          resolvedData,
+          timeoutSec,
+          session.browserId,
+          controlSource,
+          undefined,
+          options.deadline,
+        );
+      },
+    );
+  }
   return dispatchInvoke(
     action,
     resolvedData,
@@ -597,6 +628,7 @@ async function resolveControlSession(
   sessionId: string,
   timeoutSec: number,
   controlSource: CompatibleControlSource,
+  deadline?: number,
 ): Promise<any> {
   const browsers = listLiveBrowsers();
   const configuredSocketPath = process.env.MEARL_SOCKET_PATH?.trim();
@@ -614,7 +646,16 @@ async function resolveControlSession(
     : browsers.find(browser => browser.transport === 'provider');
   if (!sockets.length && !provider) sockets.push(SOCKET_PATH);
   const requests = sockets.map(socketPath =>
-    invokeOnce('__control_session_resolve', { sessionId }, timeoutSec, socketPath, controlSource),
+    invokeOnce(
+      '__control_session_resolve',
+      { sessionId },
+      timeoutSec,
+      socketPath,
+      controlSource,
+      undefined,
+      undefined,
+      deadline,
+    ),
   );
   if (provider) {
     requests.push(
@@ -625,6 +666,8 @@ async function resolveControlSession(
         provider.socketPath,
         controlSource,
         provider.browserId,
+        undefined,
+        deadline,
       ),
     );
   }

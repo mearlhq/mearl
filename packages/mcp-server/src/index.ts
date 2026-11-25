@@ -614,6 +614,7 @@ async function main() {
           operation: { type: 'string', enum: ['new', 'handoff', 'resume', 'end'] },
           browser: { type: 'string' },
           sessionId: { type: 'string' },
+          providerOptions: { type: 'object', description: 'new 时传入所选 Provider 的任务参数' },
           reason: { type: 'string' },
           closeCreatedTabs: {
             type: 'boolean',

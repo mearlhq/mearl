@@ -74,7 +74,7 @@ mearl page_snapshot --browser '<browserId>' --payload '{"tabId":12345,"mode":"vi
 
 常规响应的 session 只包含 ID、浏览器、传输、状态、代次和可选 reason，不重复标签页清单。页面列表用 tab_list 查询；session_manage 的交接结果还包含会话页面的 tabs。CLI、SDK、MCP 使用同一结构。
 
-会话自动记录新建与复用页面，串行执行同页面操作，并阻止其他会话或无会话调用占用其页面。不同任务使用独立会话；会话不隔离 Cookie 与存储，账号或浏览器共享资源冲突时使用独立浏览器。Extension、CDP 和采用 Mearl 控制的 Provider 共用这些规则；声明外部控制的 Provider（如 Ego）拒绝 Mearl 会话，交接和收尾沿用原工具。
+会话自动记录新建与复用页面，串行执行同页面操作，并阻止其他会话或无会话调用占用其页面。不同任务使用独立会话。会话共享 Cookie 与存储，账号或资源冲突时使用独立浏览器。支持任务会话的 Provider 可在 `session_manage new` 绑定原生任务，交接和收尾通过同一会话的 ID 执行。
 
 `session_manage` 的 `operation:"handoff"` 将控制权交给用户，用 `--session` 或 `sessionId` 指定会话，`reason` 说明需要用户处理的事项。用户在 Mearl Popup 浏览器管理页接管和交还；无扩展 UI 的环境，在用户明确确认交还后调用 `operation:"resume"`。
 

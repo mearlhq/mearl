@@ -54,7 +54,8 @@ export function parseSessionManageParams(value: unknown): SessionManageParams {
   const data = record(value);
   switch (data.operation) {
     case 'new':
-      allow(data, []);
+      allow(data, ['providerOptions']);
+      if (data.providerOptions !== undefined) record(data.providerOptions);
       break;
     case 'handoff':
       allow(data, ['sessionId', 'reason']);

@@ -34,6 +34,7 @@ function independentOpenUrl(id: string | undefined, data: any): string | undefin
 /** Resource ownership survives individual CLI connections; queues serialize shared pages. */
 export class ControlSessionRegistry {
   private sessions = new Map<string, ControlSessionInfo>();
+  private internalSessions = new Set<string>();
   private owners = new Map<number, string>();
   private queues = new Map<number, Promise<void>>();
   private openingUrls = new Map<string, Promise<void>>();
@@ -51,7 +52,10 @@ export class ControlSessionRegistry {
     }
   }
 
-  create(transport: ControlSessionInfo['transport']): ControlSessionInfo {
+  create(
+    transport: ControlSessionInfo['transport'],
+    options?: { internal?: boolean },
+  ): ControlSessionInfo {
     if (this.browserReleasing) throw new Error('BROWSER_CONTROL_RELEASING');
     const record: ControlSessionInfo = {
       sessionId: this.createSessionId(),
@@ -62,6 +66,7 @@ export class ControlSessionRegistry {
       generation: 1,
     };
     this.sessions.set(record.sessionId, record);
+    if (options?.internal) this.internalSessions.add(record.sessionId);
     return this.info(record.sessionId);
   }
 
@@ -77,13 +82,19 @@ export class ControlSessionRegistry {
 
   find(id: string): ControlSessionInfo | undefined {
     const record = this.sessions.get(id);
-    return record?.browserId === this.browserId() ? this.info(id) : undefined;
+    return record?.browserId === this.browserId() && !this.internalSessions.has(id)
+      ? this.info(id)
+      : undefined;
   }
 
   list(): ControlSessionInfo[] {
-    return [...this.sessions.values()]
-      .filter(record => record.status !== 'released')
+    return this.activeSessions()
+      .filter(record => !this.internalSessions.has(record.sessionId))
       .map(record => this.info(record.sessionId));
+  }
+
+  private activeSessions(): ControlSessionInfo[] {
+    return [...this.sessions.values()].filter(record => record.status !== 'released');
   }
 
   private require(id: string): ControlSessionInfo {
@@ -118,8 +129,14 @@ export class ControlSessionRegistry {
     return [...this.owners].filter(([, owner]) => owner !== id).map(([tab]) => tab);
   }
 
+  internalTabs(): number[] {
+    return [...this.owners]
+      .filter(([, owner]) => this.internalSessions.has(owner))
+      .map(([tab]) => tab);
+  }
+
   assertBrowserRelease(): void {
-    if (this.list().length)
+    if (this.activeSessions().length)
       throw new Error('ACTIVE_CONTROL_SESSIONS: release the owning session first');
   }
 
@@ -192,7 +209,7 @@ export class ControlSessionRegistry {
       if (
         action === 'run_actions' &&
         !id &&
-        this.list().length &&
+        this.activeSessions().length &&
         steps.some((step: any) => step.action === 'tab_open')
       ) {
         throw new Error(
@@ -200,12 +217,12 @@ export class ControlSessionRegistry {
         );
       }
       // Browser-wide settings cannot escape ownership through a batch.
-      if (changesSharedSettings && this.list().some(record => record.sessionId !== id)) {
+      if (changesSharedSettings && this.activeSessions().some(record => record.sessionId !== id)) {
         throw new Error(
           'BROWSER_RESOURCE_CONFLICT: use an isolated browser to change shared settings',
         );
       }
-      if (data.closeExisting && !id && this.list().length)
+      if (data.closeExisting && !id && this.activeSessions().length)
         throw new Error('ACTIVE_CONTROL_SESSIONS');
     };
     assertSharedResources();
@@ -258,7 +275,7 @@ export class ControlSessionRegistry {
         for (const tab of tabs) {
           const owner = this.owners.get(tab);
           if (owner && owner !== id) throw new Error('TAB_CONTROLLED_BY_SESSION');
-          if (id && tab >= 0) this.claim(id, tab, 'attached');
+          if (id && tab >= 0 && !this.internalSessions.has(id)) this.claim(id, tab, 'attached');
         }
         return await operation();
       } finally {
@@ -364,6 +381,11 @@ export class ControlSessionRegistry {
       await cleanup(tabs, close);
       for (const tab of tabs) if (this.owners.get(tab) === id) this.owners.delete(tab);
       record.status = 'released';
+      if (this.internalSessions.delete(id)) {
+        const result = this.info(id);
+        this.sessions.delete(id);
+        return result;
+      }
       // Bound completed metadata while retaining active ownership indefinitely.
       const released = [...this.sessions.values()].filter(
         session => session.status === 'released' && session.sessionId !== id,

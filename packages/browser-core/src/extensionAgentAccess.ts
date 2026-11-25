@@ -17,6 +17,8 @@ export function requiresExtensionAgentAccess(
   if (action === '__page_record') return data?.operation === 'start';
   if (action === '__send_request_files') return data?.operation !== 'abort';
   if (action === '__browser_enhancement') return data?.operation !== 'release';
+  if (action === '__provider_task_target' || action === '__provider_task_authorize_open')
+    return true;
   return false;
 }
 

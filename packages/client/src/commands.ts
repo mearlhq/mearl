@@ -528,6 +528,11 @@ export const COMMANDS = [
         description: 'new 创建空会话，handoff 交给用户，resume 恢复控制，end 结束会话并释放资源',
       },
       { name: 'sessionId', type: 'string', description: '已有会话 ID，也可使用 --session' },
+      {
+        name: 'providerOptions',
+        type: 'Record<string, JSON value>',
+        description: 'new 时传入所选 Provider 的任务参数',
+      },
       { name: 'reason', type: 'string', description: 'handoff 时说明需要用户处理的事项' },
       {
         name: 'closeCreatedTabs',

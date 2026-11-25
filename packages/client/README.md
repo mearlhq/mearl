@@ -176,7 +176,7 @@ SDK 宿主可从 `@mearl/client/script` 导入 `executeScript(code, options)`，
 
 ### 控制会话与文件
 
-用 `session_list` 查询控制会话，使用 `session_manage` 的 `handoff` 和 `resume` 交接控制。指定 `--session <sessionId>` 或在 payload 中传入 `sessionId`。Ego 等外部 Provider 通过 `--browser` 指定任务。
+用 `session_list` 查询控制会话，使用 `session_manage` 的 `handoff` 和 `resume` 交接控制。指定 `--session <sessionId>` 或在 payload 中传入 `sessionId`。支持任务会话的 Provider 可以将该会话关联到原生任务，例如 Ego Space。若外部任务直接作为浏览器实例暴露，则通过 `--browser` 选择。
 
 用 `session_manage --browser <browserId> --payload '{"operation":"new"}'` 创建空会话。也可以在首次 `tab_open`、`page_snapshot` 或 `page_screenshot` 上用 `--session new`。后续用响应中的 `sessionId` 自动路由。会话绑定一个浏览器与传输，页面在首次使用时关联。同一页面只允许一个会话控制，会话之间共享 Cookie 和存储。
 
@@ -199,7 +199,7 @@ mearl session_manage --session '<sessionId>' --payload '{"operation":"end","keep
 
 结束会话默认关闭会话新建的标签页，复用的用户页面始终保留。用 `keepTabIds` 保留指定结果页，或用 `closeCreatedTabs:false` 保留全部标签页。未提供关闭标签页能力的 Provider 默认保留页面并释放会话。保留的页面默认保留 Mock 和模拟环境，传 `preserveEnvironment:false` 可清理会话页面的环境。活动会话存在时，浏览器级释放与关闭会被拒绝。
 
-`page_download` 先监听再点击，返回浏览器文件产物；CLI `--output` 或 SDK `saveArtifact(artifact, absolutePath, { session })` 以 256 KiB 分块导出到调用方。`page_upload.files` 接受调用方绝对路径 `{filePath}` 或浏览器 `{artifactId}`，`filePaths` 仍指浏览器宿主路径。单文件最多 256 MiB；保存到调用方的结果独立于临时产物。会话释放清理临时产物，`keepArtifactIds` 可保留指定产物；无会话产物空闲一小时回收，宿主退出清理暂存。
+`page_download` 先监听再点击，返回浏览器文件产物；CLI `--output` 或 SDK `saveArtifact(artifact, absolutePath, { session })` 以 256 KiB 分块导出到调用方。`page_upload.files` 接受调用方绝对路径 `{filePath}` 或浏览器 `{artifactId}`，`filePaths` 仍指浏览器宿主路径。单文件最多 256 MiB；保存到调用方的结果独立于临时产物。会话释放清理临时产物，普通会话可用 `keepArtifactIds` 保留指定产物。Provider 任务会话需要在结束前保存产物。无会话产物空闲一小时回收，宿主退出清理暂存。
 
 通过 Chrome 扩展连接时，`files` 支持 HTTP(S) 页面的文件输入框，分块传输合计最多 256 MiB，无需开启「允许访问文件网址」。`filePaths` 由 Chrome 直接读取宿主文件，适用于大文件或要求原生文件选择事件的站点，在扩展连接中需要开启该设置。直连 CDP 的上传无需此扩展设置。
 

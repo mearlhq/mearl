@@ -49,6 +49,7 @@ interface Dependencies {
   openRecording?: OpenRecording;
   supportsTabClose?: () => boolean;
   supportsUploadTransfer?: () => boolean;
+  finishTask?: (closeTabIds: number[]) => Promise<void>;
 }
 
 export class ControlSessionManager {
@@ -117,6 +118,7 @@ export class ControlSessionManager {
     operation: 'handoff' | 'resume' | 'release',
     reason?: string,
   ): Promise<ControlSessionInfo> {
+    if (!this.registry.find(id)) throw new Error('CONTROL_SESSION_NOT_FOUND');
     if (operation === 'release') {
       return this.endSession(id);
     }
@@ -157,13 +159,16 @@ export class ControlSessionManager {
     assertBrowserRequestDeadline(deadline);
     if (data.operation === 'new') {
       if (sessionId) throw new Error('session_manage new does not accept a session id');
+      if (data.providerOptions !== undefined)
+        throw new Error('providerOptions requires a browser with Provider task sessions');
       const session = this.registry.create(requestedTransport ?? this.dependencies.transport());
       this.dependencies.notify();
       return { session };
     }
     if (!sessionId || sessionId === 'new')
       throw new Error('Specify an existing sessionId or --session <id>');
-    const session = this.registry.info(sessionId);
+    const session = this.registry.find(sessionId);
+    if (!session) throw new Error('CONTROL_SESSION_NOT_FOUND');
     if (requestedTransport && session.transport !== requestedTransport)
       throw new Error('A session cannot change transport');
     if (data.operation === 'end') return { session: await this.endSession(sessionId, data) };
@@ -197,7 +202,8 @@ export class ControlSessionManager {
       await this.recordings?.discard(transport, { sessionId: id });
       await this.recordings?.discard(transport, { tabIds: tabs });
       await this.dependencies.cleanup(tabs, transport, params.preserveEnvironment !== false);
-      await this.closeTabs(close, transport, id);
+      if (this.dependencies.finishTask) await this.dependencies.finishTask(close);
+      else await this.closeTabs(close, transport, id);
       await this.artifacts.release(id, params.keepArtifactIds);
     });
     this.dependencies.notify();
@@ -229,7 +235,8 @@ export class ControlSessionManager {
         requestedTransport ?? this.dependencies.transport(),
       ).sessionId;
     }
-    const info = sessionId ? this.registry.info(sessionId) : undefined;
+    const info = sessionId ? this.registry.find(sessionId) : undefined;
+    if (sessionId && !info) throw new Error('CONTROL_SESSION_NOT_FOUND');
     const transport = info?.transport ?? requestedTransport ?? this.dependencies.transport();
     if (requestedTransport && transport !== requestedTransport)
       throw new Error('A session cannot change transport');
@@ -466,13 +473,14 @@ export class ControlSessionManager {
       this.dependencies.notify();
       throw error;
     }
-    if (sessionId && action === 'tab_list' && Array.isArray(result.tabs)) {
-      const blocked = new Set(this.registry.blockedTabs(sessionId));
-      result = {
-        ...result,
-        tabs: result.tabs.filter((tab: any) => !blocked.has(tab.tabId ?? tab.id)),
-      };
-      result.count = result.tabs.length;
+    if (action === 'tab_list' && Array.isArray(result.tabs)) {
+      const blocked = new Set(
+        sessionId ? this.registry.blockedTabs(sessionId) : this.registry.internalTabs(),
+      );
+      if (blocked.size) {
+        const tabs = result.tabs.filter((tab: any) => !blocked.has(tab.tabId ?? tab.id));
+        result = { ...result, tabs, count: tabs.length };
+      }
     }
     if (sessionId) {
       this.dependencies.notify();

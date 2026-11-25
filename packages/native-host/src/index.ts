@@ -14,6 +14,7 @@ import {
 import { listInstalledAppProfiles } from './app-profile-catalog.js';
 import { ControlSessionManager } from './control-session-manager.js';
 import { BrowserEnhancementGateway } from './browser-enhancement-gateway.js';
+import { ProviderTaskExtension } from './provider-task-extension.js';
 import { requestBrowserSocket } from './browser-socket-request.js';
 import { providerRequestTimeoutMs } from './provider-request-timeout.js';
 import { readProviderControlHost } from '@mearl/provider/host';
@@ -91,7 +92,11 @@ import type { HostBrowserProvider } from './builtin-providers/host-browser-provi
 import { assertBrowserRequestDeadline } from './control-session.js';
 import { CLOSED_OWN_MANAGED_HOST } from './managed-browser.js';
 import { BrowserProviderCoordinator } from './browser-provider-coordinator.js';
-import { listProviderControlSessions, updateProviderControlSession } from './browser-provider.js';
+import {
+  listProviderControlSessions,
+  openProviderTaskFromExtension,
+  updateProviderControlSession,
+} from './browser-provider.js';
 import {
   startAppAuthorization,
   waitAppAuthorization,
@@ -519,6 +524,8 @@ function getControlSessionManager(): ControlSessionManager {
     },
   }));
 }
+
+let taskExtension: ProviderTaskExtension | undefined;
 
 function log(...args: any[]): void {
   if (process.env.MEARL_DEBUG === '1') console.error('[NativeHost]', ...args);
@@ -1039,7 +1046,11 @@ async function handleExtensionControlMessage(
     const command = parseBrowserManageParams(params);
     let result;
     if (command.operation === 'launch' || command.operation === 'attach') {
-      result = await openBrowser(command);
+      result =
+        command.operation === 'launch' && command.provider && command.providerOptions
+          ? await openProviderTaskFromExtension(command.provider, command.providerOptions)
+          : undefined;
+      result ??= await openBrowser(command);
     } else if (typeof browser !== 'string' || !browser.trim()) {
       throw new Error('browser is required');
     } else if (command.operation === 'close') {
@@ -1244,6 +1255,16 @@ async function dispatchHostRequest(
   const { action, data = {} } = request;
   assertBrowserRequestDeadline(request.deadline);
   const controlSource = normalizeControlSource(request.controlSource);
+  if (action === '__provider_task_extension') {
+    return {
+      data: await (taskExtension ??= new ProviderTaskExtension(
+        extensionProvider,
+        getControlSessionManager().registry,
+      )).dispatch(request),
+    };
+  }
+  if (!managed)
+    void taskExtension?.prune().catch(error => log('Provider task cleanup failed:', error));
   if (action === '__provider_enhancement') {
     if (request.controlSessionId !== undefined)
       throw new Error('Enhancements do not accept Mearl control sessions');

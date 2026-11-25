@@ -22,6 +22,7 @@ export interface ProviderControlHostRecord extends DaemonRecord {
   protocolVersion: number;
   /** Missing on older hosts, which only support Mearl sessions. */
   controlSessionModes?: readonly BrowserControlSessionMode[];
+  taskSessionProtocolVersion?: number;
   enhancementProtocolVersion?: number;
   enhancementNavigationOriginVersion?: number;
   enhancementPreparationVersion?: number;
@@ -34,9 +35,10 @@ export function assertProviderControlSessionMode(
   host: Pick<ProviderControlHostRecord, 'controlSessionModes'> | null,
   mode: BrowserControlSessionMode = 'mearl',
 ): void {
-  if (mode === 'external' && (
-    !Array.isArray(host?.controlSessionModes) || !host.controlSessionModes.includes('external')
-  )) {
+  if (
+    mode === 'external' &&
+    (!Array.isArray(host?.controlSessionModes) || !host.controlSessionModes.includes('external'))
+  ) {
     throw new Error(
       'CONTROL_SESSION_MODE_UNSUPPORTED: the Provider requires external task control. Update Mearl and restart the Provider control host.',
     );

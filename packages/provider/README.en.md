@@ -8,6 +8,14 @@ or connects through a local Provider Socket.
 
 The action catalog directly reuses `@mearl/browser-core/browserActionProtocol`, without a separately generated copy.
 
+## Provider task sessions
+
+An external Provider can publish a connected browser with `details.taskSessionScope: "browser"` to support `session_manage new`. The control host passes `taskSession: { browserId }` with the session's Provider options to `launch`, using the browser ID published by the Provider. Publish the returned task with `details.taskSessionScope: "session"`, the selected browser ID in `details.taskSessionBrowserId`, a stable task instance ID, and a public reference for the task. Set `details.taskSessionCreated: true` when the call creates a task. The host keeps task handles out of browser selection and uses the original browser ID and the Mearl session ID for routing.
+
+The Provider manages page membership and native lifecycle operations. A ready `getEnhancementTarget` response with the physical DevTools target ID lets Mearl select a matching extension. Otherwise the session uses the Provider for page actions. When the native owner pauses an action, Providers can return `EXTERNAL_CONTROL_PAUSED` so the host marks the session as handed off. Hosts advertise this contract with `taskSessionProtocolVersion: 1`.
+
+A hybrid session reserves each matched extension tab once its physical page has been verified. The reservation lasts until the task ends, and the ordinary extension route can still operate other tabs. Popups opened by a page are listed when the Provider recognizes them and are treated as existing pages during session cleanup. Make `handoff` and `resume` idempotent so Mearl can retry extension cleanup after native control has changed.
+
 ## Core model
 
 Mearl manages control sessions by default. Providers receive target instances, pages, and ordinary actions, without handling session IDs, resource ownership, or human handoff state. Release with `--session` ends only Mearl task control; instance closure, detachment, and Cookie synchronization use Provider lifecycle methods. Upload and download require `page_upload` and `page_download`, respectively, in `capabilities.actions`.

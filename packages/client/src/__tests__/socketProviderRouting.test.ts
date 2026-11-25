@@ -367,6 +367,65 @@ describe('external provider routing', () => {
     },
   );
 
+  it('routes an existing session ID to its Provider even with a connected extension', async () => {
+    const session = {
+      sessionId: 's_aB3d_E-f',
+      browserId: 'provider:fixture:device-a',
+      transport: 'provider',
+    };
+    const requests: Array<{ socketPath: string; action: string; controlSessionId?: string }> = [];
+    createConnectionMock.mockImplementation((socketPath: string) => {
+      const socket = new EventEmitter() as MockSocket;
+      socket.end = vi.fn();
+      socket.write = vi.fn((line: string) => {
+        const request = JSON.parse(line);
+        const atProvider = socketPath === '/tmp/mearl-provider-control.sock';
+        requests.push({
+          socketPath,
+          action: request.action,
+          controlSessionId: request.controlSessionId,
+        });
+        const data =
+          request.action === '__control_session_resolve'
+            ? { session: atProvider ? session : null }
+            : { tabId: 1 };
+        queueMicrotask(() =>
+          socket.emit(
+            'data',
+            Buffer.from(JSON.stringify({ id: request.id, success: true, data }) + '\n'),
+          ),
+        );
+      });
+      queueMicrotask(() => socket.emit('connect'));
+      return socket;
+    });
+    vi.mocked(listLiveBrowsers).mockReturnValue([liveBrowsers[2]!, ...liveBrowsers.slice(0, 2)]);
+    try {
+      await expect(
+        invoke(
+          'page_eval',
+          { tabId: 1, expression: '1' },
+          { controlSessionId: session.sessionId, controlSource: 'remote' },
+        ),
+      ).resolves.toEqual({ tabId: 1 });
+    } finally {
+      vi.mocked(listLiveBrowsers).mockReturnValue(liveBrowsers);
+    }
+    expect(requests).toContainEqual(
+      expect.objectContaining({
+        socketPath: '/tmp/mearl-provider-control.sock',
+        action: '__control_session_resolve',
+      }),
+    );
+    expect(requests.filter(item => item.action === 'page_eval')).toEqual([
+      {
+        socketPath: '/tmp/mearl-provider-control.sock',
+        action: 'page_eval',
+        controlSessionId: session.sessionId,
+      },
+    ]);
+  });
+
   it('routes declared downloads and their artifacts without requiring upload support', async () => {
     const target = liveBrowsers[1]!;
     const capabilities = target.capabilities;

@@ -4,6 +4,7 @@ export * from './browserEnhancement.js';
 export * from './browserDiscovery.js';
 export * from './externalBrowserControl.js';
 export * from './providerAppResources.js';
+export * from './providerTask.js';
 export * from './eventFilters.js';
 export * from './requestSerializer.js';
 export * from './boundedRequestBuffer.js';

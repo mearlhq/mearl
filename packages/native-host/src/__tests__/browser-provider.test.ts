@@ -73,6 +73,7 @@ import {
   syncProviderBrowserCookies,
   findProviderBrowser,
   launchProviderBrowser,
+  openProviderTaskFromExtension,
   listExternalBrowserProviders,
   getProviderLaunchForm,
 } from '../browser-provider.js';
@@ -88,6 +89,41 @@ beforeEach(() => {
 });
 
 describe('external browser providers', () => {
+  it('opens a task session from the extension form when its Provider has a discovered browser', async () => {
+    const browser = {
+      browserId: 'provider:fixture:local',
+      providerBrowserId: 'local',
+      browserName: 'Fixture',
+      transport: 'provider',
+      status: 'connected',
+      socketPath: '/tmp/fixture.sock',
+      provider: { id: 'fixture', name: 'Fixture', protocolVersion: 3, builtin: false },
+      details: { taskSessionScope: 'browser' },
+      persistence: 'persistent',
+      operations: [],
+    };
+    mocks.browsers = [browser];
+    const session = { sessionId: 's_fixture0' };
+    mocks.request.mockResolvedValueOnce({ session } as any);
+    await expect(
+      openProviderTaskFromExtension('fixture', { name: 'Session' }),
+    ).resolves.toMatchObject({
+      browserId: browser.browserId,
+      session,
+    });
+    expect(mocks.request).toHaveBeenCalledWith(
+      '/tmp/provider-control.sock',
+      'session_manage',
+      { operation: 'new', providerOptions: { name: 'Session' } },
+      '1.0.0',
+      expect.any(Number),
+      undefined,
+      undefined,
+      { providerTarget: browser.browserId },
+    );
+    await expect(openProviderTaskFromExtension('unknown', {})).resolves.toBeUndefined();
+  });
+
   it('rejects lifecycle mutations for external control on an older host', async () => {
     const browser = {
       browserId: 'provider:fixture:space',

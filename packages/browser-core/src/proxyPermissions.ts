@@ -146,6 +146,9 @@ export const ACTIONS_SKIP_DOMAIN_CHECK = new Set([
   '__control_release',
   '__control_cleanup',
   '__control_deactivate',
+  '__provider_task_target',
+  // The task open preflight checks its destination in the handler.
+  '__provider_task_authorize_open',
   // The recording handler authorizes the recorded tab and its navigation history.
   '__page_record',
   '__page_record_status',

@@ -25,6 +25,7 @@ import { listRegisteredBrowsers, type BrowserRecord } from './browser-registry.j
 import { requestBrowserSocket } from './browser-socket-request.js';
 import { NATIVE_HOST_VERSION } from './version.js';
 import { providerRequestTimeoutMs } from './provider-request-timeout.js';
+import { mergeBrowserInventory } from './browser-inventory.js';
 
 export interface BrowserProviderSummary {
   provider: {
@@ -89,11 +90,35 @@ export async function launchProviderBrowser(input: {
   provider: string;
   providerOptions: JsonObject;
   host?: ProviderHostContextData;
+  taskSession?: { browserId: string };
+  deadline?: number;
 }): Promise<ProviderBrowser> {
   const providerId = input.provider.trim();
   const provider = listInstalledProviders().find(item => item.providerId === providerId);
   if (!provider) throw new Error(`Provider is not registered: ${providerId}`);
+  if (Object.hasOwn(input.providerOptions, 'taskSession'))
+    throw new Error('taskSession is reserved for the Provider control host');
   const live = await requireLiveProvider(providerId);
+  if (input.taskSession) {
+    const options = { ...input.providerOptions, taskSession: input.taskSession };
+    const result = (await requestBrowserSocket(
+      live.socketPath,
+      'browser_launch',
+      options,
+      NATIVE_HOST_VERSION,
+      providerRequestTimeoutMs('browser_launch', options, input.deadline),
+      undefined,
+      undefined,
+      { deadline: input.deadline },
+    )) as ProviderBrowser;
+    validateProviderBrowser(result);
+    if (
+      result.details?.taskSessionScope !== 'session' ||
+      result.details.taskSessionBrowserId !== input.taskSession.browserId
+    )
+      throw new Error('Provider did not return a session-owned target');
+    return { ...result, browserId: providerBrowserKey(providerId, result.browserId) };
+  }
   const result = (await (input.host
     ? requestBrowserSocket(
         live.socketPath,
@@ -164,6 +189,25 @@ function requestControlledProvider(
       { providerTarget: browser.browserId },
     );
   });
+}
+
+/** The extension's existing Provider form can open a task on a discovered instance. */
+export async function openProviderTaskFromExtension(providerId: string, options: JsonObject) {
+  const matches = listRegisteredBrowsers().filter(
+    browser =>
+      browser.provider?.id === providerId &&
+      browser.status === 'connected' &&
+      browser.details?.taskSessionScope === 'browser',
+  );
+  if (matches.length > 1)
+    throw new Error('Choose a browser instance before opening a Provider task');
+  const browser = matches[0];
+  if (!browser) return undefined;
+  const { session } = await requestControlledProvider(browser, 'session_manage', {
+    operation: 'new',
+    providerOptions: options,
+  });
+  return { ...mergeBrowserInventory([browser], []).browsers[0]!, session };
 }
 
 export async function listProviderControlSessions() {

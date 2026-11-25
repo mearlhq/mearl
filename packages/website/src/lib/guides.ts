@@ -37,7 +37,8 @@ const findProfiles = 'mearl set_app_profile --help';
 const profileCreatorInstall =
   'npx skills add https://github.com/mearlhq/mearl --skill mearl-profile-creator --global';
 const egoSetup = `npx @mearl/setup provider install @mearl/provider-ego
-mearl browser_manage --payload '{"operation":"launch","provider":"ego","providerOptions":{"name":"My task"}}'`;
+mearl browser_list
+mearl session_manage --browser '<browserId>' --payload '{"operation":"new","providerOptions":{"name":"My task"}}'`;
 const skillCreatorInstall =
   'npx skills add https://github.com/mearlhq/mearl --skill mearl-skill-creator --global';
 const registerReportPlugin = `npx @mearl/setup plugin ./skills/report-export
@@ -628,12 +629,12 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
   'ego-lite': {
     en: {
       title: 'Use Mearl with EgoLite',
-      lead: 'Use the independent Ego Provider for Spaces, page operations, human handoff, and device or App emulation through the native Ego channel. No browser extension is required.',
+      lead: 'Bind a Mearl task session to an Ego Space and use either the native page route or a matching Mearl extension.',
       sections: [
         {
           id: 'setup',
           title: 'Install the independent Provider',
-          text: 'Install @mearl/provider-ego 0.1.1+ with Mearl setup. Requires Node.js 22.23.4+, Mearl 3.0.7+ and ego-browser on PATH. Control uses the unified mearl command without an additional CLI or Skill. The package bundles the native page SDK; source builds use the published SDK pinned in the lockfile.',
+          text: 'Install the Ego Provider with Mearl setup. The session workflow requires Node.js 22.23.4+, support for Provider task sessions on both the Mearl host and the Provider, and an executable ego-browser. Start Ego Lite before listing browsers. With older versions, use browser_manage launch and the resulting browser ID for direct Space control.',
           command: egoSetup,
           links: [
             {
@@ -645,30 +646,29 @@ export const guideContent: Record<Topic, Record<Locale, TopicCopy>> = {
         {
           id: 'extension-agent',
           title: 'Keep the extension optional',
-          text: 'The Provider works without the extension. On macOS, its EgoLite declaration defaults extension Agent access off for that browser profile, while manual debugging panels remain available. Update both the extension and Native Host to versions supporting coordination, then register the Provider again to activate this behavior.',
+          text: 'Space lifecycle uses the native Ego route. Mearl prefers the extension for supported page actions when Agent service is enabled and the extension can match the native page. Otherwise it selects the Provider page route.',
           items: [
             'You can explicitly enable or disable Agent access in extension settings. This preference stays local to the browser profile and does not sync to other browsers.',
-            'Provider outages or removal do not automatically re-enable extension Agent access. Access stays closed until the policy handshake completes; an older Native Host must be updated.',
-            'Coordination uses change notifications without periodic polling. Ego ownership checks run only while host requests are pending; each native page operation still checks control. Other platforms do not automatically identify EgoLite.',
+            'The selected page route appears in session.task.pageTransport. A disconnected extension ends page dispatch on that route. Inspect the page state before reattaching.',
           ],
         },
         {
           id: 'identify',
           title: 'Use one Space per task',
-          text: 'Launch with providerOptions.name or attach an existing Agent Space with providerOptions.spaceId. Reuse the Provider browserId and tabId. Page mapping is handled by the Provider, without manual extension matching or Mearl --session.',
+          text: 'Create a session with providerOptions.name or attach an existing Agent Space with providerOptions.spaceId. Reuse the returned sessionId and tabId.',
         },
         {
           id: 'control',
           title: 'Keep control in Ego',
-          text: 'Use mearl session_manage with the full browserId for handoff, resume and end, without --session. Resume only after the user explicitly returns control. Ego blocks native page operations during takeover. The end operation keeps no Agent pages by default; keepTabIds accepts numeric IDs from tab_list. browser_manage detach only detaches the Provider and does not finish the Space or clear emulation.',
-          command: `mearl session_manage --browser '<browserId>' --payload '{"operation":"handoff"}'
-mearl session_manage --browser '<browserId>' --payload '{"operation":"resume"}'
-mearl session_manage --browser '<browserId>' --payload '{"operation":"end","keepTabIds":[1,2]}'`,
+          text: 'Use session_manage with the session ID for handoff, resume and end. Resume after the user explicitly returns control. The end operation closes session-created pages by default. Pass numeric tab IDs from tab_list in keepTabIds to retain results.',
+          command: `mearl session_manage --session '<sessionId>' --payload '{"operation":"handoff"}'
+mearl session_manage --session '<sessionId>' --payload '{"operation":"resume"}'
+mearl session_manage --session '<sessionId>' --payload '{"operation":"end","keepTabIds":[1,2]}'`,
         },
         {
           id: 'emulation',
           title: 'Device shells, WebViews and App services',
-          text: 'Configure device and App emulation independently through set_device_emulation and set_app_profile. Enable deviceShell to use a device shell and root WebView. The shared native page host supplies installed App protocol and authorization services; real authorization requires user approval, and takeover cancels pending authorization. Retained pages depend on the Provider connection for emulation and host services. Clear emulation before ending when ordinary pages are needed. Extension-specific request/log entry points are not provided.',
+          text: 'Configure device and App emulation independently through set_device_emulation and set_app_profile. Enable deviceShell to use a device shell and root WebView. The shared native page host supplies installed App protocol and authorization services; real authorization requires user approval, and takeover cancels pending authorization. Retained pages depend on their page route for emulation and host services. Use get_capabilities to check available operations.',
           links: [
             { label: 'Provider contracts', path: 'packages/provider/README.en.md', shared: true },
             { label: 'Device emulation and App Profiles', page: 'emulation' },
@@ -686,12 +686,12 @@ mearl session_manage --browser '<browserId>' --payload '{"operation":"end","keep
     },
     'zh-CN': {
       title: '与 EgoLite 协作',
-      lead: '独立 Ego Provider 通过 Ego 原生通道管理 Space、页面操作、人工交接及设备/App 模拟，无需浏览器扩展。',
+      lead: '将 Mearl 会话绑定到 Ego Space，并通过匹配到同一页面的扩展或 Ego 原生通道执行页面操作。',
       sections: [
         {
           id: 'setup',
           title: '安装独立 Provider',
-          text: '通过 Mearl setup 安装 @mearl/provider-ego 0.1.1+。需要 Node.js 22.23.4+、Mearl 3.0.7+，且 ego-browser 可执行。控制操作统一使用 mearl 命令，无需额外 CLI 或 Skill。安装包已内置原生页面 SDK；源码构建使用锁文件中固定的已发布 SDK。',
+          text: '通过 Mearl setup 安装 Ego Provider。会话流程需要 Node.js 22.23.4+、可执行的 ego-browser，以及均支持 Provider 任务会话的 Mearl 宿主和 Provider。启动 Ego Lite 后列出浏览器。旧版可用 browser_manage launch，并用返回的浏览器 ID 操作 Space。',
           command: egoSetup,
           links: [
             { label: 'Provider 源码与构建说明', url: 'https://github.com/mearlhq/provider-ego' },
@@ -699,31 +699,30 @@ mearl session_manage --browser '<browserId>' --payload '{"operation":"end","keep
         },
         {
           id: 'extension-agent',
-          title: '扩展按需安装，Agent 默认关闭',
-          text: 'Provider 无需扩展即可工作。在 macOS 上，其 EgoLite 声明会让该浏览器配置的扩展 Agent 接入默认关闭，人工调试面板仍可使用。需将扩展和 Native Host 都更新到支持协调协议的版本，再重新注册 Provider 后生效。',
+          title: '按需使用扩展',
+          text: 'Space 生命周期由 Ego 原生通道管理。扩展已启用 Agent 服务并能匹配同一物理页面时，Mearl 优先通过扩展执行受支持的页面操作。其他情况选择 Provider 页面通道。',
           items: [
             '可在扩展设置中明确开启或关闭 Agent 接入。偏好仅保存在当前浏览器配置中，不同步到其他浏览器。',
-            'Provider 离线或移除不会自动重新开启扩展 Agent。策略握手完成前保持关闭；旧版 Native Host 需要更新。',
-            '协调使用变更通知，不做定时轮询。Ego 控制权检查仅在有待完成的宿主请求时运行，每次原生页面操作仍校验控制权。其他平台暂不自动识别 EgoLite。',
+            'session.task.pageTransport 显示会话选定的页面通道。扩展断开后该通道停止派发操作，重新关联前先核对页面状态。',
           ],
         },
         {
           id: 'identify',
           title: '一个任务对应一个 Space',
-          text: '通过 providerOptions.name 创建任务，或用 providerOptions.spaceId 关联已有 Agent Space。复用 Provider 返回的 browserId 和 tabId；页面映射由 Provider 处理，无需手工匹配扩展标签页，不使用 Mearl --session。',
+          text: '通过 providerOptions.name 创建会话，或用 providerOptions.spaceId 关联已有 Agent Space。后续复用返回的 sessionId 和页面 tabId。',
         },
         {
           id: 'control',
           title: '由 Ego 统一控制权',
-          text: '使用 mearl session_manage 和完整 browserId 交接、恢复和完成任务，不传 --session，仅在用户明确交还后恢复。接管期间 Ego 阻断原生页面操作。end 默认不保留 Agent 页面；keepTabIds 使用 tab_list 返回的数字 ID 保留结果页。browser_manage detach 只解绑 Provider，不结束 Space，也不清除模拟。',
-          command: `mearl session_manage --browser '<browserId>' --payload '{"operation":"handoff"}'
-mearl session_manage --browser '<browserId>' --payload '{"operation":"resume"}'
-mearl session_manage --browser '<browserId>' --payload '{"operation":"end","keepTabIds":[1,2]}'`,
+          text: '通过 session_manage 和会话 ID 交接、恢复及结束任务。仅在用户明确交还后恢复。end 默认关闭本次会话新建的页面，用 keepTabIds 和 tab_list 返回的数字 ID 保留结果页。',
+          command: `mearl session_manage --session '<sessionId>' --payload '{"operation":"handoff"}'
+mearl session_manage --session '<sessionId>' --payload '{"operation":"resume"}'
+mearl session_manage --session '<sessionId>' --payload '{"operation":"end","keepTabIds":[1,2]}'`,
         },
         {
           id: 'emulation',
           title: '设备外壳、WebView 与 App 服务',
-          text: '通过 set_device_emulation 和 set_app_profile 分别配置设备模拟与 App Profile，启用 deviceShell 可使用设备外壳和根 WebView。共享原生页面宿主提供已安装 App 的协议和授权服务；真实授权仍需用户批准，接管会取消待授权会话。保留页面的模拟与宿主服务依赖 Provider 连接，需要普通页面时应在 finish 前清除模拟。不提供扩展专属请求/日志入口。',
+          text: '通过 set_device_emulation 和 set_app_profile 分别配置设备模拟与 App Profile，启用 deviceShell 可使用设备外壳和根 WebView。共享原生页面宿主提供已安装 App 的协议和授权服务；真实授权仍需用户批准，接管会取消待授权会话。保留页面的模拟和宿主服务依赖会话选定的页面通道，可用 get_capabilities 检查支持的操作。',
           links: [
             { label: 'Provider 接口', path: 'packages/provider/README.md', shared: true },
             { label: '设备模拟与 App Profile', page: 'emulation' },

@@ -183,6 +183,10 @@ export type BrowserDetails = Record<string, BrowserJsonValue> & {
   createdAt?: string;
   cdpPort?: number;
   copiedCookies?: { domains: string[]; count: number };
+  /** A discoverable browser can open native tasks; a session target belongs to one Mearl session. */
+  taskSessionScope?: 'browser' | 'session';
+  taskSessionCreated?: true;
+  taskSessionBrowserId?: string;
 };
 
 export interface BrowserReference extends BrowserProviderLocales<'label'> {
@@ -297,6 +301,7 @@ export interface ControlSessionInfo {
   generation: number;
   tabs: Array<{ tabId: number; source: 'created' | 'attached'; title?: string; url?: string }>;
   reason?: string;
+  task?: { reference?: BrowserReference; pageTransport: 'extension' | 'provider' };
 }
 
 export interface BrowserReleaseParams {
@@ -420,7 +425,7 @@ export type BrowserManageParams =
   | { operation: 'release' };
 
 export type SessionManageParams =
-  | { operation: 'new' }
+  | { operation: 'new'; providerOptions?: Record<string, BrowserJsonValue> }
   | { operation: 'handoff'; sessionId?: string; reason?: string }
   | { operation: 'resume'; sessionId?: string }
   | ({ operation: 'end'; sessionId?: string } & BrowserReleaseParams);

@@ -8,6 +8,14 @@ Provider 使用相同的 `BrowserProviderDefinition`；区别只在于运行时�
 
 action 清单直接复用 `@mearl/browser-core/browserActionProtocol` 的能力动作合同，不维护独立生成副本。
 
+## Provider 任务会话
+
+外部 Provider 可发布带 `details.taskSessionScope: "browser"` 的已连接浏览器，供 `session_manage new` 选择。控制宿主调用 `launch` 时传入任务参数和 `taskSession: { browserId }`，其中 `browserId` 是 Provider 发布的浏览器 ID。Provider 发布返回的任务，声明 `details.taskSessionScope: "session"`，在 `details.taskSessionBrowserId` 中回传所选的浏览器 ID，并提供稳定的任务实例 ID 与可公开的任务引用。任务由本次调用新建时，声明 `details.taskSessionCreated: true`。宿主按原浏览器 ID 和 Mearl 会话 ID 路由，任务句柄不出现在浏览器列表中。
+
+Provider 管理任务页面范围和原生生命周期。就绪的 `getEnhancementTarget` 返回同一物理页面的 DevTools target ID 时，Mearl 可选择匹配的扩展，其他情况使用 Provider 页面通道。原生控制权暂停时，Provider 可返回 `EXTERNAL_CONTROL_PAUSED`，宿主据此将会话标记为用户接管。支持此协议的宿主声明 `taskSessionProtocolVersion: 1`。
+
+混合会话从确认物理页面相同起保留扩展标签页归属，直到任务结束。普通扩展入口可继续操作其他标签页。Provider 能识别的页面弹窗会显示在列表中，收尾时按已有页面处理。`handoff` 和 `resume` 应支持重复调用，便于 Mearl 在原生控制权改变后重试扩展清理。
+
 ## 核心模型
 
 默认由 Mearl 管理控制会话。Provider 继续接收目标实例、页面与普通 action，无需处理控制会话 ID、资源归属或人工交接状态。带 `--session` 的释放只结束 Mearl 任务控制；实例关闭、退出接管与 Cookie 同步仍使用 Provider 的生命周期方法。上传与下载分别按 `capabilities.actions` 中的 `page_upload`、`page_download` 声明使用。

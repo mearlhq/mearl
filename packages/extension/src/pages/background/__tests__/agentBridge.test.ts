@@ -406,6 +406,84 @@ describe('AgentBridge native handshake', () => {
     expect(reply).toHaveBeenCalledWith({ id: 'cleanup', success: true, data: { released: true } });
   });
 
+  it('probes the task target and authorizes only the destination before a task tab opens', async () => {
+    bridge = new AgentBridge(new Map());
+    const internals = bridge as any;
+    const reply = vi.spyOn(internals, 'sendToAgent').mockImplementation(() => {});
+    vi.spyOn(internals, 'getActiveTabId').mockReturnValue(1);
+    chrome.debugger.getTargets = vi
+      .fn()
+      .mockResolvedValue([
+        { tabId: 7, id: 'physical', type: 'page', url: 'about:blank', attached: false, title: '' },
+      ]);
+    permissionMocks.isAgentDomainAuthorized.mockImplementation(
+      async domain => domain === 'allowed.example',
+    );
+    await internals.handleAgentMessage({
+      id: 'probe',
+      action: '__provider_task_target',
+      trustedInternal: true,
+      data: { targetId: 'physical' },
+    });
+    expect(reply).toHaveBeenLastCalledWith({ id: 'probe', success: true, data: { tabId: 7 } });
+    expect(permissionMocks.isAgentDomainAuthorized).not.toHaveBeenCalled();
+    await internals.handleAgentMessage({
+      id: 'open',
+      action: '__provider_task_authorize_open',
+      trustedInternal: true,
+      data: { url: 'https://allowed.example' },
+    });
+    expect(reply).toHaveBeenLastCalledWith({
+      id: 'open',
+      success: true,
+      data: { authorized: true },
+    });
+    expect(permissionMocks.isAgentDomainAuthorized).toHaveBeenCalledExactlyOnceWith(
+      'allowed.example',
+    );
+  });
+
+  it('authorizes a task page against its physical target and requested navigation destination', async () => {
+    bridge = new AgentBridge(new Map());
+    const internals = bridge as any;
+    const reply = vi.spyOn(internals, 'sendToAgent').mockImplementation(() => {});
+    const dispatch = vi.spyOn(internals, 'dispatchSingleAction');
+    vi.mocked(chrome.tabs.get).mockResolvedValue({ id: 7 } as chrome.tabs.Tab);
+    chrome.debugger.getTargets = vi
+      .fn()
+      .mockResolvedValue([
+        {
+          tabId: 7,
+          id: 'physical',
+          type: 'page',
+          url: 'https://allowed.example',
+          attached: false,
+          title: '',
+        },
+      ]);
+    permissionMocks.isAgentDomainAuthorized.mockImplementation(
+      async domain => domain === 'allowed.example',
+    );
+    await internals.handleAgentMessage({
+      id: 'navigate',
+      action: 'page_navigate',
+      trustedInternal: true,
+      data: { tabId: 7, __mearlExpectedTargetId: 'physical', url: 'https://denied.example' },
+    });
+    expect(reply).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        id: 'navigate',
+        success: false,
+        errorDetails: expect.objectContaining({ domain: 'denied.example' }),
+      }),
+    );
+    expect(permissionMocks.isAgentDomainAuthorized.mock.calls).toEqual([
+      ['allowed.example'],
+      ['denied.example'],
+    ]);
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
   it('requires a trusted host for preset synchronization even with agent service disabled', async () => {
     bridge = new AgentBridge(new Map());
     const internals = bridge as any;
