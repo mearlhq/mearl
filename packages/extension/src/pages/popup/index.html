@@ -45,12 +45,19 @@
       border-radius: 9999px;
       opacity: 0.35;
       content: '';
-      animation: popup-bootstrap-spin 0.8s linear infinite;
+      visibility: hidden;
+      animation: popup-bootstrap-spin 0.8s linear infinite, popup-bootstrap-reveal 0s 300ms forwards;
     }
 
     @keyframes popup-bootstrap-spin {
       to {
         transform: rotate(360deg);
+      }
+    }
+
+    @keyframes popup-bootstrap-reveal {
+      to {
+        visibility: visible;
       }
     }
   </style>
