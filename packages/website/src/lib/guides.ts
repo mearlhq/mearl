@@ -36,7 +36,7 @@ const emulate = `mearl set_device_emulation --payload '{"tabId":12345,"enabled":
 const findProfiles = 'mearl set_app_profile --help';
 const profileCreatorInstall =
   'npx skills add https://github.com/mearlhq/mearl --skill mearl-profile-creator --global';
-const egoSetup = `npx @mearl/setup@latest provider install @mearl/provider-ego
+const egoSetup = `npx @mearl/setup provider install @mearl/provider-ego
 mearl browser_manage --payload '{"operation":"launch","provider":"ego","providerOptions":{"name":"My task"}}'`;
 const skillCreatorInstall =
   'npx skills add https://github.com/mearlhq/mearl --skill mearl-skill-creator --global';

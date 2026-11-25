@@ -89,7 +89,7 @@ export async function readGuide(
     const installed = await readInstallationManagement();
     const command = setupManagementCommand(
       installed.setup ?? { package: '@mearl/setup', version: 'beta' },
-    );
+    ).replace(/@latest$/, '');
     if (hasSetup) {
       source = source.replaceAll('{{setup}}', command);
       if (id !== 'skills') {

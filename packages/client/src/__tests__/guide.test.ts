@@ -77,15 +77,13 @@ it.each(['\n', '\r\n'])(
     expect(guide).toContain('| `other-report` | `https://example.test/other/skills.git` |');
     expect(guide).toContain('| `managed-report` | Preset 管理 |');
     expect(guide).toContain(agentDocs);
-    expect(guide).toContain(
-      "npx @team/setup@latest plugin install '<source>' --skill <skill-name> --yes",
-    );
-    expect(guide).toContain('npx @team/setup@latest preset apply');
+    expect(guide).toContain("npx @team/setup plugin install '<source>' --skill <skill-name> --yes");
+    expect(guide).toContain('npx @team/setup preset apply');
     expect(guide).not.toContain('管理入口');
     expect(guide.indexOf('team-report')).toBeLessThan(guide.indexOf('## 通用 Skill'));
     vi.mocked(readFileSync).mockReturnValueOnce('{{setup}} update');
     const troubleshooting = await readGuide('troubleshooting');
-    expect(troubleshooting).toContain('管理入口：npx @team/setup@latest');
+    expect(troubleshooting).toContain('管理入口：npx @team/setup；沿用本机已选 preset。');
     expect(troubleshooting).not.toContain(agentDocs);
     vi.mocked(readInstallationManagement).mockResolvedValue({
       setup: undefined,
