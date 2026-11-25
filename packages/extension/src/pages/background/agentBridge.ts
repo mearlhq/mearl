@@ -277,6 +277,7 @@ export class AgentBridge {
       resolve(providerIds?: string[]): Promise<boolean>;
       changed(enabled: boolean): void;
     },
+    private readonly onNativeReady?: () => void,
   ) {
     this.devtoolsPorts = devtoolsPorts;
     this.devtoolsPagePorts = devtoolsPagePorts;
@@ -560,7 +561,15 @@ export class AgentBridge {
             typeof message.rpcVersion === 'number' ? message.rpcVersion : null;
           const resolveHandshake = this.resolveHandshake;
           void this.refreshAgentAccess(message.agentPolicy)
-            .then(resolveHandshake)
+            .then(() => {
+              resolveHandshake();
+              if (
+                this.nativePort === connection &&
+                this.nativeRpcVersion === EXTENSION_RPC_VERSION
+              ) {
+                this.onNativeReady?.();
+              }
+            })
             .catch(error => {
               console.warn('[AgentBridge] Agent policy negotiation failed:', error);
             });

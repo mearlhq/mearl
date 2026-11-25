@@ -16,6 +16,7 @@ import { initializeBrowserPureCapabilities } from './browserPureCapabilities';
 import { handleBrowserUiService, initializeBrowserUiOperations } from './browserUiService';
 import { handleExtensionServiceRequest } from './extensionServiceHandler';
 import { createToolboxInstallQueue } from './toolboxInstallQueue';
+import { initializeToolboxContextMenu } from './toolboxContextMenu';
 import { TOOLBOX_INSTALL_QUEUE_PORT } from '../../shared/toolboxInstallQueue';
 import {
   getAppProfileVariants,
@@ -349,6 +350,7 @@ function ensureNativeBridge(reset = false): AgentBridge {
             agentServiceEnabled = enabled;
           },
         },
+        () => toolboxContextMenu.refresh(),
       );
       console.log('[Background] Agent Bridge instance created');
     } catch (error) {
@@ -406,6 +408,10 @@ initializeBrowserControllers();
 // Chrome extension service workers require static imports for installation modules.
 const installationService = createInstallationService({
   native: createNativeInstallationClient(() => ensureNativeBridge(false)),
+});
+const toolboxContextMenu = initializeToolboxContextMenu(async () => {
+  await agentServiceReady;
+  return ensureNativeBridge(false).requestNativeHost('toolbox_tools_list');
 });
 initializePresetAutoUpdate(() => installationService.autoUpdate());
 chrome.runtime.onMessageExternal.addListener((message, sender, reply) => {
@@ -2093,11 +2099,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     void handleExtensionServiceRequest(message, sender, {
       extensionId: chrome.runtime.id,
       ready: agentServiceReady,
-      request: (action, data, timeoutMs) => {
+      request: async (action, data, timeoutMs) => {
+        if (action === 'toolbox_tools_list') return toolboxContextMenu.listTools();
         const agentBridgeRequired =
           action.startsWith('agent_chat_') || isCloudConnectorAction(action);
         const bridge = agentBridgeRequired ? ensureAgentBridge(false) : ensureNativeBridge(false);
-        return bridge.requestNativeHost(action, data, timeoutMs);
+        const result = await bridge.requestNativeHost(action, data, timeoutMs);
+        if (
+          action === 'toolbox_plugin_uninstall' ||
+          action === 'agent_skills_install' ||
+          action === 'agent_skills_update' ||
+          action === 'agent_skills_uninstall'
+        ) {
+          toolboxContextMenu.refresh();
+        }
+        return result;
       },
     }).then(sendResponse);
     return true;
@@ -2810,18 +2826,15 @@ async function injectConfigToSessionStorage(tabId: number) {
   });
 }
 
-const connectToolboxInstallQueue = createToolboxInstallQueue(
-  async options => {
-    await agentServiceReady;
-    const action = 'agent_skills_install';
-    return ensureNativeBridge(false).requestNativeHost(
-      action,
-      options,
-      getExtensionServiceTimeout(action),
-    );
-  },
-  () => ensureNativeBridge(false).requestNativeHost('toolbox_tools_list'),
-);
+const connectToolboxInstallQueue = createToolboxInstallQueue(async options => {
+  await agentServiceReady;
+  const action = 'agent_skills_install';
+  return ensureNativeBridge(false).requestNativeHost(
+    action,
+    options,
+    getExtensionServiceTimeout(action),
+  );
+}, toolboxContextMenu.listTools);
 
 chrome.runtime.onConnect.addListener(port => {
   if (port.name === TOOLBOX_INSTALL_QUEUE_PORT) {

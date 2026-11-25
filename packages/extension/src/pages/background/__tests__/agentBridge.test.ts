@@ -211,7 +211,8 @@ describe('AgentBridge native handshake', () => {
   it('tries the alternate host immediately without reporting a missing candidate as an error', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     const info = vi.spyOn(console, 'info').mockImplementation(() => {});
-    bridge = new AgentBridge(new Map());
+    const ready = vi.fn();
+    bridge = new AgentBridge(new Map(), new Map(), () => true, undefined, undefined, ready);
 
     bridge.start();
 
@@ -223,6 +224,7 @@ describe('AgentBridge native handshake', () => {
 
     await vi.waitFor(() => expect(chrome.runtime.connectNative).toHaveBeenCalledTimes(2));
     expect(chrome.runtime.connectNative).toHaveBeenNthCalledWith(2, 'ai.mearl.mcp');
+    expect(ready).not.toHaveBeenCalled();
     expect(error).not.toHaveBeenCalled();
     expect(info).toHaveBeenCalledWith('[AgentBridge] Trying alternate Native Messaging host');
 
@@ -233,6 +235,7 @@ describe('AgentBridge native handshake', () => {
       rpcVersion: EXTENSION_RPC_VERSION,
     });
     expect(bridge.getStatus().connected).toBe(true);
+    await vi.waitFor(() => expect(ready).toHaveBeenCalledOnce());
   });
 
   it('sends Skill installation requests while browser actions from agents are disabled', async () => {
@@ -449,18 +452,16 @@ describe('AgentBridge native handshake', () => {
     const reply = vi.spyOn(internals, 'sendToAgent').mockImplementation(() => {});
     const dispatch = vi.spyOn(internals, 'dispatchSingleAction');
     vi.mocked(chrome.tabs.get).mockResolvedValue({ id: 7 } as chrome.tabs.Tab);
-    chrome.debugger.getTargets = vi
-      .fn()
-      .mockResolvedValue([
-        {
-          tabId: 7,
-          id: 'physical',
-          type: 'page',
-          url: 'https://allowed.example',
-          attached: false,
-          title: '',
-        },
-      ]);
+    chrome.debugger.getTargets = vi.fn().mockResolvedValue([
+      {
+        tabId: 7,
+        id: 'physical',
+        type: 'page',
+        url: 'https://allowed.example',
+        attached: false,
+        title: '',
+      },
+    ]);
     permissionMocks.isAgentDomainAuthorized.mockImplementation(
       async domain => domain === 'allowed.example',
     );

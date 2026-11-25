@@ -1,8 +1,18 @@
 import { openExtensionTab } from './extensionTab';
 
+const PLUGIN_TOOL_ID_PREFIX = 'plugin:';
+const PLUGIN_NAME = /^[a-z][a-z0-9_-]*$/;
+
+export function toolboxToolIdFromHash(hash: string): string | null {
+  const plugin = hash.slice(1);
+  return PLUGIN_NAME.test(plugin) ? `${PLUGIN_TOOL_ID_PREFIX}${plugin}` : null;
+}
+
 function toolboxPluginName(toolId: string): string {
-  const plugin = toolId.startsWith('plugin:') ? toolId.slice('plugin:'.length) : '';
-  if (!/^[a-z][a-z0-9-]*$/.test(plugin)) throw new Error('Invalid plugin tool id');
+  const plugin = toolId.startsWith(PLUGIN_TOOL_ID_PREFIX)
+    ? toolId.slice(PLUGIN_TOOL_ID_PREFIX.length)
+    : '';
+  if (!PLUGIN_NAME.test(plugin)) throw new Error('Invalid plugin tool id');
   return plugin;
 }
 

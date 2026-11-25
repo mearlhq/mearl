@@ -9,15 +9,19 @@ interface LocalizableToolboxMetadata {
 
 function localizedMetadata(
   locales: Record<string, ToolboxPluginToolLocale>,
+  uiLanguage: string,
 ): ToolboxPluginToolLocale | undefined {
-  const locale = getCurrentLanguage().replaceAll('-', '_');
+  const locale = uiLanguage.replaceAll('-', '_');
   const language = locale.split('_')[0];
   return locales[locale] ?? locales[locale.toLowerCase()] ?? locales[language];
 }
 
-export function localizeToolboxMetadata<T extends LocalizableToolboxMetadata>(metadata: T): T {
+export function localizeToolboxMetadata<T extends LocalizableToolboxMetadata>(
+  metadata: T,
+  uiLanguage = getCurrentLanguage(),
+): T {
   if (!metadata.locales) return metadata;
-  const localized = localizedMetadata(metadata.locales);
+  const localized = localizedMetadata(metadata.locales, uiLanguage);
   if (!localized) return metadata;
   return {
     ...metadata,

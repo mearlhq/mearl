@@ -37,6 +37,7 @@ describe('ToolHost', () => {
   });
 
   it('opens the localized registered sandbox page and updates the tab title', async () => {
+    window.history.replaceState({}, '', '#work_notes');
     mocks.requestToolbox.mockResolvedValue({
       title: 'Workspace Notes',
       locales: { zh_CN: { title: '工作区笔记' } },
@@ -48,7 +49,7 @@ describe('ToolHost', () => {
     expect(await screen.findByTitle('工作区笔记')).toBeInTheDocument();
     await waitFor(() => expect(document.title).toBe('工作区笔记 - Mearl'));
     expect(mocks.requestToolbox).toHaveBeenCalledWith('toolbox_tool_open', {
-      id: 'plugin:notebook',
+      id: 'plugin:work_notes',
     });
   });
 

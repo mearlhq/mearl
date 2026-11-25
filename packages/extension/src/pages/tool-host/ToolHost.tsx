@@ -6,13 +6,13 @@ import { requestToolbox } from '../popup/toolboxRequest';
 import { setExtensionPageTitle } from '../../shared/pageTitle';
 import type { ToolboxToolOpenResult } from '@mearl/browser-core';
 import { localizeToolboxMetadata } from '../../shared/toolboxLocale';
+import { toolboxToolIdFromHash } from '../../shared/toolboxTab';
 import { SandboxToolPage } from './SandboxToolPage';
 
 const LOADING_INDICATOR_DELAY_MS = 300;
 
 export function ToolHost() {
-  const plugin = window.location.hash.slice(1);
-  const toolId = /^[a-z][a-z0-9-]*$/.test(plugin) ? `plugin:${plugin}` : null;
+  const toolId = toolboxToolIdFromHash(window.location.hash);
   const [tool, setTool] = useState<ToolboxToolOpenResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showLoading, setShowLoading] = useState(false);
