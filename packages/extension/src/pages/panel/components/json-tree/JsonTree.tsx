@@ -35,6 +35,7 @@ import { AddItemForm } from './AddItemForm';
 import {
   formatJson,
   getStringFormatTooltipText,
+  type ParseResult,
   StringFormat,
   tryParseJsonString,
   serializeWithFormat,
@@ -84,6 +85,7 @@ const JsonTreeInteractionContext = createContext<JsonTreeInteractionController |
 
 interface JsonTreeProps {
   data: any;
+  parsedInput?: ParseResult;
   name?: string;
   depth?: number;
   path?: string[];
@@ -178,6 +180,7 @@ export const JsonTree: FC<JsonTreeProps> = props => {
 
 const JsonTreeNode: FC<JsonTreeProps> = ({
   data,
+  parsedInput,
   name,
   depth = 0,
   path = [],
@@ -220,7 +223,7 @@ const JsonTreeNode: FC<JsonTreeProps> = ({
     parsed: parsedData,
     format,
     prefix,
-  } = useMemo(() => tryParseJsonString(data, depth), [data, depth]);
+  } = useMemo(() => parsedInput ?? tryParseJsonString(data, depth), [parsedInput, data, depth]);
 
   // 顶层解析完成后通知外部
   useEffect(() => {

@@ -10,8 +10,7 @@ import { useCallback, useRef } from 'react';
  * - `redo(current)`：传入当前状态，弹出 redo 栈顶并通过 `onRestore` 应用；
  *   当前状态会被推回 undo 栈。
  *
- * 仅由用户主动操作（例如粘贴、编辑 JSON 字段）触发 `pushSnapshot`，
- * 内部自动流程（初始化加载、撤销/重做恢复本身）不应压栈。
+ * 记录用户可以撤销的输入变化，例如粘贴、编辑字段和打开工具时的自动粘贴。
  */
 interface UseUndoHistoryOptions<T> {
   maxSize?: number;

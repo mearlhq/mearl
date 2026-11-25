@@ -7,7 +7,7 @@ export { parseQueryString };
  * 支持的格式：JSON、URL 编码 JSON、带前缀 JSON、Query String、FPT、URL
  */
 
-import { stripQueryPrefix } from '../../../shared/dataPreprocessor';
+import { stripQueryPrefix, tryParseJSON } from '../../../shared/dataPreprocessor';
 import { t } from './i18n';
 
 // ====================== 类型定义 ======================
@@ -31,10 +31,7 @@ export interface StringFormat {
 }
 
 export type StringFormatTooltipKey =
-  | 'parsedFromString'
-  | 'parsedFromQuery'
-  | 'parsedFromFpt'
-  | 'parsedFromUrl';
+  'parsedFromString' | 'parsedFromQuery' | 'parsedFromFpt' | 'parsedFromUrl';
 
 export const getStringFormatTooltipText = (key: StringFormatTooltipKey): string => {
   switch (key) {
@@ -230,20 +227,22 @@ const encodedJsonFormat: StringFormat = {
 const jsonFormat: StringFormat = {
   id: 'json',
   badge: { text: 'String', variant: 'amber', tooltipKey: 'parsedFromString' },
-  detect: str => {
-    if (!((str.startsWith('{') && str.endsWith('}')) || (str.startsWith('[') && str.endsWith(']'))))
-      return false;
-    try {
-      const parsed = JSON.parse(str);
-      return typeof parsed === 'object' && parsed !== null;
-    } catch {
-      return false;
-    }
-  },
+  detect: str => parseJsonContainer(str) !== undefined,
   parse: str => JSON.parse(str),
   serialize: obj => JSON.stringify(obj),
   priority: 20,
 };
+
+export function parseJsonContainer(text: string): ParseResult | undefined {
+  if (!(
+    (text.startsWith('{') && text.endsWith('}')) ||
+    (text.startsWith('[') && text.endsWith(']'))
+  )) {
+    return undefined;
+  }
+  const parsed = tryParseJSON(text);
+  return parsed === text ? undefined : { parsed, format: jsonFormat };
+}
 
 const prefixedJsonFormat: StringFormat = {
   id: 'prefixedJson',

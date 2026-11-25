@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { preprocessData } from '../../../shared/dataPreprocessor';
 import { tryParseJsonString } from '../../panel/utils/helpers';
 import { t } from '../../panel/utils/i18n';
+import { parseJsonContainer, type ParseResult } from '../../panel/utils/stringFormats';
 import packageJson from '../../../../package.json';
 
 const createWelcomeJson = () =>
@@ -56,12 +57,14 @@ const canParse = (text: string): boolean => {
 };
 
 export interface JsonInputSnapshot {
+  /** The transferred or active-tab input before any automatic paste. */
   inputText?: string;
+  clipboard?: { text: string; parsed: ParseResult };
   isStandalonePage: boolean;
   expandedPaths?: Record<string, boolean>;
 }
 
-/** Resolve one input source before rendering; transferred data takes precedence over the active tab. */
+/** Resolve the default input and any clipboard override before rendering. */
 export async function loadJsonInput(): Promise<JsonInputSnapshot> {
   const [stored, tabs] = await Promise.all([
     new Promise<Record<string, any>>(resolve => {
@@ -78,22 +81,40 @@ export async function loadJsonInput(): Promise<JsonInputSnapshot> {
     void chrome.storage.local.remove(['jsonFormatterData', 'jsonFormatterExpandedPaths']);
     return snapshot;
   }
+  const snapshot: JsonInputSnapshot = { isStandalonePage: false };
   const url = tabs[0]?.url;
   if (url) {
-    const inputText = normalizeForDisplay(unwrapJsonString(url));
-    if (canParse(inputText)) return { inputText, isStandalonePage: false };
+    const inputText = normalizeForDisplay(url);
+    if (canParse(inputText)) snapshot.inputText = inputText;
   }
   try {
-    const text = (await navigator.clipboard.readText())?.trim();
-    if (text) {
-      const inputText = normalizeForDisplay(unwrapJsonString(text));
-      if (canParse(inputText)) return { inputText, isStandalonePage: false };
+    const clipboard = navigator.clipboard;
+    if (!clipboard) return snapshot;
+    // Chrome can finish loading a toolbar popup before giving it focus.
+    if (!document.hasFocus()) {
+      await new Promise<void>(resolve => {
+        const finish = () => {
+          clearTimeout(timeout);
+          window.removeEventListener('focus', finish);
+          resolve();
+        };
+        const timeout = setTimeout(finish, 150);
+        window.addEventListener('focus', finish, { once: true });
+      });
     }
+    const text = (await clipboard.readText()).trim();
+    const parsed = parseJsonContainer(text);
+    if (parsed) snapshot.clipboard = { text, parsed };
   } catch {
-    /* The welcome input is available when clipboard access is denied. */
+    /* Clipboard access can fail when the document is unfocused. */
   }
-  return { isStandalonePage: false };
+  return snapshot;
 }
+
+const resolveDefaultInput = (snapshot?: JsonInputSnapshot) => ({
+  ...snapshot,
+  inputText: snapshot?.inputText ?? createWelcomeJson(),
+});
 
 interface UseJsonInputOptions {
   enableAutoLoad?: boolean;
@@ -104,16 +125,13 @@ interface UseJsonInputOptions {
 export const useJsonInput = (options: UseJsonInputOptions = {}) => {
   const { enableAutoLoad = true, initialInput, onExpandedPathsRestore } = options;
 
-  const [inputText, setInputText] = useState<string>(
-    () => initialInput?.inputText ?? createWelcomeJson(),
-  );
+  const [initialSources, setInitialSources] = useState(() => resolveDefaultInput(initialInput));
+  const [editedInput, setInputText] = useState<string>();
   const [parseError, setParseError] = useState<string>('');
-  const [isStandalonePage, setIsStandalonePage] = useState<boolean>(
-    initialInput?.isStandalonePage ?? false,
-  );
-  const [isInitialized, setIsInitialized] = useState<boolean>(initialInput !== undefined);
   const loadRef = useRef<Promise<JsonInputSnapshot> | null>(null);
   const loadedRef = useRef(initialInput !== undefined);
+  const { clipboard, inputText: defaultInput, isStandalonePage } = initialSources;
+  const inputText = editedInput ?? clipboard?.text ?? defaultInput;
 
   const processInputText = (text: string) => {
     if (!text?.trim()) return;
@@ -135,10 +153,8 @@ export const useJsonInput = (options: UseJsonInputOptions = {}) => {
     void loadRef.current.then(snapshot => {
       if (disposed) return;
       loadedRef.current = true;
-      setInputText(snapshot.inputText ?? createWelcomeJson());
-      setIsStandalonePage(snapshot.isStandalonePage);
+      setInitialSources(resolveDefaultInput(snapshot));
       if (snapshot.expandedPaths) onExpandedPathsRestore?.(snapshot.expandedPaths);
-      setIsInitialized(true);
     });
     return () => {
       disposed = true;
@@ -150,8 +166,10 @@ export const useJsonInput = (options: UseJsonInputOptions = {}) => {
     setInputText,
     parseError,
     setParseError,
-    isStandalonePage,
-    isInitialized,
+    isStandalonePage: isStandalonePage ?? false,
+    isInitialized: isStandalonePage !== undefined,
+    autoPasteUndoInput: clipboard && editedInput === undefined ? defaultInput : undefined,
+    parsedClipboardInput: clipboard?.text === inputText ? clipboard.parsed : undefined,
     processInputText,
   };
 };

@@ -1,5 +1,15 @@
 import { useExtensionConfig } from '../panel/hooks/useExtensionConfig';
-import { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense, FC } from 'react';
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useMemo,
+  useCallback,
+  lazy,
+  Suspense,
+  FC,
+} from 'react';
 import {
   ArrowLeft,
   Bot,
@@ -234,33 +244,31 @@ export const Popup: FC<PopupProps> = ({ isSidePanel = false, bootstrapConfig, bo
     showSearch: boolean;
   }>({ isUrlFormat: false, urlForQRCode: '', showSearch: false });
 
-  const [topLevelParsed, setTopLevelParsed] = useState<{
-    parsed: any;
-    format?: import('../panel/utils/helpers').StringFormat;
-    prefix?: string;
-  } | null>(() =>
-    bootstrapInput?.inputText ? tryParseJsonString(bootstrapInput.inputText) : null,
-  );
-  const parsedData = topLevelParsed?.parsed ?? null;
-  const inputFormat = topLevelParsed?.format;
-  const inputPrefix = topLevelParsed?.prefix;
-
   const {
     inputText,
     setInputText,
     parseError,
     isStandalonePage,
     isInitialized: isInputInitialized,
+    autoPasteUndoInput,
+    parsedClipboardInput,
     processInputText,
   } = useJsonInput({
     enableAutoLoad: activeView === 'formatter',
     initialInput: bootstrapInput,
     onExpandedPathsRestore: setExpandedPaths,
   });
+  const topLevelParsed = useMemo(() => {
+    if (!isInputInitialized || !inputText) return undefined;
+    return parsedClipboardInput ?? tryParseJsonString(inputText);
+  }, [inputText, isInputInitialized, parsedClipboardInput]);
+  const parsedData = topLevelParsed?.parsed ?? null;
+  const inputFormat = topLevelParsed?.format;
+  const inputPrefix = topLevelParsed?.prefix;
   const isStandaloneRoute = new URLSearchParams(window.location.search).get('standalone') === '1';
   const chatAvailable = agentEnabled && !isSidePanel && !isStandalonePage && !isStandaloneRoute;
 
-  // 撤销/重做历史：仅记录用户主动动作（粘贴/编辑）前的 inputText + expandedPaths 快照
+  // 撤销和重做同时恢复输入文本和展开状态。
   const { pushSnapshot, undo, redo } = useUndoHistory<{
     inputText: string;
     expandedPaths: Record<string, boolean>;
@@ -278,6 +286,13 @@ export const Popup: FC<PopupProps> = ({ isSidePanel = false, bootstrapConfig, bo
   const recordSnapshot = () => {
     pushSnapshot({ ...snapshotRef.current });
   };
+
+  const autoPasteRecorded = useRef(false);
+  useLayoutEffect(() => {
+    if (autoPasteUndoInput === undefined || autoPasteRecorded.current) return;
+    autoPasteRecorded.current = true;
+    pushSnapshot({ inputText: autoPasteUndoInput, expandedPaths: {} });
+  }, [autoPasteUndoInput, pushSnapshot]);
 
   useEffect(() => {
     if (!configLoaded || loadedLanguageRef.current === config.language) return;
@@ -1028,7 +1043,7 @@ export const Popup: FC<PopupProps> = ({ isSidePanel = false, bootstrapConfig, bo
             {isInputInitialized && inputText ? (
               <JsonTree
                 data={inputText}
-                onParsed={setTopLevelParsed}
+                parsedInput={topLevelParsed}
                 searchQuery={searchQuery}
                 currentMatchIndex={currentMatchIndex}
                 matchNavigationVersion={matchNavigationVersion}

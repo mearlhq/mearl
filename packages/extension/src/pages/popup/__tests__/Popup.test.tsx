@@ -27,6 +27,7 @@ const configMocks = vi.hoisted(() => ({
   getConfig: vi.fn(),
 }));
 const jsonInputMocks = vi.hoisted(() => ({
+  useActual: false,
   inputText: '',
   isInitialized: true,
   processInputText: vi.fn(),
@@ -34,8 +35,6 @@ const jsonInputMocks = vi.hoisted(() => ({
 }));
 const undoMocks = vi.hoisted(() => ({
   pushSnapshot: vi.fn(),
-  undo: vi.fn(),
-  redo: vi.fn(),
 }));
 const clipboardMocks = vi.hoisted(() => ({
   readClipboardContent: vi.fn(),
@@ -66,24 +65,40 @@ vi.mock('../../panel/utils/i18n', () => ({
   t: (key: string) => key,
 }));
 
-vi.mock('../hooks/useJsonInput', () => ({
-  useJsonInput: () => ({
-    inputText: jsonInputMocks.inputText,
-    setInputText: jsonInputMocks.setInputText,
-    parseError: null,
-    isStandalonePage: false,
-    isInitialized: jsonInputMocks.isInitialized,
-    processInputText: jsonInputMocks.processInputText,
-  }),
-}));
+vi.mock('../hooks/useJsonInput', async importOriginal => {
+  const actual = await importOriginal<typeof import('../hooks/useJsonInput')>();
+  return {
+    useJsonInput: (options: Parameters<typeof actual.useJsonInput>[0]) =>
+      jsonInputMocks.useActual
+        ? actual.useJsonInput(options)
+        : {
+            inputText: jsonInputMocks.inputText,
+            setInputText: jsonInputMocks.setInputText,
+            parseError: null,
+            isStandalonePage: false,
+            isInitialized: jsonInputMocks.isInitialized,
+            processInputText: jsonInputMocks.processInputText,
+          },
+  };
+});
 
-vi.mock('../hooks/useUndoHistory', () => ({
-  useUndoHistory: () => ({
-    pushSnapshot: undoMocks.pushSnapshot,
-    undo: undoMocks.undo,
-    redo: undoMocks.redo,
-  }),
-}));
+vi.mock('../hooks/useUndoHistory', async importOriginal => {
+  const actual = await importOriginal<typeof import('../hooks/useUndoHistory')>();
+  const { useCallback } = await import('react');
+  return {
+    useUndoHistory: (options: Parameters<typeof actual.useUndoHistory>[0]) => {
+      const history = actual.useUndoHistory(options);
+      const pushSnapshot = useCallback(
+        (snapshot: unknown) => {
+          undoMocks.pushSnapshot(snapshot);
+          history.pushSnapshot(snapshot);
+        },
+        [history.pushSnapshot],
+      );
+      return { ...history, pushSnapshot };
+    },
+  };
+});
 
 vi.mock('../../panel/utils/clipboard', () => ({
   copySvgImageToClipboard: vi.fn(),
@@ -124,19 +139,13 @@ vi.mock('../../panel/hooks/useCloudConnectorStatus', () => ({
 }));
 
 vi.mock('../../panel/components/json-tree/JsonTree', async () => {
-  const { createElement, useEffect } = await vi.importActual<typeof import('react')>('react');
+  const { createElement } = await vi.importActual<typeof import('react')>('react');
   return {
-    JsonTree: ({ data, onParsed, onInteractionChange }: any) => {
-      useEffect(() => {
-        onParsed?.({
-          parsed: { protocol: 'https:', host: 'example.com', pathname: '/' },
-          format: { id: 'url', serialize: () => data },
-        });
-      }, [data, onParsed]);
-
+    JsonTree: ({ data, onInteractionChange }: any) => {
       return createElement(
         'div',
         null,
+        createElement('output', { 'data-testid': 'formatter-input' }, data),
         createElement(
           'button',
           { onClick: () => onInteractionChange?.({ type: 'add', path: [] }) },
@@ -273,6 +282,7 @@ vi.mock('../../options/components/RulesEditor', () => ({
 describe('Popup Agent side panel shortcut', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    jsonInputMocks.useActual = false;
     jsonInputMocks.inputText = '';
     jsonInputMocks.isInitialized = true;
     configMocks.getConfig.mockReset().mockResolvedValue({
@@ -318,6 +328,32 @@ describe('Popup Agent side panel shortcut', () => {
 
     expect(screen.getByTestId('formatter-tools')).toHaveClass('opacity-0');
     expect(screen.getByTestId('formatter-tools')).not.toHaveClass('opacity-100');
+  });
+
+  it('restores the active page URL once on undo and redoes the clipboard JSON', () => {
+    jsonInputMocks.useActual = true;
+    const inputText = 'https://example.com/current?a=1';
+    const text = '{"copied":true}';
+    render(
+      <Popup
+        bootstrapConfig={bootstrapConfig}
+        bootstrapInput={{
+          inputText,
+          clipboard: { text, parsed: { parsed: { copied: true } } },
+          isStandalonePage: false,
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('formatter-input')).toHaveTextContent(text);
+    fireEvent.keyDown(document, { key: 'z', ctrlKey: true });
+    expect(screen.getByTestId('formatter-input')).toHaveTextContent(inputText);
+    fireEvent.keyDown(document, { key: 'z', ctrlKey: true });
+    expect(screen.getByTestId('formatter-input')).toHaveTextContent(inputText);
+    expect(undoMocks.pushSnapshot).toHaveBeenCalledOnce();
+
+    fireEvent.keyDown(document, { key: 'Z', ctrlKey: true, shiftKey: true });
+    expect(screen.getByTestId('formatter-input')).toHaveTextContent(text);
   });
 
   it('uses a fixed viewport for the Chrome popup to avoid resize feedback', () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   isFptString,
   parseFptString,
@@ -6,12 +6,31 @@ import {
   parseQueryString,
   serializeToQueryString,
   detectFormat,
+  parseJsonContainer,
   tryParseJsonString,
   serializeWithFormat,
   formatRegistry,
 } from '../stringFormats';
 
 describe('stringFormats.ts', () => {
+  it('skips parsing non-JSON shapes and parses a candidate once', () => {
+    const parse = vi.spyOn(JSON, 'parse');
+    try {
+      const ordinaryText = 'https://example.com/?payload={"value":1}';
+      const truncated = '{"value":1';
+      expect(parseJsonContainer(ordinaryText)).toBeUndefined();
+      expect(parseJsonContainer(truncated)).toBeUndefined();
+      expect(parse).not.toHaveBeenCalledWith(ordinaryText);
+      expect(parse).not.toHaveBeenCalledWith(truncated);
+
+      const candidate = '{"value":1}';
+      expect(parseJsonContainer(candidate)?.parsed).toEqual({ value: 1 });
+      expect(parse.mock.calls.filter(([text]) => text === candidate)).toHaveLength(1);
+    } finally {
+      parse.mockRestore();
+    }
+  });
+
   // ==================== FPT ====================
   describe('isFptString', () => {
     it('应该识别标准 FPT 格式', () => {
