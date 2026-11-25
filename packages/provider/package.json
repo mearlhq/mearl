@@ -1,6 +1,6 @@
 {
   "name": "@mearl/provider",
-  "version": "3.1.8",
+  "version": "3.2.0",
   "description": "Unified contracts and runtime utilities for built-in and external Mearl browser providers",
   "type": "module",
   "main": "dist/index.js",
