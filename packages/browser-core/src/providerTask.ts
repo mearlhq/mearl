@@ -1,6 +1,12 @@
-import type { BrowserDetails } from './browserActionProtocol.js';
+import type { BrowserDetails, BrowserProviderObjectSchema } from './browserActionProtocol.js';
 
 export const PROVIDER_TASK_SESSION_VERSION = 1;
+
+/** The host injects this reserved launch parameter when creating a Provider task. */
+export function declaresProviderTaskSessions(schema: BrowserProviderObjectSchema): boolean {
+  const field = schema.properties.taskSession;
+  return field?.type === 'object' && field.formHidden === true;
+}
 
 /** Operations whose page inputs and outputs can be kept on the same execution route. */
 export const PROVIDER_TASK_EXTENSION_ACTIONS = [

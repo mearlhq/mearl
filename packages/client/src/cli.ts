@@ -2,6 +2,7 @@ import { readHelpCapabilities, formatCapabilityHelp } from './capabilityHelp.js'
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Command, CommanderError } from 'commander';
+import { declaresProviderTaskSessions } from '@mearl/browser-core';
 import { listInstalledProviders } from '@mearl/provider/host';
 import { resolveActionTimeoutSec } from './actionTimeouts.js';
 import { runUnifiedCheck, parseCheckTimeout, type UnifiedCheckOptions } from './check.js';
@@ -310,20 +311,33 @@ function printProviderHelp(
   extensionHelp?: string,
 ): void {
   const browserType = provider.browserType;
+  const taskSessions = declaresProviderTaskSessions(browserType.inputSchema);
   const lines = [
     `${provider.providerId} — ${provider.name} v${provider.version}`,
     '',
     ...(browserType.help ?? []).map(line => String(line)),
   ];
   if (browserType.help?.length) lines.push('');
-  lines.push(
-    '创建：',
-    `  ${commandName} browser_manage --payload '{"operation":"${browserType.openOperation ?? 'launch'}","provider":"${provider.providerId}","providerOptions":{}}'`,
-    '',
-    '启动参数（providerOptions）：',
-  );
+  if (taskSessions) {
+    lines.push(
+      '创建任务会话：',
+      `  从 ${commandName} browser_list 选择此 Provider 的完整 browserId。`,
+      `  ${commandName} session_manage --browser '<browserId>' --payload '{"operation":"new"}'`,
+      '  有必填任务参数时，在 payload 的 providerOptions 对象中填写。',
+      `  ${commandName} tab_list --session '<返回的 session.sessionId>'`,
+    );
+  } else {
+    lines.push(
+      '创建：',
+      `  ${commandName} browser_manage --payload '{"operation":"${browserType.openOperation ?? 'launch'}","provider":"${provider.providerId}","providerOptions":{}}'`,
+    );
+  }
+  lines.push('', taskSessions ? '任务参数（providerOptions）：' : '启动参数（providerOptions）：');
   const required = new Set(browserType.inputSchema.required ?? []);
-  const properties = Object.entries(browserType.inputSchema.properties);
+  const isUserParameter = (name: string) => !taskSessions || name !== 'taskSession';
+  const properties = Object.entries(browserType.inputSchema.properties).filter(([name]) =>
+    isUserParameter(name),
+  );
   if (properties.length === 0) lines.push('  （无）');
   else {
     for (const [name, schema] of properties) {
@@ -334,7 +348,7 @@ function printProviderHelp(
     lines.push('', '可选模式：');
     browserType.inputSchema.oneOf.forEach((schema, index) => {
       const mode = schema.title || `模式 ${index + 1}`;
-      const requiredFields = schema.required?.length ? schema.required.join(', ') : '无必填字段';
+      const requiredFields = schema.required?.filter(isUserParameter).join(', ') || '无必填字段';
       lines.push(`  ${mode}（必填：${requiredFields}）`);
     });
   }

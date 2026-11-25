@@ -106,7 +106,7 @@ describe('external browser providers', () => {
     const session = { sessionId: 's_fixture0' };
     mocks.request.mockResolvedValueOnce({ session } as any);
     await expect(
-      openProviderTaskFromExtension('fixture', { name: 'Session' }),
+      openProviderTaskFromExtension('launch', 'fixture', { name: 'Session' }),
     ).resolves.toMatchObject({
       browserId: browser.browserId,
       session,
@@ -121,7 +121,34 @@ describe('external browser providers', () => {
       undefined,
       { providerTarget: browser.browserId },
     );
-    await expect(openProviderTaskFromExtension('unknown', {})).resolves.toBeUndefined();
+    await expect(openProviderTaskFromExtension('launch', 'unknown', {})).resolves.toBeUndefined();
+  });
+
+  it('keeps the extension on the task route when a declared Provider has no connected browser', async () => {
+    const provider = {
+      providerId: 'task-fixture',
+      browserType: {
+        inputSchema: {
+          type: 'object',
+          properties: { taskSession: { type: 'object', formHidden: true, properties: {} } },
+        },
+      },
+    };
+    mocks.installed.push(provider);
+    try {
+      await expect(openProviderTaskFromExtension('launch', ' task-fixture ', {})).rejects.toThrow(
+        'No connected browser for Provider task-fixture',
+      );
+      await expect(openProviderTaskFromExtension('attach', 'task-fixture', {})).rejects.toThrow(
+        'No connected browser for Provider task-fixture',
+      );
+      expect(mocks.ensureRunning).toHaveBeenCalledWith(['task-fixture']);
+      expect(mocks.request).not.toHaveBeenCalled();
+      await expect(openProviderTaskFromExtension('launch', 'fixture', {})).resolves.toBeUndefined();
+      await expect(openProviderTaskFromExtension('attach', 'fixture', {})).resolves.toBeUndefined();
+    } finally {
+      mocks.installed.pop();
+    }
   });
 
   it('rejects lifecycle mutations for external control on an older host', async () => {

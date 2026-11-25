@@ -1064,6 +1064,78 @@ describe('BrowserManager', () => {
     );
   });
 
+  it('validates the task creation form with a host-owned target and sends user options only', async () => {
+    const taskSession = {
+      type: 'object',
+      formHidden: true,
+      required: ['browserId'],
+      properties: { browserId: { type: 'string' } },
+    };
+    const name = { type: 'string', title: 'Task name', placeholder: 'task-name' };
+    const spaceId = { type: 'number', title: 'Existing task', placeholder: 'task-id' };
+    const taskVariant = (browserId: string) => ({
+      type: 'object',
+      required: ['taskSession'],
+      properties: {
+        taskSession: {
+          ...taskSession,
+          properties: { browserId: { type: 'string', enum: [browserId] } },
+        },
+      },
+    });
+    managerMocks.request.mockImplementation(async (operation: string) => {
+      if (operation === 'list') {
+        return { count: 0, connectedCount: 0, defaultBrowserId: null, browsers: [] };
+      }
+      if (operation === 'providers') {
+        return {
+          providers: [
+            {
+              provider: { id: 'task-provider', name: 'Task Provider', builtin: false },
+              browserType: {
+                name: 'Task Browser',
+                inputSchema: {
+                  type: 'object',
+                  required: ['taskSession'],
+                  properties: { taskSession, name, spaceId },
+                  additionalProperties: false,
+                  not: taskVariant('blocked'),
+                  oneOf: [
+                    { type: 'object', required: ['name'], properties: { taskSession, name } },
+                    { type: 'object', required: ['spaceId'], properties: { taskSession, spaceId } },
+                    taskVariant('first'),
+                    taskVariant('second'),
+                  ],
+                },
+              },
+            },
+          ],
+        };
+      }
+      return {};
+    });
+
+    render(<BrowserManager />);
+    await screen.findByText('browserManagerEmpty');
+    fireEvent.click(screen.getByRole('button', { name: 'browserManagerNew' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Task Browser' }));
+    const submit = screen.getByRole('button', { name: 'browserManagerAdd' });
+    expect(submit).toBeEnabled();
+    fireEvent.change(screen.getByPlaceholderText('task-name'), { target: { value: 'My task' } });
+    fireEvent.change(screen.getByPlaceholderText('task-id'), { target: { value: '123' } });
+    expect(submit).toBeDisabled();
+    fireEvent.change(screen.getByPlaceholderText('task-id'), { target: { value: '' } });
+    fireEvent.click(submit);
+
+    await waitFor(() =>
+      expect(managerMocks.request).toHaveBeenCalledWith('launch', {
+        operation: 'launch',
+        provider: 'task-provider',
+        providerOptions: { name: 'My task' },
+      }),
+    );
+  });
+
   it('preserves structured Provider option types', async () => {
     managerMocks.request.mockImplementation(async (operation: string) => {
       if (operation === 'list') {

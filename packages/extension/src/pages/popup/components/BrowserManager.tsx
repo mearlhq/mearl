@@ -29,6 +29,7 @@ import type {
   BrowserProviderLaunchForm,
   BrowserProviderLocales,
 } from '@mearl/browser-core';
+import { declaresProviderTaskSessions } from '@mearl/browser-core';
 import { clsx } from 'clsx';
 import { requestBrowserManager, type BrowserProviderSummary } from '../../../shared/browserManager';
 import { readStoredBrowserId } from '../../../shared/browserIdentity';
@@ -691,7 +692,16 @@ function parseProviderQueryOptions(
 function providerValueMatchesSchema(
   schema: BrowserProviderInputSchema,
   value: BrowserJsonValue,
+  hostSuppliesTaskSession = false,
 ): boolean {
+  return matchProviderValue(schema, value, hostSuppliesTaskSession) !== false;
+}
+
+function matchProviderValue(
+  schema: BrowserProviderInputSchema,
+  value: BrowserJsonValue,
+  hostSuppliesTaskSession: boolean,
+): boolean | undefined {
   if (schema.type === 'string') {
     if (typeof value !== 'string') return false;
     if (schema.enum && !schema.enum.includes(value)) return false;
@@ -731,11 +741,19 @@ function providerValueMatchesSchema(
   }
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const objectValue = value as Record<string, BrowserJsonValue>;
-  if ((schema.required ?? []).some(key => objectValue[key] === undefined)) return false;
+  const keys = Object.keys(objectValue);
+  if (hostSuppliesTaskSession) keys.push('taskSession');
   if (
-    schema.additionalProperties === false &&
-    Object.keys(objectValue).some(key => schema.properties[key] === undefined)
+    (schema.required ?? []).some(
+      key => objectValue[key] === undefined && !(hostSuppliesTaskSession && key === 'taskSession'),
+    )
   ) {
+    return false;
+  }
+  const strict = hostSuppliesTaskSession
+    ? schema.additionalProperties !== true
+    : schema.additionalProperties === false;
+  if (strict && keys.some(key => schema.properties[key] === undefined)) {
     return false;
   }
   if (
@@ -746,23 +764,36 @@ function providerValueMatchesSchema(
   ) {
     return false;
   }
-  if (schema.not && providerValueMatchesSchema(schema.not, objectValue)) return false;
+  // A match that depends on the injected task target is resolved by the host.
+  const excluded = schema.not
+    ? matchProviderValue(schema.not, objectValue, hostSuppliesTaskSession)
+    : false;
+  if (excluded === true) return false;
+  let deferred =
+    excluded === undefined ||
+    (hostSuppliesTaskSession && schema.properties.taskSession !== undefined);
   if (schema.oneOf) {
-    return (
-      schema.oneOf.filter(option => providerValueMatchesSchema(option, objectValue)).length === 1
+    const branches = schema.oneOf.map(option =>
+      matchProviderValue(option, objectValue, hostSuppliesTaskSession),
     );
+    const matched = branches.filter(result => result === true).length;
+    const canDefer = branches.includes(undefined);
+    if (matched > 1 || (matched === 0 && !canDefer)) return false;
+    deferred ||= canDefer;
   }
-  return true;
+  return deferred ? undefined : true;
 }
 
 function providerOptionsAreValid(
   inputSchema: BrowserProviderObjectSchema | undefined,
   fields: Array<[string, BrowserProviderInputSchema]>,
   values: Record<string, string | undefined>,
+  hostSuppliesTaskSession = false,
 ): boolean {
   if (!inputSchema) return false;
   if (
     (inputSchema.required ?? []).some(key => {
+      if (hostSuppliesTaskSession && key === 'taskSession') return false;
       const value = values[key];
       return value === undefined || !value.trim();
     })
@@ -772,7 +803,7 @@ function providerOptionsAreValid(
   try {
     const options = parseProviderOptions(fields, values);
     return (
-      providerValueMatchesSchema(inputSchema, options) &&
+      providerValueMatchesSchema(inputSchema, options, hostSuppliesTaskSession) &&
       fields.every(([key, schema]) => {
         if (schema.component !== 'cookie-sync' || values[key] === undefined) return true;
         const selection = cookieSyncSelectionFromValue(values[key]);
@@ -1151,6 +1182,8 @@ function LaunchForm({
       ? dynamicForm
       : initialProviderLaunchForm(externalProvider);
   const externalSchema = launchForm?.inputSchema ?? externalProvider?.browserType.inputSchema;
+  const taskSessions =
+    externalProvider && declaresProviderTaskSessions(externalProvider.browserType.inputSchema);
   const externalFields = visibleProviderFields(
     Object.entries(externalSchema?.properties ?? {}) as Array<[string, BrowserProviderInputSchema]>,
     providerOptions,
@@ -1362,7 +1395,12 @@ function LaunchForm({
   };
 
   const launchValid = externalProvider
-    ? providerOptionsAreValid(externalSchema, externalFields, providerOptions) &&
+    ? providerOptionsAreValid(
+        externalSchema,
+        externalFields,
+        providerOptions,
+        taskSessions && externalSchema?.properties.taskSession !== undefined,
+      ) &&
       (!externalProvider.browserType.dynamicLaunchForm ||
         Boolean(
           launchForm &&
@@ -1370,10 +1408,11 @@ function LaunchForm({
           !formLoading &&
           !formError &&
           !launchForm.blocked &&
-          providerValueMatchesSchema(externalProvider.browserType.inputSchema, {
-            ...parseProviderOptions(externalFields, providerOptions),
-            ...launchForm.values,
-          }),
+          providerValueMatchesSchema(
+            externalProvider.browserType.inputSchema,
+            { ...parseProviderOptions(externalFields, providerOptions), ...launchForm.values },
+            taskSessions,
+          ),
         ))
     : selectedCookieSyncSelections(localComponentFields, providerOptions) !== null;
   const configurationValid =

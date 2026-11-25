@@ -290,6 +290,41 @@ describe('runMearlCli', () => {
     expect(help).toContain('mearl browser_manage');
   });
 
+  it('shows the session commands for a Provider that declares task sessions', async () => {
+    registeredProviders.push({
+      providerId: 'example-task',
+      name: 'Example Task Browser',
+      version: '1.0.0',
+      packageName: '@example/task-browser',
+      browserType: {
+        name: 'Task Browser',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            taskSession: { type: 'object', formHidden: true, properties: {} },
+            name: { type: 'string', title: '任务名称' },
+          },
+          oneOf: [{ type: 'object', required: ['taskSession'], properties: {} }],
+        },
+      },
+    });
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const invoke = vi.spyOn(UnifiedClient.prototype, 'invoke');
+
+    await expect(runMearlCli(['example-task', '--help'])).resolves.toBe(0);
+
+    const help = String(error.mock.calls[0]?.[0]);
+    expect(help).toContain('mearl browser_list');
+    expect(help).toContain(
+      `mearl session_manage --browser '<browserId>' --payload '{"operation":"new"}'`,
+    );
+    expect(help).toContain(`mearl tab_list --session '<返回的 session.sessionId>'`);
+    expect(help).toContain('任务名称');
+    expect(help).not.toContain('browser_manage');
+    expect(help).not.toContain('taskSession');
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
   it('appends commands from a registered same-name plugin to Provider help', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'mearl-provider-plugin-help-'));
     temporaryDirectories.push(directory);

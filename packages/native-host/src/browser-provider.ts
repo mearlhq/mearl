@@ -1,3 +1,4 @@
+import { declaresProviderTaskSessions } from '@mearl/browser-core';
 import {
   assertProviderProtocolVersion,
   validateProviderBrowser,
@@ -192,7 +193,16 @@ function requestControlledProvider(
 }
 
 /** The extension's existing Provider form can open a task on a discovered instance. */
-export async function openProviderTaskFromExtension(providerId: string, options: JsonObject) {
+export async function openProviderTaskFromExtension(
+  operation: 'launch' | 'attach',
+  selector: string,
+  options: JsonObject,
+) {
+  const providerId = selector.trim();
+  const provider = listInstalledProviders().find(item => item.providerId === providerId);
+  const taskSessions = provider && declaresProviderTaskSessions(provider.browserType.inputSchema);
+  if (operation === 'attach' && !taskSessions) return undefined;
+  if (taskSessions) await requireLiveProvider(providerId);
   const matches = listRegisteredBrowsers().filter(
     browser =>
       browser.provider?.id === providerId &&
@@ -202,7 +212,13 @@ export async function openProviderTaskFromExtension(providerId: string, options:
   if (matches.length > 1)
     throw new Error('Choose a browser instance before opening a Provider task');
   const browser = matches[0];
-  if (!browser) return undefined;
+  if (!browser) {
+    if (taskSessions)
+      throw new Error(
+        `No connected browser for Provider ${providerId}. Start or connect its browser and try again.`,
+      );
+    return undefined;
+  }
   const { session } = await requestControlledProvider(browser, 'session_manage', {
     operation: 'new',
     providerOptions: options,

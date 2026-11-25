@@ -14,6 +14,8 @@ action 清单直接复用 `@mearl/browser-core/browserActionProtocol` 的能力�
 
 Provider 管理任务页面范围和原生生命周期。就绪的 `getEnhancementTarget` 返回同一物理页面的 DevTools target ID 时，Mearl 可选择匹配的扩展，其他情况使用 Provider 页面通道。原生控制权暂停时，Provider 可返回 `EXTERNAL_CONTROL_PAUSED`，宿主据此将会话标记为用户接管。支持此协议的宿主声明 `taskSessionProtocolVersion: 1`。
 
+以任务为主要入口的 Provider 在 `browserType.inputSchema.properties` 中将保留字段 `taskSession` 声明为带 `formHidden: true` 的对象。CLI 帮助随之展示创建任务会话的命令，扩展的创建表单需要一个已连接的任务会话目标。该字段由宿主注入。
+
 混合会话从确认物理页面相同起保留扩展标签页归属，直到任务结束。普通扩展入口可继续操作其他标签页。Provider 能识别的页面弹窗会显示在列表中，收尾时按已有页面处理。`handoff` 和 `resume` 应支持重复调用，便于 Mearl 在原生控制权改变后重试扩展清理。
 
 ## 核心模型

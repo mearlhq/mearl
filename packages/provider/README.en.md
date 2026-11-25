@@ -14,6 +14,8 @@ An external Provider can publish a connected browser with `details.taskSessionSc
 
 The Provider manages page membership and native lifecycle operations. A ready `getEnhancementTarget` response with the physical DevTools target ID lets Mearl select a matching extension. Otherwise the session uses the Provider for page actions. When the native owner pauses an action, Providers can return `EXTERNAL_CONTROL_PAUSED` so the host marks the session as handed off. Hosts advertise this contract with `taskSessionProtocolVersion: 1`.
 
+Providers whose primary entry point is a task declare the reserved `taskSession` property as an object with `formHidden: true` in `browserType.inputSchema.properties`. CLI help then displays task session commands, and the extension's creation form requires a connected task session target. The host injects this field.
+
 A hybrid session reserves each matched extension tab once its physical page has been verified. The reservation lasts until the task ends, and the ordinary extension route can still operate other tabs. Popups opened by a page are listed when the Provider recognizes them and are treated as existing pages during session cleanup. Make `handoff` and `resume` idempotent so Mearl can retry extension cleanup after native control has changed.
 
 ## Core model

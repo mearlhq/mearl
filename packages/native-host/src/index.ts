@@ -1046,10 +1046,13 @@ async function handleExtensionControlMessage(
     const command = parseBrowserManageParams(params);
     let result;
     if (command.operation === 'launch' || command.operation === 'attach') {
-      result =
-        command.operation === 'launch' && command.provider && command.providerOptions
-          ? await openProviderTaskFromExtension(command.provider, command.providerOptions)
-          : undefined;
+      result = command.provider
+        ? await openProviderTaskFromExtension(
+            command.operation,
+            command.provider,
+            command.providerOptions ?? {},
+          )
+        : undefined;
       result ??= await openBrowser(command);
     } else if (typeof browser !== 'string' || !browser.trim()) {
       throw new Error('browser is required');
